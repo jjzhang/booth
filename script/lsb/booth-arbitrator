@@ -1,0 +1,89 @@
+#!/bin/bash
+#
+# BOOTH daemon init script for LSB-compliant Linux distributions.
+#
+# booth-arbitrator	BOOTH arbitrator daemon
+#
+# chkconfig: - 20 20
+# processname:  booth
+# pidfile:      /var/run/booth.pid
+# description:  Cluster Ticket Registry
+### BEGIN INIT INFO
+# Provides: booth
+# Required-Start: $network $syslog
+# Required-Stop: $network $syslog
+# Should-Start:
+# Should-Stop:
+# Default-Start: 3 5
+# Default-Stop: 0 6
+# Short-Description: start and stop BOOTH arbitrator daemon
+### END INIT INFO
+
+prog="booth"
+exec="/usr/sbin/$prog"
+type="arbitrator"
+lockfile="/var/run/$prog.pid"
+
+[ -f /etc/sysconfig/$prog ] && . /etc/sysconfig/$prog
+
+. /etc/rc.status
+
+internal_status() {
+    checkproc $exec > /dev/null 2>&1
+    return $?
+}
+
+status() {
+	if internal_status; then
+		echo "Running"
+		return 0
+    else
+		echo "Stopped"
+		return 7
+	fi
+}
+
+start() {
+	[ -x $exec ] || exit 5
+	echo -n $"Starting BOOTH arbitrator daemon: "
+	if ! internal_status; then
+		startproc $exec $type
+	fi
+	rc_status -v
+}
+
+stop() {
+	echo -n $"Stopping BOOTH arbitrator daemon: "
+	killproc -p $lockfile $prog -TERM
+	rc_status -v
+}
+
+wait_for_stop() {
+	while [ -e $lockfile ]; do
+		sleep .5
+	done
+}
+
+restart() {
+	stop
+	wait_for_stop
+	start
+}
+
+case "$1" in
+    start|stop|restart)
+        $1
+        ;;
+    reload|force-reload)
+        restart
+        ;;
+    condrestart|try-restart)
+        [ ! -f "$lockfile" ] || restart
+        ;;
+    status)
+        status $prog
+        ;;
+    *)
+        echo $"Usage: $0 {start|stop|restart|try-restart|condrestart|reload|force-reload|status}"
+        exit 2
+esac
