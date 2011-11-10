@@ -671,7 +671,7 @@ int paxos_recvmsg(void *msg, int msglen)
 	struct paxos_space *ps;
 	struct paxos_instance *pi;
 	int found = 0;
-	int myid = ps->p_op->get_myid();
+	int myid;
 
 	list_for_each_entry(ps, &ps_head, list) {
 		if (!strcmp(ps->name, hdr->psname)) {
@@ -681,6 +681,7 @@ int paxos_recvmsg(void *msg, int msglen)
 	}
 	if (!found)
 		return -EINVAL;
+	myid = ps->p_op->get_myid();
 
 	found = 0;
 	list_for_each_entry(pi, &ps->pi_head, list) {
