@@ -304,7 +304,7 @@ static void acceptor_promise(struct paxos_space *ps,
 	hdr = msg;
 
 	if (ntohl(hdr->ballot_number) < pi->acceptor->highest_promised) {
-		to = hdr->from;
+		to = ntohl(hdr->from);
 		hdr->from = htonl(ps->p_op->get_myid());
 		hdr->state = htonl(PROMISING);
 		hdr->reject = htonl(1);
@@ -318,7 +318,7 @@ static void acceptor_promise(struct paxos_space *ps,
 		ps->p_op->promise(pih, extra);
 
 	pi->acceptor->state = PROMISING;
-	to = hdr->from;
+	to = ntohl(hdr->from);
 	hdr->from = htonl(ps->p_op->get_myid());
 	hdr->state = htonl(PROMISING);
 	ps->p_op->send(to, hdr, sizeof(struct paxos_msghdr));	
@@ -345,7 +345,7 @@ static void acceptor_accepted(struct paxos_space *ps,
 	ballot = ntohl(hdr->ballot_number);
 
 	if (ballot < pi->acceptor->highest_promised) {
-		to = hdr->from;
+		to = ntohl(hdr->from);
 		hdr->from = htonl(myid);
 		hdr->state = htonl(ACCEPTING);
 		hdr->reject = htonl(1);
@@ -361,7 +361,7 @@ static void acceptor_accepted(struct paxos_space *ps,
 		ps->p_op->accepted(pih, extra, ballot, value);
 
 	pi->acceptor->state = ACCEPTING;
-	to = hdr->from;
+	to = ntohl(hdr->from);
 	hdr->from = htonl(myid);
 	hdr->state = htonl(ACCEPTING);
 
