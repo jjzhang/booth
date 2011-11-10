@@ -495,7 +495,7 @@ static int do_grant(void)
 	char *buf;
 	struct boothc_header *h, reply;
 	int buflen;
-	uint32_t force;
+	uint32_t force = 0;
 	int fd, rv;
 
 	buflen = sizeof(struct boothc_header) + 
