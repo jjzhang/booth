@@ -145,7 +145,7 @@ static int ticket_send(unsigned long id, void *value, int len)
 	memcpy((char *)buf + sizeof(struct booth_msghdr), value, len);
 
 	rv = booth_transport[booth_conf->proto].send(
-			(unsigned long)to, buf, hdr->len);
+		(unsigned long)to, buf, sizeof(struct booth_msghdr) + len);
 
 	free(buf);
 	return rv;
@@ -166,7 +166,8 @@ static int ticket_broadcast(void *value, int len)
 	hdr->len = htonl(sizeof(struct booth_msghdr) + len);
 	memcpy((char *)buf + sizeof(struct booth_msghdr), value, len);
 
-	rv = booth_transport[booth_conf->proto].broadcast(buf, hdr->len);
+	rv = booth_transport[booth_conf->proto].broadcast(
+			buf, sizeof(struct booth_msghdr) + len);
 
 	free(buf);
 	return rv;	
