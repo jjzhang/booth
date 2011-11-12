@@ -310,7 +310,10 @@ int setup_ticket(void)
 		}
 		memset(tk, 0, sizeof(struct ticket));
 		strcpy(tk->id, booth_conf->ticket[i].name);
+		tk->owner = -1;
 		tk->expiry = booth_conf->ticket[i].expiry;
+		if (!tk->expiry)
+			tk->expiry = DEFAULT_TICKET_EXPIRY;
 		list_add_tail(&tk->list, &ticket_list); 
 
 		plh = paxos_lease_init(tk->id,
