@@ -58,7 +58,7 @@ struct proposer {
 	int state;
 	int open_number;
 	int accepted_number;
-	int count_me;
+	int proposed;
 	struct proposal *proposal;
 };
 
@@ -232,6 +232,10 @@ static void proposer_propose(struct paxos_space *ps,
 
 	if (!have_quorum(ps, pi->proposer->open_number))
 		return;
+
+	if (pi->proposer->proposed)
+		return;
+	pi->proposer->proposed = 1;
 
 	if (ps->p_op->propose)
 		ps->p_op->propose(pih, extra, ballot, value);
