@@ -285,7 +285,6 @@ static int lease_commit(pi_handle_t handle,
 			int round)
 {
 	struct paxos_lease *pl;
-	pl_handle_t plh = (pl_handle_t)pl;
 	struct paxos_lease_result plr;
 	int found = 0;
 
@@ -308,7 +307,7 @@ static int lease_commit(pi_handle_t handle,
 	plr.owner = pl->proposer.plv->owner;
 	plr.expires = current_time() + pl->proposer.plv->expiry;
 
-	p_l_op->notify(plh, &plr);
+	p_l_op->notify((pl_handle_t)pl, &plr);
 
 	return 0;	
 }
@@ -318,7 +317,6 @@ static int lease_learned(pi_handle_t handle,
 			 int round)
 {
 	struct paxos_lease *pl;
-	pl_handle_t plh = (pl_handle_t)pl;
 	struct paxos_lease_result plr;
 	int found = 0;
 
@@ -341,7 +339,7 @@ static int lease_learned(pi_handle_t handle,
 	plr.owner = pl->acceptor.plv->owner;
 	plr.expires = current_time() + pl->acceptor.plv->expiry;
 
-	p_l_op->notify(plh, &plr);
+	p_l_op->notify((pl_handle_t)pl, &plr);
 
 	return 0;
 }
