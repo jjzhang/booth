@@ -249,7 +249,7 @@ static int lease_propose(pi_handle_t handle,
 	return 0;
 }
 
-static int lease_accpeted(pi_handle_t handle,
+static int lease_accepted(pi_handle_t handle,
 			  void *extra __attribute__((unused)),
 			  int round, void *value)
 {
@@ -377,7 +377,7 @@ pl_handle_t paxos_lease_init(const void *name,
 		px_op->prepare = lease_prepared;
 		px_op->promise = handle_lease_request;
 		px_op->propose = lease_propose;
-		px_op->accepted = lease_accpeted;
+		px_op->accepted = lease_accepted;
 		px_op->commit = lease_commit;
 		px_op->learned = lease_learned;
 		p_l_op = pl_op;
