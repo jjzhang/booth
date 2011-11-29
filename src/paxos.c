@@ -237,12 +237,11 @@ static void proposer_propose(struct paxos_space *ps,
 		return;
 	pi->proposer->proposed = 1;
 
+	value = pi->proposer->proposal->value;
 	if (ps->p_op->propose)
 		ps->p_op->propose(pih, extra, ballot, value);
 
-	value = pi->proposer->proposal->value;
 	hdr->valuelen = htonl(ps->valuelen); 
-
 	message = malloc(msglen + ps->valuelen);
 	if (!message)
 		return;
