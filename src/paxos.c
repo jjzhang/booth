@@ -248,7 +248,7 @@ static void proposer_propose(struct paxos_space *ps,
 	memset(message, 0, msglen + ps->valuelen);
 	memcpy(message, msg, msglen);
 	memcpy((char *)message + msglen, value, ps->valuelen);
-	pi->acceptor->state = PROPOSING;
+	pi->proposer->state = PROPOSING;
 	hdr = message;
 	hdr->from = htonl(ps->p_op->get_myid());
 	hdr->state = htonl(PROPOSING);
@@ -660,11 +660,42 @@ int paxos_recovery_status_set(pi_handle_t handle, int recovery)
 int paxos_propose(pi_handle_t handle, void *value, int round)
 {
 	struct paxos_instance *pi = (struct paxos_instance *)handle;
+	struct paxos_msghdr *hdr;
+	void *extra, *msg;
+	int len = sizeof(struct paxos_msghdr)
+			 + pi->ps->extralen + pi->ps->valuelen;
 
 	strcpy(pi->proposer->proposal->value, value);
 	pi->round = round;
 
-	pi->ps->r_op->propose(pi->ps, pi, NULL, 0);
+	msg = malloc(len);
+	if (!msg)
+		return -ENOMEM;
+	memset(msg, 0, len);
+	hdr = msg;
+	hdr->state = htonl(PROPOSING);
+	hdr->from = htonl(pi->ps->p_op->get_myid());
+	hdr->proposer_id = hdr->from;
+	strcpy(hdr->psname, pi->ps->name);
+	strcpy(hdr->piname, pi->name);
+	hdr->ballot_number = htonl(pi->round);
+	hdr->extralen = htonl(pi->ps->extralen);
+	extra = (char *)msg + sizeof(struct paxos_msghdr);
+	memcpy((char *)msg + sizeof(struct paxos_msghdr) + pi->ps->extralen,
+		value, pi->ps->valuelen);
+
+	if (pi->ps->p_op->propose)
+		pi->ps->p_op->propose(handle, extra, round, value);
+
+	if (pi->ps->p_op->broadcast)
+		pi->ps->p_op->broadcast(msg, len);
+	else {
+		int i;
+		for (i = 0; i < pi->ps->number; i++) {
+			if (pi->ps->role[i] & ACCEPTOR)
+				pi->ps->p_op->send(i, msg, len);
+		}
+	}
 
 	return 0;
 }
