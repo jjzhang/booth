@@ -104,7 +104,7 @@ booth_start() {
     ${OCF_RESKEY_daemon} $OCF_RESKEY_type $OCF_RESKEY_args
 
     sleep 1
-    controld_monitor
+    booth_monitor
 }
 
 booth_stop() {
