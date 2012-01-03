@@ -5,7 +5,7 @@
 # booth-arbitrator	BOOTH arbitrator daemon
 #
 # chkconfig: - 20 20
-# processname:  booth
+# processname:  boothd
 # pidfile:      /var/run/booth.pid
 # description:  Cluster Ticket Registry
 ### BEGIN INIT INFO
@@ -19,7 +19,7 @@
 # Short-Description: start and stop BOOTH arbitrator daemon
 ### END INIT INFO
 
-prog="booth"
+prog="boothd"
 exec="/usr/sbin/$prog"
 type="arbitrator"
 lockfile="/var/run/$prog.pid"
