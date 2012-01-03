@@ -38,7 +38,7 @@ meta_data() {
 
 <longdesc lang="en">
 This Resource Agent can control the BOOTH site daemon.
-It assumes that the binary booth is in your default PATH.
+It assumes that the binary boothd is in your default PATH.
 In most cases, it should be run as a primitive resource.
 </longdesc>
 <shortdesc lang="en">BOOTH site daemon</shortdesc>
@@ -66,7 +66,7 @@ The type of BOOTH daemon which should be started
 The daemon to start
 </longdesc>
 <shortdesc lang="en">The daemon to start</shortdesc>
-<content type="string" default="booth" />
+<content type="string" default="boothd" />
 </parameter>
 
 </parameters>
@@ -104,7 +104,7 @@ booth_start() {
     ${OCF_RESKEY_daemon} $OCF_RESKEY_type $OCF_RESKEY_args
 
     sleep 1
-    controld_monitor
+    booth_monitor
 }
 
 booth_stop() {
@@ -156,8 +156,14 @@ booth_validate() {
     return $OCF_SUCCESS
 }
 
-: ${OCF_RESKEY_type=site}
-: ${OCF_RESKEY_CRM_meta_gloablly_unique:="false"}
+# Set OCF_RESKEY_daemon to boothd as default if not set
+if [ ! ${OCF_RESKEY_daemon} ]; then
+    OCF_RESKEY_daemon=boothd
+fi
+# Set OCF_RESKEY_type to site as default if not set
+if [ ! ${OCF_RESKEY_type} ]; then
+    OCF_RESKEY_type=site
+fi
 
 case $__OCF_ACTION in
 meta-data)	meta_data
