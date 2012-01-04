@@ -273,8 +273,11 @@ static int lease_accepted(pi_handle_t handle,
 	}
 	memcpy(pl->acceptor.plv, value, sizeof(struct paxos_lease_value));
 
-	pl->acceptor.timer = add_timer(pl->expiry, (unsigned long)pl,
-				       lease_expires);
+	if (pl->acceptor.timer)
+		mod_timer(pl->acceptor.timer, pl->expiry);
+	else
+		pl->acceptor.timer = add_timer(pl->expiry, (unsigned long)pl,
+					       lease_expires);
 	pl->acceptor.expires = current_time() + pl->expiry;
 
 	return 0;	
