@@ -30,6 +30,7 @@ typedef enum {
 	PROPOSING,
 	ACCEPTING,
 	RECOVERY,
+	COMMITTED,
 } paxos_state_t;
 
 struct proposal {
@@ -173,7 +174,7 @@ static void proposer_prepare(struct paxos_instance *pi, int *round)
 
 	msg = malloc(msglen);
 	if (!msg) {
-		*round = 0;
+		*round = -ENOMEM;
 		return;
 	}
 	memset(msg, 0, msglen);
@@ -287,6 +288,8 @@ static void proposer_commit(struct paxos_space *ps,
 	pi->round = ntohl(hdr->ballot_number);
 	if (ps->p_op->commit)
 		ps->p_op->commit(pih, extra, pi->round);
+	pi->proposer->state = COMMITTED;
+
 	pi->end(pih, pi->round, 0);	
 }
 
@@ -618,7 +621,12 @@ int paxos_round_request(pi_handle_t handle,
 	if (!(pi->ps->role[myid] & PROPOSER))
 		return -EOPNOTSUPP;
 
-	pi->proposer->state = PREPARING; 
+	pi->proposer->state = PREPARING;
+	if (pi->proposer->state != INIT && pi->proposer->state != COMMITTED)
+		return -EAGAIN;
+	pi->proposer->open_number = 0;
+	pi->proposer->accepted_number = 0;
+	pi->proposer->proposed = 0; 
 	memcpy(pi->proposer->proposal->value, value, pi->ps->valuelen);
 
 	pi->end = end_request;
