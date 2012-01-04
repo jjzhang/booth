@@ -23,7 +23,6 @@
 #include "log.h"
 #include "timer.h"
 
-#define USEC_IN_SEC	1000000
 #define MSEC_IN_SEC	1000
 
 extern int poll_timeout;
@@ -35,7 +34,7 @@ unsigned long long current_time(void)
 
 	gettimeofday(&tv, NULL);
 
-	return (tv.tv_sec * USEC_IN_SEC + tv.tv_usec);
+	return tv.tv_sec;
 }
 
 struct timerlist * add_timer(unsigned long expires,
@@ -51,7 +50,7 @@ struct timerlist * add_timer(unsigned long expires,
 	}
 	memset(timer, 0, sizeof(struct timerlist));
 
-	timer->expires = current_time() + expires * USEC_IN_SEC;
+	timer->expires = current_time() + expires;
 	timer->data = data;
 	timer->function = function;
 	list_add_tail(&timer->entry, &timer_head);
@@ -61,30 +60,32 @@ struct timerlist * add_timer(unsigned long expires,
 
 int mod_timer(struct timerlist *timer, unsigned long expires)
 {
-	timer->expires = current_time() + expires * USEC_IN_SEC;
+	timer->expires = current_time() + expires;
 
 	return 0;
 }
 
 int del_timer(struct timerlist *timer)
 {
-	list_del(&timer->entry);
-	free(timer);
+	timer->expires = -2;
 	
 	return 0;
 }
 
 void process_timerlist(void)
 {
-	struct timerlist *timer;
+	struct timerlist *timer, *safe;
 
 	if (list_empty(&timer_head))
 		return;
 
-	list_for_each_entry(timer, &timer_head, entry) {
-		if (current_time() >= timer->expires) {
-			timer->function(timer->data);
+	list_for_each_entry_safe(timer, safe, &timer_head, entry) {
+		if (timer->expires == -2) {
+			list_del(&timer->entry);
+			free(timer);
+		} else if (current_time() >= timer->expires) {
 			timer->expires = -1;
+			timer->function(timer->data);
 		}
 	}
 }
