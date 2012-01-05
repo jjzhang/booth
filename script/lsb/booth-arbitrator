@@ -22,7 +22,7 @@
 prog="boothd"
 exec="/usr/sbin/$prog"
 type="arbitrator"
-lockfile="/var/run/$prog.pid"
+lockfile="/var/run/booth.pid"
 
 [ -f /etc/sysconfig/$prog ] && . /etc/sysconfig/$prog
 
