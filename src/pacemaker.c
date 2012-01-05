@@ -27,7 +27,7 @@ static void pcmk_grant_ticket(const void *ticket)
 	FILE *p;
 	char cmd[COMMAND_MAX];
 
-	snprintf(cmd, COMMAND_MAX, "crm_ticket -t %s -n true", (char *)ticket);
+	snprintf(cmd, COMMAND_MAX, "crm_ticket -t %s -v true", (char *)ticket);
 	log_info("command: '%s' was executed", cmd);
 	p = popen(cmd, "r");
 	if (p == NULL) {
@@ -44,7 +44,7 @@ static void pcmk_revoke_ticket(const void *ticket)
 	FILE *p;
 	char cmd[COMMAND_MAX];
 
-	snprintf(cmd, COMMAND_MAX, "crm_ticket -t %s -n false", (char *)ticket);
+	snprintf(cmd, COMMAND_MAX, "crm_ticket -t %s -v false", (char *)ticket);
 	log_info("command: '%s' was executed", cmd);
 	p = popen(cmd, "r");
 	if (p == NULL) {
