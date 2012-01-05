@@ -378,7 +378,7 @@ static int setup_timer(void)
 	return timerlist_init();
 }
 
-static void loop(int type)
+static int loop(int type)
 {
 	void (*workfn) (int ci);
 	void (*deadfn) (int ci);
@@ -386,23 +386,23 @@ static void loop(int type)
 
 	rv = setup_config(type);
 	if (rv < 0)
-		goto out;
+		goto fail;
 
 	rv = setup_timer();
 	if (rv < 0)
-		goto out;
+		goto fail;
 
 	rv = setup_transport();
 	if (rv < 0)
-		goto out;
+		goto fail;
 
 	rv = setup_ticket();
 	if (rv < 0)
-		goto out;
+		goto fail;
 
 	rv = setup_listener(BOOTHC_SOCK_PATH);
 	if (rv < 0)
-		goto out;
+		goto fail;
 	client_add(rv, process_listener, NULL);
 
         while (1) {
@@ -411,7 +411,7 @@ static void loop(int type)
                         continue;
                 if (rv < 0) {
                         log_error("poll errno %d", errno);
-			goto out;
+			goto fail;
                 }
 
                 for (i = 0; i <= client_maxi; i++) {
@@ -433,8 +433,10 @@ static void loop(int type)
 		process_timerlist();
 	}
 
-out:
-	return;
+	return 0;
+
+fail:
+	return -1;
 }
 
 static int do_list(void)
@@ -893,6 +895,7 @@ static void set_oom_adj(int val)
 static int do_arbitrator(void)
 {
 	int fd;
+	int rv = -1;
 
 	if (!cl.debug) {
 		if (daemon(0, 0) < 0) {
@@ -910,17 +913,22 @@ static int do_arbitrator(void)
 	set_scheduler();
 	set_oom_adj(-16);
 
-	loop(ARBITRATOR);
+	rv = loop(ARBITRATOR);
+	if (rv < 0)
+		goto fail;
 
 	unlink_lockfile(fd);
 	close_logging();
 
 	return 0;
+fail:
+	return -1;
 }
 
 static int do_site(void)
 {
 	int fd;
+	int rv = -1;
 
 	if (!cl.debug) {
 		if (daemon(0, 0) < 0) {
@@ -938,12 +946,17 @@ static int do_site(void)
 	set_scheduler();
 	set_oom_adj(-16);
 
-	loop(SITE);
+	rv = loop(SITE);
+	if (rv < 0)
+		goto fail;
 
 	unlink_lockfile(fd);
 	close_logging();
 
 	return 0;
+
+fail:
+	return -1;
 }
 
 static int do_client(void)
@@ -996,5 +1009,5 @@ int main(int argc, char *argv[])
 	}
 
 out:
-	return rv;	
+	return rv ? EXIT_FAILURE : EXIT_SUCCESS;
 }
