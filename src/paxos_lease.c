@@ -85,7 +85,8 @@ static void end_paxos_request(pi_handle_t handle, int round, int result)
 	if (round != pl->proposer.round)
 		return;
 
-	pl->end_lease((pl_handle_t)pl, result);
+	if (pl->end_lease)
+		pl->end_lease((pl_handle_t)pl, result);
 		
 	return;	
 }
