@@ -621,9 +621,10 @@ int paxos_round_request(pi_handle_t handle,
 	if (!(pi->ps->role[myid] & PROPOSER))
 		return -EOPNOTSUPP;
 
-	pi->proposer->state = PREPARING;
 	if (pi->proposer->state != INIT && pi->proposer->state != COMMITTED)
 		return -EAGAIN;
+
+	pi->proposer->state = PREPARING;
 	pi->proposer->open_number = 0;
 	pi->proposer->accepted_number = 0;
 	pi->proposer->proposed = 0; 
