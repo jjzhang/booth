@@ -43,9 +43,17 @@ MAINTAINERCLEANFILES	= Makefile.in aclocal.m4 configure depcomp \
 
 dist_doc_DATA		= README COPYING
 
-boothconfdir		= ${BOOTHCONFDIR}
+boothconfdir		= ${BOOTHSYSCONFDIR}
 
-boothconf_DATA	= conf/booth.conf.example
+boothconf_DATA		= conf/booth.conf.example
+
+boothsitedir		= /usr/lib/ocf/resource.d/pacemaker
+
+boothsite_SCRIPTS	= script/ocf/booth-site
+
+bootharbitratordir	= ${INITDDIR}
+
+bootharbitrator_SCRIPTS	= script/lsb/booth-arbitrator 
 
 SUBDIRS			= src
 
@@ -55,17 +63,18 @@ coverity:
 	cov-format-errors --dir cov
 
 install-exec-local:
-	$(INSTALL) -d $(DESTDIR)/${BOOTHCONFDIR}/service.d
-	$(INSTALL) -d $(DESTDIR)/${BOOTHCONFDIR}/uidgid.d
-	$(INSTALL) -d $(DESTDIR)/${localstatedir}/lib/corosync
-	$(INSTALL) -d $(DESTDIR)/${localstatedir}/log/cluster
+	$(INSTALL) -d $(DESTDIR)/${boothconfdir}
+	$(INSTALL) -d $(DESTDIR)/${bootharbitratordir}
+	$(INSTALL) -d $(DESTDIR)/${boothsitedir}
 	$(INSTALL) -d $(DESTDIR)/${SOCKETDIR}
 
+install-exec-hook:
+	ln -sf ${sbindir}/boothd $(DESTDIR)/${sbindir}/booth
+
 uninstall-local:
-	rmdir $(DESTDIR)/${BOOTHCONFDIR}/service.d || :;
-	rmdir $(DESTDIR)/${BOOTHCONFDIR}/uidgid.d || :;
-	rmdir $(DESTDIR)/${localstatedir}/lib/corosync || :;
-	rmdir $(DESTDIR)/${localstatedir}/log/cluster || :;
+	rmdir $(DESTDIR)/${boothconfdir} || :;
+	rmdir $(DESTDIR)/${bootharbitratordir} || :;
+	rmdir $(DESTDIR)/${boothsitedir} || :;
 	rmdir $(DESTDIR)/${SOCKETDIR} || :;
 
 lint:
