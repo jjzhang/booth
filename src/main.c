@@ -311,6 +311,20 @@ void process_connection(int ci)
 		break;
 
 	case BOOTHC_CMD_REVOKE:
+		site = data;
+		ticket = data + BOOTH_NAME_LEN;
+		if (!check_ticket(ticket)) {
+			h.result = BOOTHC_RLT_INVALID_ARG;
+			goto reply;
+		}
+		if (!check_site(site, &local)) {
+			h.result = BOOTHC_RLT_INVALID_ARG;
+			goto reply;
+		}
+		if (local)
+			h.result = revoke_ticket(ticket, h.option);
+		else
+			h.result = BOOTHC_RLT_REMOTE_OP;
 		break;
 
 	default:
@@ -553,7 +567,7 @@ static int do_grant(void)
 			goto out_close;
 		}
 		rv = booth_transport[TCP].recv(s, &reply,
-					     sizeof(struct boothc_header));
+					       sizeof(struct boothc_header));
 		if (rv < 0) {	
 			booth_transport[TCP].close(s);
 			goto out_close;
@@ -588,17 +602,24 @@ static int do_revoke(void)
 	char *buf;
 	struct boothc_header *h, reply;
 	int buflen;
+	uint32_t force = 0;
 	int fd, rv;
 
-	buflen = sizeof(struct boothc_header) + sizeof(cl.ticket);
+	buflen = sizeof(struct boothc_header) +
+		 sizeof(cl.site) + sizeof(cl.ticket);
 	buf = malloc(buflen);
 	if (!buf) {
 		rv = -ENOMEM;
 		goto out;
 	}
 	h = (struct boothc_header *)buf;
-	init_header(h, BOOTHC_CMD_REVOKE, 0, 0, 0, sizeof(cl.ticket));
-	strcpy(buf + sizeof(struct boothc_header), cl.ticket);
+	if (cl.force)
+		force = BOOTHC_OPT_FORCE;
+	init_header(h, BOOTHC_CMD_REVOKE, force, 0, 0,
+		    sizeof(cl.site) + sizeof(cl.ticket));
+	strcpy(buf + sizeof(struct boothc_header), cl.site);
+	strcpy(buf + sizeof(struct boothc_header) + sizeof(cl.site), cl.ticket);
+
 
 	fd = do_connect(BOOTHC_SOCK_PATH);
 	if (fd < 0) {
@@ -613,6 +634,39 @@ static int do_revoke(void)
 	rv = do_read(fd, &reply, sizeof(struct boothc_header));
 	if (rv < 0)
 		goto out_close;
+
+	if (reply.result == BOOTHC_RLT_INVALID_ARG) {
+		log_info("invalid argument!");
+		rv = -1;
+		goto out_close;
+	}
+
+	if (reply.result == BOOTHC_RLT_REMOTE_OP) {
+		struct booth_node to;
+		int s;
+
+		memset(&to, 0, sizeof(struct booth_node));
+		to.family = BOOTH_PROTO_FAMILY;
+		strcpy(to.addr, cl.site);
+
+		s = booth_transport[TCP].open(&to);
+		if (s < 0)
+			goto out_close;
+
+		rv = booth_transport[TCP].send(s, buf, buflen);
+		if (rv < 0) {
+			booth_transport[TCP].close(s);
+			goto out_close;
+		}
+		rv = booth_transport[TCP].recv(s, &reply,
+					       sizeof(struct boothc_header));
+		if (rv < 0) {
+			booth_transport[TCP].close(s);
+			goto out_close;
+		}
+		booth_transport[TCP].close(s);
+	}
+
 	if (reply.result == BOOTHC_RLT_ASYNC) {
 		log_info("revoke command sent, but result is async.");
 		rv = 0;
@@ -709,7 +763,7 @@ static void print_usage(void)
 	printf("Please note that operations are valid iff type is client!\n");
 	printf("list:		List all the tickets\n");
 	printf("grant:		Grant ticket T(-t T) to site S(-s S)\n");
-	printf("revoke:		Revoke ticket T(-t T) from local site\n");
+	printf("revoke:		Revoke ticket T(-t T) from site S(-s S)\n");
 	printf("\n");
 	printf("Options:\n");
 	printf(" -D		Enable debugging to stderr and don't fork\n");

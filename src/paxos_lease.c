@@ -55,6 +55,7 @@ struct paxos_lease {
 	int expiry;
 	int relet;
 	int failover;
+	int release;
 	unsigned long long expires;
 	void (*end_lease) (pi_handle_t, int);
 	struct timerlist *timer;
@@ -112,7 +113,7 @@ static void lease_expires(unsigned long data)
 
 		if (pl->failover)
 			paxos_lease_acquire(plh, 1, NULL);
-	} else if (pl->owner == myid && pl->relet) {
+	} else if (pl->owner == myid && pl->relet && !pl->release) {
 		struct paxos_lease_value value;
 		strncpy(value.name, pl->name, PAXOS_NAME_LEN + 1);
 		value.owner = myid;
@@ -146,12 +147,22 @@ int paxos_lease_acquire(pl_handle_t handle,
 	value.expiry = pl->expiry;
 	pl->relet = relet;
 	pl->end_lease = end_acquire;
+	pl->release = 0;
 
 	round = paxos_round_request(pl->pih, &value, end_paxos_request);
 	if (round <= 0)
 		return -1;
 
 	pl->proposer.round = round;	
+	return 0;
+}
+
+int paxos_lease_release(pl_handle_t handle)
+{
+	struct paxos_lease *pl = (struct paxos_lease *)handle;
+
+	pl->release = 1;
+
 	return 0;
 }
 

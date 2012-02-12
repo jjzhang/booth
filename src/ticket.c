@@ -279,6 +279,35 @@ int grant_ticket(char *ticket, int force, int expiry)
 	}
 }
 
+int revoke_ticket(char *ticket, int force)
+{
+	struct ticket *tk;
+	int found = 0;
+
+	list_for_each_entry(tk, &ticket_list, list) {
+		if (!strcmp(tk->id, ticket)) {
+			found = 1;
+			break;
+		}
+	}
+	if (!found) {
+		log_error("ticket %s does not exist", ticket);
+		return BOOTHC_RLT_SYNC_FAIL;
+	}
+
+	if (force) {
+		pcmk_handler.store_ticket(tk->id, -1, 0);
+		pcmk_handler.revoke_ticket(tk->id);
+	}
+
+	if (tk->owner == -1)
+		return BOOTHC_RLT_SYNC_SUCC;
+	else {
+		paxos_lease_release(tk->handle);
+		return BOOTHC_RLT_ASYNC;
+	}	
+}
+
 const struct paxos_lease_operations ticket_operations = {
 	.get_myid	= ticket_get_myid,
 	.send		= ticket_send,
