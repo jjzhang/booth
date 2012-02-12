@@ -33,6 +33,7 @@
 #include <sys/poll.h>
 #include <fcntl.h>
 #include <string.h>
+#include <assert.h>
 #include "log.h"
 #include "booth.h"
 #include "config.h"
@@ -287,10 +288,13 @@ void process_connection(int ci)
 			log_error("connection %d read data error %d", ci, rv);
 			goto out;
 		}
+		h.len = 0;
 	}
 
 	switch (h.cmd) {
 	case BOOTHC_CMD_LIST:
+		assert(!data);
+		h.result = list_ticket(&data, &h.len);
 		break;
 
 	case BOOTHC_CMD_GRANT:
@@ -336,6 +340,11 @@ reply:
 	rv = do_write(client[ci].fd, &h, sizeof(h));
 	if (rv < 0)
 		log_error("connection %d write error %d", ci, rv);
+	if (h.len) {
+		rv = do_write(client[ci].fd, data, h.len);
+		if (rv < 0)
+			log_error("connection %d write error %d", ci, rv);
+	}
 out:
 	free(data);	
 }

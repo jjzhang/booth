@@ -20,6 +20,7 @@
 #include <string.h>
 #include <errno.h>
 #include <arpa/inet.h>
+#include <stdio.h>
 #include "ticket.h"
 #include "config.h"
 #include "pacemaker.h"
@@ -29,6 +30,7 @@
 #include "paxos.h"
 
 #define PAXOS_MAGIC     0xDB12
+#define TK_LINE		256
 
 struct booth_msghdr {
         uint16_t magic;
@@ -306,6 +308,28 @@ int revoke_ticket(char *ticket, int force)
 		paxos_lease_release(tk->handle);
 		return BOOTHC_RLT_ASYNC;
 	}	
+}
+
+int list_ticket(char **pdata, int *len)
+{
+	struct ticket *tk;
+	char tmp[TK_LINE];
+
+	*pdata = NULL;
+	*len = 0;
+	list_for_each_entry(tk, &ticket_list, list) {
+		memset(tmp, 0, TK_LINE);
+		snprintf(tmp, TK_LINE, "ticket: %s, owner: %d, expires: %llu\n",
+			 tk->id, tk->owner, tk->expires);
+		*pdata = realloc(*pdata, *len + TK_LINE);
+		if (*pdata == NULL)
+			return -ENOMEM;
+		memset(*pdata + *len, 0, TK_LINE);
+		memcpy(*pdata + *len, tmp, TK_LINE);
+		*len += TK_LINE;
+	}
+
+	return 0;
 }
 
 const struct paxos_lease_operations ticket_operations = {
