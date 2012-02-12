@@ -218,13 +218,15 @@ static int ticket_write(pl_handle_t handle, struct paxos_lease_result *result)
 	tk->owner = result->owner;
 	tk->expires = result->expires;
 
-	if (tk->owner != ticket_get_myid())
-		pcmk_handler.store_ticket(tk->id, tk->owner, tk->expires);
-	else {
+	if (tk->owner == ticket_get_myid()) {
 		pcmk_handler.store_ticket(tk->id, tk->owner, tk->expires);
 		pcmk_handler.grant_ticket(tk->id);
-	}
- 
+	} else if (tk->owner == -1) {
+		pcmk_handler.store_ticket(tk->id, tk->owner, tk->expires);
+		pcmk_handler.revoke_ticket(tk->id);
+	} else
+		pcmk_handler.store_ticket(tk->id, tk->owner, tk->expires);
+
 	return 0; 
 }
 
