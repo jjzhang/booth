@@ -249,7 +249,7 @@ int ticket_recv(void *msg, int msglen)
 				      msglen - sizeof(struct booth_msghdr));
 }
 
-int grant_ticket(char *ticket, int force, int expiry)
+int grant_ticket(char *ticket, int force)
 {
 	struct ticket *tk;
 	int found = 0;
@@ -259,8 +259,6 @@ int grant_ticket(char *ticket, int force, int expiry)
 		pcmk_handler.grant_ticket(ticket);
 		return BOOTHC_RLT_SYNC_SUCC;
 	}
-	if (!expiry)
-		expiry = DEFAULT_TICKET_EXPIRY;
 
 	list_for_each_entry(tk, &ticket_list, list) {
 		if (!strcmp(tk->id, ticket)) {

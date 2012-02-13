@@ -23,7 +23,7 @@
 
 int check_ticket(char *ticket);
 int check_site(char *site, int *local);
-int grant_ticket(char *ticket, int force, int expiry);
+int grant_ticket(char *ticket, int force);
 int revoke_ticket(char *ticket, int force);
 int list_ticket(char **pdata, int *len);
 int ticket_recv(void *msg, int msglen);

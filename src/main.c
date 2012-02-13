@@ -74,7 +74,6 @@ struct command_line {
 	int op;			/* OP_ */
 	int debug;
 	int force;
-	int expiry;
 	char site[BOOTH_NAME_LEN];
 	char ticket[BOOTH_NAME_LEN]; 
 };
@@ -144,7 +143,7 @@ out:
 }
 
 static void init_header(struct boothc_header *h, int cmd, int option,
-			int expiry, int result, int data_len)
+			int result, int data_len)
 {
 	memset(h, 0, sizeof(struct boothc_header));
 
@@ -153,7 +152,6 @@ static void init_header(struct boothc_header *h, int cmd, int option,
 	h->len = data_len;
 	h->cmd = cmd;
 	h->option = option;
-	h->expiry = expiry;
 	h->result = result;
 }
 
@@ -309,7 +307,7 @@ void process_connection(int ci)
 			goto reply;
 		}
 		if (local)
-			h.result = grant_ticket(ticket, h.option, h.expiry);
+			h.result = grant_ticket(ticket, h.option);
 		else
 			h.result = BOOTHC_RLT_REMOTE_OP;
 		break;
@@ -469,7 +467,7 @@ static int do_list(void)
 	int data_len;
 	int fd, rv;
 
-	init_header(&h, BOOTHC_CMD_LIST, 0, 0, 0, 0);
+	init_header(&h, BOOTHC_CMD_LIST, 0, 0, 0);
 
 	fd = do_connect(BOOTHC_SOCK_PATH);
 	if (fd < 0) {
@@ -533,7 +531,7 @@ static int do_grant(void)
 	h = (struct boothc_header *)buf;
 	if (cl.force)
 		force = BOOTHC_OPT_FORCE;
-	init_header(h, BOOTHC_CMD_GRANT, force, cl.expiry, 0,
+	init_header(h, BOOTHC_CMD_GRANT, force, 0,
 		    sizeof(cl.site) + sizeof(cl.ticket));
 	strcpy(buf + sizeof(struct boothc_header), cl.site);
 	strcpy(buf + sizeof(struct boothc_header) + sizeof(cl.site), cl.ticket);
@@ -624,7 +622,7 @@ static int do_revoke(void)
 	h = (struct boothc_header *)buf;
 	if (cl.force)
 		force = BOOTHC_OPT_FORCE;
-	init_header(h, BOOTHC_CMD_REVOKE, force, 0, 0,
+	init_header(h, BOOTHC_CMD_REVOKE, force, 0,
 		    sizeof(cl.site) + sizeof(cl.ticket));
 	strcpy(buf + sizeof(struct boothc_header), cl.site);
 	strcpy(buf + sizeof(struct boothc_header) + sizeof(cl.site), cl.ticket);
@@ -780,13 +778,10 @@ static void print_usage(void)
 	printf(" -s		site name\n");
 	printf(" -f		ticket attribute: force, only valid when "
 				"granting\n");
-	printf(" -e		ticket will failover after the expiry time if "
-				"not being renewed,\n\t\tset it while "
-				"granting. default: 600sec\n");
 	printf(" -h		Print this help, then exit\n");
 }
 
-#define OPTION_STRING		"Dt:s:fe:h"
+#define OPTION_STRING		"Dt:s:fh"
 
 static int read_arguments(int argc, char **argv)
 {
@@ -880,15 +875,6 @@ static int read_arguments(int argc, char **argv)
 		case 'f':
 			if (cl.op == OP_GRANT)
 				cl.force = 1;
-			else {
-				print_usage();
-				exit(EXIT_FAILURE);
-			}
-			break;
-
-		case 'e':
-			if (cl.op == OP_GRANT)
-				cl.expiry = atoi(optarg);
 			else {
 				print_usage();
 				exit(EXIT_FAILURE);
