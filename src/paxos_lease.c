@@ -169,6 +169,7 @@ int paxos_lease_release(pl_handle_t handle)
 static int lease_catchup(const void *name)
 {
 	struct paxos_lease *pl;
+	struct paxos_lease_result plr;
 	int found = 0;
 
 	list_for_each_entry(pl, &lease_head, list) {
@@ -181,6 +182,37 @@ static int lease_catchup(const void *name)
 		return -1;
 
 	p_l_op->catchup(name, &pl->owner, &pl->expires);
+
+	if (pl->owner == -1)
+		return 0;
+
+	if (current_time() > pl->expires) {
+		plr.owner = pl->owner = -1;
+		plr.expires = pl->expires = 0;
+		strcpy(plr.name, pl->name);
+		p_l_op->notify((pl_handle_t)pl, &plr);
+		return 0;
+	}
+
+	if (pl->owner == myid) {
+		pl->acceptor.timer = add_timer(pl->expires - current_time(),
+						(unsigned long)pl,
+						lease_expires);
+		if (current_time() < pl->expires - 1 * pl->expiry / 5)
+			pl->proposer.timer = add_timer(pl->expires
+							- 1 * pl->expiry / 5
+							- current_time(),
+							(unsigned long)pl,
+							lease_expires);
+	} else
+		pl->acceptor.timer = add_timer(pl->expires - current_time(),
+						(unsigned long)pl,
+						lease_expires);
+
+	plr.owner = pl->owner;
+	plr.expires = pl->expires;
+	strcpy(plr.name, pl->name);
+	p_l_op->notify((pl_handle_t)pl, &plr);
 
 	return 0;	
 }
