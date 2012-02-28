@@ -220,6 +220,7 @@ static void proposer_propose(struct paxos_space *ps,
 
 	if (ntohl(hdr->reject)) {
 		pi->round = ballot;
+		pi->proposer->state = INIT;
 		pi->end(pih, pi->round, -EAGAIN);
 		return;
 	}
