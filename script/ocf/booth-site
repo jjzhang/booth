@@ -146,9 +146,9 @@ booth_monitor() {
 booth_validate() {
     check_binary ${OCF_RESKEY_daemon}
 
-    case ${OCF_RESKEY_CRM_meta_gloablly_unique} in
+    case ${OCF_RESKEY_CRM_meta_globally_unique} in
 	yes|Yes|true|True|1) 
-	    ocf_log err "$OCF_RESOURCE_INSTANCE must be configured with the gloablly_unique=false meta attribute"
+	    ocf_log err "$OCF_RESOURCE_INSTANCE must be configured with the globally_unique=false meta attribute"
 	    exit $OCF_ERR_CONFIGURED
 	    ;;
     esac
