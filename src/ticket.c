@@ -352,7 +352,7 @@ int setup_ticket(void)
 		if (booth_conf->node[i].type == SITE)
 			role[i] = PROPOSER | ACCEPTOR | LEARNER;
 		else if (booth_conf->node[i].type == ARBITRATOR)
-			role[i] = ACCEPTOR;
+			role[i] = ACCEPTOR | LEARNER;
 	}
 
 	for (i = 0; i < booth_conf->ticket_count; i++) {
