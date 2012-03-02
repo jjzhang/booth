@@ -944,7 +944,7 @@ static void set_oom_adj(int val)
         fclose(fp);
 }
 
-static int do_arbitrator(void)
+static int do_server(int type)
 {
 	int fd;
 	int rv = -1;
@@ -960,34 +960,11 @@ static int do_arbitrator(void)
 	if (fd < 0)
 		return fd;
 
-	log_info("BOOTH arbitrator daemon started");
-	set_scheduler();
-	set_oom_adj(-16);
+	if (type == ARBITRATOR)
+		log_info("BOOTH arbitrator daemon started");
+	else if (type == SITE)
+		log_info("BOOTH cluster site daemon started");
 
-	rv = loop(ARBITRATOR);
-
-	unlink_lockfile(fd);
-
-	return rv;
-}
-
-static int do_site(void)
-{
-	int fd;
-	int rv = -1;
-
-	if (!debug_level) {
-		if (daemon(0, 0) < 0) {
-			perror("daemon error");
-			exit(EXIT_FAILURE);
-		}
-	}
-
-	fd = lockfile();
-	if (fd < 0)
-		return fd;
-
-	log_info("BOOTH cluster site daemon started");
 	set_scheduler();
 	set_oom_adj(-16);
 
@@ -1041,11 +1018,11 @@ int main(int argc, char *argv[])
 
 	switch (cl.type) {
 	case ACT_ARBITRATOR:
-		rv = do_arbitrator();
+		rv = do_server(ARBITRATOR);
 		break;
 
 	case ACT_SITE:
-		rv = do_site();
+		rv = do_server(SITE);
 		break;
 
 	case ACT_CLIENT:
