@@ -149,7 +149,8 @@ int paxos_lease_acquire(pl_handle_t handle,
 	pl->end_lease = end_acquire;
 	pl->release = 0;
 
-	round = paxos_round_request(pl->pih, &value, end_paxos_request);
+	round = paxos_round_request(pl->pih, &value, pl->acceptor.round,
+				    end_paxos_request);
 	if (round <= 0)
 		return -1;
 

@@ -180,6 +180,8 @@ static void proposer_prepare(struct paxos_instance *pi, int *round)
 	memset(msg, 0, msglen);
 	hdr = msg;
 
+	if (*round > pi->round)
+		pi->round = *round;
 	ballot = next_ballot_number(pi);
 
 	hdr->state = htonl(PREPARING);
@@ -611,13 +613,14 @@ out:
 
 int paxos_round_request(pi_handle_t handle,
 			void *value,
+			int round,
 			void (*end_request) (pi_handle_t handle,
 					     int round,
 					     int result))
 {
 	struct paxos_instance *pi = (struct paxos_instance *)handle;
 	int myid = pi->ps->p_op->get_myid();
-	int round;
+	int rv = round;
 
 	if (!(pi->ps->role[myid] & PROPOSER))
 		return -EOPNOTSUPP;
@@ -632,9 +635,9 @@ int paxos_round_request(pi_handle_t handle,
 	memcpy(pi->proposer->proposal->value, value, pi->ps->valuelen);
 
 	pi->end = end_request;
-	pi->ps->r_op->prepare(pi, &round);
+	pi->ps->r_op->prepare(pi, &rv);
 
-	return round;
+	return rv;
 }
 
 int paxos_recovery_status_get(pi_handle_t handle)
