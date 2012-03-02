@@ -308,7 +308,7 @@ int revoke_ticket(char *ticket, int force)
 	}	
 }
 
-int list_ticket(char **pdata, int *len)
+int list_ticket(char **pdata, unsigned int *len)
 {
 	struct ticket *tk;
 	char tmp[TK_LINE];
