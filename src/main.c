@@ -761,23 +761,23 @@ static void print_usage(void)
 	printf("booth <type> <operation> [options]\n");
 	printf("\n");
 	printf("Types:\n");
-	printf(" arbitrator:	daemon running on arbitrator\n");
-	printf(" site:		daemon running on cluster site\n");
-	printf(" client:	command running from client\n");
+	printf("  arbitrator:   daemon running on arbitrator\n");
+	printf("  site:	        daemon running on cluster site\n");
+	printf("  client:       command running from client\n");
 	printf("\n");
 	printf("Operations:\n");
 	printf("Please note that operations are valid iff type is client!\n");
-	printf("list:		List all the tickets\n");
-	printf("grant:		Grant ticket T(-t T) to site S(-s S)\n");
-	printf("revoke:		Revoke ticket T(-t T) from site S(-s S)\n");
+	printf("  list:	        List all the tickets\n");
+	printf("  grant:        Grant ticket T(-t T) to site S(-s S)\n");
+	printf("  revoke:       Revoke ticket T(-t T) from site S(-s S)\n");
 	printf("\n");
 	printf("Options:\n");
-	printf(" -D		Enable debugging to stderr and don't fork\n");
-	printf(" -t		ticket name\n");
-	printf(" -s		site name\n");
-	printf(" -f		ticket attribute: force, only valid when "
+	printf("  -D            Enable debugging to stderr and don't fork\n");
+	printf("  -t            ticket name\n");
+	printf("  -s            site name\n");
+	printf("  -f            ticket attribute: force, only valid when "
 				"granting\n");
-	printf(" -h		Print this help, then exit\n");
+	printf("  -h            Print this help, then exit\n");
 }
 
 #define OPTION_STRING		"Dt:s:fh"
