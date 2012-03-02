@@ -788,7 +788,7 @@ static int read_arguments(int argc, char **argv)
 {
 	int optchar;
 	char *arg1 = argv[1];
-	char *op;
+	char *op = NULL;
 
 	if (argc < 2 || !strcmp(arg1, "help") || !strcmp(arg1, "--help") ||
 		!strcmp(arg1, "-h")) {
@@ -896,7 +896,7 @@ static int read_arguments(int argc, char **argv)
 			break;
 		
 		default:
-			fprintf(stderr, "unknown option: %c\n", optchar);
+			fprintf(stderr, "unknown option: %s\n", argv[optind]);
 			exit(EXIT_FAILURE);
 			break;
 		};
