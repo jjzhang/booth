@@ -57,6 +57,7 @@ struct paxos_msghdr {
 
 struct proposer {
 	int state;
+	int ballot;
 	int open_number;
 	int accepted_number;
 	int proposed;
@@ -183,6 +184,7 @@ static void proposer_prepare(struct paxos_instance *pi, int *round)
 	if (*round > pi->round)
 		pi->round = *round;
 	ballot = next_ballot_number(pi);
+	pi->proposer->ballot = ballot;
 
 	hdr->state = htonl(PREPARING);
 	hdr->from = htonl(pi->ps->p_op->get_myid());
@@ -218,7 +220,10 @@ static void proposer_propose(struct paxos_space *ps,
 	if (msglen != sizeof(struct paxos_msghdr) + ps->extralen)
 		return;
 	hdr = msg;
+
 	ballot = ntohl(hdr->ballot_number);
+	if (pi->proposer->ballot != ballot)
+		return;
 
 	if (ntohl(hdr->reject)) {
 		pi->round = ballot;
@@ -276,6 +281,7 @@ static void proposer_commit(struct paxos_space *ps,
 	struct paxos_msghdr *hdr;
 	pi_handle_t pih = (pi_handle_t)pi;
 	void *extra;
+	int ballot;
 
 	if (msglen != sizeof(struct paxos_msghdr) + ps->extralen)
 		return;
@@ -283,12 +289,16 @@ static void proposer_commit(struct paxos_space *ps,
 	extra = (char *)msg + sizeof(struct paxos_msghdr);
 	hdr = msg;
 
+        ballot = ntohl(hdr->ballot_number);
+        if (pi->proposer->ballot != ballot)
+                return;
+
 	pi->proposer->accepted_number++;
 
 	if (!have_quorum(ps, pi->proposer->accepted_number))
 		return;
 
-	pi->round = ntohl(hdr->ballot_number);
+	pi->round = ballot;
 	if (ps->p_op->commit)
 		ps->p_op->commit(pih, extra, pi->round);
 	pi->proposer->state = COMMITTED;
@@ -613,20 +623,17 @@ out:
 
 int paxos_round_request(pi_handle_t handle,
 			void *value,
-			int round,
+			int *round,
 			void (*end_request) (pi_handle_t handle,
 					     int round,
 					     int result))
 {
 	struct paxos_instance *pi = (struct paxos_instance *)handle;
 	int myid = pi->ps->p_op->get_myid();
-	int rv = round;
+	int rv = *round;
 
 	if (!(pi->ps->role[myid] & PROPOSER))
 		return -EOPNOTSUPP;
-
-	if (pi->proposer->state != INIT && pi->proposer->state != COMMITTED)
-		return -EAGAIN;
 
 	pi->proposer->state = PREPARING;
 	pi->proposer->open_number = 0;
@@ -677,6 +684,9 @@ int paxos_propose(pi_handle_t handle, void *value, int round)
 	void *extra, *msg;
 	int len = sizeof(struct paxos_msghdr)
 			 + pi->ps->extralen + pi->ps->valuelen;
+
+	if (round != pi->proposer->ballot)
+		return -EINVAL;
 
 	strcpy(pi->proposer->proposal->value, value);
 	pi->round = round;

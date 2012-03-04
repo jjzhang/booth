@@ -134,6 +134,28 @@ static void lease_expires(unsigned long data)
 	}
 }
 
+static void lease_retry(unsigned long data)
+{
+	struct paxos_lease *pl = (struct paxos_lease *)data;
+	struct paxos_lease_value value;
+	int round;
+
+	if (pl->timer)
+		del_timer(pl->timer);
+	if (pl->owner == myid)
+		return;
+
+	strncpy(value.name, pl->name, PAXOS_NAME_LEN + 1);
+	value.owner = myid;
+	value.expiry = pl->expiry;
+
+	round = paxos_round_request(pl->pih, &value, &pl->acceptor.round,
+				     end_paxos_request);
+
+	if (round > 0)
+		pl->proposer.round = round;
+}
+
 int paxos_lease_acquire(pl_handle_t handle,
 			int relet,
 			void (*end_acquire) (pl_handle_t handle, int result))
@@ -149,13 +171,16 @@ int paxos_lease_acquire(pl_handle_t handle,
 	pl->end_lease = end_acquire;
 	pl->release = 0;
 
-	round = paxos_round_request(pl->pih, &value, pl->acceptor.round,
-				    end_paxos_request);
+	round = paxos_round_request(pl->pih, &value, &pl->acceptor.round,
+				     end_paxos_request);
+	pl->timer = add_timer(1 * pl->expiry / 10, (unsigned long)pl,
+			      lease_retry);
 	if (round <= 0)
 		return -1;
-
-	pl->proposer.round = round;	
-	return 0;
+	else {
+		pl->proposer.round = round;	
+		return 0;
+	}
 }
 
 int paxos_lease_release(pl_handle_t handle)
@@ -280,6 +305,9 @@ static int lease_propose(pi_handle_t handle,
 	}
 	memcpy(pl->proposer.plv, value, sizeof(struct paxos_lease_value));
 
+	if (pl->proposer.timer)
+		del_timer(pl->proposer.timer);
+
 	if (pl->relet) {
 		pl->proposer.timer = add_timer(4 * pl->expiry / 5,
 					       (unsigned long)pl,
@@ -319,10 +347,9 @@ static int lease_accepted(pi_handle_t handle,
 	memcpy(pl->acceptor.plv, value, sizeof(struct paxos_lease_value));
 
 	if (pl->acceptor.timer)
-		mod_timer(pl->acceptor.timer, pl->expiry);
-	else
-		pl->acceptor.timer = add_timer(pl->expiry, (unsigned long)pl,
-					       lease_expires);
+		del_timer(pl->acceptor.timer);
+	pl->acceptor.timer = add_timer(pl->expiry, (unsigned long)pl,
+				       lease_expires);
 	pl->acceptor.expires = current_time() + pl->expiry;
 
 	return 0;	

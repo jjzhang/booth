@@ -58,7 +58,7 @@ pi_handle_t paxos_instance_init(ps_handle_t handle,
 
 int paxos_round_request(pi_handle_t handle,
 			void *value,
-			int round,
+			int *round,
 			void (*end_request) (pi_handle_t handle,
 					     int round,
 					     int result));
