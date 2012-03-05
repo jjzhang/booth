@@ -963,15 +963,11 @@ static int do_arbitrator(void)
 	set_oom_adj(-16);
 
 	rv = loop(ARBITRATOR);
-	if (rv < 0)
-		goto fail;
 
 	unlink_lockfile(fd);
 	close_logging();
 
-	return 0;
-fail:
-	return -1;
+	return rv;
 }
 
 static int do_site(void)
@@ -996,16 +992,11 @@ static int do_site(void)
 	set_oom_adj(-16);
 
 	rv = loop(SITE);
-	if (rv < 0)
-		goto fail;
 
 	unlink_lockfile(fd);
 	close_logging();
 
-	return 0;
-
-fail:
-	return -1;
+	return rv;
 }
 
 static int do_client(void)
