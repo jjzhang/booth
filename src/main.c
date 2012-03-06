@@ -977,6 +977,10 @@ static int do_server(int type)
 	int fd;
 	int rv = -1;
 
+	rv = setup(SITE);
+	if (rv < 0)
+		goto out;
+
 	if (!debug_level) {
 		if (daemon(0, 0) < 0) {
 			perror("daemon error");
@@ -984,6 +988,10 @@ static int do_server(int type)
 		}
 	}
 
+	/*
+	  The lock cannot be obtained before the call to daemon(), otherwise
+	  the lockfile would contain the pid of the parent, not the daemon.
+	*/
 	fd = lockfile();
 	if (fd < 0)
 		return fd;
@@ -996,10 +1004,9 @@ static int do_server(int type)
 	set_scheduler();
 	set_oom_adj(-16);
 
-	rv = setup(SITE);
-	if (rv == 0)
-		rv = loop();
+	rv = loop();
 
+out:
 	unlink_lockfile(fd);
 
 	return rv;
