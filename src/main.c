@@ -382,14 +382,19 @@ out:
 static int setup_transport(void)
 {
 	int rv;
+	transport_layer_t proto = booth_conf->proto;
 
-	rv = booth_transport[booth_conf->proto].init(ticket_recv);
-	if (rv < 0)
+	rv = booth_transport[proto].init(ticket_recv);
+	if (rv < 0) {
+		log_error("failed to init booth_transport[%d]", proto);
 		goto out;
+	}
 
 	rv = booth_transport[TCP].init(NULL);
-	if (rv < 0)
+	if (rv < 0) {
+		log_error("failed to init booth_transport[TCP]");
 		goto out;
+	}
 
 out:
 	return rv;
