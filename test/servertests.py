@@ -79,3 +79,12 @@ class ServerTests(ServerTestEnvironment):
         (pid, ret, stdout, stderr, runner) = \
             self.run_booth(config_text=self.working_config, debug=True,
                            expected_exitcode=None)
+
+    def test_missing_transport(self):
+        config = re.sub('transport=.+\n', '', self.typical_config)
+        (pid, ret, stdout, stderr, runner) = \
+            self.run_booth(config_text=config, expected_exitcode=1)
+        self.assertRegexpMatches(
+            self.read_log(),
+            'config file was missing transport line'
+        )

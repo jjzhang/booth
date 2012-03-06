@@ -53,6 +53,7 @@ int read_config(const char *path)
 	char *s, *key, *val, *expiry, *weight, *c;
 	int in_quotes, got_equals, got_quotes, i;
 	int lineno = 0;
+	int got_transport = 0;
 
 	fp = fopen(path, "r");
 	if (!fp) {
@@ -170,7 +171,8 @@ int read_config(const char *path)
 			else {
 				log_error("invalid transport protocol");
 				goto out;
-			}	
+			}
+			got_transport = 1;
 		}
 
 		if (!strcmp(key, "port"))
@@ -247,6 +249,12 @@ int read_config(const char *path)
 			booth_conf->ticket_count++;
 		}
 	}
+
+	if (!got_transport) {
+		log_error("config file was missing transport line");
+		goto out;
+	}
+
 	return 0;
 
 out:
