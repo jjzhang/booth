@@ -58,14 +58,51 @@ AC_PROG_MAKE_SET
 AC_PROG_RANLIB
 
 AC_PATH_PROGS(HELP2MAN, help2man)
+AC_PATH_PROGS(PKGCONFIG, pkg-config)
 AM_CONDITIONAL(HAVE_HELP2MAN, test x"${HELP2MAN}" != x"")
 
 # Checks for libraries.
 AC_CHECK_LIB([dl], [dlopen])
-AC_CHECK_LIB([pthread], [pthread_create])
 AC_CHECK_LIB([socket], [socket])
 AC_CHECK_LIB([nsl], [t_open])
 AC_CHECK_LIB([rt], [sched_getscheduler])
+
+#
+# glib
+#
+if test x"${PKGCONFIG}" = x""; then
+	AC_MSG_ERROR(You need pkgconfig installed in order to build ${PACKAGE})
+fi
+GPKGNAME="glib-2.0"
+
+if 
+	$PKGCONFIG --exists $GPKGNAME
+then
+	GLIBCONFIG="$PKGCONFIG $GPKGNAME"
+else
+	set -x
+	echo PKG_CONFIG_PATH=$PKG_CONFIG_PATH
+	$PKGCONFIG --exists $GPKGNAME; echo $?
+	$PKGCONFIG --cflags $GPKGNAME; echo $?
+	$PKGCONFIG $GPKGNAME; echo $?
+	set +x
+        
+	AC_MSG_ERROR(You need glib2-devel installed in order to build ${PACKAGE})
+fi
+AC_MSG_RESULT(using $GLIBCONFIG)
+
+if test "X$GLIBCONFIG" != X; then
+	AC_MSG_CHECKING(for special glib includes: )
+	GLIBHEAD=`$GLIBCONFIG --cflags`
+	AC_MSG_RESULT($GLIBHEAD)
+	CPPFLAGS="$CPPFLAGS $GLIBHEAD"
+
+	AC_MSG_CHECKING(for glib library flags)
+	GLIBLIB=`$GLIBCONFIG --libs`
+	AC_MSG_RESULT($GLIBLIB)
+	LIBS="$LIBS $GLIBLIB"
+fi
+
 
 # Checks for header files.
 AC_FUNC_ALLOCA
@@ -76,6 +113,7 @@ AC_CHECK_HEADERS([arpa/inet.h fcntl.h limits.h netdb.h netinet/in.h stdint.h \
 		  stdlib.h string.h sys/ioctl.h sys/param.h sys/socket.h \
 		  sys/time.h syslog.h unistd.h sys/types.h getopt.h malloc.h \
 		  sys/sockio.h utmpx.h])
+AC_CHECK_HEADERS(heartbeat/glue_config.h)
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
@@ -109,7 +147,7 @@ AC_FUNC_VPRINTF
 AC_CHECK_FUNCS([alarm alphasort atexit bzero dup2 endgrent endpwent fcntl \
 		getcwd getpeerucred getpeereid gettimeofday inet_ntoa memmove \
 		memset mkdir scandir select socket strcasecmp strchr strdup \
-		strerror strrchr strspn strstr pthread_setschedparam \
+		strerror strrchr strspn strstr \
 		sched_get_priority_max sched_setscheduler])
 
 AC_CONFIG_FILES([Makefile

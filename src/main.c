@@ -72,7 +72,6 @@ typedef enum {
 struct command_line {
 	int type;		/* ACT_ */
 	int op;			/* OP_ */
-	int debug;
 	int force;
 	char site[BOOTH_NAME_LEN];
 	char ticket[BOOTH_NAME_LEN]; 
@@ -783,6 +782,8 @@ static void print_usage(void)
 
 #define OPTION_STRING		"Dt:s:fh"
 
+static char *logging_entity = NULL;
+
 static int read_arguments(int argc, char **argv)
 {
 	int optchar;
@@ -804,9 +805,11 @@ static int read_arguments(int argc, char **argv)
 
 	if (!strcmp(arg1, "arbitrator")) {
 		cl.type = ACT_ARBITRATOR;
+		logging_entity = DAEMON_NAME "-arbitrator";
 		optind = 2;
 	} else if (!strcmp(arg1, "site")) {
 		cl.type = ACT_SITE;
+		logging_entity = DAEMON_NAME "-site";
 		optind = 2;
 	} else if (!strcmp(arg1, "client")) {
 		cl.type = ACT_CLIENT;
@@ -849,7 +852,7 @@ static int read_arguments(int argc, char **argv)
 
 		switch (optchar) {
 		case 'D':
-			cl.debug = 1;
+			debug_level = 1;
 			log_logfile_priority = LOG_DEBUG;
 			log_syslog_priority = LOG_DEBUG;
 			break;
@@ -946,14 +949,13 @@ static int do_arbitrator(void)
 	int fd;
 	int rv = -1;
 
-	if (!cl.debug) {
+	if (!debug_level) {
 		if (daemon(0, 0) < 0) {
 			perror("daemon error");
 			exit(EXIT_FAILURE);
 		}
 	}
 
-	setup_logging();
 	fd = lockfile();
 	if (fd < 0)
 		return fd;
@@ -965,7 +967,6 @@ static int do_arbitrator(void)
 	rv = loop(ARBITRATOR);
 
 	unlink_lockfile(fd);
-	close_logging();
 
 	return rv;
 }
@@ -975,14 +976,13 @@ static int do_site(void)
 	int fd;
 	int rv = -1;
 
-	if (!cl.debug) {
+	if (!debug_level) {
 		if (daemon(0, 0) < 0) {
 			perror("daemon error");
 			exit(EXIT_FAILURE);
 		}
 	}
 
-	setup_logging();
 	fd = lockfile();
 	if (fd < 0)
 		return fd;
@@ -994,7 +994,6 @@ static int do_site(void)
 	rv = loop(SITE);
 
 	unlink_lockfile(fd);
-	close_logging();
 
 	return rv;
 }
@@ -1002,8 +1001,6 @@ static int do_site(void)
 static int do_client(void)
 {
 	int rv = -1;
-
-	setup_logging();
 
 	switch (cl.op) {
 	case OP_LIST:
@@ -1019,8 +1016,6 @@ static int do_client(void)
 		break;
 	}
 	
-	close_logging();
-
 	return rv;
 }
 
@@ -1033,6 +1028,16 @@ int main(int argc, char *argv[])
 	rv = read_arguments(argc, argv);
 	if (rv < 0)
 		goto out;
+
+	if (cl.type == ACT_CLIENT) {
+		cl_log_enable_stderr(TRUE);
+		cl_log_set_facility(0);
+	} else {
+		cl_log_set_entity(logging_entity);
+		cl_log_enable_stderr(debug_level ? TRUE : FALSE);
+		cl_log_set_facility(HA_LOG_FACILITY);
+	}
+	cl_inherit_logging_environment(0);
 
 	switch (cl.type) {
 	case ACT_ARBITRATOR:

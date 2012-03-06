@@ -15,8 +15,9 @@
 
 /**
  * Get offset of a member
+ * (renamed to avoid clash with offsetof elsewhere (glib)
  */
-#define offsetof(type, member) ((size_t) &((type *)0)->member)
+#define offset_of(type, member) ((size_t) &((type *)0)->member)
 
 /**
  * container_of - cast a member of a structure out to the containing structure
@@ -28,7 +29,7 @@
  */
 #define container_of(ptr, type, member) ({                      \
 	const typeof( ((type *)0)->member ) *__mptr = (ptr);    \
-	(type *)( (char *)__mptr - offsetof(type,member) );})
+	(type *)( (char *)__mptr - offset_of(type,member) );})
 
 #define LIST_POISON1  ((void *) 0x00100100)
 #define LIST_POISON2  ((void *) 0x00200200)

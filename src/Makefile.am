@@ -7,9 +7,9 @@ INCLUDES		= -I$(top_builddir)/include
 sbin_PROGRAMS		= boothd
 
 boothd_SOURCES	 	= config.c main.c paxos.c ticket.c  transport.c \
-			  log.c pacemaker.c paxos_lease.c timer.c
+			  pacemaker.c paxos_lease.c timer.c
 
-boothd_LDADD	  	= -lpthread
+boothd_LDADD	  	= -lplumb -lplumbgpl
 boothd_LDFLAGS		= $(OS_DYFLAGS) -L./
 
 noinst_HEADERS		= booth.h list.h pacemaker.h paxos_lease.h timer.h \

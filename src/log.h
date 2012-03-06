@@ -21,16 +21,11 @@
 #ifndef _LOG_H
 #define _LOG_H
 
-#include <syslog.h>
+#include <heartbeat/glue_config.h>
+#include <clplumbing/cl_log.h>
 
-void log_level(int level, const char *fmt, ...)
-	__attribute__((format(printf, 2, 3)));
-
-int setup_logging(void);
-void close_logging(void);
-
-#define log_debug(fmt, args...)		log_level(LOG_DEBUG, fmt, ##args)
-#define log_info(fmt, args...)		log_level(LOG_INFO, fmt, ##args)
-#define log_error(fmt, args...)		log_level(LOG_ERR, fmt, ##args)
+#define log_debug(fmt, args...)		cl_log(LOG_DEBUG, fmt, ##args)
+#define log_info(fmt, args...)		cl_log(LOG_INFO, fmt, ##args)
+#define log_error(fmt, args...)		cl_log(LOG_ERR, fmt, ##args)
 
 #endif /* _LOG_H */
