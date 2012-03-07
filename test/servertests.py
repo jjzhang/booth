@@ -49,3 +49,28 @@ class ServerTests(ServerTestEnvironment):
     def test_working_config(self):
         (pid, ret, stdout, stderr, runner) = \
             self.run_booth(config_text=self.working_config)
+
+    def test_missing_quotes(self):
+        orig_lines = self.working_config.split("\n")
+        for i in xrange(len(orig_lines)):
+            new_lines = copy.copy(orig_lines)
+            new_lines[i] = new_lines[i].replace('"', '')
+            new_config = "\n".join(new_lines)
+
+            line_contains_IP = re.search('=.+\.', orig_lines[i])
+            if line_contains_IP:
+                # IP addresses need to be surrounded by quotes
+                expected_exitcode = 1
+            else:
+                expected_exitcode = 0
+
+            (pid, ret, stdout, stderr, runner) = \
+                self.run_booth(config_text=new_config,
+                               expected_exitcode=expected_exitcode)
+
+            if line_contains_IP:
+                self.assertRegexpMatches(
+                    self.read_log(),
+                    "ERROR: invalid config file format: unquoted '.'",
+                    'IP addresses need to be quoted'
+                )
