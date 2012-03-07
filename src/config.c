@@ -91,7 +91,7 @@ int read_config(const char *path)
 		in_quotes = 0;  /* true iff we're inside a double-quoted string   */
 		got_equals = 0; /* true iff we're on the RHS of the = assignment  */
 		got_quotes = 0; /* true iff the RHS is quoted                     */
-		while (*s != '\n') {
+		while (*s != '\n' && *s != '\0') {
 			if (!(*s >='a' && *s <= 'z')
 			     && !(*s >= 'A' && *s <= 'Z')
 			     && !(*s >= '0' && *s <= '9')

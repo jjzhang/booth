@@ -97,3 +97,8 @@ class ServerTests(ServerTestEnvironment):
             self.read_log(),
             'invalid transport protocol'
         )
+
+    def test_missing_final_newline(self):
+        config = re.sub('\n$', '', self.working_config)
+        (pid, ret, stdout, stderr, runner) = \
+            self.run_booth(config_text=config)
