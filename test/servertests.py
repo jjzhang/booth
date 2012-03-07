@@ -88,3 +88,12 @@ class ServerTests(ServerTestEnvironment):
             self.read_log(),
             'config file was missing transport line'
         )
+
+    def test_invalid_transport_protocol(self):
+        config = re.sub('transport=.+', 'transport=SNEAKERNET', self.typical_config)
+        (pid, ret, stdout, stderr, runner) = \
+            self.run_booth(config_text=config, expected_exitcode=1)
+        self.assertRegexpMatches(
+            self.read_log(),
+            'invalid transport protocol'
+        )
