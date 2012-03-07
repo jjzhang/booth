@@ -73,6 +73,8 @@ struct command_line {
 	int type;		/* ACT_ */
 	int op;			/* OP_ */
 	int force;
+	char configfile[BOOTH_PATH_LEN];
+	char lockfile[BOOTH_PATH_LEN];
 	char site[BOOTH_NAME_LEN];
 	char ticket[BOOTH_NAME_LEN]; 
 };
@@ -365,7 +367,7 @@ static int setup_config(int type)
 {
 	int rv;
 
-	rv = read_config(BOOTH_DEFAULT_CONF);
+	rv = read_config(cl.configfile);
 	if (rv < 0)
 		goto out;
 
@@ -707,17 +709,14 @@ out:
 
 static int lockfile(void)
 {
-	char path[PATH_MAX];
 	char buf[16];
 	struct flock lock;
 	int fd, rv;
 
-	snprintf(path, PATH_MAX, "%s/%s", BOOTH_RUN_DIR, BOOTH_LOCKFILE_NAME);
-
-	fd = open(path, O_CREAT|O_WRONLY, 0666);
+	fd = open(cl.lockfile, O_CREAT|O_WRONLY, 0666);
 	if (fd < 0) {
                 log_error("lockfile open error %s: %s",
-                          path, strerror(errno));
+                          cl.lockfile, strerror(errno));
                 return -1;
         }       
 
@@ -729,14 +728,14 @@ static int lockfile(void)
         rv = fcntl(fd, F_SETLK, &lock);
         if (rv < 0) {
                 log_error("lockfile setlk error %s: %s",
-                          path, strerror(errno));
+                          cl.lockfile, strerror(errno));
                 goto fail;
         }
 
         rv = ftruncate(fd, 0);
         if (rv < 0) {
                 log_error("lockfile truncate error %s: %s",
-                          path, strerror(errno));
+                          cl.lockfile, strerror(errno));
                 goto fail;
         }
 
@@ -746,7 +745,7 @@ static int lockfile(void)
         rv = write(fd, buf, strlen(buf));
         if (rv <= 0) {
                 log_error("lockfile write error %s: %s",
-                          path, strerror(errno));
+                          cl.lockfile, strerror(errno));
                 goto fail;
         }
 
@@ -758,10 +757,7 @@ static int lockfile(void)
 
 static void unlink_lockfile(int fd)
 {
-	char path[PATH_MAX];
-
-	snprintf(path, PATH_MAX, "%s/%s", BOOTH_RUN_DIR, BOOTH_LOCKFILE_NAME);
-	unlink(path);
+	unlink(cl.lockfile);
 	close(fd);
 }
 
@@ -782,6 +778,8 @@ static void print_usage(void)
 	printf("  revoke:       Revoke ticket T(-t T) from site S(-s S)\n");
 	printf("\n");
 	printf("Options:\n");
+	printf("  -c FILE       Specify config file [default " BOOTH_DEFAULT_CONF "]\n");
+	printf("  -l LOCKFILE   Specify lock file [default " BOOTH_DEFAULT_LOCKFILE "]\n");
 	printf("  -D            Enable debugging to stderr and don't fork\n");
 	printf("  -t            ticket name\n");
 	printf("  -s            site name\n");
@@ -790,7 +788,7 @@ static void print_usage(void)
 	printf("  -h            Print this help, then exit\n");
 }
 
-#define OPTION_STRING		"Dt:s:fh"
+#define OPTION_STRING		"c:Dl:t:s:fh"
 
 static char *logging_entity = NULL;
 
@@ -861,12 +859,18 @@ static int read_arguments(int argc, char **argv)
 		optchar = getopt(argc, argv, OPTION_STRING);
 
 		switch (optchar) {
+		case 'c':
+			strncpy(cl.configfile, optarg, BOOTH_PATH_LEN - 1);
+			break;
 		case 'D':
 			debug_level = 1;
 			log_logfile_priority = LOG_DEBUG;
 			log_syslog_priority = LOG_DEBUG;
 			break;
 
+		case 'l':
+			strncpy(cl.lockfile, optarg, BOOTH_PATH_LEN - 1);
+			break;
 		case 't':
 			if (cl.op == OP_GRANT || cl.op == OP_REVOKE)
 				strcpy(cl.ticket, optarg);
@@ -1013,6 +1017,8 @@ int main(int argc, char *argv[])
 	int rv;
 
 	memset(&cl, 0, sizeof(cl));
+	strncpy(cl.configfile, BOOTH_DEFAULT_CONF,     BOOTH_PATH_LEN - 1);
+	strncpy(cl.lockfile,   BOOTH_DEFAULT_LOCKFILE, BOOTH_PATH_LEN - 1);
 
 	rv = read_arguments(argc, argv);
 	if (rv < 0)
