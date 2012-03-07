@@ -74,3 +74,8 @@ class ServerTests(ServerTestEnvironment):
                     "ERROR: invalid config file format: unquoted '.'",
                     'IP addresses need to be quoted'
                 )
+
+    def test_debug_mode(self):
+        (pid, ret, stdout, stderr, runner) = \
+            self.run_booth(config_text=self.working_config, debug=True,
+                           expected_exitcode=None)
