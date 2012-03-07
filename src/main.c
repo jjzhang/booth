@@ -41,6 +41,7 @@
 #include "timer.h"
 #include "pacemaker.h"
 #include "ticket.h"
+#include <error.h>
 
 #define RELEASE_VERSION		"1.0"
 
@@ -257,10 +258,22 @@ void process_connection(int ci)
 	char *data = NULL;
 	char *site, *ticket;
 	int local, rv;
+	void (*deadfn) (int ci);
 
 	rv = do_read(client[ci].fd, &h, sizeof(h));
+
 	if (rv < 0) {
 		log_error("connection %d read error %d", ci, rv);
+		if (errno == ECONNRESET)
+			log_debug("client %d aborted conection fd %d", ci, client[ci].fd);
+		else 
+			log_debug("client %d closed connnection fd %d", ci, client[ci].fd);
+
+		deadfn = client[ci].deadfn;
+		if(deadfn) {
+			log_debug("run deadfn", ci, client[ci].fd);
+			deadfn(ci);
+		}
 		return;
 	}
 	if (h.magic != BOOTHC_MAGIC) {
@@ -358,7 +371,7 @@ static void process_listener(int ci)
 
 	i = client_add(fd, process_connection, NULL);
 
-	log_debug("client connection %d fd %d", i, fd);
+	log_debug("add client connection %d fd %d", i, fd);
 }
 
 static int setup_config(int type)
