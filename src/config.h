@@ -35,7 +35,7 @@ struct ticket_config {
 struct booth_config {
 	int node_count;
 	int ticket_count;
-	int proto;
+	transport_layer_t proto;
 	uint16_t port;
 	struct booth_node node[MAX_NODES];
 	struct ticket_config ticket[0];

@@ -398,11 +398,9 @@ static int setup_timer(void)
 	return timerlist_init();
 }
 
-static int loop(int type)
+static int setup(int type)
 {
-	void (*workfn) (int ci);
-	void (*deadfn) (int ci);
-	int rv, i;
+	int rv;
 
 	rv = setup_config(type);
 	if (rv < 0)
@@ -424,6 +422,18 @@ static int loop(int type)
 	if (rv < 0)
 		goto fail;
 	client_add(rv, process_listener, NULL);
+
+	return 0;
+
+fail:
+	return -1;
+}
+
+static int loop(void)
+{
+	void (*workfn) (int ci);
+	void (*deadfn) (int ci);
+	int rv, i;
 
         while (1) {
                 rv = poll(pollfd, client_maxi + 1, poll_timeout);
@@ -761,23 +771,23 @@ static void print_usage(void)
 	printf("booth <type> <operation> [options]\n");
 	printf("\n");
 	printf("Types:\n");
-	printf(" arbitrator:	daemon running on arbitrator\n");
-	printf(" site:		daemon running on cluster site\n");
-	printf(" client:	command running from client\n");
+	printf("  arbitrator:   daemon running on arbitrator\n");
+	printf("  site:	        daemon running on cluster site\n");
+	printf("  client:       command running from client\n");
 	printf("\n");
 	printf("Operations:\n");
 	printf("Please note that operations are valid iff type is client!\n");
-	printf("list:		List all the tickets\n");
-	printf("grant:		Grant ticket T(-t T) to site S(-s S)\n");
-	printf("revoke:		Revoke ticket T(-t T) from site S(-s S)\n");
+	printf("  list:	        List all the tickets\n");
+	printf("  grant:        Grant ticket T(-t T) to site S(-s S)\n");
+	printf("  revoke:       Revoke ticket T(-t T) from site S(-s S)\n");
 	printf("\n");
 	printf("Options:\n");
-	printf(" -D		Enable debugging to stderr and don't fork\n");
-	printf(" -t		ticket name\n");
-	printf(" -s		site name\n");
-	printf(" -f		ticket attribute: force, only valid when "
+	printf("  -D            Enable debugging to stderr and don't fork\n");
+	printf("  -t            ticket name\n");
+	printf("  -s            site name\n");
+	printf("  -f            ticket attribute: force, only valid when "
 				"granting\n");
-	printf(" -h		Print this help, then exit\n");
+	printf("  -h            Print this help, then exit\n");
 }
 
 #define OPTION_STRING		"Dt:s:fh"
@@ -788,7 +798,7 @@ static int read_arguments(int argc, char **argv)
 {
 	int optchar;
 	char *arg1 = argv[1];
-	char *op;
+	char *op = NULL;
 
 	if (argc < 2 || !strcmp(arg1, "help") || !strcmp(arg1, "--help") ||
 		!strcmp(arg1, "-h")) {
@@ -896,7 +906,7 @@ static int read_arguments(int argc, char **argv)
 			break;
 		
 		default:
-			fprintf(stderr, "unknown option: %c\n", optchar);
+			fprintf(stderr, "unknown option: %s\n", argv[optind]);
 			exit(EXIT_FAILURE);
 			break;
 		};
@@ -944,7 +954,7 @@ static void set_oom_adj(int val)
         fclose(fp);
 }
 
-static int do_arbitrator(void)
+static int do_server(int type)
 {
 	int fd;
 	int rv = -1;
@@ -960,38 +970,17 @@ static int do_arbitrator(void)
 	if (fd < 0)
 		return fd;
 
-	log_info("BOOTH arbitrator daemon started");
+	if (type == ARBITRATOR)
+		log_info("BOOTH arbitrator daemon started");
+	else if (type == SITE)
+		log_info("BOOTH cluster site daemon started");
+
 	set_scheduler();
 	set_oom_adj(-16);
 
-	rv = loop(ARBITRATOR);
-
-	unlink_lockfile(fd);
-
-	return rv;
-}
-
-static int do_site(void)
-{
-	int fd;
-	int rv = -1;
-
-	if (!debug_level) {
-		if (daemon(0, 0) < 0) {
-			perror("daemon error");
-			exit(EXIT_FAILURE);
-		}
-	}
-
-	fd = lockfile();
-	if (fd < 0)
-		return fd;
-
-	log_info("BOOTH cluster site daemon started");
-	set_scheduler();
-	set_oom_adj(-16);
-
-	rv = loop(SITE);
+	rv = setup(SITE);
+	if (rv == 0)
+		rv = loop();
 
 	unlink_lockfile(fd);
 
@@ -1041,11 +1030,11 @@ int main(int argc, char *argv[])
 
 	switch (cl.type) {
 	case ACT_ARBITRATOR:
-		rv = do_arbitrator();
+		rv = do_server(ARBITRATOR);
 		break;
 
 	case ACT_SITE:
-		rv = do_site();
+		rv = do_server(SITE);
 		break;
 
 	case ACT_CLIENT:
