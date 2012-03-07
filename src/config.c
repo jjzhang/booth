@@ -50,9 +50,10 @@ int read_config(const char *path)
 {
 	char line[1024];
 	FILE *fp;
-	char *s, *k, *v, *e, *w, *c;
-	int quo, equ, ischar, i;
+	char *s, *key, *val, *expiry, *weight, *c;
+	int in_quotes, got_equals, got_quotes, i;
 	int lineno = 0;
+	int got_transport = 0;
 
 	fp = fopen(path, "r");
 	if (!fp) {
@@ -82,15 +83,15 @@ int read_config(const char *path)
 		    || *s == ':' || *s == ',' || *s == '@'
 		    || *s == '=' || *s == '"') {
 			log_error("invalid key name in config file "
-				  "('%c', lineno %d)", *s, lineno);
+				  "('%c', line %d char %ld)", *s, lineno, s - line);
 			goto out;
 		}
-		k = s;
-		v = NULL;
-		quo = 0;
-		equ = 0;
-		ischar = 0;
-		while (*s != '\n') {
+		key = s;        /* will point to the key on the left hand side    */
+		val = NULL;     /* will point to the value on the right hand side */
+		in_quotes = 0;  /* true iff we're inside a double-quoted string   */
+		got_equals = 0; /* true iff we're on the RHS of the = assignment  */
+		got_quotes = 0; /* true iff the RHS is quoted                     */
+		while (*s != '\n' && *s != '\0') {
 			if (!(*s >='a' && *s <= 'z')
 			     && !(*s >= 'A' && *s <= 'Z')
 			     && !(*s >= '0' && *s <= '9')
@@ -108,74 +109,81 @@ int read_config(const char *path)
 			     && !(*s == '@')
 			     && !(*s == '=')
 			     && !(*s == '"')) {
-				log_error("invalid character ('%c', lineno %d)"
-					  " in config file", *s, lineno);
+				log_error("invalid character ('%c', line %d char %ld)"
+					  " in config file", *s, lineno, s - line);
 				goto out;
 			}
-			if (*s == '=' && !equ) {
-				equ = 1;
+			if (*s == '=' && !got_equals) {
+				got_equals = 1;
 				*s = '\0';
-				v = s + 1;
-			} else if (*s == '=' && equ && !quo) {
-				log_error("invalid config file format "
-					  "(lineno %d)", lineno);
+				val = s + 1;
+			} else if ((*s == '=' || *s == '_' || *s == '-' || *s == '.')
+				   && got_equals && !in_quotes) {
+				log_error("invalid config file format: unquoted '%c' "
+					  "(line %d char %ld)", *s, lineno, s - line);
 				goto out;
-			} else if ((*s == '_' || *s == '-' || *s == '.')
-				    && equ && !quo) {
-				log_error("invalid config file format "
-					  "(lineno %d)", lineno);
-				goto out;
-			} else if ((*s == '/' || *s == ' ' || *s == '+'
+			} else if ((*s == '/' || *s == '+'
 				    || *s == '(' || *s == ')' || *s == ':'
-				    || *s == ',' || *s == '@') && !quo) {
-				log_error("invalid config file format "
-					  "(lineno %d)", lineno);
+				    || *s == ',' || *s == '@') && !in_quotes) {
+				log_error("invalid config file format: unquoted '%c' "
+					  "(line %d char %ld)", *s, lineno, s - line);
 				goto out;
-			} else if (*s == '"' && !equ) {
-				log_error("invalid config file format "
-					  "(lineno %d)", lineno);
+			} else if ((*s == ' ')
+				   && !in_quotes && !got_quotes) {
+				log_error("invalid config file format: unquoted whitespace "
+					  "(line %d char %ld)", lineno, s - line);
 				goto out;
-			} else if (*s == '"' && !quo) {
-				quo = 1;
-				if (v) {
-					v++;
-					ischar = 1;
+			} else if (*s == '"' && !got_equals) {
+				log_error("invalid config file format: unexpected quotes "
+					  "(line %d char %ld)", lineno, s - line);
+				goto out;
+			} else if (*s == '"' && !in_quotes) {
+				in_quotes = 1;
+				if (val) {
+					val++;
+					got_quotes = 1;
 				}
-			} else if (*s == '"' && quo) {
-				quo = 0;
+			} else if (*s == '"' && in_quotes) {
+				in_quotes = 0;
 				*s = '\0';
 			}
 			s++;		 
 		}
-		if (!equ || quo) {
-			log_error("invalid config file format (lineno %d)",
+		if (!got_equals) {
+			log_error("invalid config file format: missing '=' (lineno %d)",
 				  lineno);
 			goto out;
 		}
-		if (!ischar)
+		if (in_quotes) {
+			log_error("invalid config file format: unterminated quotes (lineno %d)",
+				  lineno);
+			goto out;
+		}
+		if (!got_quotes)
 			*s = '\0';
 
-		if (strlen(k) > BOOTH_NAME_LEN
-		    || strlen(v) > BOOTH_NAME_LEN) {
+		if (strlen(key) > BOOTH_NAME_LEN
+		    || strlen(val) > BOOTH_NAME_LEN) {
 			log_error("key/value too long");
 			goto out;
 		}
 
-		if (!strcmp(k, "transport")) {
-			if (!strcmp(v, "UDP"))
+		if (!strcmp(key, "transport")) {
+			if (!strcmp(val, "UDP"))
 				booth_conf->proto = UDP;
-			else if (!strcmp(v, "SCTP"))
+			else if (!strcmp(val, "SCTP"))
 				booth_conf->proto = SCTP;
 			else {
 				log_error("invalid transport protocol");
 				goto out;
-			}	
+			}
+			got_transport = 1;
 		}
 
-		if (!strcmp(k, "port"))
-			booth_conf->port = atoi(v);
+		if (!strcmp(key, "port"))
+			booth_conf->port = atoi(val);
 
-		if (!strcmp(k, "site")) {
+		if (!strcmp(key, "site")) {
 			if (booth_conf->node_count == MAX_NODES) {
 				log_error("too many nodes");
 				goto out;
@@ -186,10 +194,10 @@ int read_config(const char *path)
 			booth_conf->node[booth_conf->node_count].nodeid = 
 				booth_conf->node_count;
 			strcpy(booth_conf->node[booth_conf->node_count++].addr,
-				v);
+				val);
 		}
 		
-		if (!strcmp(k, "arbitrator")) {
+		if (!strcmp(key, "arbitrator")) {
 			if (booth_conf->node_count == MAX_NODES) {
 				log_error("too many nodes");
 				goto out;
@@ -201,42 +209,42 @@ int read_config(const char *path)
 			booth_conf->node[booth_conf->node_count].nodeid = 
 				booth_conf->node_count;
 			strcpy(booth_conf->node[booth_conf->node_count++].addr,
-				v);
+				val);
 		}
 
-		if (!strcmp(k, "ticket")) {
+		if (!strcmp(key, "ticket")) {
 			int count = booth_conf->ticket_count;
 			if (booth_conf->ticket_count == ticket_size) {
 				if (ticket_realloc() < 0)
 					goto out;
 			}
-			e = index(v, ';');
-			w = rindex(v, ';');
-			if (!e)
-				strcpy(booth_conf->ticket[count].name, v);
-			else if (e && e == w) {
-				*e++ = '\0';
-				while (*e == ' ')
-					e++;
-				strcpy(booth_conf->ticket[count].name, v);
-				booth_conf->ticket[count].expiry = atoi(e);
+			expiry = index(val, ';');
+			weight = rindex(val, ';');
+			if (!expiry)
+				strcpy(booth_conf->ticket[count].name, val);
+			else if (expiry && expiry == weight) {
+				*expiry++ = '\0';
+				while (*expiry == ' ')
+					expiry++;
+				strcpy(booth_conf->ticket[count].name, val);
+				booth_conf->ticket[count].expiry = atoi(expiry);
 			} else {
-				*e++ = '\0';
-				*w++ = '\0';
-				while (*e == ' ')
-					e++;
-				while (*w == ' ')
-					w++;
-				strcpy(booth_conf->ticket[count].name, v);
-				booth_conf->ticket[count].expiry = atoi(e);
+				*expiry++ = '\0';
+				*weight++ = '\0';
+				while (*expiry == ' ')
+					expiry++;
+				while (*weight == ' ')
+					weight++;
+				strcpy(booth_conf->ticket[count].name, val);
+				booth_conf->ticket[count].expiry = atoi(expiry);
 				i = 0;
-				while ((c = index(w, ','))) {
+				while ((c = index(weight, ','))) {
 					*c++ = '\0';
 					booth_conf->ticket[count].weight[i++]
-						= atoi(w);
+						= atoi(weight);
 					while (*c == ' ')
 						c++;
-					w = c;
+					weight = c;
 					if (i == MAX_NODES) {
 						log_error("too many weights");
 						break;
@@ -246,6 +254,12 @@ int read_config(const char *path)
 			booth_conf->ticket_count++;
 		}
 	}
+
+	if (!got_transport) {
+		log_error("config file was missing transport line");
+		goto out;
+	}
+
 	return 0;
 
 out:

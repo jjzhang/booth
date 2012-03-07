@@ -73,6 +73,8 @@ struct command_line {
 	int type;		/* ACT_ */
 	int op;			/* OP_ */
 	int force;
+	char configfile[BOOTH_PATH_LEN];
+	char lockfile[BOOTH_PATH_LEN];
 	char site[BOOTH_NAME_LEN];
 	char ticket[BOOTH_NAME_LEN]; 
 };
@@ -365,7 +367,7 @@ static int setup_config(int type)
 {
 	int rv;
 
-	rv = read_config(BOOTH_DEFAULT_CONF);
+	rv = read_config(cl.configfile);
 	if (rv < 0)
 		goto out;
 
@@ -380,14 +382,19 @@ out:
 static int setup_transport(void)
 {
 	int rv;
+	transport_layer_t proto = booth_conf->proto;
 
-	rv = booth_transport[booth_conf->proto].init(ticket_recv);
-	if (rv < 0)
+	rv = booth_transport[proto].init(ticket_recv);
+	if (rv < 0) {
+		log_error("failed to init booth_transport[%d]", proto);
 		goto out;
+	}
 
 	rv = booth_transport[TCP].init(NULL);
-	if (rv < 0)
+	if (rv < 0) {
+		log_error("failed to init booth_transport[TCP]");
 		goto out;
+	}
 
 out:
 	return rv;
@@ -707,17 +714,14 @@ out:
 
 static int lockfile(void)
 {
-	char path[PATH_MAX];
 	char buf[16];
 	struct flock lock;
 	int fd, rv;
 
-	snprintf(path, PATH_MAX, "%s/%s", BOOTH_RUN_DIR, BOOTH_LOCKFILE_NAME);
-
-	fd = open(path, O_CREAT|O_WRONLY, 0666);
+	fd = open(cl.lockfile, O_CREAT|O_WRONLY, 0666);
 	if (fd < 0) {
                 log_error("lockfile open error %s: %s",
-                          path, strerror(errno));
+                          cl.lockfile, strerror(errno));
                 return -1;
         }       
 
@@ -729,14 +733,14 @@ static int lockfile(void)
         rv = fcntl(fd, F_SETLK, &lock);
         if (rv < 0) {
                 log_error("lockfile setlk error %s: %s",
-                          path, strerror(errno));
+                          cl.lockfile, strerror(errno));
                 goto fail;
         }
 
         rv = ftruncate(fd, 0);
         if (rv < 0) {
                 log_error("lockfile truncate error %s: %s",
-                          path, strerror(errno));
+                          cl.lockfile, strerror(errno));
                 goto fail;
         }
 
@@ -746,7 +750,7 @@ static int lockfile(void)
         rv = write(fd, buf, strlen(buf));
         if (rv <= 0) {
                 log_error("lockfile write error %s: %s",
-                          path, strerror(errno));
+                          cl.lockfile, strerror(errno));
                 goto fail;
         }
 
@@ -758,10 +762,7 @@ static int lockfile(void)
 
 static void unlink_lockfile(int fd)
 {
-	char path[PATH_MAX];
-
-	snprintf(path, PATH_MAX, "%s/%s", BOOTH_RUN_DIR, BOOTH_LOCKFILE_NAME);
-	unlink(path);
+	unlink(cl.lockfile);
 	close(fd);
 }
 
@@ -782,6 +783,8 @@ static void print_usage(void)
 	printf("  revoke:       Revoke ticket T(-t T) from site S(-s S)\n");
 	printf("\n");
 	printf("Options:\n");
+	printf("  -c FILE       Specify config file [default " BOOTH_DEFAULT_CONF "]\n");
+	printf("  -l LOCKFILE   Specify lock file [default " BOOTH_DEFAULT_LOCKFILE "]\n");
 	printf("  -D            Enable debugging to stderr and don't fork\n");
 	printf("  -t            ticket name\n");
 	printf("  -s            site name\n");
@@ -790,9 +793,18 @@ static void print_usage(void)
 	printf("  -h            Print this help, then exit\n");
 }
 
-#define OPTION_STRING		"Dt:s:fh"
+#define OPTION_STRING		"c:Dl:t:s:fh"
 
 static char *logging_entity = NULL;
+
+void safe_copy(char *dest, char *value, size_t buflen, const char *description) {
+	if (strlen(value) >= buflen) {
+		fprintf(stderr, "'%s' exceeds maximum %s length of %ld\n",
+			value, description, buflen - 1);
+		exit(EXIT_FAILURE);
+	}
+	strncpy(dest, value, buflen - 1);
+}
 
 static int read_arguments(int argc, char **argv)
 {
@@ -861,25 +873,31 @@ static int read_arguments(int argc, char **argv)
 		optchar = getopt(argc, argv, OPTION_STRING);
 
 		switch (optchar) {
+		case 'c':
+			safe_copy(cl.configfile, optarg, sizeof(cl.configfile), "config file");
+			break;
 		case 'D':
 			debug_level = 1;
 			log_logfile_priority = LOG_DEBUG;
 			log_syslog_priority = LOG_DEBUG;
 			break;
 
+		case 'l':
+			safe_copy(cl.lockfile, optarg, sizeof(cl.lockfile), "lock file");
+			break;
 		case 't':
-			if (cl.op == OP_GRANT || cl.op == OP_REVOKE)
-				strcpy(cl.ticket, optarg);
-			else {
+			if (cl.op == OP_GRANT || cl.op == OP_REVOKE) {
+				safe_copy(cl.ticket, optarg, sizeof(cl.ticket), "ticket name");
+			} else {
 				print_usage();
 				exit(EXIT_FAILURE);
 			}
 			break;
 
 		case 's':
-			if (cl.op == OP_GRANT || cl.op == OP_REVOKE)
-				strcpy(cl.site, optarg);
-			else {
+			if (cl.op == OP_GRANT || cl.op == OP_REVOKE) {
+				safe_copy(cl.site, optarg, sizeof(cl.ticket), "site name");
+			} else {
 				print_usage();
 				exit(EXIT_FAILURE);
 			}
@@ -959,6 +977,10 @@ static int do_server(int type)
 	int fd;
 	int rv = -1;
 
+	rv = setup(SITE);
+	if (rv < 0)
+		goto out;
+
 	if (!debug_level) {
 		if (daemon(0, 0) < 0) {
 			perror("daemon error");
@@ -966,6 +988,10 @@ static int do_server(int type)
 		}
 	}
 
+	/*
+	  The lock cannot be obtained before the call to daemon(), otherwise
+	  the lockfile would contain the pid of the parent, not the daemon.
+	*/
 	fd = lockfile();
 	if (fd < 0)
 		return fd;
@@ -978,10 +1004,9 @@ static int do_server(int type)
 	set_scheduler();
 	set_oom_adj(-16);
 
-	rv = setup(SITE);
-	if (rv == 0)
-		rv = loop();
+	rv = loop();
 
+out:
 	unlink_lockfile(fd);
 
 	return rv;
@@ -1013,6 +1038,8 @@ int main(int argc, char *argv[])
 	int rv;
 
 	memset(&cl, 0, sizeof(cl));
+	strncpy(cl.configfile, BOOTH_DEFAULT_CONF,     BOOTH_PATH_LEN - 1);
+	strncpy(cl.lockfile,   BOOTH_DEFAULT_LOCKFILE, BOOTH_PATH_LEN - 1);
 
 	rv = read_arguments(argc, argv);
 	if (rv < 0)
