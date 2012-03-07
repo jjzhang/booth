@@ -3,6 +3,7 @@
 import copy
 from   pprint    import pprint, pformat
 import re
+import string
 
 from   serverenv import ServerTestEnvironment
 
@@ -32,3 +33,15 @@ class ServerTests(ServerTestEnvironment):
 
     def test_example_config(self):
         self.configFileMissingMyIP(config_file=self.example_config_path)
+
+    def test_config_file_buffer_overflow(self):
+        # https://bugzilla.novell.com/show_bug.cgi?id=750256
+        longfile = (string.lowercase * 5)[:127]
+        expected_error = "'%s' exceeds maximum config file length" % longfile
+        self._test_buffer_overflow(expected_error, config_file=longfile)
+
+    def test_lock_file_buffer_overflow(self):
+        # https://bugzilla.novell.com/show_bug.cgi?id=750256
+        longfile = (string.lowercase * 5)[:127]
+        expected_error = "'%s' exceeds maximum lock file length" % longfile
+        self._test_buffer_overflow(expected_error, lock_file=longfile)

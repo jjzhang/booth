@@ -55,3 +55,8 @@ class BoothTestEnvironment(unittest.TestCase, BoothAssertions):
             msg += "\nlog follows (see %s)" % self.log_file
             msg += "\n-----------\n%s" % self.read_log()
             self.assertEqual(return_code, expected_exitcode, msg)
+
+    def _test_buffer_overflow(self, expected_error, **args):
+        (pid, ret, stdout, stderr, runner) = \
+            self.run_booth(expected_exitcode=1, **args)
+        self.assertRegexpMatches(stderr, expected_error)

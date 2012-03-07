@@ -792,6 +792,15 @@ static void print_usage(void)
 
 static char *logging_entity = NULL;
 
+void safe_copy(char *dest, char *value, size_t buflen, const char *description) {
+	if (strlen(value) >= buflen) {
+		fprintf(stderr, "'%s' exceeds maximum %s length of %ld\n",
+			value, description, buflen - 1);
+		exit(EXIT_FAILURE);
+	}
+	strncpy(dest, value, buflen - 1);
+}
+
 static int read_arguments(int argc, char **argv)
 {
 	int optchar;
@@ -860,7 +869,7 @@ static int read_arguments(int argc, char **argv)
 
 		switch (optchar) {
 		case 'c':
-			strncpy(cl.configfile, optarg, BOOTH_PATH_LEN - 1);
+			safe_copy(cl.configfile, optarg, sizeof(cl.configfile), "config file");
 			break;
 		case 'D':
 			debug_level = 1;
@@ -869,21 +878,21 @@ static int read_arguments(int argc, char **argv)
 			break;
 
 		case 'l':
-			strncpy(cl.lockfile, optarg, BOOTH_PATH_LEN - 1);
+			safe_copy(cl.lockfile, optarg, sizeof(cl.lockfile), "lock file");
 			break;
 		case 't':
-			if (cl.op == OP_GRANT || cl.op == OP_REVOKE)
-				strcpy(cl.ticket, optarg);
-			else {
+			if (cl.op == OP_GRANT || cl.op == OP_REVOKE) {
+				safe_copy(cl.ticket, optarg, sizeof(cl.ticket), "ticket name");
+			} else {
 				print_usage();
 				exit(EXIT_FAILURE);
 			}
 			break;
 
 		case 's':
-			if (cl.op == OP_GRANT || cl.op == OP_REVOKE)
-				strcpy(cl.site, optarg);
-			else {
+			if (cl.op == OP_GRANT || cl.op == OP_REVOKE) {
+				safe_copy(cl.site, optarg, sizeof(cl.ticket), "site name");
+			} else {
 				print_usage();
 				exit(EXIT_FAILURE);
 			}
