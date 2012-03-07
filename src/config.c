@@ -122,11 +122,16 @@ int read_config(const char *path)
 				log_error("invalid config file format: unquoted '%c' "
 					  "(line %d char %ld)", *s, lineno, s - line);
 				goto out;
-			} else if ((*s == '/' || *s == ' ' || *s == '+'
+			} else if ((*s == '/' || *s == '+'
 				    || *s == '(' || *s == ')' || *s == ':'
 				    || *s == ',' || *s == '@') && !in_quotes) {
 				log_error("invalid config file format: unquoted '%c' "
 					  "(line %d char %ld)", *s, lineno, s - line);
+				goto out;
+			} else if ((*s == ' ')
+				   && !in_quotes && !got_quotes) {
+				log_error("invalid config file format: unquoted whitespace "
+					  "(line %d char %ld)", lineno, s - line);
 				goto out;
 			} else if (*s == '"' && !got_equals) {
 				log_error("invalid config file format: unexpected quotes "

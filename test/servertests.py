@@ -102,3 +102,28 @@ class ServerTests(ServerTestEnvironment):
         config = re.sub('\n$', '', self.working_config)
         (pid, ret, stdout, stderr, runner) = \
             self.run_booth(config_text=config)
+
+    def test_a_few_trailing_whitespaces(self):
+        for ws in (' ', '  '):
+            new_config = self.working_config.replace("\n", ws + "\n", 3)
+            (pid, ret, stdout, stderr, runner) = \
+                self.run_booth(config_text=new_config,
+                               expected_exitcode=0)
+
+    def test_trailing_space_everywhere(self):
+        for ws in (' ', '  '):
+            new_config = self.working_config.replace("\n", ws + "\n")
+            (pid, ret, stdout, stderr, runner) = \
+                self.run_booth(config_text=new_config,
+                               expected_exitcode=0)
+
+    def test_unquoted_space(self):
+        for ticket in ('unquoted space', 'unquoted space man'):
+            new_config = re.sub('ticket=.+', 'ticket=' + ticket,
+                                self.working_config, 1)
+            (pid, ret, stdout, stderr, runner) = \
+                self.run_booth(config_text=new_config, expected_exitcode=1)
+            self.assertRegexpMatches(
+                self.read_log(),
+                'invalid config file format: unquoted whitespace'
+            )
