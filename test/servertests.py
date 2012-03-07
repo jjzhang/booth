@@ -45,3 +45,7 @@ class ServerTests(ServerTestEnvironment):
         longfile = (string.lowercase * 5)[:127]
         expected_error = "'%s' exceeds maximum lock file length" % longfile
         self._test_buffer_overflow(expected_error, lock_file=longfile)
+
+    def test_working_config(self):
+        (pid, ret, stdout, stderr, runner) = \
+            self.run_booth(config_text=self.working_config)

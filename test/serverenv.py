@@ -1,12 +1,14 @@
 #!/usr/bin/python
 
 import os
+import re
 import time
 import unittest
 
 from assertions   import BoothAssertions
 from boothrunner  import BoothRunner
 from boothtestenv import BoothTestEnvironment
+from utils        import get_IP
 
 class ServerTestEnvironment(BoothTestEnvironment):
     typical_config = """\
@@ -20,6 +22,7 @@ site="147.18.2.1"
 ticket="ticketA"
 ticket="ticketB"
 """
+    working_config = re.sub('site=".+"', 'site="%s"' % get_IP(), typical_config, 1)
 
     def run_booth(self, config_text=None, config_file=None, lock_file=True, args=[],
                   expected_exitcode=0, debug=False):
