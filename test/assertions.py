@@ -1,3 +1,7 @@
+#!/usr/bin/python
+
+import re
+
 class BoothAssertions:
     def configFileMissingMyIP(self, config_file=None, lock_file=None):
         (pid, ret, stdout, stderr, runner) = \
