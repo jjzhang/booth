@@ -273,7 +273,7 @@ void process_connection(int ci)
 
 		deadfn = client[ci].deadfn;
 		if(deadfn) {
-			log_debug("run deadfn", ci, client[ci].fd);
+			log_debug("run deadfn");
 			deadfn(ci);
 		}
 		return;
