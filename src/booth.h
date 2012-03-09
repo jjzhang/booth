@@ -29,7 +29,7 @@
 #define BOOTH_LOG_DIR "/var/log"
 #define BOOTH_LOGFILE_NAME "booth.log"
 #define BOOTH_DEFAULT_LOCKFILE BOOTH_RUN_DIR "/booth.pid"
-#define BOOTH_DEFAULT_CONF "/etc/sysconfig/booth"
+#define BOOTH_DEFAULT_CONF "/etc/booth/booth.conf"
 
 #define DAEMON_NAME		"booth"
 #define BOOTH_NAME_LEN		63
