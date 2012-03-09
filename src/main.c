@@ -273,7 +273,7 @@ void process_connection(int ci)
 
 		deadfn = client[ci].deadfn;
 		if(deadfn) {
-			log_debug("run deadfn", ci, client[ci].fd);
+			log_debug("run deadfn");
 			deadfn(ci);
 		}
 		return;
@@ -840,11 +840,11 @@ static int read_arguments(int argc, char **argv)
 
 	if (!strcmp(arg1, "arbitrator")) {
 		cl.type = ACT_ARBITRATOR;
-		logging_entity = DAEMON_NAME "-arbitrator";
+		logging_entity = (char *) DAEMON_NAME "-arbitrator";
 		optind = 2;
 	} else if (!strcmp(arg1, "site")) {
 		cl.type = ACT_SITE;
-		logging_entity = DAEMON_NAME "-site";
+		logging_entity = (char *) DAEMON_NAME "-site";
 		optind = 2;
 	} else if (!strcmp(arg1, "client")) {
 		cl.type = ACT_CLIENT;
