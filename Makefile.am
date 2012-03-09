@@ -55,6 +55,8 @@ bootharbitratordir	= ${INITDDIR}
 
 bootharbitrator_SCRIPTS	= script/lsb/booth-arbitrator 
 
+TESTS			= test/runtests.py
+
 SUBDIRS			= src
 
 coverity:
@@ -76,6 +78,8 @@ uninstall-local:
 	rmdir $(DESTDIR)/${bootharbitratordir} || :;
 	rmdir $(DESTDIR)/${boothsitedir} || :;
 	rmdir $(DESTDIR)/${SOCKETDIR} || :;
+
+test: check
 
 lint:
 	for dir in src; do make -C $$dir lint; done

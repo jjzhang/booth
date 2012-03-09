@@ -28,11 +28,12 @@
 #define BOOTH_RUN_DIR "/var/run"
 #define BOOTH_LOG_DIR "/var/log"
 #define BOOTH_LOGFILE_NAME "booth.log"
-#define BOOTH_LOCKFILE_NAME "booth.pid"
+#define BOOTH_DEFAULT_LOCKFILE BOOTH_RUN_DIR "/booth.pid"
 #define BOOTH_DEFAULT_CONF "/etc/booth/booth.conf"
 
 #define DAEMON_NAME		"booth"
 #define BOOTH_NAME_LEN		63
+#define BOOTH_PATH_LEN		127
 
 #define BOOTHC_SOCK_PATH		"boothc_lock"
 #define BOOTH_PROTO_FAMILY	AF_INET
