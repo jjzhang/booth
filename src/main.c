@@ -990,7 +990,7 @@ static int do_server(int type)
 	int fd;
 	int rv = -1;
 
-	rv = setup(SITE);
+	rv = setup(type);
 	if (rv < 0)
 		goto out;
 
