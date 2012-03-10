@@ -6,7 +6,7 @@ import time
 import unittest
 
 class BoothRunner:
-    default_config_file = '/etc/sysconfig/booth'
+    default_config_file = '/etc/booth/booth.conf'
     default_lock_file   = '/var/run/booth.pid'
 
     def __init__(self, boothd_path, mode, args):
