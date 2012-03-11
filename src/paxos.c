@@ -224,7 +224,8 @@ static void proposer_propose(struct paxos_space *ps,
 	if (msglen != sizeof(struct paxos_msghdr) + ps->extralen) {
 		log_error("message length incorrect, "
 			  "msglen: %d, msghdr len: %lu, extralen: %u",
-			  msglen, sizeof(struct paxos_msghdr), ps->extralen);
+			  msglen, (long)sizeof(struct paxos_msghdr),
+			  ps->extralen);
 		return;
 	}
 	hdr = msg;
@@ -301,7 +302,8 @@ static void proposer_commit(struct paxos_space *ps,
 	if (msglen != sizeof(struct paxos_msghdr) + ps->extralen) {
 		log_error("message length incorrect, "
 			  "msglen: %d, msghdr len: %lu, extralen: %u",
-			  msglen, sizeof(struct paxos_msghdr), ps->extralen);
+			  msglen, (long)sizeof(struct paxos_msghdr),
+			  ps->extralen);
 		return;
 	}
 	
@@ -346,7 +348,8 @@ static void acceptor_promise(struct paxos_space *ps,
 	if (msglen != sizeof(struct paxos_msghdr) + ps->extralen) {
 		log_error("message length incorrect, "
 			  "msglen: %d, msghdr len: %lu, extralen: %u",
-			  msglen, sizeof(struct paxos_msghdr), ps->extralen);
+			  msglen, (long)sizeof(struct paxos_msghdr),
+			  ps->extralen);
 		return;
 	}
 	hdr = msg;
@@ -396,7 +399,7 @@ static void acceptor_accepted(struct paxos_space *ps,
 	if (msglen != sizeof(struct paxos_msghdr) + ps->extralen + ps->valuelen) {
 		log_error("message length incorrect, msglen: "
 			  "%d, msghdr len: %lu, extralen: %u, valuelen: %u",
-			  msglen, sizeof(struct paxos_msghdr), ps->extralen,
+			  msglen, (long)sizeof(struct paxos_msghdr), ps->extralen,
 			  ps->valuelen);
 		return;
 	}
@@ -458,7 +461,8 @@ static void learner_response(struct paxos_space *ps,
 	if (msglen != sizeof(struct paxos_msghdr) + ps->extralen) {
 		log_error("message length incorrect, "
 			  "msglen: %d, msghdr len: %lu, extralen: %u",
-			  msglen, sizeof(struct paxos_msghdr), ps->extralen);
+			  msglen, (long)sizeof(struct paxos_msghdr),
+			  ps->extralen);
 		return;
 	}
 	hdr = msg;	

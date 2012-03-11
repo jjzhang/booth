@@ -83,7 +83,7 @@ int read_config(const char *path)
 		    || *s == ':' || *s == ',' || *s == '@'
 		    || *s == '=' || *s == '"') {
 			log_error("invalid key name in config file "
-				  "('%c', line %d char %ld)", *s, lineno, s - line);
+				  "('%c', line %d char %ld)", *s, lineno, (long)(s - line));
 			goto out;
 		}
 		key = s;        /* will point to the key on the left hand side    */
@@ -110,7 +110,7 @@ int read_config(const char *path)
 			     && !(*s == '=')
 			     && !(*s == '"')) {
 				log_error("invalid character ('%c', line %d char %ld)"
-					  " in config file", *s, lineno, s - line);
+					  " in config file", *s, lineno, (long)(s - line));
 				goto out;
 			}
 			if (*s == '=' && !got_equals) {
@@ -120,22 +120,22 @@ int read_config(const char *path)
 			} else if ((*s == '=' || *s == '_' || *s == '-' || *s == '.')
 				   && got_equals && !in_quotes) {
 				log_error("invalid config file format: unquoted '%c' "
-					  "(line %d char %ld)", *s, lineno, s - line);
+					  "(line %d char %ld)", *s, lineno, (long)(s - line));
 				goto out;
 			} else if ((*s == '/' || *s == '+'
 				    || *s == '(' || *s == ')' || *s == ':'
 				    || *s == ',' || *s == '@') && !in_quotes) {
 				log_error("invalid config file format: unquoted '%c' "
-					  "(line %d char %ld)", *s, lineno, s - line);
+					  "(line %d char %ld)", *s, lineno, (long)(s - line));
 				goto out;
 			} else if ((*s == ' ')
 				   && !in_quotes && !got_quotes) {
 				log_error("invalid config file format: unquoted whitespace "
-					  "(line %d char %ld)", lineno, s - line);
+					  "(line %d char %ld)", lineno, (long)(s - line));
 				goto out;
 			} else if (*s == '"' && !got_equals) {
 				log_error("invalid config file format: unexpected quotes "
-					  "(line %d char %ld)", lineno, s - line);
+					  "(line %d char %ld)", lineno, (long)(s - line));
 				goto out;
 			} else if (*s == '"' && !in_quotes) {
 				in_quotes = 1;
