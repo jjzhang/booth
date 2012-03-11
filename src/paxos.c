@@ -322,6 +322,9 @@ static void proposer_commit(struct paxos_space *ps,
 	if (!have_quorum(ps, pi->proposer->accepted_number))
 		return;
 
+	if (pi->proposer->state == COMMITTED)
+		return;
+
 	pi->round = ballot;
 	if (ps->p_op->commit)
 		ps->p_op->commit(pih, extra, pi->round);
@@ -758,15 +761,17 @@ int paxos_propose(pi_handle_t handle, void *value, int round)
 			  round, pi->proposer->ballot);
 		return -EINVAL;
 	}
-
-	strcpy(pi->proposer->proposal->value, value);
-	pi->round = round;
-
 	msg = malloc(len);
 	if (!msg) {
 		log_error("no mem for msg");
 		return -ENOMEM;
 	}
+
+	pi->proposer->state = PROPOSING;
+	strcpy(pi->proposer->proposal->value, value);
+	pi->proposer->accepted_number = 0;
+	pi->round = round;
+
 	memset(msg, 0, len);
 	hdr = msg;
 	hdr->state = htonl(PROPOSING);

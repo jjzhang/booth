@@ -32,7 +32,6 @@ int timerlist_init(void);
 struct timerlist * add_timer(unsigned long expires,
 			     unsigned long data, 
 			     void (*function) (unsigned long data));
-int mod_timer(struct timerlist *timer, unsigned long expires);
 int del_timer(struct timerlist *timer);
 void timerlist_exit(void);
 void process_timerlist(void);

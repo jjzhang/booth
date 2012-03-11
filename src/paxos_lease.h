@@ -50,7 +50,7 @@ pl_handle_t paxos_lease_init(const void *name,
 int paxos_lease_on_receive(void *msg, int msglen);
 
 int paxos_lease_acquire(pl_handle_t handle,
-			int relet,
+			int renew,
 			void (*end_acquire) (pl_handle_t handle, int result));
 /*
 int paxos_lease_owner_get(const void *name);
