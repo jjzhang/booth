@@ -82,7 +82,7 @@ static void end_paxos_request(pi_handle_t handle, int round, int result)
 		}
 	}
 	if (!found) {
-		log_error("cound not found the handle for paxos lease: %d",
+		log_error("cound not found the handle for paxos lease: %ld",
 			  handle);
 		return;
 	}
@@ -290,7 +290,7 @@ static int handle_lease_request(pi_handle_t handle, void *header)
 		}
 	}
 	if (!found) {
-		log_error("could not find the lease handle: %d", handle);
+		log_error("could not find the lease handle: %ld", handle);
 		return -1;
 	}
 
@@ -319,7 +319,7 @@ static int lease_propose(pi_handle_t handle,
 		}
 	}
 	if (!found) {
-		log_error("could not find the lease handle: %d", handle);
+		log_error("could not find the lease handle: %ld", handle);
 		return -1;
 	}
 
@@ -370,7 +370,7 @@ static int lease_accepted(pi_handle_t handle,
 		}
 	}
 	if (!found) {
-		log_error("could not find the lease handle: %d", handle);
+		log_error("could not find the lease handle: %ld", handle);
 		return -1;
 	}
 
@@ -408,7 +408,7 @@ static int lease_commit(pi_handle_t handle,
 		}
 	}
 	if (!found) {
-		log_error("could not find the lease handle: %d", handle);
+		log_error("could not find the lease handle: %ld", handle);
 		return -1;
 	}
 
@@ -446,7 +446,7 @@ static int lease_learned(pi_handle_t handle,
 		}
 	}
 	if (!found) {
-		log_error("could not find the lease handle: %d", handle);
+		log_error("could not find the lease handle: %ld", handle);
 		return -1;
 	}
 
@@ -516,7 +516,7 @@ pl_handle_t paxos_lease_init(const void *name,
 				       role,
 				       px_op);
 		if (psh <= 0) {
-			log_error("failed to initialize paxos space: %d", psh);
+			log_error("failed to initialize paxos space: %ld", psh);
 			free(px_op);
 			px_op = NULL;	
 			return psh;
@@ -538,7 +538,7 @@ pl_handle_t paxos_lease_init(const void *name,
 
 	pih = paxos_instance_init(ps_handle, name, prio);
 	if (pih <= 0) {
-		log_error("failed to initialize paxos instance: %d", pih);
+		log_error("failed to initialize paxos instance: %ld", pih);
 		free(lease);	
 		return pih;
 	}

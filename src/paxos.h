@@ -25,8 +25,8 @@
 #define ACCEPTOR	0x2
 #define LEARNER		0x1
 
-typedef int ps_handle_t;
-typedef int pi_handle_t;
+typedef long ps_handle_t;
+typedef long pi_handle_t;
 
 struct paxos_operations {
 	int (*get_myid) (void);

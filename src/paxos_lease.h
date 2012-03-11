@@ -21,7 +21,7 @@
 
 #define PLEASE_NAME_LEN		63
 
-typedef int pl_handle_t;
+typedef long pl_handle_t;
 
 struct paxos_lease_result {
 	char name[PLEASE_NAME_LEN+1];

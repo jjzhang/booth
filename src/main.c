@@ -987,7 +987,7 @@ static void set_oom_adj(int val)
 
 static int do_server(int type)
 {
-	int fd;
+	int fd = -1;
 	int rv = -1;
 
 	rv = setup(type);

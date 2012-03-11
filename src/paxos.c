@@ -451,7 +451,7 @@ static void learner_response(struct paxos_space *ps,
 	struct paxos_msghdr *hdr;
 	pi_handle_t pih = (pi_handle_t)pi;
 	void *extra;
-	int i, unused, found = 0;
+	int i, unused = 0, found = 0;
 	int ballot;
 
 	log_debug("learner response ...");
@@ -556,9 +556,9 @@ pi_handle_t paxos_instance_init(ps_handle_t handle, const void *name, int *prio)
 {
 	struct paxos_space *ps = (struct paxos_space *)handle;
 	struct paxos_instance *pi;
-	struct proposer *proposer;
-	struct acceptor *acceptor;
-	struct learner *learner;
+	struct proposer *proposer = NULL;
+	struct acceptor *acceptor = NULL;
+	struct learner *learner = NULL;
 	int myid, valuelen, rv;
 
 	list_for_each_entry(pi, &ps->pi_head, list) {
