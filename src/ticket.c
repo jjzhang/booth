@@ -115,7 +115,7 @@ static void end_acquire(pl_handle_t handle, int result)
 			}
 		}
 		if (!found)
-			log_error("BUG: ticket handle %d does not exist",
+			log_error("BUG: ticket handle %ld does not exist",
 				  handle);
 		log_info("ticket %s acquired", tk->id);
 		log_info("ticket %s granted to local (id %d)", tk->id,
@@ -213,7 +213,7 @@ static int ticket_write(pl_handle_t handle, struct paxos_lease_result *result)
 	}
 	if (!found) {
 		log_error("BUG: ticket_write failed "
-			  "(ticket handle %d does not exist)", handle);
+			  "(ticket handle %ld does not exist)", handle);
 		return -1;
 	}
 

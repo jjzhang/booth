@@ -58,13 +58,6 @@ struct timerlist * add_timer(unsigned long expires,
 	return timer;
 }
 
-int mod_timer(struct timerlist *timer, unsigned long expires)
-{
-	timer->expires = current_time() + expires;
-
-	return 0;
-}
-
 int del_timer(struct timerlist *timer)
 {
 	timer->expires = -2;

@@ -1,4 +1,4 @@
-# The booth configuration file is "/etc/sysconfig/booth". You need to
+# The booth configuration file is "/etc/booth/booth.conf". You need to
 # prepare the same booth configuration file on each arbitrator and
 # each node in the cluster sites where the booth daemon can be launched.
 # Here is an example of the configuration file:

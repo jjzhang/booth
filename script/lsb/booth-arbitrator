@@ -24,8 +24,6 @@ exec="/usr/sbin/$prog"
 type="arbitrator"
 lockfile="/var/run/booth.pid"
 
-[ -f /etc/sysconfig/$prog ] && . /etc/sysconfig/$prog
-
 . /etc/rc.status
 
 internal_status() {

@@ -78,5 +78,6 @@ int client_add(int fd, void (*workfn)(int ci), void (*deadfn)(int ci));
 int do_read(int fd, void *buf, size_t count);
 int do_write(int fd, void *buf, size_t count);
 void process_connection(int ci);
+void safe_copy(char *dest, char *value, size_t buflen, const char *description);
 
 #endif /* _BOOTH_H */
