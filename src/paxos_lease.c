@@ -129,9 +129,13 @@ static void lease_expires(unsigned long data)
 	p_l_op->notify(plh, &plr);
 		
 	if (pl->proposer.timer1)
-		del_timer(pl->proposer.timer1);
+		del_timer(&pl->proposer.timer1);
+	if (pl->proposer.timer2)
+		del_timer(&pl->proposer.timer2);
 	if (pl->acceptor.timer1)
-		del_timer(pl->acceptor.timer1);
+		del_timer(&pl->acceptor.timer1);
+	if (pl->acceptor.timer2)
+		del_timer(&pl->acceptor.timer2);
 
 	if (pl->failover)
 		paxos_lease_acquire(plh, 1, NULL);
@@ -145,7 +149,7 @@ static void lease_retry(unsigned long data)
 
 	log_debug("lease_retry ...");
 	if (pl->proposer.timer2)
-		del_timer(pl->proposer.timer2);
+		del_timer(&pl->proposer.timer2);
 	if (pl->owner == myid) {
 		log_debug("already got the lease, no need to retry");
 		return;
@@ -333,7 +337,7 @@ static int lease_propose(pi_handle_t handle,
 	memcpy(pl->proposer.plv, value, sizeof(struct paxos_lease_value));
 
 	if (pl->proposer.timer1)
-		del_timer(pl->proposer.timer1);
+		del_timer(&pl->proposer.timer1);
 
 	if (pl->renew) {
 		pl->proposer.timer1 = add_timer(4 * pl->expiry / 5,
@@ -378,7 +382,7 @@ static int lease_accepted(pi_handle_t handle,
 	memcpy(pl->acceptor.plv, value, sizeof(struct paxos_lease_value));
 
 	if (pl->acceptor.timer1 && pl->acceptor.timer2 != pl->acceptor.timer1)
-		del_timer(pl->acceptor.timer1);
+		del_timer(&pl->acceptor.timer1);
 	pl->acceptor.timer1 = add_timer(pl->expiry, (unsigned long)pl,
 					lease_expires);
 	pl->acceptor.expires = current_time() + pl->expiry;
@@ -416,7 +420,7 @@ static int lease_commit(pi_handle_t handle,
 	pl->expiry = pl->proposer.plv->expiry;
 	if (pl->acceptor.timer2 != pl->acceptor.timer1) {
 		if (pl->acceptor.timer2)
-			del_timer(pl->acceptor.timer2);
+			del_timer(&pl->acceptor.timer2);
 		pl->acceptor.timer2 = pl->acceptor.timer1;
 	}
 
@@ -459,7 +463,7 @@ static int lease_learned(pi_handle_t handle,
 	pl->expiry = pl->acceptor.plv->expiry;
 	if (pl->acceptor.timer2 != pl->acceptor.timer1) {
 		if (pl->acceptor.timer2)
-			del_timer(pl->acceptor.timer2);
+			del_timer(&pl->acceptor.timer2);
 		pl->acceptor.timer2 = pl->acceptor.timer1;
 	}
 
@@ -565,11 +569,15 @@ int paxos_lease_exit(pl_handle_t handle)
 	if (pl->proposer.plv)
 		free(pl->proposer.plv);
 	if (pl->proposer.timer1)
-		del_timer(pl->proposer.timer1);
+		del_timer(&pl->proposer.timer1);
+	if (pl->proposer.timer2)
+		del_timer(&pl->proposer.timer2);
 	if (pl->acceptor.plv)
 		free(pl->acceptor.plv);
 	if (pl->acceptor.timer1)
-		del_timer(pl->acceptor.timer1);
+		del_timer(&pl->acceptor.timer1);
+	if (pl->acceptor.timer2)
+		del_timer(&pl->acceptor.timer2);
 
 	return 0;
 }
