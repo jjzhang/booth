@@ -1020,7 +1020,8 @@ static int do_server(int type)
 	rv = loop();
 
 out:
-	unlink_lockfile(fd);
+	if (fd >= 0)
+		unlink_lockfile(fd);
 
 	return rv;
 }
