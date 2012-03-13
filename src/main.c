@@ -50,6 +50,7 @@
 int log_logfile_priority = LOG_INFO;
 int log_syslog_priority = LOG_ERR;
 int log_stderr_priority = LOG_ERR;
+int daemonize = 0;
 
 static int client_maxi;
 static int client_size = 0;
@@ -890,6 +891,7 @@ static int read_arguments(int argc, char **argv)
 			safe_copy(cl.configfile, optarg, sizeof(cl.configfile), "config file");
 			break;
 		case 'D':
+			daemonize = 1;
 			debug_level = 1;
 			log_logfile_priority = LOG_DEBUG;
 			log_syslog_priority = LOG_DEBUG;
@@ -994,7 +996,7 @@ static int do_server(int type)
 	if (rv < 0)
 		goto out;
 
-	if (!debug_level) {
+	if (!daemonize) {
 		if (daemon(0, 0) < 0) {
 			perror("daemon error");
 			exit(EXIT_FAILURE);
