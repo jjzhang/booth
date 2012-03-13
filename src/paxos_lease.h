@@ -26,6 +26,7 @@ typedef long pl_handle_t;
 struct paxos_lease_result {
 	char name[PLEASE_NAME_LEN+1];
 	int owner;
+	int ballot;
 	unsigned long long expires;
 };
 
@@ -33,7 +34,7 @@ struct paxos_lease_operations {
 	int (*get_myid) (void);
 	int (*send) (unsigned long id, void *value, int len);
 	int (*broadcast) (void *value, int len);
-	int (*catchup) (const void *name, int *owner,
+	int (*catchup) (const void *name, int *owner, int *ballot,
 			unsigned long long *expires);
 	int (*notify) (pl_handle_t handle, struct paxos_lease_result *result);
 };
@@ -59,6 +60,8 @@ int paxos_lease_epoch_get(const void *name);
 
 int paxos_lease_timeout(const void *name);
 */
+int paxos_lease_status_recovery(pl_handle_t handle);
+
 int paxos_lease_release(pl_handle_t handle);
 
 int paxos_lease_exit(pl_handle_t handle);

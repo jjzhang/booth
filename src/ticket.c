@@ -21,6 +21,7 @@
 #include <errno.h>
 #include <arpa/inet.h>
 #include <stdio.h>
+#include <assert.h>
 #include "ticket.h"
 #include "config.h"
 #include "pacemaker.h"
@@ -43,6 +44,7 @@ struct ticket {
 	pl_handle_t handle;
 	int owner;
 	int expiry;
+	int ballot;
 	unsigned long long expires;
 	struct list_head list;
 };
@@ -175,7 +177,7 @@ static int ticket_broadcast(void *value, int len)
 	return rv;	
 }
 
-static int ticket_read(const void *name, int *owner, 
+static int ticket_read(const void *name, int *owner, int *ballot, 
 		       unsigned long long *expires)
 {
 	struct ticket *tk;
@@ -193,9 +195,10 @@ static int ticket_read(const void *name, int *owner,
 		return -1;
 	}
 
-	pcmk_handler.load_ticket(tk->id, &tk->owner, &tk->expires);
+	pcmk_handler.load_ticket(tk->id, &tk->owner, &tk->ballot, &tk->expires);
 	*owner = tk->owner;
 	*expires = tk->expires;
+	*ballot = tk->ballot;
  
 	return 0;
 }
@@ -219,17 +222,23 @@ static int ticket_write(pl_handle_t handle, struct paxos_lease_result *result)
 
 	tk->owner = result->owner;
 	tk->expires = result->expires;
+	tk->ballot = result->ballot;
 
 	if (tk->owner == ticket_get_myid()) {
-		pcmk_handler.store_ticket(tk->id, tk->owner, tk->expires);
+		pcmk_handler.store_ticket(tk->id, tk->owner, tk->ballot, tk->expires);
 		pcmk_handler.grant_ticket(tk->id);
 	} else if (tk->owner == -1) {
-		pcmk_handler.store_ticket(tk->id, tk->owner, tk->expires);
+		pcmk_handler.store_ticket(tk->id, tk->owner, tk->ballot, tk->expires);
 		pcmk_handler.revoke_ticket(tk->id);
 	} else
-		pcmk_handler.store_ticket(tk->id, tk->owner, tk->expires);
+		pcmk_handler.store_ticket(tk->id, tk->owner, tk->ballot, tk->expires);
 
 	return 0; 
+}
+
+static void ticket_status_recovery(pl_handle_t handle)
+{
+	paxos_lease_status_recovery(handle);
 }
 
 int ticket_recv(void *msg, int msglen)
@@ -255,7 +264,7 @@ int grant_ticket(char *ticket, int force)
 	int found = 0;
 
 	if (force) {
-		pcmk_handler.store_ticket(ticket, ticket_get_myid(), -1);
+		pcmk_handler.store_ticket(ticket, ticket_get_myid(), 0, -1);
 		pcmk_handler.grant_ticket(ticket);
 		return BOOTHC_RLT_SYNC_SUCC;
 	}
@@ -296,7 +305,7 @@ int revoke_ticket(char *ticket, int force)
 	}
 
 	if (force) {
-		pcmk_handler.store_ticket(tk->id, -1, 0);
+		pcmk_handler.store_ticket(tk->id, -1, 0, 0);
 		pcmk_handler.revoke_ticket(tk->id);
 	}
 
@@ -343,6 +352,7 @@ int setup_ticket(void)
 	struct ticket *tk, *tmp;
 	int i, rv;
 	pl_handle_t plh;
+	int myid;
 		
 	role = malloc(booth_conf->node_count * sizeof(unsigned char));
 	if (!role)
@@ -383,6 +393,14 @@ int setup_ticket(void)
 			goto out;
 		}
 		tk->handle = plh;
+	}
+
+	myid = ticket_get_myid();
+	assert(myid < booth_conf->node_count);
+	if (role[myid] & ACCEPTOR) {
+		list_for_each_entry(tk, &ticket_list, list) {
+			ticket_status_recovery(tk->handle);
+		}
 	}
 
 	return 0;

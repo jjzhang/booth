@@ -126,6 +126,7 @@ static void lease_expires(unsigned long data)
 	strcpy(plr.name, pl->name);
 	plr.owner = -1;
 	plr.expires = 0;
+	plr.ballot = pl->acceptor.round;
 	p_l_op->notify(plh, &plr);
 		
 	if (pl->proposer.timer1)
@@ -202,27 +203,26 @@ int paxos_lease_release(pl_handle_t handle)
 	return 0;
 }
 
-static int lease_catchup(const void *name)
+static int lease_catchup(pi_handle_t handle)
 {
 	struct paxos_lease *pl;
 	struct paxos_lease_result plr;
 	int found = 0;
 
 	list_for_each_entry(pl, &lease_head, list) {
-		if (!strcmp(pl->name, name)) {
+		if (pl->pih == handle) {
 			found = 1;
 			break;
 		}
 	}
 	if (!found) {
-		log_error("could not found the lease name (%s) "
-			  "in registered list", (char *)name);
+		log_error("could not find the lease handle: %ld", handle);
 		return -1;
 	}
 
-	p_l_op->catchup(name, &pl->owner, &pl->expires);
-	log_debug("catchup result: name: %s, owner: %d, expires: %llu",
-		  (char *)name, pl->owner, pl->expires);
+	p_l_op->catchup(pl->name, &pl->owner, &pl->proposer.round, &pl->expires);
+	log_debug("catchup result: name: %s, owner: %d, ballot: %d, expires: %llu",
+		  (char *)pl->name, pl->owner, pl->proposer.round, pl->expires);
 
 	if (pl->owner == -1)
 		return 0;
@@ -252,6 +252,7 @@ static int lease_catchup(const void *name)
 
 	plr.owner = pl->owner;
 	plr.expires = pl->expires;
+	plr.ballot = pl->proposer.round;
 	strcpy(plr.name, pl->name);
 	p_l_op->notify((pl_handle_t)pl, &plr);
 
@@ -427,6 +428,7 @@ static int lease_commit(pi_handle_t handle,
 	strcpy(plr.name, pl->proposer.plv->name);
 	plr.owner = pl->proposer.plv->owner;
 	plr.expires = current_time() + pl->proposer.plv->expiry;
+	plr.ballot = round;
 
 	p_l_op->notify((pl_handle_t)pl, &plr);
 
@@ -470,6 +472,7 @@ static int lease_learned(pi_handle_t handle,
 	strcpy(plr.name, pl->acceptor.plv->name);
 	plr.owner = pl->acceptor.plv->owner;
 	plr.expires = current_time() + pl->acceptor.plv->expiry;
+	plr.ballot = round;
 
 	p_l_op->notify((pl_handle_t)pl, &plr);
 
@@ -552,6 +555,19 @@ pl_handle_t paxos_lease_init(const void *name,
 	lease->pih = pih;
 
 	return (pl_handle_t)lease;
+}
+
+int paxos_lease_status_recovery(pl_handle_t handle)
+{
+	struct paxos_lease *pl = (struct paxos_lease *)handle;
+
+	if (paxos_recovery_status_get(pl->pih) == 1) {
+		pl->renew = 1;
+		if (paxos_catchup(pl->pih) == 0)
+			paxos_recovery_status_set(pl->pih, 0);
+	}
+
+	return 0;	
 }
 
 int paxos_lease_on_receive(void *msg, int msglen)

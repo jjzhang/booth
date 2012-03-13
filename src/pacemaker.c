@@ -56,7 +56,7 @@ static void pcmk_revoke_ticket(const void *ticket)
 	return;
 }
 
-static void pcmk_store_ticket(const void *ticket, int owner,
+static void pcmk_store_ticket(const void *ticket, int owner, int ballot,
 			      unsigned long long expires)
 {
 	FILE *p;
@@ -84,16 +84,27 @@ static void pcmk_store_ticket(const void *ticket, int owner,
 	}
 	pclose(p);
 
+	snprintf(cmd, COMMAND_MAX,
+		 "crm_attribute -t tickets -n ballot-%s -v %d",
+		 (char *)ticket, ballot);
+	log_info("command: '%s' was executed", cmd);
+	p = popen(cmd, "r");
+	if (p == NULL) {
+		log_error("popen error: %s", cmd);
+		return;
+	}
+	pclose(p);
+
 	return;
 }
 
-static void pcmk_load_ticket(const void *ticket, int *owner,
+static void pcmk_load_ticket(const void *ticket, int *owner, int *ballot,
 			     unsigned long long *expires)
 {
 	FILE *p;
 	char cmd[COMMAND_MAX];
 	char line[256];
-	int ow;
+	int ow, ba;
 	unsigned long long ex;
 
 	snprintf(cmd, COMMAND_MAX,
@@ -128,6 +139,23 @@ static void pcmk_load_ticket(const void *ticket, int *owner,
 	}
 	if (sscanf(line, "%llu", &ex) == 1)
 		*expires = ex;
+	pclose(p);
+
+	snprintf(cmd, COMMAND_MAX,
+		 "crm_attribute -t tickets -n ballot-%s -G --quiet",
+		 (char *)ticket);
+	log_info("command: '%s' was executed", cmd);
+	p = popen(cmd, "r");
+	if (p == NULL) {
+		log_error("popen error: %s", cmd);
+		return;
+	}
+	if (fgets(line, sizeof(line) - 1, p) == NULL) {
+		pclose(p);
+		return;
+	}
+	if (sscanf(line, "%d", &ba) == 1)
+		*ballot = ba;
 	pclose(p);
 
 	return;

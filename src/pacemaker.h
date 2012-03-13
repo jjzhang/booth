@@ -22,8 +22,8 @@
 struct ticket_handler {
 	void (*grant_ticket) (const void *);
 	void (*revoke_ticket) (const void *);
-	void (*store_ticket) (const void *, int, unsigned long long);
-	void (*load_ticket) (const void *, int *, unsigned long long *);
+	void (*store_ticket) (const void *, int, int, unsigned long long);
+	void (*load_ticket) (const void *, int *, int *, unsigned long long *);
 };
 
 struct ticket_handler pcmk_handler;
