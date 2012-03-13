@@ -814,7 +814,7 @@ static char *logging_entity = NULL;
 void safe_copy(char *dest, char *value, size_t buflen, const char *description) {
 	if (strlen(value) >= buflen) {
 		fprintf(stderr, "'%s' exceeds maximum %s length of %ld\n",
-			value, description, buflen - 1);
+			value, description, (long)(buflen - 1));
 		exit(EXIT_FAILURE);
 	}
 	strncpy(dest, value, buflen - 1);
