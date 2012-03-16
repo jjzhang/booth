@@ -495,7 +495,7 @@ static int booth_udp_send(unsigned long to, void *buf, int len)
 	struct sockaddr_storage sockaddr;
 	struct iovec iovec;
 	unsigned int iov_len;
-	int addrlen, rv;
+	int addrlen = 0, rv;
 
 	iovec.iov_base = (void *)buf;
 	iovec.iov_len = len;

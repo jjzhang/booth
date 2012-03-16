@@ -32,7 +32,7 @@ struct paxos_operations {
 	int (*get_myid) (void);
 	int (*send) (unsigned long id, void *value, int len);
 	int (*broadcast) (void *value, int len);
-	int (*catchup) (const void *name);
+	int (*catchup) (pi_handle_t handle);
 	int (*prepare) (pi_handle_t handle, void *extra);
 	int (*promise) (pi_handle_t handle, void *extra);
 	int (*propose) (pi_handle_t handle, void *extra,
@@ -70,6 +70,8 @@ int paxos_leader_get(pi_handle_t handle, int *round);
 int paxos_recovery_status_get(pi_handle_t handle);
 
 int paxos_recovery_status_set(pi_handle_t handle, int recovery);
+
+int paxos_catchup(pi_handle_t handle);
 
 int paxos_propose(pi_handle_t handle, void *value, int round);
 

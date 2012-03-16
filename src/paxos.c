@@ -330,7 +330,8 @@ static void proposer_commit(struct paxos_space *ps,
 		ps->p_op->commit(pih, extra, pi->round);
 	pi->proposer->state = COMMITTED;
 
-	pi->end(pih, pi->round, 0);	
+	if (pi->end)
+		pi->end(pih, pi->round, 0);	
 }
 
 static void acceptor_promise(struct paxos_space *ps,
@@ -642,11 +643,10 @@ pi_handle_t paxos_instance_init(ps_handle_t handle, const void *name, int *prio)
 		       sizeof(struct proposal) + valuelen);
 		pi->acceptor = acceptor;
 	
-		if (ps->p_op->catchup) {
+		if (ps->p_op->catchup)
 			pi->acceptor->state = RECOVERY;
-			ps->p_op->catchup(name);
+		else
 			pi->acceptor->state = INIT;
-		}
 	}
 
 	if (ps->role[myid] & LEARNER) {
@@ -756,6 +756,8 @@ int paxos_propose(pi_handle_t handle, void *value, int round)
 	int len = sizeof(struct paxos_msghdr)
 			 + pi->ps->extralen + pi->ps->valuelen;
 
+	if (!pi->proposer->ballot)
+		pi->proposer->ballot = round;
 	if (round != pi->proposer->ballot) {
 		log_debug("round: %d, proposer ballot: %d",
 			  round, pi->proposer->ballot);
@@ -799,6 +801,13 @@ int paxos_propose(pi_handle_t handle, void *value, int round)
 	}
 
 	return 0;
+}
+
+int paxos_catchup(pi_handle_t handle)
+{
+	struct paxos_instance *pi = (struct paxos_instance *)handle;
+	
+	return pi->ps->p_op->catchup(handle);
 }
 
 int paxos_recvmsg(void *msg, int msglen)

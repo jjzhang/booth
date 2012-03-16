@@ -58,9 +58,12 @@ struct timerlist * add_timer(unsigned long expires,
 	return timer;
 }
 
-int del_timer(struct timerlist *timer)
+int del_timer(struct timerlist **timer)
 {
-	timer->expires = -2;
+	(*timer)->expires = -2;
+	(*timer)->data = 0;
+	(*timer)->function = NULL;
+	*timer = NULL;
 	
 	return 0;
 }

@@ -1,6 +1,6 @@
 MAINTAINERCLEANFILES	= Makefile.in
 
-AM_CFLAGS		= -fPIC
+AM_CFLAGS		= -fPIC -Werror
 
 INCLUDES		= -I$(top_builddir)/include
 

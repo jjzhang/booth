@@ -126,12 +126,17 @@ static void lease_expires(unsigned long data)
 	strcpy(plr.name, pl->name);
 	plr.owner = -1;
 	plr.expires = 0;
+	plr.ballot = pl->acceptor.round;
 	p_l_op->notify(plh, &plr);
 		
 	if (pl->proposer.timer1)
-		del_timer(pl->proposer.timer1);
+		del_timer(&pl->proposer.timer1);
+	if (pl->proposer.timer2)
+		del_timer(&pl->proposer.timer2);
 	if (pl->acceptor.timer1)
-		del_timer(pl->acceptor.timer1);
+		del_timer(&pl->acceptor.timer1);
+	if (pl->acceptor.timer2)
+		del_timer(&pl->acceptor.timer2);
 
 	if (pl->failover)
 		paxos_lease_acquire(plh, 1, NULL);
@@ -145,7 +150,7 @@ static void lease_retry(unsigned long data)
 
 	log_debug("lease_retry ...");
 	if (pl->proposer.timer2)
-		del_timer(pl->proposer.timer2);
+		del_timer(&pl->proposer.timer2);
 	if (pl->owner == myid) {
 		log_debug("already got the lease, no need to retry");
 		return;
@@ -198,27 +203,26 @@ int paxos_lease_release(pl_handle_t handle)
 	return 0;
 }
 
-static int lease_catchup(const void *name)
+static int lease_catchup(pi_handle_t handle)
 {
 	struct paxos_lease *pl;
 	struct paxos_lease_result plr;
 	int found = 0;
 
 	list_for_each_entry(pl, &lease_head, list) {
-		if (!strcmp(pl->name, name)) {
+		if (pl->pih == handle) {
 			found = 1;
 			break;
 		}
 	}
 	if (!found) {
-		log_error("could not found the lease name (%s) "
-			  "in registered list", (char *)name);
+		log_error("could not find the lease handle: %ld", handle);
 		return -1;
 	}
 
-	p_l_op->catchup(name, &pl->owner, &pl->expires);
-	log_debug("catchup result: name: %s, owner: %d, expires: %llu",
-		  (char *)name, pl->owner, pl->expires);
+	p_l_op->catchup(pl->name, &pl->owner, &pl->proposer.round, &pl->expires);
+	log_debug("catchup result: name: %s, owner: %d, ballot: %d, expires: %llu",
+		  (char *)pl->name, pl->owner, pl->proposer.round, pl->expires);
 
 	if (pl->owner == -1)
 		return 0;
@@ -248,6 +252,7 @@ static int lease_catchup(const void *name)
 
 	plr.owner = pl->owner;
 	plr.expires = pl->expires;
+	plr.ballot = pl->proposer.round;
 	strcpy(plr.name, pl->name);
 	p_l_op->notify((pl_handle_t)pl, &plr);
 
@@ -333,7 +338,7 @@ static int lease_propose(pi_handle_t handle,
 	memcpy(pl->proposer.plv, value, sizeof(struct paxos_lease_value));
 
 	if (pl->proposer.timer1)
-		del_timer(pl->proposer.timer1);
+		del_timer(&pl->proposer.timer1);
 
 	if (pl->renew) {
 		pl->proposer.timer1 = add_timer(4 * pl->expiry / 5,
@@ -378,7 +383,7 @@ static int lease_accepted(pi_handle_t handle,
 	memcpy(pl->acceptor.plv, value, sizeof(struct paxos_lease_value));
 
 	if (pl->acceptor.timer1 && pl->acceptor.timer2 != pl->acceptor.timer1)
-		del_timer(pl->acceptor.timer1);
+		del_timer(&pl->acceptor.timer1);
 	pl->acceptor.timer1 = add_timer(pl->expiry, (unsigned long)pl,
 					lease_expires);
 	pl->acceptor.expires = current_time() + pl->expiry;
@@ -416,13 +421,14 @@ static int lease_commit(pi_handle_t handle,
 	pl->expiry = pl->proposer.plv->expiry;
 	if (pl->acceptor.timer2 != pl->acceptor.timer1) {
 		if (pl->acceptor.timer2)
-			del_timer(pl->acceptor.timer2);
+			del_timer(&pl->acceptor.timer2);
 		pl->acceptor.timer2 = pl->acceptor.timer1;
 	}
 
 	strcpy(plr.name, pl->proposer.plv->name);
 	plr.owner = pl->proposer.plv->owner;
 	plr.expires = current_time() + pl->proposer.plv->expiry;
+	plr.ballot = round;
 
 	p_l_op->notify((pl_handle_t)pl, &plr);
 
@@ -459,13 +465,14 @@ static int lease_learned(pi_handle_t handle,
 	pl->expiry = pl->acceptor.plv->expiry;
 	if (pl->acceptor.timer2 != pl->acceptor.timer1) {
 		if (pl->acceptor.timer2)
-			del_timer(pl->acceptor.timer2);
+			del_timer(&pl->acceptor.timer2);
 		pl->acceptor.timer2 = pl->acceptor.timer1;
 	}
 
 	strcpy(plr.name, pl->acceptor.plv->name);
 	plr.owner = pl->acceptor.plv->owner;
 	plr.expires = current_time() + pl->acceptor.plv->expiry;
+	plr.ballot = round;
 
 	p_l_op->notify((pl_handle_t)pl, &plr);
 
@@ -550,6 +557,19 @@ pl_handle_t paxos_lease_init(const void *name,
 	return (pl_handle_t)lease;
 }
 
+int paxos_lease_status_recovery(pl_handle_t handle)
+{
+	struct paxos_lease *pl = (struct paxos_lease *)handle;
+
+	if (paxos_recovery_status_get(pl->pih) == 1) {
+		pl->renew = 1;
+		if (paxos_catchup(pl->pih) == 0)
+			paxos_recovery_status_set(pl->pih, 0);
+	}
+
+	return 0;	
+}
+
 int paxos_lease_on_receive(void *msg, int msglen)
 {
 	return paxos_recvmsg(msg, msglen);
@@ -565,11 +585,15 @@ int paxos_lease_exit(pl_handle_t handle)
 	if (pl->proposer.plv)
 		free(pl->proposer.plv);
 	if (pl->proposer.timer1)
-		del_timer(pl->proposer.timer1);
+		del_timer(&pl->proposer.timer1);
+	if (pl->proposer.timer2)
+		del_timer(&pl->proposer.timer2);
 	if (pl->acceptor.plv)
 		free(pl->acceptor.plv);
 	if (pl->acceptor.timer1)
-		del_timer(pl->acceptor.timer1);
+		del_timer(&pl->acceptor.timer1);
+	if (pl->acceptor.timer2)
+		del_timer(&pl->acceptor.timer2);
 
 	return 0;
 }
