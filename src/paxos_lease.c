@@ -37,7 +37,8 @@ struct paxos_lease_msghdr {
 struct paxos_lease_value {
 	char name[PAXOS_NAME_LEN+1];
 	int owner;
-	int expiry;	
+	int expiry;
+	int release;	
 };
 
 struct lease_state {
@@ -107,12 +108,14 @@ static void renew_expires(unsigned long data)
 	struct paxos_lease_value value;
 
 	log_debug("renew expires ...");
-	if (!pl->release) {
-		strncpy(value.name, pl->name, PAXOS_NAME_LEN + 1);
-		value.owner = myid;
-		value.expiry = pl->expiry;
-		paxos_propose(pl->pih, &value, pl->proposer.round);
-	}	
+
+	memset(&value, 0, sizeof(struct paxos_lease_value));
+	strncpy(value.name, pl->name, PAXOS_NAME_LEN + 1);
+	value.owner = myid;
+	value.expiry = pl->expiry;
+	if (pl->release)
+		value.release = 1;
+	paxos_propose(pl->pih, &value, pl->proposer.round);
 }
 
 static void lease_expires(unsigned long data)
@@ -156,6 +159,7 @@ static void lease_retry(unsigned long data)
 		return;
 	}
 
+	memset(&value, 0, sizeof(struct paxos_lease_value));
 	strncpy(value.name, pl->name, PAXOS_NAME_LEN + 1);
 	value.owner = myid;
 	value.expiry = pl->expiry;
@@ -175,6 +179,7 @@ int paxos_lease_acquire(pl_handle_t handle,
 	struct paxos_lease_value value;
 	int round;
 
+	memset(&value, 0, sizeof(struct paxos_lease_value));
 	strncpy(value.name, pl->name, PAXOS_NAME_LEN + 1);
 	value.owner = myid;
 	value.expiry = pl->expiry;
@@ -419,6 +424,7 @@ static int lease_commit(pi_handle_t handle,
 
 	pl->owner = pl->proposer.plv->owner;
 	pl->expiry = pl->proposer.plv->expiry;
+	pl->release = pl->proposer.plv->release;
 	if (pl->acceptor.timer2 != pl->acceptor.timer1) {
 		if (pl->acceptor.timer2)
 			del_timer(&pl->acceptor.timer2);
@@ -429,6 +435,19 @@ static int lease_commit(pi_handle_t handle,
 	plr.owner = pl->proposer.plv->owner;
 	plr.expires = current_time() + pl->proposer.plv->expiry;
 	plr.ballot = round;
+
+	if (pl->release) {
+		if (pl->acceptor.timer2)
+			del_timer(&pl->acceptor.timer2);
+		if (pl->acceptor.timer1)
+			del_timer(&pl->acceptor.timer1);
+		if (pl->proposer.timer2)
+			del_timer(&pl->proposer.timer2);
+		if (pl->proposer.timer1)
+			del_timer(&pl->proposer.timer1);
+		plr.owner = pl->owner = -1;
+		plr.expires = 0;
+	}
 
 	p_l_op->notify((pl_handle_t)pl, &plr);
 
@@ -463,6 +482,7 @@ static int lease_learned(pi_handle_t handle,
 
 	pl->owner = pl->acceptor.plv->owner;
 	pl->expiry = pl->acceptor.plv->expiry;
+	pl->release = pl->acceptor.plv->release;
 	if (pl->acceptor.timer2 != pl->acceptor.timer1) {
 		if (pl->acceptor.timer2)
 			del_timer(&pl->acceptor.timer2);
@@ -473,6 +493,15 @@ static int lease_learned(pi_handle_t handle,
 	plr.owner = pl->acceptor.plv->owner;
 	plr.expires = current_time() + pl->acceptor.plv->expiry;
 	plr.ballot = round;
+
+	if (pl->release) {
+		if (pl->acceptor.timer2)
+			del_timer(&pl->acceptor.timer2);
+		if (pl->acceptor.timer1)
+			del_timer(&pl->acceptor.timer1);
+		plr.owner = pl->owner = -1;
+		plr.expires = 0;
+	}
 
 	p_l_op->notify((pl_handle_t)pl, &plr);
 
