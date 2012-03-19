@@ -111,7 +111,6 @@ static void end_acquire(pl_handle_t handle, int result)
 	if (result == 0) {
 		list_for_each_entry(tk, &ticket_list, list) {
 			if (tk->handle == handle) {
-				tk->owner = ticket_get_myid();
 				found = 1;
 				break;
 			}
@@ -119,9 +118,8 @@ static void end_acquire(pl_handle_t handle, int result)
 		if (!found)
 			log_error("BUG: ticket handle %ld does not exist",
 				  handle);
-		log_info("ticket %s acquired", tk->id);
-		log_info("ticket %s granted to local (id %d)", tk->id,
-			 ticket_get_myid());
+		log_info("ticket %s was granted/reovked successfully (site %d)",
+			 tk->id, ticket_get_myid());
 	}
 }
 

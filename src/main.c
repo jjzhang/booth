@@ -613,7 +613,9 @@ static int do_grant(void)
 	}
  
 	if (reply.result == BOOTHC_RLT_ASYNC) {
-		log_info("grant command sent, but result is async.");
+		log_info("grant command sent, result will be returned "
+			 "asynchronously, you can get the result from "
+			 "the booth log");
 		rv = 0;
 	} else if (reply.result == BOOTHC_RLT_SYNC_SUCC) {
 		log_info("grant succeeded!");
@@ -705,7 +707,9 @@ static int do_revoke(void)
 	}
 
 	if (reply.result == BOOTHC_RLT_ASYNC) {
-		log_info("revoke command sent, but result is async.");
+		log_info("revoke command sent, result will be returned "
+			 "asynchronously, you can get the result from "
+			 "booth log after the ticket expiry time.");
 		rv = 0;
 	} else if (reply.result == BOOTHC_RLT_SYNC_SUCC) {
 		log_info("revoke succeeded!");
