@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import os
+import subprocess
 import time
 import tempfile
 import unittest
@@ -22,6 +23,15 @@ class BoothTestEnvironment(unittest.TestCase, BoothAssertions):
         self.test_name = self._testMethodName[5:]
         self.test_path = os.path.join(self.test_run_path, self.test_name)
         os.makedirs(self.test_path)
+        self.ensure_boothd_not_running()
+
+    def ensure_boothd_not_running(self):
+        # Need to redirect STDERR in case we're not root, in which
+        # case netstat's -p option causes a warning.  However we only
+        # want to kill boothd processes which we own; -p will list the
+        # pid for those and only those, which is exactly what we want
+        # here.
+        subprocess.call("netstat -tpln 2>&1 | perl -lne 'm,LISTEN\s+(\d+)/boothd, and kill 15, $1'", shell=True)
 
     def get_tempfile(self, identity):
         tf = tempfile.NamedTemporaryFile(
