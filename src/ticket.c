@@ -318,14 +318,25 @@ int revoke_ticket(char *ticket, int force)
 int list_ticket(char **pdata, unsigned int *len)
 {
 	struct ticket *tk;
+	char timeout_str[100];
+	char node_name[BOOTH_NAME_LEN];
 	char tmp[TK_LINE];
 
 	*pdata = NULL;
 	*len = 0;
 	list_for_each_entry(tk, &ticket_list, list) {
 		memset(tmp, 0, TK_LINE);
-		snprintf(tmp, TK_LINE, "ticket: %s, owner: %d, expires: %llu\n",
-			 tk->id, tk->owner, tk->expires);
+		strncpy(timeout_str, "INF", sizeof(timeout_str));
+		strncpy(node_name, "None", sizeof(node_name));
+
+		if (tk->owner < MAX_NODES && tk->owner > -1)
+			strncpy(node_name, booth_conf->node[tk->owner].addr,
+					sizeof(node_name));
+		if (tk->expires != 0)
+			strftime(timeout_str, sizeof(timeout_str), "%Y/%m/%d %H:%M:%S",
+					localtime((time_t *)&tk->expires));
+		snprintf(tmp, TK_LINE, "ticket: %s, owner: %s, expires: %s\n",
+			 tk->id, node_name, timeout_str);
 		*pdata = realloc(*pdata, *len + TK_LINE);
 		if (*pdata == NULL)
 			return -ENOMEM;
