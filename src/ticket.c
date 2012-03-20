@@ -318,14 +318,19 @@ int revoke_ticket(char *ticket, int force)
 int list_ticket(char **pdata, unsigned int *len)
 {
 	struct ticket *tk;
+	char outstr[100];
 	char tmp[TK_LINE];
 
 	*pdata = NULL;
 	*len = 0;
 	list_for_each_entry(tk, &ticket_list, list) {
 		memset(tmp, 0, TK_LINE);
-		snprintf(tmp, TK_LINE, "ticket: %s, owner: %d, expires: %llu\n",
-			 tk->id, tk->owner, tk->expires);
+		strncpy(outstr, "INF", sizeof(outstr));
+		if (tk->expires != 0) {
+			strftime(outstr, sizeof(outstr), "%Y/%m/%d %H:%M:%S", localtime((time_t *)&tk->expires));
+		}
+		snprintf(tmp, TK_LINE, "ticket: %s, owner: %d, expires: %s\n",
+			 tk->id, tk->owner, outstr);
 		*pdata = realloc(*pdata, *len + TK_LINE);
 		if (*pdata == NULL)
 			return -ENOMEM;

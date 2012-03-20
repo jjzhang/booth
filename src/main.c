@@ -266,7 +266,6 @@ void process_connection(int ci)
 	rv = do_read(client[ci].fd, &h, sizeof(h));
 
 	if (rv < 0) {
-		log_error("connection %d read error %d", ci, rv);
 		if (errno == ECONNRESET)
 			log_debug("client %d aborted conection fd %d", ci, client[ci].fd);
 		else 
