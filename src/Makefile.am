@@ -22,6 +22,9 @@ EXTRA_DIST		= $(man_MANS)
 
 %.8: %
 	$(HELP2MAN) -N -o $@ ./$<
+
+booth.8: boothd.8
+	cp $< $@
 endif
 
 lint:
