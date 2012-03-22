@@ -558,7 +558,7 @@ out:
 	return rv;
 }
 
-static int do_grant(void)
+static int do_command(cmd_request_t cmd)
 {
 	char *buf;
 	struct boothc_header *h, reply;
@@ -576,7 +576,7 @@ static int do_grant(void)
 	h = (struct boothc_header *)buf;
 	if (cl.force)
 		force = BOOTHC_OPT_FORCE;
-	init_header(h, BOOTHC_CMD_GRANT, force, 0,
+	init_header(h, cmd, force, 0,
 		    sizeof(cl.site) + sizeof(cl.ticket));
 	strcpy(buf + sizeof(struct boothc_header), cl.site);
 	strcpy(buf + sizeof(struct boothc_header) + sizeof(cl.site), cl.ticket);
@@ -628,15 +628,28 @@ static int do_grant(void)
 	}
  
 	if (reply.result == BOOTHC_RLT_ASYNC) {
-		log_info("grant command sent, result will be returned "
-			 "asynchronously, you can get the result from "
-			 "the booth log");
+		if (cmd == BOOTHC_CMD_GRANT)
+			log_info("grant command sent, result will be returned "
+				 "asynchronously, you can get the result from "
+				 "the log files");
+		else if (cmd == BOOTHC_CMD_REVOKE)
+			log_info("revoke command sent, result will be returned "
+				 "asynchronously, you can get the result from "
+				 "the log files after the ticket expiry time.");
+		else
+			log_error("internal error reading reply result!");
 		rv = 0;
 	} else if (reply.result == BOOTHC_RLT_SYNC_SUCC) {
-		log_info("grant succeeded!");
+		if (cmd == BOOTHC_CMD_GRANT)
+			log_info("grant succeeded!");
+		else if (cmd == BOOTHC_CMD_REVOKE)
+			log_info("revoke succeeded!");
 		rv = 0;
 	} else if (reply.result == BOOTHC_RLT_SYNC_FAIL) {
-		log_info("grant failed!");
+		if (cmd == BOOTHC_CMD_GRANT)
+			log_info("grant failed!");
+		else if (cmd == BOOTHC_CMD_REVOKE)
+			log_info("revoke failed!");
 		rv = 0;
 	} else {
 		log_error("internal error!");
@@ -651,98 +664,14 @@ out:
 	return rv;
 }
 
+static int do_grant(void)
+{
+	return do_command(BOOTHC_CMD_GRANT);
+}
+
 static int do_revoke(void)
 {
-	char *buf;
-	struct boothc_header *h, reply;
-	int buflen;
-	uint32_t force = 0;
-	int fd, rv;
-
-	buflen = sizeof(struct boothc_header) +
-		 sizeof(cl.site) + sizeof(cl.ticket);
-	buf = malloc(buflen);
-	if (!buf) {
-		rv = -ENOMEM;
-		goto out;
-	}
-	h = (struct boothc_header *)buf;
-	if (cl.force)
-		force = BOOTHC_OPT_FORCE;
-	init_header(h, BOOTHC_CMD_REVOKE, force, 0,
-		    sizeof(cl.site) + sizeof(cl.ticket));
-	strcpy(buf + sizeof(struct boothc_header), cl.site);
-	strcpy(buf + sizeof(struct boothc_header) + sizeof(cl.site), cl.ticket);
-
-
-	fd = do_connect(BOOTHC_SOCK_PATH);
-	if (fd < 0) {
-		rv = fd;
-		goto out_free;
-	}
-        
-	rv = do_write(fd, buf, buflen);
-        if (rv < 0)
-                goto out_close;
-
-	rv = do_read(fd, &reply, sizeof(struct boothc_header));
-	if (rv < 0)
-		goto out_close;
-
-	if (reply.result == BOOTHC_RLT_INVALID_ARG) {
-		log_info("invalid argument!");
-		rv = -1;
-		goto out_close;
-	}
-
-	if (reply.result == BOOTHC_RLT_REMOTE_OP) {
-		struct booth_node to;
-		int s;
-
-		memset(&to, 0, sizeof(struct booth_node));
-		to.family = BOOTH_PROTO_FAMILY;
-		strcpy(to.addr, cl.site);
-
-		s = booth_transport[TCP].open(&to);
-		if (s < 0)
-			goto out_close;
-
-		rv = booth_transport[TCP].send(s, buf, buflen);
-		if (rv < 0) {
-			booth_transport[TCP].close(s);
-			goto out_close;
-		}
-		rv = booth_transport[TCP].recv(s, &reply,
-					       sizeof(struct boothc_header));
-		if (rv < 0) {
-			booth_transport[TCP].close(s);
-			goto out_close;
-		}
-		booth_transport[TCP].close(s);
-	}
-
-	if (reply.result == BOOTHC_RLT_ASYNC) {
-		log_info("revoke command sent, result will be returned "
-			 "asynchronously, you can get the result from "
-			 "booth log after the ticket expiry time.");
-		rv = 0;
-	} else if (reply.result == BOOTHC_RLT_SYNC_SUCC) {
-		log_info("revoke succeeded!");
-		rv = 0;
-	} else if (reply.result == BOOTHC_RLT_SYNC_FAIL) {
-		log_info("revoke failed!");
-		rv = 0;
-	} else {
-		log_error("internal error!");
-		rv = -1;
-	}
-
-out_close:
-	close(fd);
-out_free:
-	free(buf);
-out:
-	return rv;
+	return do_command(BOOTHC_CMD_REVOKE);
 }
 
 static int lockfile(void)
