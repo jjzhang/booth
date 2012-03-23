@@ -109,7 +109,7 @@ retry:
 	if (rv == -1 && errno == EINTR)
 		goto retry;
 	if (rv < 0) {
-		log_error("write failed: %s", strerror(errno));
+		log_error("write failed: %s (%d)", strerror(errno), errno);
 		return rv;
 	}
 
@@ -129,7 +129,7 @@ static int do_connect(const char *sock_path)
 
 	fd = socket(PF_UNIX, SOCK_STREAM, 0);
 	if (fd < 0) {
-		log_error("failed to create socket: %s", strerror(errno));
+		log_error("failed to create socket: %s (%d)", strerror(errno), errno);
 		goto out;
 	}
 
@@ -145,7 +145,7 @@ static int do_connect(const char *sock_path)
 				  "please ensure that you are on a "
 				  "machine which has boothd running.");
 		else
-			log_error("failed to connect: %s", strerror(errno));
+			log_error("failed to connect: %s (%d)", strerror(errno), errno);
 		close(fd);
 		fd = rv;
 	}
@@ -237,7 +237,7 @@ static int setup_listener(const char *sock_path)
 
 	s = socket(AF_LOCAL, SOCK_STREAM, 0);
 	if (s < 0) {
-		log_error("socket error %d %d", s, errno);
+		log_error("socket error %d: %s (%d)", s, strerror(errno), errno);
 		return s;
 	}
 
@@ -249,14 +249,14 @@ static int setup_listener(const char *sock_path)
 
 	rv = bind(s, (struct sockaddr *) &addr, addrlen);
 	if (rv < 0) {
-		log_error("bind error %d %d", rv, errno);
+		log_error("bind error %d: %s (%d)", rv, strerror(errno), errno);
 		close(s);
 		return rv;
 	}
 
 	rv = listen(s, 5);
 	if (rv < 0) {
-		log_error("listen error %d %d", rv, errno);
+		log_error("listen error %d: %s (%d)", rv, strerror(errno), errno);
 		close(s);
 		return rv;
 	}
@@ -275,9 +275,11 @@ void process_connection(int ci)
 
 	if (rv < 0) {
 		if (errno == ECONNRESET)
-			log_debug("client %d aborted conection fd %d", ci, client[ci].fd);
+			log_debug("client %d connection reset for fd %d", ci, client[ci].fd);
 		else 
-			log_debug("client %d closed connnection fd %d", ci, client[ci].fd);
+			log_debug("client %d read failed for fd %d: %s (%d)",
+				  ci, client[ci].fd,
+				  strerror(errno), errno);
 
 		deadfn = client[ci].deadfn;
 		if(deadfn) {
@@ -380,7 +382,8 @@ static void process_listener(int ci)
 
 	fd = accept(client[ci].fd, NULL, NULL);
 	if (fd < 0) {
-		log_error("process_listener: accept error %d %d", fd, errno);
+		log_error("process_listener: accept error for fd %d: %s (%d)",
+			  fd, strerror(errno), errno);
 		return;
 	}
 
@@ -473,8 +476,8 @@ static int loop(void)
                 if (rv == -1 && errno == EINTR)
                         continue;
                 if (rv < 0) {
-                        log_error("poll errno %d", errno);
-			goto fail;
+                        log_error("poll failed: %s (%d)", strerror(errno), errno);
+                        goto fail;
                 }
 
                 for (i = 0; i <= client_maxi; i++) {
@@ -983,8 +986,9 @@ static void set_scheduler(void)
                 sched_param.sched_priority = rv;
                 rv = sched_setscheduler(0, SCHED_RR, &sched_param);
                 if (rv == -1)
-                        log_error("could not set SCHED_RR priority %d err %d",
-                                   sched_param.sched_priority, errno);
+                        log_error("could not set SCHED_RR priority %d: %s (%d)",
+                                  sched_param.sched_priority,
+                                  strerror(errno), errno);
         } else {
                 log_error("could not get maximum scheduler priority err %d",
                           errno);
