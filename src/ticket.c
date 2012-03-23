@@ -255,10 +255,6 @@ static int ticket_catchup(const void *name, int *owner, int *ballot,
 				if (current_time() >= tk->expires) {
 					tk->owner = -1;
 					tk->expires = 0;
-					pcmk_handler.store_ticket(tk->id,
-								  tk->owner,
-								  tk->ballot,
-								  tk->expires);
 				} 
 			}
 		}
@@ -298,6 +294,28 @@ static int ticket_catchup(const void *name, int *owner, int *ballot,
 			booth_transport[TCP].close(s);
 			ticket_parse(tmsg);
 			memset(tmsg, 0, sizeof(struct ticket_msg)); 
+		}
+	}
+		
+	list_for_each_entry(tk, &ticket_list, list) {
+		if (!strcmp(tk->id, name)) {
+			if (booth_conf->node[myid].type != ARBITRATOR) {
+				if (current_time() >= tk->expires) {
+					tk->owner = -1;
+					tk->expires = 0;
+				}
+				pcmk_handler.store_ticket(tk->id,
+							  tk->owner,
+							  tk->ballot,
+							  tk->expires);
+				if (tk->owner == myid)
+					pcmk_handler.grant_ticket(tk->id);
+				else
+					pcmk_handler.revoke_ticket(tk->id);
+			}
+			*owner = tk->owner;
+			*expires = tk->expires;
+			*ballot = tk->ballot;
 		}
 	}
 
