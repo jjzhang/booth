@@ -58,6 +58,7 @@ typedef enum {
 	BOOTHC_CMD_LIST = 1,
 	BOOTHC_CMD_GRANT,
 	BOOTHC_CMD_REVOKE,
+	BOOTHC_CMD_CATCHUP,
 } cmd_request_t;
 
 typedef enum {

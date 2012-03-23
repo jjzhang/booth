@@ -308,7 +308,6 @@ void process_connection(int ci)
 			log_error("connection %d read data error %d", ci, rv);
 			goto out;
 		}
-		h.len = 0;
 	}
 
 	switch (h.cmd) {
@@ -318,6 +317,7 @@ void process_connection(int ci)
 		break;
 
 	case BOOTHC_CMD_GRANT:
+		h.len = 0;
 		site = data;
 		ticket = data + BOOTH_NAME_LEN;
 		if (!check_ticket(ticket)) {
@@ -335,6 +335,7 @@ void process_connection(int ci)
 		break;
 
 	case BOOTHC_CMD_REVOKE:
+		h.len = 0;
 		site = data;
 		ticket = data + BOOTH_NAME_LEN;
 		if (!check_ticket(ticket)) {
@@ -349,6 +350,10 @@ void process_connection(int ci)
 			h.result = revoke_ticket(ticket, h.option);
 		else
 			h.result = BOOTHC_RLT_REMOTE_OP;
+		break;
+
+	case BOOTHC_CMD_CATCHUP:
+		h.result = catchup_ticket(&data, h.len);	
 		break;
 
 	default:

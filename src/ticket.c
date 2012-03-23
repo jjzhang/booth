@@ -27,6 +27,8 @@
 #include "pacemaker.h"
 #include "list.h"
 #include "log.h"
+#include "booth.h"
+#include "timer.h"
 #include "paxos_lease.h"
 #include "paxos.h"
 
@@ -37,6 +39,14 @@ struct booth_msghdr {
         uint16_t magic;
         uint16_t checksum;
         uint32_t len;
+} __attribute__((packed));
+
+struct ticket_msg {
+	char id[BOOTH_NAME_LEN+1];
+	uint32_t owner;
+	uint32_t expiry;
+	uint32_t ballot;
+	uint32_t result;
 } __attribute__((packed));
 
 struct ticket {
@@ -174,7 +184,7 @@ static int ticket_broadcast(void *value, int len)
 	free(buf);
 	return rv;	
 }
-
+#if 0
 static int ticket_read(const void *name, int *owner, int *ballot, 
 		       unsigned long long *expires)
 {
@@ -199,6 +209,100 @@ static int ticket_read(const void *name, int *owner, int *ballot,
 	*ballot = tk->ballot;
  
 	return 0;
+}
+#endif
+static int ticket_parse(struct ticket_msg *tmsg)
+{
+	struct ticket *tk;
+	int found = 0;
+
+	if (!tmsg->result)
+		return -1;
+
+	list_for_each_entry(tk, &ticket_list, list) {
+		if (!strcmp(tk->id, tmsg->id)) {
+			tk->owner = tmsg->owner;
+			tk->expires = current_time() + tmsg->expiry;
+			tk->ballot = tmsg->ballot;
+			found = 1;
+			break;
+		}
+	}
+
+	if (!found)
+		return -1;
+	else
+		return 0;
+}
+
+static int ticket_catchup(const void *name, int *owner, int *ballot,
+			  unsigned long long *expires)
+{	
+	struct ticket *tk;
+	int i, s, buflen, rv = 0;
+	char *buf = NULL;
+	struct boothc_header *h;
+	struct ticket_msg *tmsg;
+	int myid = ticket_get_myid();
+
+	if (booth_conf->node[myid].type != ARBITRATOR) {
+		list_for_each_entry(tk, &ticket_list, list) {
+			if (!strcmp(tk->id, name)) {
+				pcmk_handler.load_ticket(tk->id,
+							 &tk->owner,
+							 &tk->ballot,
+							 &tk->expires);
+				if (current_time() >= tk->expires) {
+					tk->owner = -1;
+					tk->expires = 0;
+					pcmk_handler.store_ticket(tk->id,
+								  tk->owner,
+								  tk->ballot,
+								  tk->expires);
+				} 
+			}
+		}
+	}
+
+	buflen = sizeof(struct boothc_header) + sizeof(struct ticket_msg);
+	buf = malloc(buflen);
+	if (!buf)
+		return -ENOMEM;
+	memset(buf, 0, buflen);
+
+	h = (struct boothc_header *)buf;
+	h->magic = BOOTHC_MAGIC;
+	h->version = BOOTHC_VERSION;
+	h->cmd = BOOTHC_CMD_CATCHUP;
+	h->len = sizeof(struct ticket_msg);
+	tmsg = (struct ticket_msg *)(buf + sizeof(struct boothc_header));
+	
+	for (i = 0; i < booth_conf->node_count; i++) {
+		if (booth_conf->node[i].type == SITE &&
+		    !(booth_conf->node[i].local)) {
+			strncpy(tmsg->id, name, BOOTH_NAME_LEN + 1);
+			s = booth_transport[TCP].open(&booth_conf->node[i]);
+			if (s < 0)
+				continue;
+			rv = booth_transport[TCP].send(s, buf, buflen);
+			if (rv < 0) {
+				booth_transport[TCP].close(s);
+				continue;
+			}
+			memset(tmsg, 0, sizeof(struct ticket_msg));
+			rv = booth_transport[TCP].recv(s, buf, buflen);
+			if (rv < 0) {
+				booth_transport[TCP].close(s);
+				continue;
+			}
+			booth_transport[TCP].close(s);
+			ticket_parse(tmsg);
+			memset(tmsg, 0, sizeof(struct ticket_msg)); 
+		}
+	}
+
+	free(buf);
+	return rv;
 }
 
 static int ticket_write(pl_handle_t handle, struct paxos_lease_result *result)
@@ -348,11 +452,35 @@ int list_ticket(char **pdata, unsigned int *len)
 	return 0;
 }
 
+int catchup_ticket(char **pdata, unsigned int len)
+{
+	struct ticket_msg *tmsg;
+	struct ticket *tk;
+
+	assert(len == sizeof(struct ticket_msg));
+	tmsg = (struct ticket_msg *)(*pdata);
+	list_for_each_entry(tk, &ticket_list, list) {
+		if (!strcmp(tk->id, tmsg->id) && tk->owner == ticket_get_myid()
+		    && current_time() < tk->expires) {
+			tmsg->owner = tk->owner;
+			tmsg->expiry = tk->expires - current_time();
+			tmsg->ballot = tk->ballot;
+			tmsg->result = 1;
+			break;
+		}
+	}
+
+	if (!tmsg->result)
+		memset(*pdata, 0, len);
+
+	return 0;
+}
+
 const struct paxos_lease_operations ticket_operations = {
 	.get_myid	= ticket_get_myid,
 	.send		= ticket_send,
 	.broadcast	= ticket_broadcast,
-	.catchup	= ticket_read,
+	.catchup	= ticket_catchup,
 	.notify		= ticket_write,
 };
 

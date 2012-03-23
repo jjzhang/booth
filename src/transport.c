@@ -23,6 +23,7 @@
 #include <linux/rtnetlink.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
@@ -255,7 +256,7 @@ static void process_dead(int ci)
 
 static void process_tcp_listener(int ci)
 {
-	int fd, i;
+	int fd, i, one = 1;
 	socklen_t addrlen;
 	struct sockaddr addr;
 	struct tcp_conn *conn;
@@ -266,6 +267,7 @@ static void process_tcp_listener(int ci)
 			  fd, errno);
 		return;
 	}
+	setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&one, sizeof(one));
 
 	conn = malloc(sizeof(struct tcp_conn));
 	if (!conn) {
