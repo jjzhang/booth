@@ -109,7 +109,7 @@ retry:
 	if (rv == -1 && errno == EINTR)
 		goto retry;
 	if (rv < 0) {
-		log_error("write errno %d", errno);
+		log_error("write failed: %s", strerror(errno));
 		return rv;
 	}
 
@@ -128,8 +128,10 @@ static int do_connect(const char *sock_path)
 	int rv, fd;
 
 	fd = socket(PF_UNIX, SOCK_STREAM, 0);
-	if (fd < 0)
+	if (fd < 0) {
+		log_error("failed to create socket: %s", strerror(errno));
 		goto out;
+	}
 
 	memset(&sun, 0, sizeof(sun));
 	sun.sun_family = AF_UNIX;
@@ -138,6 +140,12 @@ static int do_connect(const char *sock_path)
 
 	rv = connect(fd, (struct sockaddr *) &sun, addrlen);
 	if (rv < 0) {
+		if (errno == ECONNREFUSED)
+			log_error("Connection to boothd was refused; "
+				  "please ensure that you are on a "
+				  "machine which has boothd running.");
+		else
+			log_error("failed to connect: %s", strerror(errno));
 		close(fd);
 		fd = rv;
 	}
