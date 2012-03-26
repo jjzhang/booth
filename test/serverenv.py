@@ -11,28 +11,75 @@ from boothtestenv import BoothTestEnvironment
 from utils        import get_IP
 
 class ServerTestEnvironment(BoothTestEnvironment):
+    '''
+    boothd site/arbitrator will hang in setup phase while attempting to connect
+    to an unreachable peer during ticket_catchup().  In a test environment we don't
+    have any reachable peers.  Fortunately, we can still successfully launch a
+    daemon by only listing our own IP in the config file.
+    '''
     typical_config = """\
 # This is like the config in the manual
 transport="UDP"
 port="6666"
 # Here's another comment
-arbitrator="147.2.207.14"
+#arbitrator="147.2.207.14"
 site="147.4.215.19"
-site="147.18.2.1"
+#site="147.18.2.1"
 ticket="ticketA"
 ticket="ticketB"
 """
-    working_config = re.sub('site=".+"', 'site="%s"' % get_IP(), typical_config, 1)
+    site_re = re.compile('^site=".+"', re.MULTILINE)
+    working_config = re.sub(site_re, 'site="%s"' % get_IP(), typical_config, 1)
 
-    def run_booth(self, config_text=None, config_file=None, lock_file=True, args=[],
-                  expected_exitcode=0, debug=False):
+    def run_booth(self, expected_exitcode, expected_daemon,
+                  config_text=None, config_file=None, lock_file=True,
+                  args=[], debug=False):
         '''
-        Runs boothd.  Defaults to using a temporary lock file and
-        the standard config file path.
+        Runs boothd.  Defaults to using a temporary lock file and the
+        standard config file path.  There are four possible types of
+        outcome:
+
+            - boothd exits non-zero without launching a daemon (setup phase failed,
+              e.g. due to invalid configuration file)
+            - boothd exits zero after launching a daemon (successful operation)
+            - boothd does not exit (running in foreground / debug mode)
+            - boothd does not exit (setup phase hangs, e.g. while attempting
+              to connect to peer during ticket_catchup())
+
+        Arguments:
+            config_text
+                a string containing the contents of a configuration file to use
+            config_file
+                path to a configuration file to use
+            lock_file
+                False: don't pass a lockfile parameter to booth via -l
+                True: pass a temporary lockfile parameter to booth via -l
+                string: pass the given lockfile path to booth via -l
+            args
+                array of extra args to pass to booth
+            expected_exitcode
+                an integer, or False if booth is not expected to terminate
+                within the timeout
+            expected_daemon
+                True iff a daemon is expected to be launched (this includes
+                running the server in debug / foreground mode via -D; even
+                though in this case the server's not technically not a daemon,
+                we still want to treat it like one by checking the lockfile
+                before and after we kill it)
+            debug
+                True means pass the -D parameter
 
         Returns a (pid, return_code, stdout, stderr, runner) tuple,
         where return_code/stdout/stderr are None iff pid is still running.
         '''
+        if expected_daemon and expected_exitcode is not None and expected_exitcode != 0:
+            raise RuntimeError, \
+                "Shouldn't ever expect daemon to start and then failure"
+
+        if not expected_daemon and expected_exitcode == 0:
+            raise RuntimeError, \
+                "Shouldn't ever expect success without starting daemon"
+
         self.init_log()
 
         runner = BoothRunner(self.boothd_path, self.mode, args)
@@ -54,11 +101,13 @@ ticket="ticketB"
         (pid, return_code, stdout, stderr) = runner.run()
         self.check_return_code(pid, return_code, expected_exitcode)
 
-        expected_daemon = expected_exitcode == 0 or expected_exitcode is None
-        got_daemon      = return_code       == 0 or return_code       is None
-
-        if got_daemon:
+        if expected_daemon:
             self.check_daemon_handling(runner, expected_daemon)
+        elif return_code is None:
+            # This isn't strictly necessary because we ensure no
+            # daemon is running from within test setUp(), but it's
+            # probably a good idea to tidy up after ourselves anyway.
+            self.kill_pid(pid)
 
         return (pid, return_code, stdout, stderr, runner)
 
@@ -68,6 +117,11 @@ ticket="ticketB"
         c.write(config_text)
         c.close()
         return config_file
+
+    def kill_pid(self, pid):
+        print "killing %d ..." % pid
+        os.kill(pid, 15)
+        print "killed"
 
     def check_daemon_handling(self, runner, expected_daemon):
         '''
@@ -86,9 +140,7 @@ ticket="ticketB"
         self.assertTrue(daemon_running, err)
 
         if daemon_running:
-            print "killing %s ..." % daemon_pid
-            os.kill(int(daemon_pid), 15)
-            print "killed"
+            self.kill_pid(int(daemon_pid))
             time.sleep(1)
             daemon_pid = self.get_daemon_pid_from_lock_file(runner.lock_file)
             self.assertTrue(daemon_pid is not None,
@@ -144,3 +196,8 @@ ticket="ticketB"
         # )
 
         return True
+
+    def _test_buffer_overflow(self, expected_error, **args):
+        (pid, ret, stdout, stderr, runner) = \
+            self.run_booth(expected_exitcode=1, expected_daemon=False, **args)
+        self.assertRegexpMatches(stderr, expected_error)

@@ -61,13 +61,11 @@ class BoothTestEnvironment(unittest.TestCase, BoothAssertions):
                 self.fail("expected exit code %d, not long-running process" % expected_exitcode)
         else:
             print "pid %d exited with code %d" % (pid, return_code)
-            msg = "should exit with code %s" % expected_exitcode
-            msg += "\nlog follows (see %s)" % self.log_file
+            if expected_exitcode is None:
+                msg = "should not exit"
+            else:
+                msg = "should exit with code %s" % expected_exitcode
+            msg += "\nLog follows (see %s)" % self.log_file
             msg += "\nN.B. expect mlockall/setscheduler errors when running tests non-root"
             msg += "\n-----------\n%s" % self.read_log()
             self.assertEqual(return_code, expected_exitcode, msg)
-
-    def _test_buffer_overflow(self, expected_error, **args):
-        (pid, ret, stdout, stderr, runner) = \
-            self.run_booth(expected_exitcode=1, **args)
-        self.assertRegexpMatches(stderr, expected_error)

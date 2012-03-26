@@ -24,7 +24,8 @@ class ServerTests(ServerTestEnvironment):
     #     self.configFileMissingMyIP(lock_file=False)
     #
     # def test_custom_lock_file(self):
-    #     (pid, ret, stdout, stderr, runner) = self.run_booth(expected_exitcode=1)
+    #     (pid, ret, stdout, stderr, runner) = \
+    #         self.run_booth(expected_exitcode=1, expected_daemon=False)
     #     self.assertRegexpMatches(
     #         stderr,
     #         'failed to open %s: ' % runner.config_file_used(),
@@ -48,7 +49,8 @@ class ServerTests(ServerTestEnvironment):
 
     def test_working_config(self):
         (pid, ret, stdout, stderr, runner) = \
-            self.run_booth(config_text=self.working_config)
+            self.run_booth(expected_exitcode=0, expected_daemon=True,
+                           config_text=self.working_config)
 
     def test_missing_quotes(self):
         orig_lines = self.working_config.split("\n")
@@ -57,16 +59,20 @@ class ServerTests(ServerTestEnvironment):
             new_lines[i] = new_lines[i].replace('"', '')
             new_config = "\n".join(new_lines)
 
-            line_contains_IP = re.search('=.+\.', orig_lines[i])
+            line_contains_IP = re.search('^\s*(site|arbitrator)=.*[0-9]\.', orig_lines[i])
             if line_contains_IP:
-                # IP addresses need to be surrounded by quotes
+                # IP addresses need to be surrounded by quotes,
+                # so stripping them should cause it to fail
                 expected_exitcode = 1
+                expected_daemon   = False
             else:
                 expected_exitcode = 0
+                expected_daemon   = True
 
             (pid, ret, stdout, stderr, runner) = \
                 self.run_booth(config_text=new_config,
-                               expected_exitcode=expected_exitcode)
+                               expected_exitcode=expected_exitcode,
+                               expected_daemon=expected_daemon)
 
             if line_contains_IP:
                 self.assertRegexpMatches(
@@ -78,12 +84,12 @@ class ServerTests(ServerTestEnvironment):
     def test_debug_mode(self):
         (pid, ret, stdout, stderr, runner) = \
             self.run_booth(config_text=self.working_config, debug=True,
-                           expected_exitcode=None)
+                           expected_exitcode=None, expected_daemon=True)
 
     def test_missing_transport(self):
         config = re.sub('transport=.+\n', '', self.typical_config)
         (pid, ret, stdout, stderr, runner) = \
-            self.run_booth(config_text=config, expected_exitcode=1)
+            self.run_booth(config_text=config, expected_exitcode=1, expected_daemon=False)
         self.assertRegexpMatches(
             self.read_log(),
             'config file was missing transport line'
@@ -92,7 +98,7 @@ class ServerTests(ServerTestEnvironment):
     def test_invalid_transport_protocol(self):
         config = re.sub('transport=.+', 'transport=SNEAKERNET', self.typical_config)
         (pid, ret, stdout, stderr, runner) = \
-            self.run_booth(config_text=config, expected_exitcode=1)
+            self.run_booth(config_text=config, expected_exitcode=1, expected_daemon=False)
         self.assertRegexpMatches(
             self.read_log(),
             'invalid transport protocol'
@@ -101,29 +107,34 @@ class ServerTests(ServerTestEnvironment):
     def test_missing_final_newline(self):
         config = re.sub('\n$', '', self.working_config)
         (pid, ret, stdout, stderr, runner) = \
-            self.run_booth(config_text=config)
+            self.run_booth(config_text=config, expected_exitcode=0, expected_daemon=True)
 
     def test_a_few_trailing_whitespaces(self):
         for ws in (' ', '  '):
             new_config = self.working_config.replace("\n", ws + "\n", 3)
             (pid, ret, stdout, stderr, runner) = \
                 self.run_booth(config_text=new_config,
-                               expected_exitcode=0)
+                               expected_exitcode=0, expected_daemon=True)
 
     def test_trailing_space_everywhere(self):
         for ws in (' ', '  '):
             new_config = self.working_config.replace("\n", ws + "\n")
             (pid, ret, stdout, stderr, runner) = \
                 self.run_booth(config_text=new_config,
-                               expected_exitcode=0)
+                               expected_exitcode=0, expected_daemon=True)
 
     def test_unquoted_space(self):
         for ticket in ('unquoted space', 'unquoted space man'):
             new_config = re.sub('ticket=.+', 'ticket=' + ticket,
                                 self.working_config, 1)
             (pid, ret, stdout, stderr, runner) = \
-                self.run_booth(config_text=new_config, expected_exitcode=1)
+                self.run_booth(config_text=new_config, expected_exitcode=1, expected_daemon=False)
             self.assertRegexpMatches(
                 self.read_log(),
                 'invalid config file format: unquoted whitespace'
             )
+
+    def test_unreachable_peer(self):
+        config = re.sub('#(.+147.+)', lambda m: m.group(1), self.working_config)
+        self.run_booth(config_text=config,
+                       expected_exitcode=None, expected_daemon=False)
