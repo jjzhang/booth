@@ -63,6 +63,7 @@ class BoothTestEnvironment(unittest.TestCase, BoothAssertions):
             print "pid %d exited with code %d" % (pid, return_code)
             msg = "should exit with code %s" % expected_exitcode
             msg += "\nlog follows (see %s)" % self.log_file
+            msg += "\nN.B. expect mlockall/setscheduler errors when running tests non-root"
             msg += "\n-----------\n%s" % self.read_log()
             self.assertEqual(return_code, expected_exitcode, msg)
 
