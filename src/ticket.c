@@ -22,6 +22,7 @@
 #include <arpa/inet.h>
 #include <stdio.h>
 #include <assert.h>
+#include <time.h>
 #include "ticket.h"
 #include "config.h"
 #include "pacemaker.h"
