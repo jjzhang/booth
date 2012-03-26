@@ -327,6 +327,62 @@ static int booth_tcp_init(void * unused __attribute__((unused)))
 	return 0;
 }
 
+static int connect_nonb(int sockfd, const struct sockaddr *saptr,
+			socklen_t salen, int sec)
+{
+	int		flags, n, error;
+	socklen_t	len;
+	fd_set		rset, wset;
+	struct timeval	tval;
+
+	flags = fcntl(sockfd, F_GETFL, 0);
+	fcntl(sockfd, F_SETFL, flags | O_NONBLOCK);
+
+	error = 0;
+	if ( (n = connect(sockfd, saptr, salen)) < 0)
+		if (errno != EINPROGRESS)
+			return -1;
+
+	if (n == 0)
+		goto done;	/* connect completed immediately */
+
+	FD_ZERO(&rset);
+	FD_SET(sockfd, &rset);
+	wset = rset;
+	tval.tv_sec = sec;
+	tval.tv_usec = 0;
+
+	if ((n = select(sockfd + 1, &rset, &wset, NULL,
+	    sec ? &tval : NULL)) == 0) {
+		/* leave outside function to close */
+		/* timeout */
+		/* close(sockfd); */	
+		errno = ETIMEDOUT;
+		return -1;
+	}
+
+	if (FD_ISSET(sockfd, &rset) || FD_ISSET(sockfd, &wset)) {
+		len = sizeof(error);
+		if (getsockopt(sockfd, SOL_SOCKET, SO_ERROR, &error, &len) < 0)
+			return -1;	/* Solaris pending error */
+	} else {
+		log_error("select error: sockfd not set");
+		return -1;
+	}
+
+done:
+	fcntl(sockfd, F_SETFL, flags);	/* restore file status flags */
+
+	if (error) {
+		/* leave outside function to close */
+		/* close(sockfd); */	
+		errno = error;
+		return -1;
+	}
+
+	return 0;
+}
+
 static int booth_tcp_open(struct booth_node *to)
 {
 	struct sockaddr_storage sockaddr;
@@ -346,8 +402,9 @@ static int booth_tcp_open(struct booth_node *to)
 		if (s == -1)
 			return -1;
 
-		rv = connect(s, (struct sockaddr *)&sockaddr, addrlen);
+		rv = connect_nonb(s, (struct sockaddr *)&sockaddr, addrlen, 10);
 		if (rv == -1) {
+			log_error("connection to %s timeout", to->addr);
 			close(s);
 			return rv;
 		}
