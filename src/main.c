@@ -109,7 +109,7 @@ retry:
 	if (rv == -1 && errno == EINTR)
 		goto retry;
 	if (rv < 0) {
-		log_error("write failed: %s", strerror(errno));
+		log_error("write failed: %s (%d)", strerror(errno), errno);
 		return rv;
 	}
 
@@ -129,7 +129,7 @@ static int do_connect(const char *sock_path)
 
 	fd = socket(PF_UNIX, SOCK_STREAM, 0);
 	if (fd < 0) {
-		log_error("failed to create socket: %s", strerror(errno));
+		log_error("failed to create socket: %s (%d)", strerror(errno), errno);
 		goto out;
 	}
 
@@ -145,7 +145,7 @@ static int do_connect(const char *sock_path)
 				  "please ensure that you are on a "
 				  "machine which has boothd running.");
 		else
-			log_error("failed to connect: %s", strerror(errno));
+			log_error("failed to connect: %s (%d)", strerror(errno), errno);
 		close(fd);
 		fd = rv;
 	}
@@ -237,7 +237,7 @@ static int setup_listener(const char *sock_path)
 
 	s = socket(AF_LOCAL, SOCK_STREAM, 0);
 	if (s < 0) {
-		log_error("socket error %d %d", s, errno);
+		log_error("socket error %d: %s (%d)", s, strerror(errno), errno);
 		return s;
 	}
 
@@ -249,14 +249,14 @@ static int setup_listener(const char *sock_path)
 
 	rv = bind(s, (struct sockaddr *) &addr, addrlen);
 	if (rv < 0) {
-		log_error("bind error %d %d", rv, errno);
+		log_error("bind error %d: %s (%d)", rv, strerror(errno), errno);
 		close(s);
 		return rv;
 	}
 
 	rv = listen(s, 5);
 	if (rv < 0) {
-		log_error("listen error %d %d", rv, errno);
+		log_error("listen error %d: %s (%d)", rv, strerror(errno), errno);
 		close(s);
 		return rv;
 	}
@@ -275,9 +275,11 @@ void process_connection(int ci)
 
 	if (rv < 0) {
 		if (errno == ECONNRESET)
-			log_debug("client %d aborted conection fd %d", ci, client[ci].fd);
+			log_debug("client %d connection reset for fd %d", ci, client[ci].fd);
 		else 
-			log_debug("client %d closed connnection fd %d", ci, client[ci].fd);
+			log_debug("client %d read failed for fd %d: %s (%d)",
+				  ci, client[ci].fd,
+				  strerror(errno), errno);
 
 		deadfn = client[ci].deadfn;
 		if(deadfn) {
@@ -380,7 +382,8 @@ static void process_listener(int ci)
 
 	fd = accept(client[ci].fd, NULL, NULL);
 	if (fd < 0) {
-		log_error("process_listener: accept error %d %d", fd, errno);
+		log_error("process_listener: accept error for fd %d: %s (%d)",
+			  fd, strerror(errno), errno);
 		return;
 	}
 
@@ -473,8 +476,8 @@ static int loop(void)
                 if (rv == -1 && errno == EINTR)
                         continue;
                 if (rv < 0) {
-                        log_error("poll errno %d", errno);
-			goto fail;
+                        log_error("poll failed: %s (%d)", strerror(errno), errno);
+                        goto fail;
                 }
 
                 for (i = 0; i <= client_maxi; i++) {
@@ -555,7 +558,7 @@ out:
 	return rv;
 }
 
-static int do_grant(void)
+static int do_command(cmd_request_t cmd)
 {
 	char *buf;
 	struct boothc_header *h, reply;
@@ -573,7 +576,7 @@ static int do_grant(void)
 	h = (struct boothc_header *)buf;
 	if (cl.force)
 		force = BOOTHC_OPT_FORCE;
-	init_header(h, BOOTHC_CMD_GRANT, force, 0,
+	init_header(h, cmd, force, 0,
 		    sizeof(cl.site) + sizeof(cl.ticket));
 	strcpy(buf + sizeof(struct boothc_header), cl.site);
 	strcpy(buf + sizeof(struct boothc_header) + sizeof(cl.site), cl.ticket);
@@ -625,15 +628,28 @@ static int do_grant(void)
 	}
  
 	if (reply.result == BOOTHC_RLT_ASYNC) {
-		log_info("grant command sent, result will be returned "
-			 "asynchronously, you can get the result from "
-			 "the booth log");
+		if (cmd == BOOTHC_CMD_GRANT)
+			log_info("grant command sent, result will be returned "
+				 "asynchronously, you can get the result from "
+				 "the log files");
+		else if (cmd == BOOTHC_CMD_REVOKE)
+			log_info("revoke command sent, result will be returned "
+				 "asynchronously, you can get the result from "
+				 "the log files after the ticket expiry time.");
+		else
+			log_error("internal error reading reply result!");
 		rv = 0;
 	} else if (reply.result == BOOTHC_RLT_SYNC_SUCC) {
-		log_info("grant succeeded!");
+		if (cmd == BOOTHC_CMD_GRANT)
+			log_info("grant succeeded!");
+		else if (cmd == BOOTHC_CMD_REVOKE)
+			log_info("revoke succeeded!");
 		rv = 0;
 	} else if (reply.result == BOOTHC_RLT_SYNC_FAIL) {
-		log_info("grant failed!");
+		if (cmd == BOOTHC_CMD_GRANT)
+			log_info("grant failed!");
+		else if (cmd == BOOTHC_CMD_REVOKE)
+			log_info("revoke failed!");
 		rv = 0;
 	} else {
 		log_error("internal error!");
@@ -648,98 +664,14 @@ out:
 	return rv;
 }
 
+static int do_grant(void)
+{
+	return do_command(BOOTHC_CMD_GRANT);
+}
+
 static int do_revoke(void)
 {
-	char *buf;
-	struct boothc_header *h, reply;
-	int buflen;
-	uint32_t force = 0;
-	int fd, rv;
-
-	buflen = sizeof(struct boothc_header) +
-		 sizeof(cl.site) + sizeof(cl.ticket);
-	buf = malloc(buflen);
-	if (!buf) {
-		rv = -ENOMEM;
-		goto out;
-	}
-	h = (struct boothc_header *)buf;
-	if (cl.force)
-		force = BOOTHC_OPT_FORCE;
-	init_header(h, BOOTHC_CMD_REVOKE, force, 0,
-		    sizeof(cl.site) + sizeof(cl.ticket));
-	strcpy(buf + sizeof(struct boothc_header), cl.site);
-	strcpy(buf + sizeof(struct boothc_header) + sizeof(cl.site), cl.ticket);
-
-
-	fd = do_connect(BOOTHC_SOCK_PATH);
-	if (fd < 0) {
-		rv = fd;
-		goto out_free;
-	}
-        
-	rv = do_write(fd, buf, buflen);
-        if (rv < 0)
-                goto out_close;
-
-	rv = do_read(fd, &reply, sizeof(struct boothc_header));
-	if (rv < 0)
-		goto out_close;
-
-	if (reply.result == BOOTHC_RLT_INVALID_ARG) {
-		log_info("invalid argument!");
-		rv = -1;
-		goto out_close;
-	}
-
-	if (reply.result == BOOTHC_RLT_REMOTE_OP) {
-		struct booth_node to;
-		int s;
-
-		memset(&to, 0, sizeof(struct booth_node));
-		to.family = BOOTH_PROTO_FAMILY;
-		strcpy(to.addr, cl.site);
-
-		s = booth_transport[TCP].open(&to);
-		if (s < 0)
-			goto out_close;
-
-		rv = booth_transport[TCP].send(s, buf, buflen);
-		if (rv < 0) {
-			booth_transport[TCP].close(s);
-			goto out_close;
-		}
-		rv = booth_transport[TCP].recv(s, &reply,
-					       sizeof(struct boothc_header));
-		if (rv < 0) {
-			booth_transport[TCP].close(s);
-			goto out_close;
-		}
-		booth_transport[TCP].close(s);
-	}
-
-	if (reply.result == BOOTHC_RLT_ASYNC) {
-		log_info("revoke command sent, result will be returned "
-			 "asynchronously, you can get the result from "
-			 "booth log after the ticket expiry time.");
-		rv = 0;
-	} else if (reply.result == BOOTHC_RLT_SYNC_SUCC) {
-		log_info("revoke succeeded!");
-		rv = 0;
-	} else if (reply.result == BOOTHC_RLT_SYNC_FAIL) {
-		log_info("revoke failed!");
-		rv = 0;
-	} else {
-		log_error("internal error!");
-		rv = -1;
-	}
-
-out_close:
-	close(fd);
-out_free:
-	free(buf);
-out:
-	return rv;
+	return do_command(BOOTHC_CMD_REVOKE);
 }
 
 static int lockfile(void)
@@ -983,8 +915,9 @@ static void set_scheduler(void)
                 sched_param.sched_priority = rv;
                 rv = sched_setscheduler(0, SCHED_RR, &sched_param);
                 if (rv == -1)
-                        log_error("could not set SCHED_RR priority %d err %d",
-                                   sched_param.sched_priority, errno);
+                        log_error("could not set SCHED_RR priority %d: %s (%d)",
+                                  sched_param.sched_priority,
+                                  strerror(errno), errno);
         } else {
                 log_error("could not get maximum scheduler priority err %d",
                           errno);

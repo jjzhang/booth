@@ -22,3 +22,8 @@ class ClientTestEnvironment(BoothTestEnvironment):
         self.check_return_code(pid, return_code, expected_exitcode)
 
         return (pid, return_code, stdout, stderr, runner)
+
+    def _test_buffer_overflow(self, expected_error, **args):
+        (pid, ret, stdout, stderr, runner) = \
+            self.run_booth(expected_exitcode=1, **args)
+        self.assertRegexpMatches(stderr, expected_error)

@@ -6,7 +6,7 @@ class BoothAssertions:
     def configFileMissingMyIP(self, config_file=None, lock_file=None):
         (pid, ret, stdout, stderr, runner) = \
             self.run_booth(config_file=config_file, lock_file=lock_file,
-                           expected_exitcode=1)
+                           expected_exitcode=1, expected_daemon=False)
 
         expected_error = "ERROR: can't find myself in config file"
         self.assertRegexpMatches(self.read_log(), expected_error)

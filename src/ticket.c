@@ -278,14 +278,17 @@ static int ticket_catchup(const void *name, int *owner, int *ballot,
 		if (booth_conf->node[i].type == SITE &&
 		    !(booth_conf->node[i].local)) {
 			strncpy(tmsg->id, name, BOOTH_NAME_LEN + 1);
+			log_debug("attempting catchup from %s", booth_conf->node[i].addr);
 			s = booth_transport[TCP].open(&booth_conf->node[i]);
 			if (s < 0)
 				continue;
+			log_debug("connected to %s", booth_conf->node[i].addr);
 			rv = booth_transport[TCP].send(s, buf, buflen);
 			if (rv < 0) {
 				booth_transport[TCP].close(s);
 				continue;
 			}
+			log_debug("sent catchup command to %s", booth_conf->node[i].addr);
 			memset(tmsg, 0, sizeof(struct ticket_msg));
 			rv = booth_transport[TCP].recv(s, buf, buflen);
 			if (rv < 0) {

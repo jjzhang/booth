@@ -40,7 +40,7 @@ class BoothRunner:
             print "------"
             print stdout,
         if stderr:
-            print "STDERR:"
+            print "STDERR: (N.B. crm_ticket failures indicate daemon started correctly)"
             print "------"
             print stderr,
         print "-" * 70
