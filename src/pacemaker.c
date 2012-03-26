@@ -27,7 +27,7 @@ static void pcmk_grant_ticket(const void *ticket)
 	FILE *p;
 	char cmd[COMMAND_MAX];
 
-	snprintf(cmd, COMMAND_MAX, "crm_ticket -t %s -v true --force",
+	snprintf(cmd, COMMAND_MAX, "crm_ticket -t %s -g --force",
 		 (char *)ticket);
 	log_info("command: '%s' was executed", cmd);
 	p = popen(cmd, "r");
@@ -45,7 +45,7 @@ static void pcmk_revoke_ticket(const void *ticket)
 	FILE *p;
 	char cmd[COMMAND_MAX];
 
-	snprintf(cmd, COMMAND_MAX, "crm_ticket -t %s -v false --force",
+	snprintf(cmd, COMMAND_MAX, "crm_ticket -t %s -r --force",
 		 (char *)ticket);
 	log_info("command: '%s' was executed", cmd);
 	p = popen(cmd, "r");
@@ -65,7 +65,7 @@ static void pcmk_store_ticket(const void *ticket, int owner, int ballot,
 	char cmd[COMMAND_MAX];
 
 	snprintf(cmd, COMMAND_MAX,
-		 "crm_attribute -t tickets -n owner-%s -v %d",
+		 "crm_ticket -t %s -S owner -v %d",
 		 (char *)ticket, owner);
 	log_info("command: '%s' was executed", cmd);
 	p = popen(cmd, "r");
@@ -76,7 +76,7 @@ static void pcmk_store_ticket(const void *ticket, int owner, int ballot,
 	pclose(p);
 
 	snprintf(cmd, COMMAND_MAX,
-		 "crm_attribute -t tickets -n expires-%s -v %llu",
+		 "crm_ticket -t %s -S expires -v %llu",
 		 (char *)ticket, expires);
 	log_info("command: '%s' was executed", cmd);
 	p = popen(cmd, "r");
@@ -87,7 +87,7 @@ static void pcmk_store_ticket(const void *ticket, int owner, int ballot,
 	pclose(p);
 
 	snprintf(cmd, COMMAND_MAX,
-		 "crm_attribute -t tickets -n ballot-%s -v %d",
+		 "crm_ticket -t %s -S ballot -v %d",
 		 (char *)ticket, ballot);
 	log_info("command: '%s' was executed", cmd);
 	p = popen(cmd, "r");
@@ -110,7 +110,7 @@ static void pcmk_load_ticket(const void *ticket, int *owner, int *ballot,
 	unsigned long long ex;
 
 	snprintf(cmd, COMMAND_MAX,
-		 "crm_attribute -t tickets -n owner-%s -G --quiet",
+		 "crm_ticket -t %s -G owner --quiet",
 		 (char *)ticket);
 	log_info("command: '%s' was executed", cmd);
 	p = popen(cmd, "r");
@@ -127,7 +127,7 @@ static void pcmk_load_ticket(const void *ticket, int *owner, int *ballot,
 	pclose(p);
 	
 	snprintf(cmd, COMMAND_MAX,
-		 "crm_attribute -t tickets -n expires-%s -G --quiet",
+		 "crm_ticket -t %s -G expires --quiet",
 		 (char *)ticket);
 	log_info("command: '%s' was executed", cmd);
 	p = popen(cmd, "r");
@@ -144,7 +144,7 @@ static void pcmk_load_ticket(const void *ticket, int *owner, int *ballot,
 	pclose(p);
 
 	snprintf(cmd, COMMAND_MAX,
-		 "crm_attribute -t tickets -n ballot-%s -G --quiet",
+		 "crm_ticket -t %s -G ballot --quiet",
 		 (char *)ticket);
 	log_info("command: '%s' was executed", cmd);
 	p = popen(cmd, "r");
