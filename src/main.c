@@ -37,6 +37,7 @@
 #include <error.h>
 #include <sys/ioctl.h>
 #include <termios.h>
+#include <signal.h>
 #include "log.h"
 #include "booth.h"
 #include "config.h"
@@ -334,7 +335,6 @@ void process_connection(int ci)
 				h.result = BOOTHC_RLT_OVERGRANT;
 				goto reply;
 			}
-
 		} else {
 			log_error("can not get ticket %s's info", ticket);
 			h.result = BOOTHC_RLT_INVALID_ARG;
@@ -575,29 +575,29 @@ out:
 
 static inline void load_bar(int x, int n, int r, int w)
 {
-    int i;
-    float ratio;
-    int c;
+	int i;
+	float ratio;
+	int c;
 
-    /* Only update r times.*/
-    if ( x % (n / r) != 0 ) return;
- 
-    /* Calculuate the ratio of complete-to-incomplete.*/
-    ratio = x / (float)n;
-    c     = ratio * w;
- 
-    /* Show the percentage complete.*/
-    printf("%3d%% [", (int)(ratio * 100) );
- 
-    /* Show the load bar.*/
-    for (i = 0; i < c; i++)
-       printf("=");
-    for (i = c; i < w; i++)
-       printf(" ");
+	/* Only update r times.*/
+	if ( x % (n / r) != 0 ) return;
 
-    printf("]");
-    printf("\r");
-    fflush(stdout);
+	/* Calculuate the ratio of complete-to-incomplete.*/
+	ratio = x / (float)n;
+	c = ratio * w;
+ 
+	/* Show the percentage complete.*/
+	printf("%3d%% [", (int)(ratio * 100));
+ 
+	/* Show the load bar.*/
+	for (i = 0; i < c; i++)
+		printf("=");
+	for (i = c; i < w; i++)
+		printf(" ");
+
+	printf("]");
+	printf("\r");
+	fflush(stdout);
 }
 
 static void counting_down(int total_time)
@@ -607,7 +607,7 @@ static void counting_down(int total_time)
 	int i;
 
 	ioctl(STDIN_FILENO, TIOCGWINSZ, (char*)&size);
-	screen_width = size.ws_col/(float)2;
+	screen_width = size.ws_col / (float)2;
 
 	/* ignore signals */
 	signal(SIGTERM, SIG_IGN);
@@ -630,10 +630,8 @@ static int do_command(cmd_request_t cmd)
 	int buflen;
 	uint32_t force = 0;
 	int fd, rv;
-
 	int expire_time;
 	int i;
-	
 
 	buflen = sizeof(struct boothc_header) + 
 		 sizeof(cl.site) + sizeof(cl.ticket);
