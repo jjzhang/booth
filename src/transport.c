@@ -404,7 +404,11 @@ static int booth_tcp_open(struct booth_node *to)
 
 		rv = connect_nonb(s, (struct sockaddr *)&sockaddr, addrlen, 10);
 		if (rv == -1) {
-			log_error("connection to %s timeout", to->addr);
+			if( errno == ETIMEDOUT)
+				log_error("connection to %s timeout", to->addr);
+			else 
+	                        log_error("connection to %s error %s", to->addr,
+					  strerror(errno));
 			close(s);
 			return rv;
 		}

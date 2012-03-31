@@ -441,6 +441,23 @@ int revoke_ticket(char *ticket, int force)
 	}	
 }
 
+int get_ticket_info(char *name, int *owner, int *expires)
+{
+	struct ticket *tk;
+
+	list_for_each_entry(tk, &ticket_list, list) {
+		if (!strncmp(tk->id, name, BOOTH_NAME_LEN + 1)) {
+			if(owner)
+				*owner = tk->owner;
+			if(expires)
+				*expires = tk->expires;
+			return 0;
+		}
+	}
+
+	return -1;
+}
+
 int list_ticket(char **pdata, unsigned int *len)
 {
 	struct ticket *tk;

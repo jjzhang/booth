@@ -29,5 +29,6 @@ int list_ticket(char **pdata, unsigned int *len);
 int catchup_ticket(char **pdata, unsigned int len);
 int ticket_recv(void *msg, int msglen);
 int setup_ticket(void);
+int get_ticket_info(char *name, int *owner, int *expires);
 
 #endif /* _TICKET_H */
