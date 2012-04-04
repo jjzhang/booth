@@ -429,8 +429,10 @@ int revoke_ticket(char *ticket, int force)
 	}
 
 	if (force) {
+		paxos_lease_release_force(tk->handle);
 		pcmk_handler.store_ticket(tk->id, -1, 0, 0);
 		pcmk_handler.revoke_ticket(tk->id);
+		return BOOTHC_RLT_SYNC_SUCC;
 	}
 
 	if (tk->owner == -1)
