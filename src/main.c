@@ -971,7 +971,7 @@ static int read_arguments(int argc, char **argv)
 			break;
 
 		case 'f':
-			if (cl.op == OP_GRANT)
+			if (cl.op == OP_GRANT || cl.op == OP_REVOKE)
 				cl.force = 1;
 			else {
 				print_usage();

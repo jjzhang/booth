@@ -208,6 +208,24 @@ int paxos_lease_release(pl_handle_t handle)
 	return 0;
 }
 
+int paxos_lease_release_force(pl_handle_t handle)
+{
+	struct paxos_lease *pl = (struct paxos_lease *)handle;
+
+	if (pl->acceptor.timer2)
+		del_timer(&pl->acceptor.timer2);
+	if (pl->acceptor.timer1)
+		del_timer(&pl->acceptor.timer1);
+	if (pl->proposer.timer2)
+		del_timer(&pl->proposer.timer2);
+	if (pl->proposer.timer1)
+		del_timer(&pl->proposer.timer1);
+
+	pl->owner = -1;
+
+	return 0;
+}
+
 static int lease_catchup(pi_handle_t handle)
 {
 	struct paxos_lease *pl;
