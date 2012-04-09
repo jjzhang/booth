@@ -382,16 +382,10 @@ int ticket_recv(void *msg, int msglen)
 				      msglen - sizeof(struct booth_msghdr));
 }
 
-int grant_ticket(char *ticket, int force)
+int grant_ticket(char *ticket)
 {
 	struct ticket *tk;
 	int found = 0;
-
-	if (force) {
-		pcmk_handler.store_ticket(ticket, ticket_get_myid(), 0, -1);
-		pcmk_handler.grant_ticket(ticket);
-		return BOOTHC_RLT_SYNC_SUCC;
-	}
 
 	list_for_each_entry(tk, &ticket_list, list) {
 		if (!strcmp(tk->id, ticket)) {
@@ -412,7 +406,7 @@ int grant_ticket(char *ticket, int force)
 	}
 }
 
-int revoke_ticket(char *ticket, int force)
+int revoke_ticket(char *ticket)
 {
 	struct ticket *tk;
 	int found = 0;
@@ -426,11 +420,6 @@ int revoke_ticket(char *ticket, int force)
 	if (!found) {
 		log_error("ticket %s does not exist", ticket);
 		return BOOTHC_RLT_SYNC_FAIL;
-	}
-
-	if (force) {
-		pcmk_handler.store_ticket(tk->id, -1, 0, 0);
-		pcmk_handler.revoke_ticket(tk->id);
 	}
 
 	if (tk->owner == -1)

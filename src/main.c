@@ -77,7 +77,6 @@ typedef enum {
 struct command_line {
 	int type;		/* ACT_ */
 	int op;			/* OP_ */
-	int force;
 	char configfile[BOOTH_PATH_LEN];
 	char lockfile[BOOTH_PATH_LEN];
 	char site[BOOTH_NAME_LEN];
@@ -156,7 +155,7 @@ out:
 	return fd;
 }
 
-static void init_header(struct boothc_header *h, int cmd, int option,
+static void init_header(struct boothc_header *h, int cmd,
 			int result, int data_len)
 {
 	memset(h, 0, sizeof(struct boothc_header));
@@ -165,7 +164,6 @@ static void init_header(struct boothc_header *h, int cmd, int option,
 	h->version = BOOTHC_VERSION;
 	h->len = data_len;
 	h->cmd = cmd;
-	h->option = option;
 	h->result = result;
 }
 
@@ -346,7 +344,7 @@ void process_connection(int ci)
 			goto reply;
 		}
 		if (local)
-			h.result = grant_ticket(ticket, h.option);
+			h.result = grant_ticket(ticket);
 		else
 			h.result = BOOTHC_RLT_REMOTE_OP;
 		break;
@@ -364,7 +362,7 @@ void process_connection(int ci)
 			goto reply;
 		}
 		if (local)
-			h.result = revoke_ticket(ticket, h.option);
+			h.result = revoke_ticket(ticket);
 		else
 			h.result = BOOTHC_RLT_REMOTE_OP;
 		break;
@@ -527,7 +525,7 @@ static int do_list(void)
 	int data_len;
 	int fd, rv;
 
-	init_header(&h, BOOTHC_CMD_LIST, 0, 0, 0);
+	init_header(&h, BOOTHC_CMD_LIST, 0, 0);
 
 	fd = do_connect(BOOTHC_SOCK_PATH);
 	if (fd < 0) {
@@ -628,7 +626,6 @@ static int do_command(cmd_request_t cmd)
 	char *buf;
 	struct boothc_header *h, reply;
 	int buflen;
-	uint32_t force = 0;
 	int fd, rv;
 	int expire_time;
 	int i;
@@ -641,10 +638,7 @@ static int do_command(cmd_request_t cmd)
 		goto out;
 	}
 	h = (struct boothc_header *)buf;
-	if (cl.force)
-		force = BOOTHC_OPT_FORCE;
-	init_header(h, cmd, force, 0,
-		    sizeof(cl.site) + sizeof(cl.ticket));
+	init_header(h, cmd, 0, sizeof(cl.site) + sizeof(cl.ticket));
 	strcpy(buf + sizeof(struct boothc_header), cl.site);
 	strcpy(buf + sizeof(struct boothc_header) + sizeof(cl.site), cl.ticket);
 
@@ -854,12 +848,10 @@ static void print_usage(void)
 	printf("  -D            Enable debugging to stderr and don't fork\n");
 	printf("  -t            ticket name\n");
 	printf("  -s            site name\n");
-	printf("  -f            ticket attribute: force, only valid when "
-				"granting\n");
 	printf("  -h            Print this help, then exit\n");
 }
 
-#define OPTION_STRING		"c:Dl:t:s:fh"
+#define OPTION_STRING		"c:Dl:t:s:h"
 
 static char *logging_entity = NULL;
 
@@ -965,15 +957,6 @@ static int read_arguments(int argc, char **argv)
 			if (cl.op == OP_GRANT || cl.op == OP_REVOKE) {
 				safe_copy(cl.site, optarg, sizeof(cl.ticket), "site name");
 			} else {
-				print_usage();
-				exit(EXIT_FAILURE);
-			}
-			break;
-
-		case 'f':
-			if (cl.op == OP_GRANT)
-				cl.force = 1;
-			else {
 				print_usage();
 				exit(EXIT_FAILURE);
 			}

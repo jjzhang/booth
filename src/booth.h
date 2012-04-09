@@ -42,13 +42,10 @@
 #define BOOTHC_MAGIC		0x5F1BA08C
 #define BOOTHC_VERSION		0x00010000
 
-#define BOOTHC_OPT_FORCE		0x00000001
-
 struct boothc_header {
 	uint32_t magic;
 	uint32_t version;
 	uint32_t cmd;
-	uint32_t option;
 	uint32_t expiry;
 	uint32_t len;
 	uint32_t result;
