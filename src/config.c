@@ -22,6 +22,7 @@
 #include <string.h>
 #include "booth.h"
 #include "config.h"
+#include "ticket.h"
 #include "log.h"
 
 static int ticket_size = 0;
@@ -220,8 +221,14 @@ int read_config(const char *path)
 			}
 			expiry = index(val, ';');
 			weight = rindex(val, ';');
-			if (!expiry)
+			if (!expiry) {
 				strcpy(booth_conf->ticket[count].name, val);
+				booth_conf->ticket[count].expiry = DEFAULT_TICKET_EXPIRY;
+				log_info("expire is not set in %s."
+					 " Set the default value %ds.",
+					 booth_conf->ticket[count].name,
+					 DEFAULT_TICKET_EXPIRY);
+			}
 			else if (expiry && expiry == weight) {
 				*expiry++ = '\0';
 				while (*expiry == ' ')
