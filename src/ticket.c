@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <time.h>
+#include <pthread.h>
 #include "ticket.h"
 #include "config.h"
 #include "pacemaker.h"
@@ -32,6 +33,7 @@
 #include "timer.h"
 #include "paxos_lease.h"
 #include "paxos.h"
+#include "thread_loop.h"
 
 #define PAXOS_MAGIC     0xDB12
 #define TK_LINE		256
@@ -238,13 +240,16 @@ static int ticket_parse(struct ticket_msg *tmsg)
 
 static int ticket_catchup(const void *name, int *owner, int *ballot,
 			  unsigned long long *expires)
-{	
+{
 	struct ticket *tk;
 	int i, s, buflen, rv = 0;
 	char *buf = NULL;
 	struct boothc_header *h;
 	struct ticket_msg *tmsg;
 	int myid = ticket_get_myid();
+
+	pthread_t loop_t;
+	int status;
 
 	if (booth_conf->node[myid].type != ARBITRATOR) {
 		list_for_each_entry(tk, &ticket_list, list) {
@@ -256,7 +261,7 @@ static int ticket_catchup(const void *name, int *owner, int *ballot,
 				if (current_time() >= tk->expires) {
 					tk->owner = -1;
 					tk->expires = 0;
-				} 
+				}
 			}
 		}
 	}
@@ -273,7 +278,14 @@ static int ticket_catchup(const void *name, int *owner, int *ballot,
 	h->cmd = BOOTHC_CMD_CATCHUP;
 	h->len = sizeof(struct ticket_msg);
 	tmsg = (struct ticket_msg *)(buf + sizeof(struct boothc_header));
-	
+
+	status = pthread_create(&loop_t, NULL, (void *)pthread_loop, 0);
+	if ( status == 0 ) {
+		log_debug("success to thread create");
+	} else {
+		log_debug("fail to thread create");
+	}
+
 	for (i = 0; i < booth_conf->node_count; i++) {
 		if (booth_conf->node[i].type == SITE &&
 		    !(booth_conf->node[i].local)) {
@@ -289,6 +301,7 @@ static int ticket_catchup(const void *name, int *owner, int *ballot,
 				continue;
 			}
 			log_debug("sent catchup command to %s", booth_conf->node[i].addr);
+
 			memset(tmsg, 0, sizeof(struct ticket_msg));
 			rv = booth_transport[TCP].recv(s, buf, buflen);
 			if (rv < 0) {
@@ -297,10 +310,18 @@ static int ticket_catchup(const void *name, int *owner, int *ballot,
 			}
 			booth_transport[TCP].close(s);
 			ticket_parse(tmsg);
-			memset(tmsg, 0, sizeof(struct ticket_msg)); 
+			memset(tmsg, 0, sizeof(struct ticket_msg));
 		}
 	}
-		
+
+	thread_state = THREAD_END;
+	status = pthread_join(loop_t, NULL);
+	if ( status == 0 ) {
+		log_debug("success to thread join");
+	} else {
+		log_debug("fail to thread join");
+	}
+
 	list_for_each_entry(tk, &ticket_list, list) {
 		if (!strcmp(tk->id, name)) {
 			if (booth_conf->node[myid].type != ARBITRATOR) {

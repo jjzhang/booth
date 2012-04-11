@@ -38,6 +38,7 @@
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <signal.h>
+#include <pthread.h>
 #include "log.h"
 #include "booth.h"
 #include "config.h"
@@ -45,10 +46,12 @@
 #include "timer.h"
 #include "pacemaker.h"
 #include "ticket.h"
+#include "thread_loop.h"
 
 #define RELEASE_VERSION		"1.0"
 
 #define CLIENT_NALLOC		32
+
 
 int log_logfile_priority = LOG_INFO;
 int log_syslog_priority = LOG_ERR;
@@ -262,6 +265,99 @@ static int setup_listener(const char *sock_path)
 		return rv;
 	}
 	return s;
+}
+
+void pthread_process_connection(int ci)
+{
+	struct boothc_header h;
+	char *data = NULL;
+	char *site, *ticket;
+	int rv;
+	void (*deadfn) (int ci);
+
+	rv = do_read(client[ci].fd, &h, sizeof(h));
+
+	if (rv < 0) {
+		if (errno == ECONNRESET)
+			log_debug("client %d connection reset for fd %d",
+				  ci, client[ci].fd);
+
+		deadfn = client[ci].deadfn;
+		if(deadfn) {
+			deadfn(ci);
+		}
+		return;
+	}
+	if (h.magic != BOOTHC_MAGIC) {
+		log_error("connection %d magic error %x", ci, h.magic);
+		return;
+	}
+	if (h.version != BOOTHC_VERSION) {
+		log_error("connection %d version error %x", ci, h.version);
+		return;
+	}
+
+	if (h.len) {
+		data = malloc(h.len);
+		if (!data) {
+			log_error("process_connection no mem %u", h.len);
+			return;
+		}
+		memset(data, 0, h.len);
+
+		rv = do_read(client[ci].fd, data, h.len);
+		if (rv < 0) {
+			log_error("connection %d read data error %d", ci, rv);
+			goto out;
+		}
+	}
+
+	switch (h.cmd) {
+	case BOOTHC_CMD_LIST:
+		log_debug("can't use booth command yet");
+		h.result = BOOTHC_RLT_REJECT;
+		break;
+
+	case BOOTHC_CMD_GRANT:
+		h.len = 0;
+		site = data;
+		ticket = data + BOOTH_NAME_LEN;
+
+		log_debug("can't use booth command yet");
+		h.result = BOOTHC_RLT_REJECT;
+		goto reply;
+		break;
+
+	case BOOTHC_CMD_REVOKE:
+		h.len = 0;
+		site = data;
+		ticket = data + BOOTH_NAME_LEN;
+
+		log_debug("can't use booth command yet");
+		h.result = BOOTHC_RLT_REJECT;
+		goto reply;
+		break;
+
+	case BOOTHC_CMD_CATCHUP:
+		h.result = catchup_ticket(&data, h.len);
+		break;
+
+	default:
+		log_error("connection %d cmd %x unknown", ci, h.cmd);
+		break;
+	}
+
+reply:
+	rv = do_write(client[ci].fd, &h, sizeof(h));
+	if (rv < 0)
+		log_error("connection %d write error %d", ci, rv);
+	if (h.len) {
+		rv = do_write(client[ci].fd, data, h.len);
+		if (rv < 0)
+			log_error("connection %d write error %d", ci, rv);
+	}
+out:
+	free(data);
 }
 
 void process_connection(int ci)
@@ -484,6 +580,8 @@ static int loop(void)
 	void (*deadfn) (int ci);
 	int rv, i;
 
+	
+
         while (1) {
                 rv = poll(pollfd, client_maxi + 1, poll_timeout);
                 if (rv == -1 && errno == EINTR)
@@ -516,6 +614,64 @@ static int loop(void)
 
 fail:
 	return -1;
+}
+
+void pthread_loop(void)
+{
+	void (*workfn) (int ci);
+	void (*deadfn) (int ci);
+	int rv, i;
+
+	for (i = 0; i <= client_maxi; i++) {
+		if (client[i].workfn == pthread_process_recv) {
+			pollfd[i].events = POLLERR;
+		}
+	}
+
+	while (1) {
+		rv = poll(pollfd, client_maxi + 1, poll_timeout);
+		if (rv == -1 && errno == EINTR) {
+			continue;
+		}
+		if (rv < 0) {
+			log_error("poll failed: %s (%d)", strerror(errno), errno);
+			goto fail;
+		}
+
+		for (i = 0; i <= client_maxi; i++) {
+			if (client[i].fd < 0)
+				continue;
+			if (pollfd[i].revents & POLLIN) {
+				workfn = client[i].workfn;
+				if (workfn) {
+					if ( workfn == &process_connection) {
+						pthread_process_connection(i);
+					} else {
+						workfn(i);
+					}
+				}
+			}
+			if (pollfd[i].revents &
+				(POLLERR | POLLHUP | POLLNVAL)) {
+				deadfn = client[i].deadfn;
+				if (deadfn)
+					deadfn(i);
+			}
+		}
+
+		if (thread_state == THREAD_END) {
+			break;
+		}
+		process_timerlist();
+	}
+
+fail:
+	for (i = 0; i <= client_maxi; i++) {
+		if (client[i].workfn == pthread_process_recv) {
+			pollfd[i].events = POLLIN;
+		}
+	}
+	return;
 }
 
 static int do_list(void)
@@ -749,6 +905,9 @@ static int do_command(cmd_request_t cmd)
 		else if (cmd == BOOTHC_CMD_REVOKE)
 			log_info("revoke failed!");
 		rv = 0;
+	} else if (reply.result == BOOTHC_RLT_REJECT) {
+		log_info("can't still command to continue a setup!");
+		rv = -1;
 	} else {
 		log_error("internal error!");
 		rv = -1;

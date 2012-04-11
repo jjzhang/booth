@@ -34,6 +34,7 @@
 #include "config.h"
 #include "paxos_lease.h"
 #include "transport.h"
+#include "thread_loop.h"
 
 #define BOOTH_IPADDR_LEN	(sizeof(struct in6_addr))
 
@@ -53,6 +54,7 @@ struct tcp_conn {
 };
 
 static LIST_HEAD(tcp);
+
 
 struct udp_context {
 	int s;
@@ -547,6 +549,7 @@ static int booth_udp_init(void *f)
 
 	deliver_fn = f;
 
+	pthread_process_recv = process_recv;
 	client_add(udp.s, process_recv, NULL);
 
 	return 0;
