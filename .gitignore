@@ -17,3 +17,11 @@ src/booth_config.h
 src/boothd
 src/stamp-h1
 src/stamp-h2
+
+# cscope files
+cscope.*
+ncscope.*
+
+# ctags files
+tags
+
