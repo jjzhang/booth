@@ -287,6 +287,7 @@ static void proposer_propose(struct paxos_space *ps,
 					       msglen + ps->valuelen);
 		}
 	}
+	free(message);
 }
 
 static void proposer_commit(struct paxos_space *ps,
@@ -800,6 +801,7 @@ int paxos_propose(pi_handle_t handle, void *value, int round)
 		}
 	}
 
+	free(msg);
 	return 0;
 }
 
