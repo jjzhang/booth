@@ -114,24 +114,59 @@ static int ticket_get_myid(void)
 	return booth_transport[booth_conf->proto].get_myid();
 }
 
-static void end_acquire(pl_handle_t handle, int result)
+static void end_acquire(pl_handle_t handle, int error)
 {
 	struct ticket *tk;
 	int found = 0;
 
-	if (result == 0) {
-		list_for_each_entry(tk, &ticket_list, list) {
-			if (tk->handle == handle) {
-				found = 1;
-				break;
-			}
+	log_debug("enter end_acquire");
+	list_for_each_entry(tk, &ticket_list, list) {
+		if (tk->handle == handle) {
+			found = 1;
+			break;
 		}
-		if (!found)
-			log_error("BUG: ticket handle %ld does not exist",
-				  handle);
-		log_info("ticket %s was granted/reovked successfully (site %d)",
-			 tk->id, ticket_get_myid());
 	}
+
+	if (!found) {
+		log_error("BUG: ticket handle %ld does not exist", handle);
+		return;
+	}
+
+	if (error)
+		log_info("ticket %s was granted failed (site %d), error:%s",
+				tk->id, ticket_get_myid(), strerror(error));
+	else
+		log_info("ticket %s was granted successfully (site %d)",
+				tk->id, ticket_get_myid());
+	log_debug("exit end_acquire");
+}
+
+static void end_release(pl_handle_t handle, int error)
+{
+	struct ticket *tk;
+	int found = 0;
+
+	log_debug("enter end_release");
+	list_for_each_entry(tk, &ticket_list, list) {
+		if (tk->handle == handle) {
+			found = 1;
+			break;
+		}
+	}
+
+	if (!found) {
+		log_error("BUG: ticket handle %ld does not exist", handle);
+		return;
+	}
+
+	if (error)
+		log_info("ticket %s was reovked failed (site %d), error:%s",
+				tk->id, ticket_get_myid(), strerror(error));
+	else
+		log_info("ticket %s was reovked successfully (site %d)",
+				tk->id, ticket_get_myid());
+
+	log_debug("exit end_release");
 }
 
 static int ticket_send(unsigned long id, void *value, int len)
@@ -393,6 +428,7 @@ int grant_ticket(char *ticket)
 			break;
 		}
 	}
+
 	if (!found) {
 		log_error("ticket %s does not exist", ticket);
 		return BOOTHC_RLT_SYNC_FAIL;
@@ -401,7 +437,7 @@ int grant_ticket(char *ticket)
 	if (tk->owner == ticket_get_myid())
 		return BOOTHC_RLT_SYNC_SUCC;
 	else {
-		paxos_lease_acquire(tk->handle, 1, end_acquire);
+		paxos_lease_acquire(tk->handle, CLEAR_RELEASE, 1, end_acquire);
 		return BOOTHC_RLT_ASYNC;
 	}
 }
@@ -417,6 +453,7 @@ int revoke_ticket(char *ticket)
 			break;
 		}
 	}
+
 	if (!found) {
 		log_error("ticket %s does not exist", ticket);
 		return BOOTHC_RLT_SYNC_FAIL;
@@ -425,7 +462,7 @@ int revoke_ticket(char *ticket)
 	if (tk->owner == -1)
 		return BOOTHC_RLT_SYNC_SUCC;
 	else {
-		paxos_lease_release(tk->handle);
+		paxos_lease_release(tk->handle, end_release);
 		return BOOTHC_RLT_ASYNC;
 	}	
 }
