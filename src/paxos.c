@@ -256,8 +256,9 @@ static void proposer_propose(struct paxos_space *ps,
 	pi->proposer->proposed = 1;
 
 	value = pi->proposer->proposal->value;
-	if (ps->p_op->propose)
-		ps->p_op->propose(pih, extra, ballot, value);
+	if (ps->p_op->propose
+		&& ps->p_op->propose(pih, extra, ballot, value) < 0)
+		return;
 
 	hdr->valuelen = htonl(ps->valuelen); 
 	message = malloc(msglen + ps->valuelen);
@@ -323,8 +324,9 @@ static void proposer_commit(struct paxos_space *ps,
 		return;
 
 	pi->round = ballot;
-	if (ps->p_op->commit)
-		ps->p_op->commit(pih, extra, pi->round);
+	if (ps->p_op->commit
+		&& ps->p_op->commit(pih, extra, pi->round) < 0)
+		return;
 	pi->proposer->state = COMMITTED;
 
 	if (pi->end)
@@ -362,11 +364,12 @@ static void acceptor_promise(struct paxos_space *ps,
 			  pi->acceptor->highest_promised);
 		return;
 	}
+
+	if (ps->p_op->promise
+		&& ps->p_op->promise(pih, extra) < 0)
+		return;
+
 	pi->acceptor->highest_promised = ntohl(hdr->ballot_number);
-
-	if (ps->p_op->promise)
-		ps->p_op->promise(pih, extra);
-
 	pi->acceptor->state = PROMISING;
 	to = ntohl(hdr->from);
 	hdr->from = htonl(ps->p_op->get_myid());
