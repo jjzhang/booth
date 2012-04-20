@@ -571,64 +571,12 @@ out:
 	return rv;
 }
 
-static inline void load_bar(int x, int n, int r, int w)
-{
-	int i;
-	float ratio;
-	int c;
-
-	/* Only update r times.*/
-	if ( x % (n / r) != 0 ) return;
-
-	/* Calculuate the ratio of complete-to-incomplete.*/
-	ratio = x / (float)n;
-	c = ratio * w;
- 
-	/* Show the percentage complete.*/
-	printf("%3d%% [", (int)(ratio * 100));
- 
-	/* Show the load bar.*/
-	for (i = 0; i < c; i++)
-		printf("=");
-	for (i = c; i < w; i++)
-		printf(" ");
-
-	printf("]");
-	printf("\r");
-	fflush(stdout);
-}
-
-static void counting_down(int total_time)
-{
-	struct winsize size;
-	int screen_width;
-	int i;
-
-	ioctl(STDIN_FILENO, TIOCGWINSZ, (char*)&size);
-	screen_width = size.ws_col / (float)2;
-
-	/* ignore signals */
-	signal(SIGTERM, SIG_IGN);
-	signal(SIGINT, SIG_IGN);
-	signal(SIGHUP, SIG_IGN);
-
-	i = 0;
-	while (i <= total_time) {
-		load_bar(i, total_time, total_time, screen_width);
-		sleep(1);
-		i++;
-	}
-
-	log_info("\nCounting Down Over...\n");
-}
 static int do_command(cmd_request_t cmd)
 {
 	char *buf;
 	struct boothc_header *h, reply;
 	int buflen;
 	int fd, rv;
-	int expire_time;
-	int i;
 
 	buflen = sizeof(struct boothc_header) + 
 		 sizeof(cl.site) + sizeof(cl.ticket);
@@ -701,41 +649,12 @@ static int do_command(cmd_request_t cmd)
 			log_info("grant command sent, result will be returned "
 				 "asynchronously, you can get the result from "
 				 "the log files");
-		else if (cmd == BOOTHC_CMD_REVOKE) {
+		else if (cmd == BOOTHC_CMD_REVOKE)
 			log_info("revoke command sent, result will be returned "
 				 "asynchronously, you can get the result from "
-				 "the log files after the ticket expiry time.");
-			i = 0;
-			/* FIXME: if we access the server then get the actual
-			 * remaining time the waiting will be shorter, for now,
-			 * client is just waiting the expiry time.
-			 */
-			read_config(cl.configfile);
-			while (i < booth_conf->ticket_count) {
-				if (!strncmp(booth_conf->ticket[i].name, cl.ticket,
-					     BOOTH_NAME_LEN)) {
-					expire_time = booth_conf->ticket[i].expiry;
-					log_info("You have to wait %d seconds to "
-						 "ensure all timer has expired!",
-						 expire_time);	
-					counting_down(expire_time);
-					rv = 0;
-					break;
-					}
-				i++;
-				/* no ticket found in conf file */
-				if( i == booth_conf->ticket_count ) {
-					log_error("check your config file, "
-						  "ticket %s not found", cl.ticket);
-					log_error("your booth's config file may "
-						  "not be the same!");	
-					break;
-					rv = -1;
-				}
-			}
-		}
+				 "the log files.");
 		else
-			log_error("internal error when reading reply result!");
+			log_error("internal error reading reply result!");
 		rv = 0;
 	} else if (reply.result == BOOTHC_RLT_SYNC_SUCC) {
 		if (cmd == BOOTHC_CMD_GRANT)

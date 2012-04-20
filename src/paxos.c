@@ -170,7 +170,7 @@ static int next_ballot_number(struct paxos_instance *pi)
 static void proposer_prepare(struct paxos_instance *pi, int *round)
 {
 	struct paxos_msghdr *hdr;
-	void *msg;
+	void *msg, *extra;
 	int msglen = sizeof(struct paxos_msghdr) + pi->ps->extralen;
 	int ballot;
 
@@ -183,6 +183,7 @@ static void proposer_prepare(struct paxos_instance *pi, int *round)
 	}
 	memset(msg, 0, msglen);
 	hdr = msg;
+	extra = (char *)msg + sizeof(struct paxos_msghdr);
 
 	if (*round > pi->round)
 		pi->round = *round;
@@ -196,6 +197,10 @@ static void proposer_prepare(struct paxos_instance *pi, int *round)
 	strcpy(hdr->piname, pi->name);
 	hdr->ballot_number = htonl(ballot);
 	hdr->extralen = htonl(pi->ps->extralen);
+
+	if (pi->ps->p_op->prepare &&
+		pi->ps->p_op->prepare((pi_handle_t)pi, extra) < 0)
+		return;
 
 	if (pi->ps->p_op->broadcast)
 		pi->ps->p_op->broadcast(msg, msglen);
@@ -246,8 +251,8 @@ static void proposer_propose(struct paxos_space *ps,
 	}
 
 	extra = (char *)msg + sizeof(struct paxos_msghdr);
-	if (ps->p_op->prepare) {
-		if (ps->p_op->prepare(pih, extra))
+	if (ps->p_op->is_prepared) {
+		if (ps->p_op->is_prepared(pih, extra))
 			pi->proposer->open_number++;
 	} else
 		pi->proposer->open_number++;
@@ -427,8 +432,9 @@ static void acceptor_accepted(struct paxos_space *ps,
 	memcpy(value, (char *)msg + sizeof(struct paxos_msghdr) + ps->extralen,
 	       ps->valuelen);
 
-	if (ps->p_op->accepted)
-		ps->p_op->accepted(pih, extra, ballot, value);
+	if (ps->p_op->accepted
+		&& ps->p_op->accepted(pih, extra, ballot, value) < 0)
+		return;
 
 	pi->acceptor->state = ACCEPTING;
 	to = ntohl(hdr->from);

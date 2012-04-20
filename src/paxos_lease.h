@@ -21,6 +21,9 @@
 
 #define PLEASE_NAME_LEN		63
 
+#define NOT_CLEAR_RELEASE	0
+#define CLEAR_RELEASE		1
+
 typedef long pl_handle_t;
 
 struct paxos_lease_result {
@@ -51,6 +54,7 @@ pl_handle_t paxos_lease_init(const void *name,
 int paxos_lease_on_receive(void *msg, int msglen);
 
 int paxos_lease_acquire(pl_handle_t handle,
+			int clear,
 			int renew,
 			void (*end_acquire) (pl_handle_t handle, int result));
 /*
@@ -62,7 +66,8 @@ int paxos_lease_timeout(const void *name);
 */
 int paxos_lease_status_recovery(pl_handle_t handle);
 
-int paxos_lease_release(pl_handle_t handle);
+int paxos_lease_release(pl_handle_t handle,
+			void (*end_release) (pl_handle_t handle, int result));
 
 int paxos_lease_exit(pl_handle_t handle);
 

@@ -35,6 +35,7 @@ struct paxos_operations {
 	int (*catchup) (pi_handle_t handle);
 	int (*prepare) (pi_handle_t handle, void *extra);
 	int (*promise) (pi_handle_t handle, void *extra);
+	int (*is_prepared) (pi_handle_t handle, void *extra);
 	int (*propose) (pi_handle_t handle, void *extra,
 			int round, void *value);
 	int (*accepted) (pi_handle_t handle, void *extra,
