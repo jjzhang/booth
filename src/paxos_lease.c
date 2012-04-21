@@ -723,6 +723,9 @@ static int start_lease_learned(pi_handle_t handle, void *extra, int round)
 		return -1;
 	}
 
+	if (!pl->acceptor.plv)
+		return -1;
+
 	pl->release = LEASE_STARTED;
 	pl->owner = pl->acceptor.plv->owner;
 	pl->expiry = pl->acceptor.plv->expiry;
@@ -758,6 +761,9 @@ static int stop_lease_learned(pi_handle_t handle,
 			  round, pl->proposer.round);
 		return -1;
 	}
+
+	if (!pl->acceptor.plv)
+		return -1;
 
 	if (pl->acceptor.timer2)
 		del_timer(&pl->acceptor.timer2);

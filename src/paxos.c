@@ -50,7 +50,6 @@ struct paxos_msghdr {
 	char psname[PAXOS_NAME_LEN+1];
 	char piname[PAXOS_NAME_LEN+1];
 	int ballot_number;
-	int reject;
 	int proposer_id;
 	unsigned int extralen;
 	unsigned int valuelen;
@@ -242,14 +241,6 @@ static void proposer_propose(struct paxos_space *ps,
 		return;
 	}
 
-	if (ntohl(hdr->reject)) {
-		log_debug("proposal was rejected");
-		pi->round = ballot;
-		pi->proposer->state = INIT;
-		pi->end(pih, pi->round, -EAGAIN);
-		return;
-	}
-
 	extra = (char *)msg + sizeof(struct paxos_msghdr);
 	if (ps->p_op->is_prepared) {
 		if (ps->p_op->is_prepared(pih, extra))
@@ -265,8 +256,9 @@ static void proposer_propose(struct paxos_space *ps,
 	pi->proposer->proposed = 1;
 
 	value = pi->proposer->proposal->value;
-	if (ps->p_op->propose)
-		ps->p_op->propose(pih, extra, ballot, value);
+	if (ps->p_op->propose
+		&& ps->p_op->propose(pih, extra, ballot, value) < 0)
+		return;
 
 	hdr->valuelen = htonl(ps->valuelen); 
 	message = malloc(msglen + ps->valuelen);
@@ -332,8 +324,9 @@ static void proposer_commit(struct paxos_space *ps,
 		return;
 
 	pi->round = ballot;
-	if (ps->p_op->commit)
-		ps->p_op->commit(pih, extra, pi->round);
+	if (ps->p_op->commit
+		&& ps->p_op->commit(pih, extra, pi->round) < 0)
+		return;
 	pi->proposer->state = COMMITTED;
 
 	if (pi->end)
@@ -369,19 +362,14 @@ static void acceptor_promise(struct paxos_space *ps,
 		log_debug("ballot number: %d, highest promised: %d",
 			  ntohl(hdr->ballot_number),
 			  pi->acceptor->highest_promised);
-		to = ntohl(hdr->from);
-		hdr->from = htonl(ps->p_op->get_myid());
-		hdr->state = htonl(PROMISING);
-		hdr->reject = htonl(1);
-		memset(extra, 0, ps->extralen);
-		ps->p_op->send(to, msg, msglen);
 		return;
 	}
+
+	if (ps->p_op->promise
+		&& ps->p_op->promise(pih, extra) < 0)
+		return;
+
 	pi->acceptor->highest_promised = ntohl(hdr->ballot_number);
-
-	if (ps->p_op->promise)
-		ps->p_op->promise(pih, extra);
-
 	pi->acceptor->state = PROMISING;
 	to = ntohl(hdr->from);
 	hdr->from = htonl(ps->p_op->get_myid());
@@ -420,11 +408,6 @@ static void acceptor_accepted(struct paxos_space *ps,
 	if (ballot < pi->acceptor->highest_promised) {
 		log_debug("ballot: %d, highest promised: %d",
 			  ballot, pi->acceptor->highest_promised);
-		to = ntohl(hdr->from);
-		hdr->from = htonl(myid);
-		hdr->state = htonl(ACCEPTING);
-		hdr->reject = htonl(1);
-		ps->p_op->send(to, hdr, sizeof(struct paxos_msghdr));
 		return;
 	}
 
