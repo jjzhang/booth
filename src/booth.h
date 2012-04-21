@@ -65,6 +65,7 @@ typedef enum {
 	BOOTHC_RLT_INVALID_ARG,
 	BOOTHC_RLT_REMOTE_OP,
 	BOOTHC_RLT_OVERGRANT,
+	BOOTHC_RLT_REJECT,
 } cmd_result_t;
 
 struct client {
