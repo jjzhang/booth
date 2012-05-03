@@ -462,8 +462,8 @@ int revoke_ticket(char *ticket)
 	if (tk->owner == -1)
 		return BOOTHC_RLT_SYNC_SUCC;
 	else {
-		paxos_lease_release(tk->handle, end_release);
-		return BOOTHC_RLT_ASYNC;
+		int ret = paxos_lease_release(tk->handle, end_release);
+		return (ret < 0)? BOOTHC_RLT_SYNC_FAIL: BOOTHC_RLT_ASYNC;
 	}	
 }
 

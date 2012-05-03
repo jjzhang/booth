@@ -240,6 +240,12 @@ int paxos_lease_release(pl_handle_t handle,
 	int round;
 
 	log_debug("enter paxos_lease_release");
+	if (pl->owner != myid) {
+		log_error("can not release the lease "
+			  "because I'm not the lease owner");
+		return -1;
+	}
+
 	memset(&value, 0, sizeof(struct paxos_lease_value));
 	strncpy(value.name, pl->name, PAXOS_NAME_LEN + 1);
 	pl->end_lease = end_release;
