@@ -224,12 +224,9 @@ int paxos_lease_acquire(pl_handle_t handle,
 				     end_paxos_request);
 	pl->proposer.timer2 = add_timer(1 * pl->expiry / 10, (unsigned long)pl,
 					lease_retry);
-	if (round <= 0)
-		return -1;
-	else {
+	if (round > 0)
 		pl->proposer.round = round;	
-		return 0;
-	}
+	return (round < 0)? -1: round;
 }
 
 int paxos_lease_release(pl_handle_t handle,
@@ -258,7 +255,7 @@ int paxos_lease_release(pl_handle_t handle,
 		pl->proposer.round = round;
 
 	log_debug("exit paxos_lease_release");
-	return (round > 0)? 0: -1;
+	return (round < 0)? -1: round;
 }
 
 static int lease_catchup(pi_handle_t handle)
@@ -269,9 +266,9 @@ static int lease_catchup(pi_handle_t handle)
 	if (!find_paxos_lease(handle, &pl))
 		return -1;
 
-	p_l_op->catchup(pl->name, &pl->owner, &pl->proposer.round, &pl->expires);
+	p_l_op->catchup(pl->name, &pl->owner, &pl->acceptor.round, &pl->expires);
 	log_debug("catchup result: name: %s, owner: %d, ballot: %d, expires: %llu",
-		  (char *)pl->name, pl->owner, pl->proposer.round, pl->expires);
+		  (char *)pl->name, pl->owner, pl->acceptor.round, pl->expires);
 
 	/**
 	 * 1. If no site hold the ticket, the relet will be set LEASE_STOPPED.
