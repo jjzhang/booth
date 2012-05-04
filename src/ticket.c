@@ -33,8 +33,10 @@
 #include "paxos_lease.h"
 #include "paxos.h"
 
-#define PAXOS_MAGIC     0xDB12
-#define TK_LINE		256
+#define PAXOS_MAGIC		0xDB12
+#define TK_LINE			256
+
+#define CATCHED_VALID_TMSG	1
 
 struct booth_msghdr {
         uint16_t magic;
@@ -252,15 +254,15 @@ static int ticket_parse(struct ticket_msg *tmsg)
 	struct ticket *tk;
 	int found = 0;
 
-	if (!tmsg->result)
-		return -1;
-
 	list_for_each_entry(tk, &ticket_list, list) {
 		if (!strcmp(tk->id, tmsg->id)) {
-			tk->owner = tmsg->owner;
-			tk->expires = current_time() + tmsg->expiry;
-			tk->ballot = tmsg->ballot;
 			found = 1;
+			if (tk->ballot < tmsg->ballot)
+				tk->ballot = tmsg->ballot;
+			if (CATCHED_VALID_TMSG == tmsg->result) {
+				tk->owner = tmsg->owner;
+				tk->expires = current_time() + tmsg->expiry;
+			}
 			break;
 		}
 	}
@@ -437,8 +439,11 @@ int grant_ticket(char *ticket)
 	if (tk->owner == ticket_get_myid())
 		return BOOTHC_RLT_SYNC_SUCC;
 	else {
-		paxos_lease_acquire(tk->handle, CLEAR_RELEASE, 1, end_acquire);
-		return BOOTHC_RLT_ASYNC;
+		int ret = paxos_lease_acquire(tk->handle, CLEAR_RELEASE,
+				1, end_acquire);
+		if (ret >= 0)
+			tk->ballot = ret;
+		return (ret < 0)? BOOTHC_RLT_SYNC_FAIL: BOOTHC_RLT_ASYNC;
 	}
 }
 
@@ -463,6 +468,8 @@ int revoke_ticket(char *ticket)
 		return BOOTHC_RLT_SYNC_SUCC;
 	else {
 		int ret = paxos_lease_release(tk->handle, end_release);
+		if (ret >= 0)
+			tk->ballot = ret;
 		return (ret < 0)? BOOTHC_RLT_SYNC_FAIL: BOOTHC_RLT_ASYNC;
 	}	
 }
@@ -525,18 +532,17 @@ int catchup_ticket(char **pdata, unsigned int len)
 	assert(len == sizeof(struct ticket_msg));
 	tmsg = (struct ticket_msg *)(*pdata);
 	list_for_each_entry(tk, &ticket_list, list) {
-		if (!strcmp(tk->id, tmsg->id) && tk->owner == ticket_get_myid()
-		    && current_time() < tk->expires) {
-			tmsg->owner = tk->owner;
+		if (strcmp(tk->id, tmsg->id))
+			continue;
+
+		tmsg->ballot = tk->ballot;
+		if (tk->owner == ticket_get_myid()
+				&& current_time() < tk->expires) {
+			tmsg->result = CATCHED_VALID_TMSG;
 			tmsg->expiry = tk->expires - current_time();
-			tmsg->ballot = tk->ballot;
-			tmsg->result = 1;
-			break;
+			tmsg->owner = tk->owner;
 		}
 	}
-
-	if (!tmsg->result)
-		memset(*pdata, 0, len);
 
 	return 0;
 }
