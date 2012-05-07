@@ -667,7 +667,7 @@ static int do_command(cmd_request_t cmd)
 			log_info("grant failed!");
 		else if (cmd == BOOTHC_CMD_REVOKE)
 			log_info("revoke failed!");
-		rv = 0;
+		rv = -1;
 	} else {
 		log_error("internal error!");
 		rv = -1;
