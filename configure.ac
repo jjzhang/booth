@@ -4,7 +4,7 @@
 # bootstrap / init
 AC_PREREQ([2.61])
 
-AC_INIT([booth], 0.1.0, [notsure@notsure.org])
+AC_INIT([booth], [0.1.0], [pacemaker@oss.clusterlabs.org])
 
 AM_INIT_AUTOMAKE([-Wno-portability])
 
