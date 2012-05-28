@@ -2,7 +2,7 @@ MAINTAINERCLEANFILES	= Makefile.in
 
 AM_CFLAGS		= -fPIC -Werror
 
-INCLUDES		= -I$(top_builddir)/include
+AM_CPPFLAGS		= -I$(top_builddir)/include
 
 sbin_PROGRAMS		= boothd
 
