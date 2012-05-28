@@ -9,7 +9,7 @@ sbin_PROGRAMS		= boothd
 boothd_SOURCES	 	= config.c main.c paxos.c ticket.c  transport.c \
 			  pacemaker.c paxos_lease.c timer.c
 
-boothd_LDFLAGS		= $(OS_DYFLAGS) -L./ $(GLIB_LIBS)
+boothd_LDFLAGS		= $(OS_DYFLAGS) -L./
 boothd_CPPFLAGS		= $(GLIB_CFLAGS)
 
 noinst_HEADERS		= booth.h list.h pacemaker.h paxos_lease.h timer.h \
