@@ -64,6 +64,7 @@ AM_CONDITIONAL(HAVE_HELP2MAN, test x"${HELP2MAN}" != x"")
 # Checks for libraries.
 AC_CHECK_LIB([socket], [socket])
 AC_CHECK_LIB([nsl], [t_open])
+AC_CHECK_LIB([plumb], [cl_log])
 
 PKG_CHECK_MODULES(GLIB, [glib-2.0])
 

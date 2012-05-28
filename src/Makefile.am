@@ -9,7 +9,6 @@ sbin_PROGRAMS		= boothd
 boothd_SOURCES	 	= config.c main.c paxos.c ticket.c  transport.c \
 			  pacemaker.c paxos_lease.c timer.c
 
-boothd_LDADD	  	= -lplumb -lplumbgpl
 boothd_LDFLAGS		= $(OS_DYFLAGS) -L./ $(GLIB_LIBS)
 boothd_CPPFLAGS		= $(GLIB_CFLAGS)
 
