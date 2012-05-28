@@ -257,7 +257,7 @@ static void process_dead(int ci)
 static void process_tcp_listener(int ci)
 {
 	int fd, i, one = 1;
-	socklen_t addrlen;
+	socklen_t addrlen = sizeof(struct sockaddr);
 	struct sockaddr addr;
 	struct tcp_conn *conn;
 
