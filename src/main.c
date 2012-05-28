@@ -611,7 +611,7 @@ static int do_command(cmd_request_t cmd)
 	}
 	
 	if (reply.result == BOOTHC_RLT_OVERGRANT) {
-		log_info("You're granting a granted ticket"
+		log_info("You're granting a granted ticket "
 			 "If you wanted to migrate a ticket,"
 			 "use revoke first, then use grant");
 		rv = -1;
