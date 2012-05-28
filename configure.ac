@@ -62,10 +62,8 @@ AC_PATH_PROGS(PKGCONFIG, pkg-config)
 AM_CONDITIONAL(HAVE_HELP2MAN, test x"${HELP2MAN}" != x"")
 
 # Checks for libraries.
-AC_CHECK_LIB([dl], [dlopen])
 AC_CHECK_LIB([socket], [socket])
 AC_CHECK_LIB([nsl], [t_open])
-AC_CHECK_LIB([rt], [sched_getscheduler])
 
 #
 # glib
