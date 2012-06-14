@@ -286,7 +286,6 @@ WARNLIST="
 	declaration-after-statement
 	pointer-arith
 	write-strings
-	cast-align
 	bad-function-cast
 	missing-format-attribute
 	format=2
