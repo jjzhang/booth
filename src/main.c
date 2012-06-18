@@ -85,6 +85,24 @@ struct command_line {
 
 static struct command_line cl;
 
+static void check_lockfile(int fd, struct flock lock) {
+	int rv;
+
+	rv = fcntl(fd, F_GETLK, &lock);
+	if (rv < 0) {
+		log_error("lockfile getlk error %s: %s",
+			cl.lockfile, strerror(errno));
+	}
+
+	if(lock.l_type == F_UNLCK) {
+		log_error("can get the lock of %s",
+			cl.lockfile);
+	} else {
+		log_error("cannot get the lock of %s ,pid %d use file",
+			cl.lockfile, lock.l_pid);
+	}
+}
+
 int do_read(int fd, void *buf, size_t count)
 {
 	int rv, off = 0;
@@ -691,52 +709,63 @@ static int do_revoke(void)
 	return do_command(BOOTHC_CMD_REVOKE);
 }
 
-static int lockfile(void)
+static int get_lockfile(void)
 {
-	char buf[16];
-	struct flock lock;
 	int fd, rv;
-
+	struct flock lock;
 	fd = open(cl.lockfile, O_CREAT|O_WRONLY, 0666);
 	if (fd < 0) {
-                log_error("lockfile open error %s: %s",
-                          cl.lockfile, strerror(errno));
-                return -1;
-        }       
+		log_error("lockfile open error %s: %s",
+			cl.lockfile, strerror(errno));
+		return -1;
+	}
 
-        lock.l_type = F_WRLCK;
-        lock.l_start = 0;
-        lock.l_whence = SEEK_SET;
-        lock.l_len = 0;
-        
-        rv = fcntl(fd, F_SETLK, &lock);
-        if (rv < 0) {
-                log_error("lockfile setlk error %s: %s",
-                          cl.lockfile, strerror(errno));
-                goto fail;
-        }
+	lock.l_type = F_WRLCK;
+	lock.l_start = 0;
+	lock.l_whence = SEEK_SET;
+	lock.l_len = 0;
 
-        rv = ftruncate(fd, 0);
-        if (rv < 0) {
-                log_error("lockfile truncate error %s: %s",
-                          cl.lockfile, strerror(errno));
-                goto fail;
-        }
-
-        memset(buf, 0, sizeof(buf));
-        snprintf(buf, sizeof(buf), "%d\n", getpid());
-
-        rv = write(fd, buf, strlen(buf));
-        if (rv <= 0) {
-                log_error("lockfile write error %s: %s",
-                          cl.lockfile, strerror(errno));
-                goto fail;
-        }
-
-        return fd;
+	rv = fcntl(fd, F_SETLK, &lock);
+	if (rv < 0) {
+		log_error("lockfile setlk error %s: %s",
+			cl.lockfile, strerror(errno));
+		if ( errno == EACCES || errno == EAGAIN) {
+			check_lockfile(fd, lock);
+		}
+		goto fail;
+	}
+	return fd;
  fail:
-        close(fd);
-        return -1;
+	close(fd);
+	return -1;
+}
+
+static int write_lockfile(int fd)
+{
+	char buf[16];
+	int rv;
+
+	rv = ftruncate(fd, 0);
+	if (rv < 0) {
+		log_error("lockfile truncate error %s: %s",
+			cl.lockfile, strerror(errno));
+		goto fail;
+	}
+
+	memset(buf, 0, sizeof(buf));
+	snprintf(buf, sizeof(buf), "%d\n", getpid());
+
+	rv = write(fd, buf, strlen(buf));
+	if (rv <= 0) {
+		log_error("lockfile write error %s: %s",
+			cl.lockfile, strerror(errno));
+		goto fail;
+	}
+
+	return fd;
+ fail:
+	close(fd);
+	return -1;
 }
 
 static void unlink_lockfile(int fd)
@@ -947,6 +976,10 @@ static int do_server(int type)
 	int fd = -1;
 	int rv = -1;
 
+	fd = get_lockfile();
+	if (fd < 0)
+		return fd;
+
 	rv = setup(type);
 	if (rv < 0)
 		goto out;
@@ -962,7 +995,7 @@ static int do_server(int type)
 	  The lock cannot be obtained before the call to daemon(), otherwise
 	  the lockfile would contain the pid of the parent, not the daemon.
 	*/
-	fd = lockfile();
+	fd = write_lockfile(fd);
 	if (fd < 0)
 		return fd;
 
