@@ -720,9 +720,9 @@ static int start_lease_learned(pi_handle_t handle, void *extra, int round)
 		return -1;
 
 	if (round != pl->acceptor.round) {
-		log_error("current round is not the proposer round, "
-			  "current round: %d, proposer round: %d",
-			  round, pl->proposer.round);
+		log_error("current round is not the acceptor round, "
+			  "current round: %d, acceptor round: %d",
+			  round, pl->acceptor.round);
 		return -1;
 	}
 
@@ -759,9 +759,9 @@ static int stop_lease_learned(pi_handle_t handle,
 		return -1;
 
 	if (round != pl->acceptor.round) {
-		log_error("current round is not the proposer round, "
-			  "current round: %d, proposer round: %d",
-			  round, pl->proposer.round);
+		log_error("current round is not the acceptor round, "
+			  "current round: %d, acceptor round: %d",
+			  round, pl->acceptor.round);
 		return -1;
 	}
 
