@@ -306,10 +306,10 @@ static int lease_catchup(pi_handle_t handle)
 		pl->acceptor.timer1 = add_timer(pl->expires - current_time(),
 						(unsigned long)pl,
 						lease_expires);
-
+	pl->proposer.round = pl->acceptor.round;
 	plr.owner = pl->owner;
 	plr.expires = pl->expires;
-	plr.ballot = pl->proposer.round;
+	plr.ballot = pl->acceptor.round;
 	strcpy(plr.name, pl->name);
 	p_l_op->notify((pl_handle_t)pl, &plr);
 
