@@ -293,7 +293,7 @@ static int lease_catchup(pi_handle_t handle)
 	}
 
 	if (pl->owner == myid) {
-		pl->acceptor.timer1 = add_timer(pl->expires - current_time(),
+		pl->acceptor.timer2 = add_timer(pl->expires - current_time(),
 						(unsigned long)pl,
 						lease_expires);
 		if (current_time() < pl->expires - 1 * pl->expiry / 5)
@@ -303,7 +303,7 @@ static int lease_catchup(pi_handle_t handle)
 							(unsigned long)pl,
 							renew_expires);
 	} else
-		pl->acceptor.timer1 = add_timer(pl->expires - current_time(),
+		pl->acceptor.timer2 = add_timer(pl->expires - current_time(),
 						(unsigned long)pl,
 						lease_expires);
 	pl->proposer.round = pl->acceptor.round;
