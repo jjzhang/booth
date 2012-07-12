@@ -536,7 +536,7 @@ int catchup_ticket(char **pdata, unsigned int len)
 			continue;
 
 		tmsg->ballot = tk->ballot;
-		if (tk->owner == ticket_get_myid()
+		if (tk->owner != -1
 				&& current_time() < tk->expires) {
 			tmsg->result = CATCHED_VALID_TMSG;
 			tmsg->expiry = tk->expires - current_time();
