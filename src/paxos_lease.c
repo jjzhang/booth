@@ -135,6 +135,11 @@ static void renew_expires(unsigned long data)
 
 	log_debug("renew expires ...");
 
+	if (pl->owner != myid) {
+		log_debug("can not renew because I'm not the lease owner");
+		return;
+	}
+
 	memset(&value, 0, sizeof(struct paxos_lease_value));
 	strncpy(value.name, pl->name, PAXOS_NAME_LEN + 1);
 	value.owner = myid;
@@ -178,8 +183,8 @@ static void lease_retry(unsigned long data)
 	log_debug("lease_retry ...");
 	if (pl->proposer.timer2)
 		del_timer(&pl->proposer.timer2);
-	if (pl->owner == myid) {
-		log_debug("already got the lease, no need to retry");
+	if (pl->owner != -1) {
+		log_debug("someone already got the lease, no need to retry");
 		return;
 	}
 
