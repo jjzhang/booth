@@ -613,9 +613,10 @@ static int do_command(cmd_request_t cmd)
 		strcpy(to.addr, cl.site);
 
 		s = booth_transport[TCP].open(&to);
-		if (s < 0)
+		if (s < 0) {
+			rv = -1;
 			goto out_close;
-
+		}
 		rv = booth_transport[TCP].send(s, buf, buflen);
 		if (rv < 0) {
 			booth_transport[TCP].close(s);
