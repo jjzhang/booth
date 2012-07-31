@@ -33,7 +33,7 @@ SPEC			= $(PACKAGE_NAME).spec
 
 TARFILE			= $(PACKAGE_NAME)-$(VERSION).tar.gz
 
-EXTRA_DIST		= autogen.sh conf/booth.conf.example 
+EXTRA_DIST		= autogen.sh conf/booth.conf.example $(bootharbitrator_SCRIPTS) $(boothsite_SCRIPTS) 
 
 AUTOMAKE_OPTIONS	= foreign
 
@@ -87,6 +87,10 @@ lint:
 dist-clean-local:
 	rm -f autoconf automake autoheader
 
+dist-hook:
+	echo $(VERSION) > $(distdir)/.tarball-version
+
+
 ## make rpm/srpm section.
 
 $(SPEC): $(SPEC).in
@@ -139,9 +143,11 @@ RPMBUILDOPTS	= --define "_sourcedir $(abs_builddir)" \
 		  --define "_rpmdir $(abs_builddir)"
 
 srpm: clean
+	autoreconf -if
 	$(MAKE) $(SPEC) $(TARFILE)
 	rpmbuild $(RPMBUILDOPTS) --nodeps -bs $(SPEC)
 
 rpm: clean
+	autoreconf -if
 	$(MAKE) $(SPEC) $(TARFILE)
 	rpmbuild $(RPMBUILDOPTS) -ba $(SPEC)
