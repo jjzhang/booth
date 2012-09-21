@@ -38,6 +38,9 @@
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <signal.h>
+#include <netdb.h>
+#include <arpa/inet.h>
+#include <sys/types.h>
 #include "log.h"
 #include "booth.h"
 #include "config.h"
@@ -770,11 +773,33 @@ void safe_copy(char *dest, char *value, size_t buflen, const char *description) 
 	strncpy(dest, value, buflen - 1);
 }
 
+static void host_convert(char *hostname, char *ip_str)
+{
+	struct addrinfo *result = NULL, hints = {0};
+	int re = -1;
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_DGRAM;
+
+	re = getaddrinfo(hostname, NULL, &hints, &result);
+
+	if (re == 0) {
+		struct in_addr addr = ((struct sockaddr_in *)result->ai_addr)->sin_addr;
+		memcpy(ip_str, inet_ntoa(addr), strlen(inet_ntoa(addr)) + 1);
+	} else {
+		ip_str = hostname;
+	}
+
+	freeaddrinfo(result);
+}
+
 static int read_arguments(int argc, char **argv)
 {
 	int optchar;
 	char *arg1 = argv[1];
 	char *op = NULL;
+	char site_arg[15] = {0};
 
 	if (argc < 2 || !strcmp(arg1, "help") || !strcmp(arg1, "--help") ||
 		!strcmp(arg1, "-h")) {
@@ -861,7 +886,8 @@ static int read_arguments(int argc, char **argv)
 
 		case 's':
 			if (cl.op == OP_GRANT || cl.op == OP_REVOKE) {
-				safe_copy(cl.site, optarg, sizeof(cl.ticket), "site name");
+				host_convert(optarg, site_arg);
+				safe_copy(cl.site, site_arg, sizeof(cl.ticket), "site name");
 			} else {
 				print_usage();
 				exit(EXIT_FAILURE);
