@@ -39,7 +39,7 @@ static int ticket_realloc(void)
 		return -ENOMEM;
 	}
 
-	p = booth_conf + sizeof(struct booth_config)
+	p = (char *) booth_conf + sizeof(struct booth_config)
 	    + ticket_size * sizeof(struct ticket_config);
 	memset(p, 0, TICKET_ALLOC * sizeof(struct ticket_config));
 	ticket_size += TICKET_ALLOC;
