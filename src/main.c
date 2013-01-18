@@ -450,12 +450,14 @@ static int setup_timer(void)
 	return timerlist_init();
 }
 
-static int loop(void)
+static int setup(int type)
 {
-	void (*workfn) (int ci);
-	void (*deadfn) (int ci);
-	int rv, i;
-	
+	int rv;
+
+	rv = setup_config(type);
+	if (rv < 0)
+		goto fail;
+
 	rv = setup_timer();
 	if (rv < 0)
 		goto fail;
@@ -472,6 +474,18 @@ static int loop(void)
 	if (rv < 0)
 		goto fail;
 	client_add(rv, process_listener, NULL);
+
+	return 0;
+
+fail:
+	return -1;
+}
+
+static int loop(void)
+{
+	void (*workfn) (int ci);
+	void (*deadfn) (int ci);
+	int rv, i;
 
         while (1) {
                 rv = poll(pollfd, client_maxi + 1, poll_timeout);
@@ -966,7 +980,7 @@ static int do_server(int type)
 	int fd = -1;
 	int rv = -1;
 
-	rv = setup_config(type);
+	rv = setup(type);
 	if (rv < 0)
 		goto out;
 
