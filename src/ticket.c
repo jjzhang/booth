@@ -497,6 +497,7 @@ int list_ticket(char **pdata, unsigned int *len)
 	char timeout_str[100];
 	char node_name[BOOTH_NAME_LEN];
 	char tmp[TK_LINE];
+	int ret;
 
 	*pdata = NULL;
 	*len = 0;
@@ -519,6 +520,9 @@ int list_ticket(char **pdata, unsigned int *len)
 		memset(*pdata + *len, 0, TK_LINE);
 		memcpy(*pdata + *len, tmp, TK_LINE);
 		*len += TK_LINE;
+		ret = paxos_lease_list(tk->handle, pdata, len);
+		if (ret < 0)
+			return ret;
 	}
 
 	return 0;

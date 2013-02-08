@@ -80,4 +80,8 @@ int paxos_instance_exit(pi_handle_t handle);
 
 int paxos_space_exit(ps_handle_t handle);
 
+void paxos_display_status_init(pi_handle_t handle);
+
+int paxos_display_list(pi_handle_t handle, char **pdata, unsigned int *len);
+
 #endif /* _PAXOS_H */

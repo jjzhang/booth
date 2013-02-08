@@ -20,9 +20,14 @@
 #include <string.h>
 #include <errno.h>
 #include <arpa/inet.h>
+#include <stdio.h>
 #include "list.h"
 #include "paxos.h"
 #include "log.h"
+#include "transport.h"
+#include "config.h"
+
+#define PAXOS_PRINT_LINE 256
 
 typedef enum {
 	INIT = 1,
@@ -125,12 +130,14 @@ struct paxos_instance {
 	char name[PAXOS_NAME_LEN+1];
 	int round;
 	int *prio;
+	int state_monitoring;
 	struct proposer *proposer;
 	struct acceptor *acceptor;
 	struct learner *learner;
 	void (*end) (pi_handle_t pih, int round, int result);
 	struct list_head list;
 	struct paxos_space *ps;
+	struct booth_node node[MAX_NODES];
 };
 
 static LIST_HEAD(ps_head);
@@ -171,7 +178,7 @@ static void proposer_prepare(struct paxos_instance *pi, int *round)
 	struct paxos_msghdr *hdr;
 	void *msg, *extra;
 	int msglen = sizeof(struct paxos_msghdr) + pi->ps->extralen;
-	int ballot;
+	int ballot, i;
 
 	log_debug("preposer prepare ...");
 	msg = malloc(msglen);
@@ -204,7 +211,6 @@ static void proposer_prepare(struct paxos_instance *pi, int *round)
 	if (pi->ps->p_op->broadcast)
 		pi->ps->p_op->broadcast(msg, msglen);
 	else {
-		int i;
 		for (i = 0; i < pi->ps->number; i++) {
 			if (pi->ps->role[i] & ACCEPTOR)
 				pi->ps->p_op->send(i, msg, msglen);
@@ -213,6 +219,9 @@ static void proposer_prepare(struct paxos_instance *pi, int *round)
 
 	free(msg);
 	*round = ballot;
+
+	for (i = 0; i < booth_conf->node_count; i++)
+		pi->node[i].connect_state = PREPARING;
 }
 
 static void proposer_propose(struct paxos_space *ps,
@@ -294,7 +303,7 @@ static void proposer_commit(struct paxos_space *ps,
 	struct paxos_msghdr *hdr;
 	pi_handle_t pih = (pi_handle_t)pi;
 	void *extra;
-	int ballot;
+	int ballot, i;
 
 	log_debug("proposer commit ...");
 	if (msglen != sizeof(struct paxos_msghdr) + ps->extralen) {
@@ -308,14 +317,22 @@ static void proposer_commit(struct paxos_space *ps,
 	extra = (char *)msg + sizeof(struct paxos_msghdr);
 	hdr = msg;
 
-        ballot = ntohl(hdr->ballot_number);
-        if (pi->proposer->ballot != ballot) {
+	ballot = ntohl(hdr->ballot_number);
+	if (pi->proposer->ballot != ballot) {
 		log_debug("not the same ballot, proposer ballot: %d, "
 			  "received ballot: %d", pi->proposer->ballot, ballot);
-                return;
+		return;
 	}
 
 	pi->proposer->accepted_number++;
+
+	for (i = 0; i < booth_conf->node_count; i++) {
+		if (ntohl(hdr->from) == pi->node[i].nodeid &&
+			pi->state_monitoring == 1) {
+			pi->node[i].connect_state = ACCEPTING;
+			break;
+		}
+	}
 
 	if (!have_quorum(ps, pi->proposer->accepted_number))
 		return;
@@ -330,7 +347,7 @@ static void proposer_commit(struct paxos_space *ps,
 	pi->proposer->state = COMMITTED;
 
 	if (pi->end)
-		pi->end(pih, pi->round, 0);	
+		pi->end(pih, pi->round, 0);
 }
 
 static void acceptor_promise(struct paxos_space *ps,
@@ -341,6 +358,7 @@ static void acceptor_promise(struct paxos_space *ps,
 	unsigned long to;
 	pi_handle_t pih = (pi_handle_t)pi;
 	void *extra;
+	int i;
 
 	log_debug("acceptor promise ...");
 	if (pi->acceptor->state == RECOVERY) {
@@ -374,6 +392,15 @@ static void acceptor_promise(struct paxos_space *ps,
 	to = ntohl(hdr->from);
 	hdr->from = htonl(ps->p_op->get_myid());
 	hdr->state = htonl(PROMISING);
+
+	pi->state_monitoring = 1;
+	for (i = 0; i < booth_conf->node_count; i++) {
+		if (ntohl(hdr->from) == pi->node[i].nodeid) {
+			pi->node[i].connect_state = PROMISING;
+			break;
+		}
+	}
+
 	ps->p_op->send(to, msg, msglen);	
 }
 
@@ -386,7 +413,7 @@ static void acceptor_accepted(struct paxos_space *ps,
 	pi_handle_t pih = (pi_handle_t)pi;
 	void *extra, *value;
 	int myid = ps->p_op->get_myid();
-	int ballot;
+	int ballot, i;
 
 	log_debug("acceptor accepted ...");
 	if (pi->acceptor->state == RECOVERY) {
@@ -424,11 +451,14 @@ static void acceptor_accepted(struct paxos_space *ps,
 	hdr->from = htonl(myid);
 	hdr->state = htonl(ACCEPTING);
 
+	pi->state_monitoring = 1;
+	for (i = 0; i < booth_conf->node_count; i++)
+		pi->node[i].connect_state = PROPOSING;
+
 	if (ps->p_op->broadcast)
 		ps->p_op->broadcast(msg, sizeof(struct paxos_msghdr)
 						+ ps->extralen);
 	else {
-		int i;
 		for (i = 0; i < ps->number; i++) {
 			if (ps->role[i] & LEARNER)
 				ps->p_op->send(i, msg,
@@ -481,6 +511,14 @@ static void learner_response(struct paxos_space *ps,
 	if (!found) {
 		pi->learner->learned[unused].ballot = ntohl(hdr->ballot_number);
 		pi->learner->learned[unused].number = 1;
+	}
+
+	for (i = 0; i < booth_conf->node_count; i++) {
+		if (ntohl(hdr->from) == pi->node[i].nodeid &&
+			pi->state_monitoring == 1) {
+			pi->node[i].connect_state = ACCEPTING;
+			break;
+		}
 	}
 
 	if (!have_quorum(ps, pi->learner->learned_max))
@@ -557,7 +595,7 @@ pi_handle_t paxos_instance_init(ps_handle_t handle, const void *name, int *prio)
 	struct proposer *proposer = NULL;
 	struct acceptor *acceptor = NULL;
 	struct learner *learner = NULL;
-	int myid, valuelen, rv;
+	int myid, valuelen, rv, i;
 
 	list_for_each_entry(pi, &ps->pi_head, list) {
 		if (!strcmp(pi->name, name))
@@ -580,6 +618,13 @@ pi_handle_t paxos_instance_init(ps_handle_t handle, const void *name, int *prio)
 	}
 	memset(pi, 0, sizeof(struct paxos_instance));
 	strncpy(pi->name, name, PAXOS_NAME_LEN + 1);
+
+	for (i = 0; i < booth_conf->node_count; i++) {
+		memcpy(&pi->node[i], &booth_conf->node[i],
+			sizeof(struct booth_node));
+	}
+
+	paxos_display_status_init((pi_handle_t)pi);
 
 	if (prio) {
 		pi->prio = malloc(ps->number * sizeof(int));
@@ -791,6 +836,63 @@ int paxos_propose(pi_handle_t handle, void *value, int round)
 	}
 
 	free(msg);
+	return 0;
+}
+
+void paxos_display_status_init(pi_handle_t handle)
+{
+	struct paxos_instance *pi = (struct paxos_instance *)handle;
+	int i;
+
+	pi->state_monitoring = 0;
+	for (i = 0; i < booth_conf->node_count; i++)
+		pi->node[i].connect_state = INIT;
+}
+
+int paxos_display_list(pi_handle_t handle, char **pdata, unsigned int *len)
+{
+	struct paxos_instance *pi = (struct paxos_instance *)handle;
+	const char *status_str = NULL;
+	int i;
+	char tmp[PAXOS_PRINT_LINE];
+
+	for (i = 0; i < booth_conf->node_count; i++) {
+		memset(tmp, 0, PAXOS_PRINT_LINE);
+
+		switch (pi->node[i].connect_state) {
+		case INIT:
+			status_str = "init";
+			break;
+		case PREPARING:
+			status_str = "waiting promise";
+			break;
+		case PROMISING:
+			status_str = "promised";
+			break;
+		case PROPOSING:
+			status_str = "waiting accept";
+			break;
+		case ACCEPTING:
+			status_str = "accepted";
+			break;
+		default:
+			status_str = "unknown";
+			break;
+		}
+
+		snprintf(tmp, PAXOS_PRINT_LINE, "\tsite: %s, state: %s\n",
+			pi->node[i].addr, status_str);
+		*pdata = realloc(*pdata, *len + PAXOS_PRINT_LINE);
+
+		if (*pdata == NULL) {
+			log_error("failed to realloc()");
+			return -ENOMEM;
+		}
+
+		memset(*pdata + *len, 0, PAXOS_PRINT_LINE);
+		memcpy(*pdata + *len, tmp, PAXOS_PRINT_LINE);
+		*len += PAXOS_PRINT_LINE;
+	}
 	return 0;
 }
 

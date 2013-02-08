@@ -696,6 +696,7 @@ static int stop_lease_commit(pi_handle_t handle,
 	plr.ballot = round;
 	plr.expires = 0;
 	p_l_op->notify((pl_handle_t)pl, &plr);
+	paxos_display_status_init(pl->pih);
 	log_debug("exit stop_lease_commit");
 	return 0;	
 }
@@ -790,6 +791,7 @@ static int stop_lease_learned(pi_handle_t handle,
 	plr.ballot = round;
 	plr.expires = 0;
 	p_l_op->notify((pl_handle_t)pl, &plr);
+	paxos_display_status_init(pl->pih);
 	log_debug("exit stop_lease_learned");
 	return 0;
 }
@@ -934,3 +936,11 @@ int paxos_lease_exit(pl_handle_t handle)
 
 	return 0;
 }
+
+int paxos_lease_list(pl_handle_t handle, char **pdata, unsigned int *len)
+{
+	struct paxos_lease *pl = (struct paxos_lease *)handle;
+
+	return paxos_display_list(pl->pih, pdata, len);
+}
+

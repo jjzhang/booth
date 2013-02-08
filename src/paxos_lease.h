@@ -71,4 +71,6 @@ int paxos_lease_release(pl_handle_t handle,
 
 int paxos_lease_exit(pl_handle_t handle);
 
+int paxos_lease_list(pl_handle_t handle, char **pdata, unsigned int *len);
+
 #endif /* _PAXOS_LEASE_H */
