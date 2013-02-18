@@ -406,6 +406,11 @@ static int start_lease_promise(pi_handle_t handle, void *header)
 		hdr->leased = 1;
 	}
 
+	if (hdr->leased == 1) {
+		log_error("the proposal collided");
+		return -1;
+	}
+
 	log_debug("exit start_lease_promise");
 	return 0;
 }
