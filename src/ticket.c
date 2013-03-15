@@ -553,6 +553,7 @@ const struct paxos_lease_operations ticket_operations = {
 	.broadcast	= ticket_broadcast,
 	.catchup	= ticket_catchup,
 	.notify		= ticket_write,
+	.end_acquire = end_acquire,
 };
 
 int setup_ticket(void)

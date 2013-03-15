@@ -111,7 +111,6 @@ struct learner_operations {
 			  struct paxos_instance *,
 			  void *, int);
 };
-	
 
 struct paxos_space {
 	char name[PAXOS_NAME_LEN+1];
@@ -358,6 +357,7 @@ static void acceptor_promise(struct paxos_space *ps,
 	unsigned long to;
 	pi_handle_t pih = (pi_handle_t)pi;
 	void *extra;
+	int proposer_id = -1;
 	int ballot = -1;
 
 	log_debug("acceptor promise ...");
@@ -384,8 +384,9 @@ static void acceptor_promise(struct paxos_space *ps,
 		return;
 	}
 
+	proposer_id = ntohl(hdr->proposer_id);
 	if (ps->p_op->promise
-		&& ps->p_op->promise(pih, extra, ballot) < 0)
+		&& ps->p_op->promise(pih, extra, proposer_id, ballot) < 0)
 		return;
 
 	pi->acceptor->highest_promised = ballot;
@@ -714,6 +715,7 @@ pi_handle_t paxos_instance_init(ps_handle_t handle, const void *name, int *prio)
 		}
 		memset(proposer->proposal, 0,
 		       sizeof(struct proposal) + valuelen);
+		proposer->instance_number = INSTANCE_NUMBER_EMPTY;
 		pi->proposer = proposer;
 	}
 
@@ -869,6 +871,7 @@ int paxos_propose(pi_handle_t handle, void *value, int round)
 	struct paxos_instance *pi = (struct paxos_instance *)handle;
 	struct paxos_msghdr *hdr;
 	void *extra, *msg;
+
 	int len = sizeof(struct paxos_msghdr)
 			 + pi->ps->extralen + pi->ps->valuelen;
 
@@ -920,6 +923,24 @@ int paxos_propose(pi_handle_t handle, void *value, int round)
 
 	free(msg);
 	return 0;
+}
+
+int paxos_boost_round(pi_handle_t handle,
+		void *value,
+		int round,
+		void (*end_request) (pi_handle_t handle,
+	     int round,
+	     int result))
+{
+	struct paxos_instance *pi = (struct paxos_instance *)handle;
+
+	if (pi->proposer->instance_number == INSTANCE_NUMBER_EMPTY) {
+		log_debug("instance number is empty. run prepare.");
+		return paxos_round_request(handle, value, &round,
+				end_request);
+	}
+
+	return -1;
 }
 
 int paxos_catchup(pi_handle_t handle)

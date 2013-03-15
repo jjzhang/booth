@@ -39,10 +39,17 @@
 #define LEASE_STARTED			0
 #define LEASE_STOPPED			1
 
+typedef enum {
+	OTHER_LEASE = 0,
+	PROPOSER_LEASE,
+	NO_LEASE,
+	RESTRICT_LEASE
+} lease_state_t;
+
 struct paxos_lease_msghdr {
 	int op;
 	int clear;
-	int leased;
+	lease_state_t leased;
 };
 
 struct paxos_lease_value {
@@ -171,6 +178,7 @@ static void renew_expires(unsigned long data)
 {
 	struct paxos_lease *pl = (struct paxos_lease *)data;
 	struct paxos_lease_value value;
+	int next_round;
 
 	log_debug("renew expires ...");
 
@@ -183,6 +191,15 @@ static void renew_expires(unsigned long data)
 	strncpy(value.name, pl->name, PAXOS_NAME_LEN + 1);
 	value.owner = myid;
 	value.expiry = pl->expiry;
+	if (!pl->end_lease)
+		pl->end_lease = p_l_op->end_acquire;
+	next_round = paxos_boost_round(pl->pih, &value,
+			pl->proposer.round, end_paxos_request);
+	if (next_round >= 0) {
+		if (next_round > pl->proposer.round)
+			pl->proposer.round = next_round;
+		return;
+	}
 	paxos_propose(pl->pih, &value, pl->proposer.round);
 }
 
@@ -386,14 +403,26 @@ static inline int start_lease_is_prepared(pi_handle_t handle __attribute__((unus
 					void *header)
 {
 	struct paxos_lease_msghdr *hdr = header;
-
+	int leased = ntohl(hdr->leased);
 	log_debug("enter start_lease_is_prepared");
-	if (hdr->leased) {
-		log_debug("already leased");
+
+	switch (leased) {
+	case OTHER_LEASE:
+		log_debug("an other proposer already was leased");
 		return 0;
-	} else {
-		log_debug("not leased");
+	case PROPOSER_LEASE:
+		log_debug("myself already was leased");
 		return 1;
+	case NO_LEASE:
+		log_debug("no one was leased");
+		return 1;
+	case RESTRICT_LEASE:
+		log_debug("lease is restricted");
+		return 0;
+	default:
+		/* this is not pass */
+		log_error("this is not pass");
+		return 0;
 	}
 }
 
@@ -425,7 +454,8 @@ static int lease_is_prepared(pi_handle_t handle, void *header)
 	return ret;
 }
 
-static int start_lease_promise(pi_handle_t handle, void *header)
+static int start_lease_promise(pi_handle_t handle, void *header,
+		int proposer_id)
 {
 	struct paxos_lease_msghdr *hdr = header;
 	struct paxos_lease *pl;
@@ -437,16 +467,20 @@ static int start_lease_promise(pi_handle_t handle, void *header)
 
 	if (NOT_CLEAR_RELEASE == clear && LEASE_STOPPED == pl->release) {
 		log_debug("could not be leased");
-		hdr->leased = 1;
+		hdr->leased = htonl(RESTRICT_LEASE);
 	} else if (-1 == pl->owner) {
-		log_debug("has not been leased");
-		hdr->leased = 0;
+		log_debug("no one has been leased");
+		hdr->leased = htonl(NO_LEASE);
+	} else if (pl->owner == proposer_id) {
+		log_debug("a proposer has been leased");
+		hdr->leased = htonl(PROPOSER_LEASE);
 	} else {
-		log_debug("has been leased");
-		hdr->leased = 1;
+		log_debug("an other proposer has been leased");
+		hdr->leased = htonl(OTHER_LEASE);
 	}
 
-	if (hdr->leased == 1) {
+	if (hdr->leased == ntohl(RESTRICT_LEASE)
+			|| hdr->leased == ntohl(OTHER_LEASE)) {
 		log_error("the proposal collided");
 		return -1;
 	}
@@ -469,7 +503,7 @@ static int stop_lease_promise(pi_handle_t handle,
 }
 
 static int lease_promise(pi_handle_t handle, void *header,
-		int round)
+		int proposer_id, int round)
 {
 	struct paxos_lease_msghdr *hdr = header;
 	int ret = 0;
@@ -481,7 +515,7 @@ static int lease_promise(pi_handle_t handle, void *header,
 
 	switch (op) {
 	case OP_START_LEASE:
-		ret = start_lease_promise(handle, header);
+		ret = start_lease_promise(handle, header, proposer_id);
 		break;
 	case OP_STOP_LEASE:
 		ret = stop_lease_promise(handle, header);

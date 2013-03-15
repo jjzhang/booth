@@ -24,6 +24,7 @@
 #define NOT_CLEAR_RELEASE	0
 #define CLEAR_RELEASE		1
 
+
 typedef long pl_handle_t;
 
 struct paxos_lease_result {
@@ -40,6 +41,7 @@ struct paxos_lease_operations {
 	int (*catchup) (const void *name, int *owner, int *ballot,
 			unsigned long long *expires);
 	int (*notify) (pl_handle_t handle, struct paxos_lease_result *result);
+	void (*end_acquire) (pl_handle_t handle, int error);
 };
 
 pl_handle_t paxos_lease_init(const void *name,
