@@ -41,7 +41,10 @@ struct proposal {
 
 struct learned {
 	int ballot;
+	int instance_number;
 	int number;
+	paxos_state_t state;
+	char *value;
 };
 
 struct paxos_msghdr {
@@ -51,6 +54,7 @@ struct paxos_msghdr {
 	char piname[PAXOS_NAME_LEN+1];
 	int ballot_number;
 	int proposer_id;
+	int instance_number;
 	unsigned int extralen;
 	unsigned int valuelen;
 };
@@ -60,6 +64,7 @@ struct proposer {
 	int ballot;
 	int open_number;
 	int accepted_number;
+	int instance_number;
 	int proposed;
 	struct proposal *proposal;
 };
@@ -74,6 +79,7 @@ struct learner {
 	int state;
 	int learned_max;
 	int learned_ballot;
+	struct learned latest_learned;
 	struct learned learned[0];
 };
 
@@ -143,7 +149,7 @@ static int have_quorum(struct paxos_space *ps, int member)
 		if (ps->role[i] & ACCEPTOR)
 			sum++;
 	}
-
+	log_debug("total acceptor %d, current %d", sum, member);
 	if (member * 2 > sum)
 		return 1;
 	else
@@ -192,6 +198,7 @@ static void proposer_prepare(struct paxos_instance *pi, int *round)
 	hdr->state = htonl(PREPARING);
 	hdr->from = htonl(pi->ps->p_op->get_myid());
 	hdr->proposer_id = hdr->from;
+	hdr->instance_number = htonl(pi->proposer->instance_number);
 	strcpy(hdr->psname, pi->ps->name);
 	strcpy(hdr->piname, pi->name);
 	hdr->ballot_number = htonl(ballot);
@@ -294,25 +301,35 @@ static void proposer_commit(struct paxos_space *ps,
 	struct paxos_msghdr *hdr;
 	pi_handle_t pih = (pi_handle_t)pi;
 	void *extra;
-	int ballot;
+	int ballot, instance_number;
 
 	log_debug("proposer commit ...");
-	if (msglen != sizeof(struct paxos_msghdr) + ps->extralen) {
+	if (msglen != sizeof(struct paxos_msghdr) + ps->extralen
+			+ ps->valuelen) {
 		log_error("message length incorrect, "
-			  "msglen: %d, msghdr len: %lu, extralen: %u",
+			  "msglen: %d, msghdr len: %lu, extralen: %u, valuelen: %u",
 			  msglen, (long)sizeof(struct paxos_msghdr),
-			  ps->extralen);
+			  ps->extralen, ps->valuelen);
 		return;
 	}
 	
 	extra = (char *)msg + sizeof(struct paxos_msghdr);
 	hdr = msg;
 
-        ballot = ntohl(hdr->ballot_number);
-        if (pi->proposer->ballot != ballot) {
+	ballot = ntohl(hdr->ballot_number);
+	instance_number = ntohl(hdr->instance_number);
+	if (pi->proposer->ballot != ballot) {
 		log_debug("not the same ballot, proposer ballot: %d, "
-			  "received ballot: %d", pi->proposer->ballot, ballot);
-                return;
+				"received ballot: %d", pi->proposer->ballot,
+				ballot);
+		return;
+	}
+	if (pi->proposer->instance_number != instance_number) {
+		log_debug("not the same instance number, "
+				"proposer instance number: %d, "
+				"received instance number: %d",
+				pi->proposer->instance_number, instance_number);
+		return;
 	}
 
 	pi->proposer->accepted_number++;
@@ -341,6 +358,7 @@ static void acceptor_promise(struct paxos_space *ps,
 	unsigned long to;
 	pi_handle_t pih = (pi_handle_t)pi;
 	void *extra;
+	int ballot = -1;
 
 	log_debug("acceptor promise ...");
 	if (pi->acceptor->state == RECOVERY) {
@@ -358,7 +376,8 @@ static void acceptor_promise(struct paxos_space *ps,
 	hdr = msg;
 	extra = (char *)msg + sizeof(struct paxos_msghdr);
 
-	if (ntohl(hdr->ballot_number) < pi->acceptor->highest_promised) {
+	ballot = ntohl(hdr->ballot_number);
+	if (ballot < pi->acceptor->highest_promised) {
 		log_debug("ballot number: %d, highest promised: %d",
 			  ntohl(hdr->ballot_number),
 			  pi->acceptor->highest_promised);
@@ -366,10 +385,10 @@ static void acceptor_promise(struct paxos_space *ps,
 	}
 
 	if (ps->p_op->promise
-		&& ps->p_op->promise(pih, extra) < 0)
+		&& ps->p_op->promise(pih, extra, ballot) < 0)
 		return;
 
-	pi->acceptor->highest_promised = ntohl(hdr->ballot_number);
+	pi->acceptor->highest_promised = ballot;
 	pi->acceptor->state = PROMISING;
 	to = ntohl(hdr->from);
 	hdr->from = htonl(ps->p_op->get_myid());
@@ -419,6 +438,8 @@ static void acceptor_accepted(struct paxos_space *ps,
 		&& ps->p_op->accepted(pih, extra, ballot, value) < 0)
 		return;
 
+	if (ballot > pi->acceptor->highest_promised)
+		pi->acceptor->highest_promised = ballot;
 	pi->acceptor->state = ACCEPTING;
 	to = ntohl(hdr->from);
 	hdr->from = htonl(myid);
@@ -426,19 +447,64 @@ static void acceptor_accepted(struct paxos_space *ps,
 
 	if (ps->p_op->broadcast)
 		ps->p_op->broadcast(msg, sizeof(struct paxos_msghdr)
-						+ ps->extralen);
+						+ ps->extralen
+						+ ps->valuelen);
 	else {
 		int i;
 		for (i = 0; i < ps->number; i++) {
 			if (ps->role[i] & LEARNER)
 				ps->p_op->send(i, msg,
 					       sizeof(struct paxos_msghdr)
-					       + ps->extralen);
+					       + ps->extralen
+					       + ps->valuelen);
 		}
 		if (!(ps->role[to] & LEARNER))
 			ps->p_op->send(to, msg, sizeof(struct paxos_msghdr)
-						+ ps->extralen);	
+						+ ps->extralen
+						+ ps->valuelen);
 	}
+}
+
+static void debug_learned(const struct learned *learned,
+		int i,
+		struct paxos_space *ps)
+{
+	log_debug("learned[%d](ballot=%d, "
+			"instance_number=%d, "
+			"number=%d, "
+			"state=%d)",
+			i, learned[i].ballot,
+			learned[i].instance_number,
+			learned[i].number,
+			learned[i].state);
+	if (ps != NULL)
+		ps->p_op->debug_value(learned[i].value);
+}
+
+static void cp_learned(struct learned *to, struct learned *from,
+		unsigned int valuelen)
+{
+	to->ballot = from->ballot;
+	to->instance_number = from->instance_number;
+	to->number = from->number;
+	to->state = from->state;
+	memcpy(to->value, from->value, valuelen);
+}
+static void push_learned(struct paxos_instance *pi, size_t size)
+{
+	int i;
+	log_debug("start push_learned");
+	for (i = size - 1; i > 0; i--)
+		cp_learned(&pi->learner->learned[i],
+				&pi->learner->learned[i - 1],
+				pi->ps->valuelen);
+
+	pi->learner->learned[0].ballot = 0;
+	pi->learner->learned[0].instance_number = 0;
+	pi->learner->learned[0].number = 0;
+	pi->learner->learned[0].state = INIT;
+
+	log_debug("exit push_learned");
 }
 
 static void learner_response(struct paxos_space *ps,
@@ -447,47 +513,86 @@ static void learner_response(struct paxos_space *ps,
 {
 	struct paxos_msghdr *hdr;
 	pi_handle_t pih = (pi_handle_t)pi;
-	void *extra;
-	int i, unused = 0, found = 0;
-	int ballot;
+	void *extra, *value;
+	int i, unused = 0, found = 0, current = 0;
+	int ballot, instance_number;
 
 	log_debug("learner response ...");
-	if (msglen != sizeof(struct paxos_msghdr) + ps->extralen) {
+	if (msglen != sizeof(struct paxos_msghdr) + ps->extralen
+			+ ps->valuelen) {
 		log_error("message length incorrect, "
-			  "msglen: %d, msghdr len: %lu, extralen: %u",
+			  "msglen: %d, msghdr len: %lu, extralen: %u, valuelen: %u",
 			  msglen, (long)sizeof(struct paxos_msghdr),
-			  ps->extralen);
+			  ps->extralen, ps->valuelen);
 		return;
 	}
 	hdr = msg;	
 	extra = (char *)msg + sizeof(struct paxos_msghdr);
 	ballot = ntohl(hdr->ballot_number);
+	instance_number = ntohl(hdr->instance_number);
+
+	value = pi->acceptor->accepted_proposal->value;
+	memcpy(value, (char *)msg + sizeof(struct paxos_msghdr) + ps->extralen,
+	       ps->valuelen);
 
 	for (i = 0; i < ps->number; i++) {
-		if (!pi->learner->learned[i].ballot) {
-			unused = i;
-			break;
-		}
-		if (pi->learner->learned[i].ballot == ballot) {
+		if (pi->learner->learned[i].ballot == ballot
+				&& pi->learner->learned[i].instance_number
+				== instance_number
+				&& ps->p_op->equal_value(
+				pi->learner->learned[i].value, value) == 0) {
+			current = i;
 			pi->learner->learned[i].number++;
-			if (pi->learner->learned[i].number
-			    > pi->learner->learned_max)
-				pi->learner->learned_max
-					= pi->learner->learned[i].number;
 			found = 1;
+			debug_learned(pi->learner->learned, i, ps);
 			break;
 		}
 	}
 	if (!found) {
-		pi->learner->learned[unused].ballot = ntohl(hdr->ballot_number);
+		log_debug("found a new accept message");
+		current = unused;
+		push_learned(pi, ps->number);
+		pi->learner->learned[unused].ballot =
+				ntohl(hdr->ballot_number);
+		pi->learner->learned[unused].instance_number =
+				ntohl(hdr->instance_number);
 		pi->learner->learned[unused].number = 1;
+		pi->learner->learned[unused].state = INIT;
+		memcpy(pi->learner->learned[unused].value,
+				value, ps->valuelen);
+		debug_learned(pi->learner->learned, unused, ps);
 	}
 
-	if (!have_quorum(ps, pi->learner->learned_max))
+	if (!have_quorum(ps, pi->learner->learned[current].number))
 		return;
 
+	if (pi->learner->learned[current].state == COMMITTED)
+		return;
+
+
+	if (pi->learner->latest_learned.ballot >= 0) {
+		if (pi->learner->latest_learned.ballot >
+			pi->learner->learned[current].ballot) {
+			log_debug("this commit is delayed than the latest commit.");
+			pi->learner->learned[current].state = COMMITTED;
+			return;
+		} else if (pi->learner->latest_learned.ballot ==
+			pi->learner->learned[current].ballot &&
+			pi->learner->latest_learned.instance_number >
+			pi->learner->learned[current].instance_number) {
+			log_debug("this commit is delayed than the latest commit.");
+			pi->learner->learned[current].state = COMMITTED;
+			return;
+		}
+	}
+
 	if (ps->p_op->learned)
-		ps->p_op->learned(pih, extra, ballot);
+		ps->p_op->learned(pih, extra, ballot, value);
+
+	cp_learned(&pi->learner->latest_learned,
+			&pi->learner->learned[current], ps->valuelen);
+
+	pi->learner->learned[current].state = COMMITTED;
 }
 
 const struct proposer_operations generic_proposer_operations = {
@@ -640,6 +745,7 @@ pi_handle_t paxos_instance_init(ps_handle_t handle, const void *name, int *prio)
 	}
 
 	if (ps->role[myid] & LEARNER) {
+		int i;
 		learner = malloc(sizeof(struct learner)
 				 + ps->number * sizeof(struct learned));
 		if (!learner) {
@@ -651,6 +757,25 @@ pi_handle_t paxos_instance_init(ps_handle_t handle, const void *name, int *prio)
 		       sizeof(struct learner) 
 		       + ps->number * sizeof(struct learned));
 		learner->state = INIT;
+		for (i = 0; i < ps->number; i++) {
+			learner->learned[i].value = (char *)malloc(sizeof(char)
+					* valuelen);
+			if (learner->learned[i].value == NULL) {
+				log_error("no mem for learner");
+				rv = -ENOMEM;
+				goto out_accepted_proposal;
+			}
+			memset(learner->learned[i].value, 0,
+					sizeof(char) * valuelen);
+		}
+		learner->latest_learned.ballot = -1;
+		learner->latest_learned.value = (char *)malloc(sizeof(char)
+				* valuelen);
+		if (learner->latest_learned.value == NULL) {
+			log_error("no mem for learner");
+			rv = -ENOMEM;
+			goto out_accepted_proposal;
+		}
 		pi->learner = learner;
 	}
 
@@ -700,6 +825,7 @@ int paxos_round_request(pi_handle_t handle,
 	pi->proposer->open_number = 0;
 	pi->proposer->accepted_number = 0;
 	pi->proposer->proposed = 0; 
+	pi->proposer->instance_number = 0;
 	memcpy(pi->proposer->proposal->value, value, pi->ps->valuelen);
 
 	pi->end = end_request;
@@ -763,12 +889,14 @@ int paxos_propose(pi_handle_t handle, void *value, int round)
 	strcpy(pi->proposer->proposal->value, value);
 	pi->proposer->accepted_number = 0;
 	pi->round = round;
+	pi->proposer->instance_number++;
 
 	memset(msg, 0, len);
 	hdr = msg;
 	hdr->state = htonl(PROPOSING);
 	hdr->from = htonl(pi->ps->p_op->get_myid());
 	hdr->proposer_id = hdr->from;
+	hdr->instance_number = htonl(pi->proposer->instance_number);
 	strcpy(hdr->psname, pi->ps->name);
 	strcpy(hdr->piname, pi->name);
 	hdr->ballot_number = htonl(pi->round);

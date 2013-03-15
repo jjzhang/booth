@@ -16,6 +16,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
@@ -86,6 +87,44 @@ static int myid = -1;
 static struct paxos_operations *px_op = NULL;
 const struct paxos_lease_operations *p_l_op;
 ps_handle_t ps_handle = 0;
+
+static void debug_value(const void *value)
+{
+	struct paxos_lease_value *plv = (struct paxos_lease_value *) value;
+	log_debug("plv(name=%s, owner=%d, expiry=%d)",
+			plv->name,
+			plv->owner,
+			plv->expiry);
+}
+
+static int equal_value(const void *value1, const void *value2)
+{
+	struct paxos_lease_value *plv1 = (struct paxos_lease_value *) value1,
+			*plv2 = (struct paxos_lease_value *) value2;
+	if (plv1->expiry == plv2->expiry &&
+			strcmp(plv1->name, plv2->name) == 0 &&
+			plv1->owner == plv1->owner)
+		return 0;
+	return 1;
+}
+
+static void debug_plr(const struct paxos_lease_result *plr)
+{
+	struct tm *expires = NULL;
+	struct timeval tv;
+	char expires_str[100] = "Fail";
+	int rv;
+	tv.tv_sec = plr->expires;
+	expires = localtime(&tv.tv_sec);
+	rv = sprintf(expires_str,
+			"%04d/%02d/%02d %02d:%02d:%02d",
+			expires->tm_year + 1900, expires->tm_mon + 1,
+			expires->tm_mday, expires->tm_hour,
+			expires->tm_min, expires->tm_sec);
+	log_debug("paxos_lease_result->(name=%s, "
+			"owner=%d, expires=%s, ballot=%d)",
+			plr->name, plr->owner, expires_str, plr->ballot);
+}
 
 static int find_paxos_lease(pi_handle_t handle, struct paxos_lease **pl)
 {
@@ -429,7 +468,8 @@ static int stop_lease_promise(pi_handle_t handle,
 	return 0;
 }
 
-static int lease_promise(pi_handle_t handle, void *header)
+static int lease_promise(pi_handle_t handle, void *header,
+		int round)
 {
 	struct paxos_lease_msghdr *hdr = header;
 	int ret = 0;
@@ -437,6 +477,8 @@ static int lease_promise(pi_handle_t handle, void *header)
 
 	log_debug("enter lease_promise");
 	assert(OP_START_LEASE == op || OP_STOP_LEASE == op);
+
+
 	switch (op) {
 	case OP_START_LEASE:
 		ret = start_lease_promise(handle, header);
@@ -546,6 +588,31 @@ static int lease_propose(pi_handle_t handle, void *extra,
 	return ret;
 }
 
+static void make_acceptor_timer(struct paxos_lease *pl)
+{
+	if (pl->acceptor.timer1 && pl->acceptor.timer2 != pl->acceptor.timer1)
+		del_timer(&pl->acceptor.timer1);
+	pl->acceptor.timer1 = add_timer(pl->expiry, (unsigned long)pl,
+					lease_expires);
+	pl->acceptor.expires = current_time() + pl->expiry;
+}
+
+static int set_acceptor_plv(struct paxos_lease *pl, void *value)
+{
+	if (!pl->acceptor.plv) {
+		pl->acceptor.plv = malloc(sizeof(struct paxos_lease_value));
+		if (!pl->acceptor.plv) {
+			log_error("could not alloc mem for acceptor plv");
+			return -ENOMEM;
+		}
+	}
+	memcpy(pl->acceptor.plv, value, sizeof(struct paxos_lease_value));
+
+	make_acceptor_timer(pl);
+
+	return 0;
+}
+
 static int start_lease_accepted(pi_handle_t handle, void *extra,
 				int round, void *value)
 {
@@ -556,27 +623,22 @@ static int start_lease_accepted(pi_handle_t handle, void *extra,
 	if (!find_paxos_lease(handle, &pl))
 		return -1;
 
+	assert(!(round < pl->acceptor.round));
+
+	if (round >= pl->acceptor.round) {
+		log_debug("acceptor can accept the current round, "
+			  "current round: %d, acceptor round: %d",
+			  round, pl->acceptor.round);
+		if (round > pl->acceptor.round)
+			log_debug("a promise message may be delay or lost");
+	}
+
 	pl->acceptor.round = round;
 
 	if (NOT_CLEAR_RELEASE == hdr->clear && LEASE_STOPPED == pl->release) {
 		log_debug("could not be leased");
 		return -1;
 	}
-
-	if (!pl->acceptor.plv) {
-		pl->acceptor.plv = malloc(sizeof(struct paxos_lease_value));
-		if (!pl->acceptor.plv) {
-			log_error("could not alloc mem for acceptor plv");
-			return -ENOMEM;
-		}
-	}
-	memcpy(pl->acceptor.plv, value, sizeof(struct paxos_lease_value));
-
-	if (pl->acceptor.timer1 && pl->acceptor.timer2 != pl->acceptor.timer1)
-		del_timer(&pl->acceptor.timer1);
-	pl->acceptor.timer1 = add_timer(pl->expiry, (unsigned long)pl,
-					lease_expires);
-	pl->acceptor.expires = current_time() + pl->expiry;
 
 	log_debug("exit start_lease_accepted");
 	return 0;	
@@ -592,15 +654,18 @@ static int stop_lease_accepted(pi_handle_t handle,
 	if (!find_paxos_lease(handle, &pl))
 		return -1;
 
-	pl->acceptor.round = round;
-	if (!pl->acceptor.plv) {
-		pl->acceptor.plv = malloc(sizeof(struct paxos_lease_value));
-		if (!pl->acceptor.plv) {
-			log_error("could not alloc mem for acceptor plv");
-			return -ENOMEM;
-		}
+	assert(!(round < pl->acceptor.round));
+
+	if (round >= pl->acceptor.round) {
+		log_debug("acceptor can accept the current round, "
+			  "current round: %d, acceptor round: %d",
+			  round, pl->acceptor.round);
+		if (round > pl->acceptor.round)
+			log_debug("a promise message may be delay or lost");
 	}
-	memcpy(pl->acceptor.plv, value, sizeof(struct paxos_lease_value));
+
+	pl->acceptor.round = round;
+
 	log_debug("exit stop_lease_accepted");
 	return 0;
 }
@@ -646,6 +711,9 @@ static int start_lease_commit(pi_handle_t handle, void *extra, int round)
 	pl->release = LEASE_STARTED;
 	pl->owner = pl->proposer.plv->owner;
 	pl->expiry = pl->proposer.plv->expiry;
+
+	make_acceptor_timer(pl);
+
 	if (pl->acceptor.timer2 != pl->acceptor.timer1) {
 		if (pl->acceptor.timer2)
 			del_timer(&pl->acceptor.timer2);
@@ -657,7 +725,7 @@ static int start_lease_commit(pi_handle_t handle, void *extra, int round)
 	plr.expires = current_time() + pl->proposer.plv->expiry;
 	plr.ballot = round;
 	p_l_op->notify((pl_handle_t)pl, &plr);
-
+	debug_plr(&plr);
 	log_debug("exit start_lease_commit");
 	return 0;
 }
@@ -696,6 +764,7 @@ static int stop_lease_commit(pi_handle_t handle,
 	plr.ballot = round;
 	plr.expires = 0;
 	p_l_op->notify((pl_handle_t)pl, &plr);
+	debug_plr(&plr);
 	log_debug("exit stop_lease_commit");
 	return 0;	
 }
@@ -721,7 +790,8 @@ static int lease_commit(pi_handle_t handle, void *extra, int round)
 	return ret;
 }
 
-static int start_lease_learned(pi_handle_t handle, void *extra, int round)
+static int start_lease_learned(pi_handle_t handle, void *extra,
+		int round, void *value)
 {
 	struct paxos_lease *pl;
 	struct paxos_lease_result plr;
@@ -731,18 +801,20 @@ static int start_lease_learned(pi_handle_t handle, void *extra, int round)
 		return -1;
 
 	if (round != pl->acceptor.round) {
-		log_error("current round is not the acceptor round, "
+		log_debug("current round is not the acceptor round, "
 			  "current round: %d, acceptor round: %d",
 			  round, pl->acceptor.round);
-		return -1;
+		if (round > pl->acceptor.round)
+			log_debug("a promise or propose message may be delay or lost");
 	}
 
-	if (!pl->acceptor.plv)
+	if (set_acceptor_plv(pl, value) < 0)
 		return -1;
 
 	pl->release = LEASE_STARTED;
 	pl->owner = pl->acceptor.plv->owner;
 	pl->expiry = pl->acceptor.plv->expiry;
+
 	if (pl->acceptor.timer2 != pl->acceptor.timer1) {
 		if (pl->acceptor.timer2)
 			del_timer(&pl->acceptor.timer2);
@@ -754,13 +826,14 @@ static int start_lease_learned(pi_handle_t handle, void *extra, int round)
 	plr.expires = current_time() + pl->acceptor.plv->expiry;
 	plr.ballot = round;
 	p_l_op->notify((pl_handle_t)pl, &plr);
+	debug_plr(&plr);
 	log_debug("exit start_lease_learned");
 	return 0;
 }
 
 static int stop_lease_learned(pi_handle_t handle,
 				void *extra __attribute__((unused)),
-				int round)
+				int round, void *value)
 {
 	struct paxos_lease *pl;
 	struct paxos_lease_result plr;
@@ -770,13 +843,14 @@ static int stop_lease_learned(pi_handle_t handle,
 		return -1;
 
 	if (round != pl->acceptor.round) {
-		log_error("current round is not the acceptor round, "
+		log_debug("current round is not the acceptor round, "
 			  "current round: %d, acceptor round: %d",
 			  round, pl->acceptor.round);
-		return -1;
+		if (round > pl->acceptor.round)
+			log_debug("a promise or propose message may be delay or lost");
 	}
 
-	if (!pl->acceptor.plv)
+	if (set_acceptor_plv(pl, value) < 0)
 		return -1;
 
 	if (pl->acceptor.timer2)
@@ -790,11 +864,13 @@ static int stop_lease_learned(pi_handle_t handle,
 	plr.ballot = round;
 	plr.expires = 0;
 	p_l_op->notify((pl_handle_t)pl, &plr);
+	debug_plr(&plr);
 	log_debug("exit stop_lease_learned");
 	return 0;
 }
 
-static int lease_learned(pi_handle_t handle, void *extra, int round)
+static int lease_learned(pi_handle_t handle, void *extra,
+		int round, void *value)
 {
 	struct paxos_lease_msghdr *hdr = extra;
 	int ret = 0;
@@ -804,10 +880,10 @@ static int lease_learned(pi_handle_t handle, void *extra, int round)
 	assert(OP_START_LEASE == op || OP_STOP_LEASE == op);
 	switch (op) {
 	case OP_START_LEASE:
-		ret = start_lease_learned(handle, extra, round);
+		ret = start_lease_learned(handle, extra, round, value);
 		break;
 	case OP_STOP_LEASE:
-		ret = stop_lease_learned(handle, extra, round);
+		ret = stop_lease_learned(handle, extra, round, value);
 		break;
 	}
 
@@ -847,6 +923,8 @@ pl_handle_t paxos_lease_init(const void *name,
 		px_op->send = pl_op->send;
 		px_op->broadcast = pl_op->broadcast;
 		px_op->catchup = lease_catchup;
+		px_op->equal_value = equal_value;
+		px_op->debug_value = debug_value;
 		px_op->prepare = lease_prepare;
 		px_op->is_prepared = lease_is_prepared;
 		px_op->promise = lease_promise;

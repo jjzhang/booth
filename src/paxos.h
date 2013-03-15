@@ -33,15 +33,18 @@ struct paxos_operations {
 	int (*send) (unsigned long id, void *value, int len);
 	int (*broadcast) (void *value, int len);
 	int (*catchup) (pi_handle_t handle);
+	int (*equal_value) (const void *value1, const void *value2);
+	void (*debug_value) (const void *value);
 	int (*prepare) (pi_handle_t handle, void *extra);
-	int (*promise) (pi_handle_t handle, void *extra);
+	int (*promise) (pi_handle_t handle, void *extra, int round);
 	int (*is_prepared) (pi_handle_t handle, void *extra);
 	int (*propose) (pi_handle_t handle, void *extra,
 			int round, void *value);
 	int (*accepted) (pi_handle_t handle, void *extra,
 			 int round, void *value);
 	int (*commit) (pi_handle_t handle, void *extra, int round);
-	int (*learned) (pi_handle_t handle, void *extra, int round);
+	int (*learned) (pi_handle_t handle, void *extra,
+			int round, void *value);
 };
 
 int paxos_recvmsg(void *msg, int msglen);
