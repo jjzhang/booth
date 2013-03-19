@@ -153,7 +153,8 @@ static void lease_expires(unsigned long data)
 	pl_handle_t plh = (pl_handle_t)pl;
 	struct paxos_lease_result plr;
 
-	log_debug("lease expires ...");
+	log_info("lease expires ... owner [%d] ticket [%s]",
+		pl->owner, pl->name);
 	pl->owner = -1;
 	strcpy(plr.name, pl->name);
 	plr.owner = -1;
