@@ -39,6 +39,14 @@ typedef enum {
 	COMMITTED,
 } paxos_state_t;
 
+typedef enum {
+	DISPLAY_INIT = 1,
+	DISPLAY_WAITPROMISE,
+	DISPLAY_PROMISED,
+	DISPLAY_WAITACCEPT,
+	DISPLAY_ACCEPTED,
+} paxos_display_state_t;
+
 struct proposal {
 	int ballot_number;
 	char value[0];
@@ -221,7 +229,7 @@ static void proposer_prepare(struct paxos_instance *pi, int *round)
 	*round = ballot;
 
 	for (i = 0; i < booth_conf->node_count; i++)
-		pi->node[i].connect_state = PREPARING;
+		pi->node[i].connect_state = DISPLAY_WAITPROMISE;
 }
 
 static void proposer_propose(struct paxos_space *ps,
@@ -329,7 +337,7 @@ static void proposer_commit(struct paxos_space *ps,
 	for (i = 0; i < booth_conf->node_count; i++) {
 		if (ntohl(hdr->from) == pi->node[i].nodeid &&
 			pi->state_monitoring == 1) {
-			pi->node[i].connect_state = ACCEPTING;
+			pi->node[i].connect_state = DISPLAY_ACCEPTED;
 			break;
 		}
 	}
@@ -396,7 +404,7 @@ static void acceptor_promise(struct paxos_space *ps,
 	pi->state_monitoring = 1;
 	for (i = 0; i < booth_conf->node_count; i++) {
 		if (ntohl(hdr->from) == pi->node[i].nodeid) {
-			pi->node[i].connect_state = PROMISING;
+			pi->node[i].connect_state = DISPLAY_PROMISED;
 			break;
 		}
 	}
@@ -453,7 +461,7 @@ static void acceptor_accepted(struct paxos_space *ps,
 
 	pi->state_monitoring = 1;
 	for (i = 0; i < booth_conf->node_count; i++)
-		pi->node[i].connect_state = PROPOSING;
+		pi->node[i].connect_state = DISPLAY_WAITACCEPT;
 
 	if (ps->p_op->broadcast)
 		ps->p_op->broadcast(msg, sizeof(struct paxos_msghdr)
@@ -516,7 +524,7 @@ static void learner_response(struct paxos_space *ps,
 	for (i = 0; i < booth_conf->node_count; i++) {
 		if (ntohl(hdr->from) == pi->node[i].nodeid &&
 			pi->state_monitoring == 1) {
-			pi->node[i].connect_state = ACCEPTING;
+			pi->node[i].connect_state = DISPLAY_ACCEPTED;
 			break;
 		}
 	}
@@ -846,7 +854,7 @@ void paxos_display_status_init(pi_handle_t handle)
 
 	pi->state_monitoring = 0;
 	for (i = 0; i < booth_conf->node_count; i++)
-		pi->node[i].connect_state = INIT;
+		pi->node[i].connect_state = DISPLAY_INIT;
 }
 
 int paxos_display_list(pi_handle_t handle, char **pdata, unsigned int *len)
@@ -860,19 +868,19 @@ int paxos_display_list(pi_handle_t handle, char **pdata, unsigned int *len)
 		memset(tmp, 0, PAXOS_PRINT_LINE);
 
 		switch (pi->node[i].connect_state) {
-		case INIT:
+		case DISPLAY_INIT:
 			status_str = "init";
 			break;
-		case PREPARING:
+		case DISPLAY_WAITPROMISE:
 			status_str = "waiting promise";
 			break;
-		case PROMISING:
+		case DISPLAY_PROMISED:
 			status_str = "promised";
 			break;
-		case PROPOSING:
+		case DISPLAY_WAITACCEPT:
 			status_str = "waiting accept";
 			break;
-		case ACCEPTING:
+		case DISPLAY_ACCEPTED:
 			status_str = "accepted";
 			break;
 		default:
