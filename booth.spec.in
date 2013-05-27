@@ -1,3 +1,5 @@
+%bcond_with resource-monitor
+
 %global alphatag @alphatag@
 %global numcomm @numcomm@
 %global dirty @dirty@
@@ -17,6 +19,9 @@ Provides:       booth
 Requires:       pacemaker
 
 BuildRequires:  autoconf automake libtool cluster-glue-libs-devel help2man
+%if %{with resource-monitor}
+BuildRequires:  pacemaker-libs-devel
+%endif
 
 %description
 Booth manages the ticket which authorizes one of the cluster sites located in
@@ -30,7 +35,12 @@ distributed clustering.
 %build
 ./autogen.sh
 
-%configure --with-initddir=%{_initrddir}
+%configure \
+%if %{with resource-monitor}
+	--enable-resource-monitor \
+%endif
+	--with-initddir=%{_initrddir}
+
 make all
 
 #except check

@@ -15,6 +15,8 @@ AC_CANONICAL_HOST
 
 AC_LANG([C])
 
+AC_SUBST(WITH_LIST, [""])
+
 dnl Fix default variables - "prefix" variable if not specified
 if test "$prefix" = "NONE"; then
 	prefix="/usr"
@@ -115,7 +117,8 @@ AC_CHECK_FUNCS([alarm alphasort atexit bzero dup2 endgrent endpwent fcntl \
 		sched_get_priority_max sched_setscheduler])
 
 AC_CONFIG_FILES([Makefile
-		 src/Makefile])
+		 src/Makefile
+		 tools/Makefile])
 
 # ===============================================
 # Helpers
@@ -176,6 +179,10 @@ AC_ARG_WITH([initddir],
 	[  --with-initddir=DIR     : path to init script directory. ],
 	[ INITDDIR="$withval" ],
 	[ INITDDIR="$sysconfdir/init.d" ])
+
+AC_ARG_ENABLE([resource-monitor],
+	[  --enable-resource-monitor       : Enabling Resource Monitor ],
+	[ default="no" ])
 
 # OS detection
 # THIS SECTION MUST DIE!
@@ -341,6 +348,16 @@ if test "x${enable_fatal_warnings}" = xyes && \
 else
 	WERROR_CFLAGS=""
 fi
+
+if test "x${enable_resource_monitor}" = xyes; then
+	PACKAGE_FEATURES="$PACKAGE_FEATURES resource-monitor"
+	WITH_LIST="$WITH_LIST --with resource-monitor"
+	SUPPORT_RESOURCE_MONITOR=1
+else
+	SUPPORT_RESOURCE_MONITOR=0
+fi
+
+AM_CONDITIONAL(RESOURCE_MONITOR, test $SUPPORT_RESOURCE_MONITOR = 1)
 
 # don't add addtional cflags
 if test "x${enable_user_flags}" = xyes; then

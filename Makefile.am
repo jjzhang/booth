@@ -57,7 +57,7 @@ bootharbitrator_SCRIPTS	= script/lsb/booth-arbitrator
 
 TESTS			= test/runtests.py
 
-SUBDIRS			= src
+SUBDIRS			= src tools
 
 coverity:
 	cov-build --dir=cov make
@@ -145,9 +145,9 @@ RPMBUILDOPTS	= --define "_sourcedir $(abs_builddir)" \
 srpm: clean
 	autoreconf -if
 	$(MAKE) $(SPEC) $(TARFILE)
-	rpmbuild $(RPMBUILDOPTS) --nodeps -bs $(SPEC)
+	rpmbuild $(WITH_LIST) $(RPMBUILDOPTS) --nodeps -bs $(SPEC)
 
 rpm: clean
 	autoreconf -if
 	$(MAKE) $(SPEC) $(TARFILE)
-	rpmbuild $(RPMBUILDOPTS) -ba $(SPEC)
+	rpmbuild $(WITH_LIST) $(RPMBUILDOPTS) -ba $(SPEC)
