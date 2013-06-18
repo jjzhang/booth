@@ -63,6 +63,12 @@ static int client_size = 0;
 struct client *client = NULL;
 struct pollfd *pollfd = NULL;
 
+typedef enum 
+{
+	BOOTHD_STARTED=0,
+	BOOTHD_STARTING
+} BOOTH_DAEMON_STATE;
+
 int poll_timeout = -1;
 
 typedef enum {
@@ -450,7 +456,34 @@ static int setup_timer(void)
 	return timerlist_init();
 }
 
-static int loop(void)
+static int write_daemon_state(int fd, int state)
+{
+	char buf[16];
+	int rv=0;
+	
+	memset(buf, 0, sizeof(buf));
+	snprintf(buf, sizeof(buf), "%d %d", getpid(), state);
+
+	rv = lseek(fd, 0, SEEK_SET);
+	if (rv < 0) {
+		log_error("lseek set fd(%d) offset to 0 error, return(%d), message(%s)",
+			fd, rv, strerror(errno));
+		rv = -1;
+		return rv;
+	} 
+	
+	rv = write(fd, buf, strlen(buf));
+	if (rv <= 0) {
+		log_error("write to fd(%d) error, return(%d), message(%s)",
+                      fd, rv, strerror(errno));
+		rv = -1;
+		return rv;    
+	}
+
+	rv = 0;
+	return rv;
+}
+static int loop(int fd)
 {
 	void (*workfn) (int ci);
 	void (*deadfn) (int ci);
@@ -472,6 +505,18 @@ static int loop(void)
 	if (rv < 0)
 		goto fail;
 	client_add(rv, process_listener, NULL);
+
+	rv = write_daemon_state(fd, BOOTHD_STARTED);
+	if (rv != 0) {
+		log_error("write daemon state %d to lockfile error %s: %s",
+                      BOOTHD_STARTED, cl.lockfile, strerror(errno));
+		goto fail;
+	}
+
+	if (cl.type == ARBITRATOR)
+		log_info("BOOTH arbitrator daemon started");
+	else if (cl.type == SITE)
+		log_info("BOOTH cluster site daemon started");
 
         while (1) {
                 rv = poll(pollfd, client_maxi + 1, poll_timeout);
@@ -681,9 +726,10 @@ static int do_revoke(void)
 	return do_command(BOOTHC_CMD_REVOKE);
 }
 
+
+
 static int lockfile(void)
 {
-	char buf[16];
 	struct flock lock;
 	int fd, rv;
 
@@ -691,39 +737,36 @@ static int lockfile(void)
 	if (fd < 0) {
                 log_error("lockfile open error %s: %s",
                           cl.lockfile, strerror(errno));
-                return -1;
-        }       
+            return -1;
+    }       
 
-        lock.l_type = F_WRLCK;
-        lock.l_start = 0;
-        lock.l_whence = SEEK_SET;
-        lock.l_len = 0;
-        
-        rv = fcntl(fd, F_SETLK, &lock);
-        if (rv < 0) {
-                log_error("lockfile setlk error %s: %s",
-                          cl.lockfile, strerror(errno));
-                goto fail;
-        }
+    lock.l_type = F_WRLCK;
+    lock.l_start = 0;
+    lock.l_whence = SEEK_SET;
+    lock.l_len = 0;
+    
+    rv = fcntl(fd, F_SETLK, &lock);
+    if (rv < 0) {
+            log_error("lockfile setlk error %s: %s",
+                      cl.lockfile, strerror(errno));
+            goto fail;
+    }
 
-        rv = ftruncate(fd, 0);
-        if (rv < 0) {
-                log_error("lockfile truncate error %s: %s",
-                          cl.lockfile, strerror(errno));
-                goto fail;
-        }
+    rv = ftruncate(fd, 0);
+    if (rv < 0) {
+            log_error("lockfile truncate error %s: %s",
+                      cl.lockfile, strerror(errno));
+            goto fail;
+    }
 
-        memset(buf, 0, sizeof(buf));
-        snprintf(buf, sizeof(buf), "%d\n", getpid());
+    rv = write_daemon_state(fd, BOOTHD_STARTING);
+    if (rv != 0) {
+		log_error("write daemon state %d to lockfile error %s: %s",
+                      BOOTHD_STARTING, cl.lockfile, strerror(errno));
+		goto fail;
+    }
 
-        rv = write(fd, buf, strlen(buf));
-        if (rv <= 0) {
-                log_error("lockfile write error %s: %s",
-                          cl.lockfile, strerror(errno));
-                goto fail;
-        }
-
-        return fd;
+    return fd;
  fail:
         close(fd);
         return -1;
@@ -986,14 +1029,14 @@ static int do_server(int type)
 		return fd;
 
 	if (type == ARBITRATOR)
-		log_info("BOOTH arbitrator daemon started");
+		log_info("BOOTH arbitrator daemon is starting.");
 	else if (type == SITE)
-		log_info("BOOTH cluster site daemon started");
+		log_info("BOOTH cluster site daemon is starting.");
 
 	set_scheduler();
 	set_oom_adj(-16);
 
-	rv = loop();
+	rv = loop(fd);
 
 out:
 	if (fd >= 0)
