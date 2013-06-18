@@ -25,6 +25,14 @@
 #######################################################################
 # Initialization:
 
+lockfile="/var/run/booth.pid"
+
+BOOTH_DAEMON_STARTED=0
+BOOTH_DAEMON_STARTING=1
+BOOTH_DAEMON_EXIST=2
+BOOTH_DAEMON_NOT_RUNNING=3
+BOOTH_ERROR_GENERIC=4
+
 . ${OCF_ROOT}/resource.d/heartbeat/.ocf-shellfuncs
 
 #######################################################################
@@ -35,6 +43,7 @@ meta_data() {
 <!DOCTYPE resource-agent SYSTEM "ra-api-1.dtd">
 <resource-agent name="booth-site" version="0.9">
 <version>1.0</version>
+
 
 <longdesc lang="en">
 This Resource Agent can control the BOOTH site daemon.
@@ -92,55 +101,109 @@ Expects to have a fully populated OCF RA-compliant environment set.
 END
 }
 
+booth_check_daemon_exist(){
+	killall -0 ${OCF_RESKEY_daemon} >/dev/null 2>&1; rc=$?
+	
+	case $rc in
+	0) return $OCF_SUCCESS;;
+	1) return $OCF_NOT_RUNNING;;
+	*) return $OCF_ERR_GENERIC;; 
+	esac
+}
+
+booth_check_daemon_state(){
+	booth_check_daemon_exist ; rc=$?
+	
+	case $rc in 
+	$OCF_SUCCESS)
+		pidnum=$(cat $lockfile |awk '{print $1}')
+		daemonstate=$(cat $lockfile |awk '{print $2}')
+		if cat /proc/$pidnum/cmdline |grep $OCF_RESKEY_type >/dev/null 2>&1; then
+			case  $daemonstate in 
+			$BOOTH_DAEMON_STARTED) return $BOOTH_DAEMON_STARTED;;
+			$BOOTH_DAEMON_STARTING) return $BOOTH_DAEMON_STARTING;;
+			*) return $BOOTH_ERROR_GENERIC;;	
+			esac
+		else
+			return $BOOTH_DAEMON_EXIST;
+		fi
+	;;
+	$OCF_NOT_RUNNING) return $BOOTH_DAEMON_NOT_RUNNING;;
+	$OCF_ERR_GENERIC) return $BOOTH_ERROR_GENERIC;;
+	*) return $BOOTH_ERROR_GENERIC;;
+	esac
+}
+
 booth_start() {
-    booth_monitor; rc=$?
+	booth_check_daemon_state; rc=$?
 
-    case $rc in
-      $OCF_SUCCESS)     return $OCF_SUCCESS;;
-      $OCF_NOT_RUNNING) ;;
-      *) return $OCF_ERR_GENERIC;;
-    esac
+	case $rc in
+	$BOOTH_DAEMON_STARTED)     return $OCF_SUCCESS;;
+	$BOOTH_DAEMON_STARTING) 
+		while [ $rc != $BOOTH_DAEMON_STARTED ]; do
+			sleep 1
+			booth_check_daemon_state ; rc=$?
+		done
+		return $OCF_SUCCESS;;
+	$BOOTH_DAEMON_EXIST) return $OCF_ERR_GENERIC;;
+	$BOOTH_DAEMON_NOT_RUNNING) ;;
+	*) return $OCF_ERR_GENERIC;;
+	esac
 
-    ${OCF_RESKEY_daemon} $OCF_RESKEY_type $OCF_RESKEY_args
+	${OCF_RESKEY_daemon} $OCF_RESKEY_type $OCF_RESKEY_args
 
-    sleep 1
-    booth_monitor
+	sleep 1
+	rc=$BOOTH_DAEMON_STARTING
+	while [ $rc != $BOOTH_DAEMON_STARTED ]; do
+		booth_check_daemon_state; rc=$?
+		sleep 1
+	done
+	
+	return $OCF_SUCCESS
 }
 
 booth_stop() {
-    booth_monitor; rc=$?
+	booth_check_daemon_state; rc=$?
 
-    if [ $rc = $OCF_NOT_RUNNING ]; then
-	return $OCF_SUCCESS
-    fi
+	case $rc in
+	$BOOTH_DAEMON_STARTED) ;;
+	$BOOTH_DAEMON_STARTING) ;;
+	$BOOTH_DAEMON_EXIST) return $OCF_ERR_GENERIC;;
+	$BOOTH_DAEMON_NOT_RUNNING) return $OCF_SUCCESS;;
+	*) return $OCF_ERR_GENERIC;;
+	esac
 
-    killall -TERM ${OCF_RESKEY_daemon}; rc=$?
+	killall -TERM ${OCF_RESKEY_daemon}; rc=$?
 
-    if [ $rc != 0 ]; then
-	return $OCF_ERR_GENERIC
-    fi
+	if [ $rc != 0 ]; then
+		return $OCF_ERR_GENERIC
+	fi
 
-    rc=$OCF_SUCCESS
-    while [ $rc = $OCF_SUCCESS ]; do
-	booth_monitor; rc=$?
-	sleep 1
-    done
+	rc=$BOOTH_DAEMON_STARTED
+	while [ $rc != $BOOTH_DAEMON_NOT_RUNNING ]; do
+		booth_check_daemon_state; rc=$?
+		sleep 1
+	done
 
-    if [ $rc = $OCF_NOT_RUNNING ]; then
-    	rc=$OCF_SUCCESS
-    fi
+	if [ $rc = $BOOTH_DAEMON_NOT_RUNNING ]; then
+		rc=$OCF_SUCCESS
+	else
+		rc=$OCF_ERR_GENERIC
+	fi
 
-    return $rc
+	return $rc
 }
 
 booth_monitor() {
-    killall -0 ${OCF_RESKEY_daemon}; rc=$?
+	booth_check_daemon_state; rc=$?
 
-    case $rc in
-      0) return $OCF_SUCCESS;;
-      1) return $OCF_NOT_RUNNING;;
-      *) return $OCF_ERR_GENERIC;;
-    esac
+	case $rc in
+	$BOOTH_DAEMON_STARTED) return $OCF_SUCCESS;;
+	$BOOTH_DAEMON_STARTING) return $OCF_NOT_RUNNING;;
+	$BOOTH_DAEMON_EXIST) return $OCF_NOT_RUNNING;;
+	$BOOTH_DAEMON_NOT_RUNNING) return $OCF_NOT_RUNNING;;
+	*) return $OCF_ERR_GENERIC;;
+	esac
 }
 
 booth_validate() {
