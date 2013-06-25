@@ -61,7 +61,6 @@
 #include "booth_resource_monitord.h"
 
 GMainLoop *mainloop;
-const char *crm_system_name = "booth_resource_monitord";
 char *booth_config_file;
 char *pid_file;
 int max_failures = 30;
@@ -1938,9 +1937,8 @@ int main(int argc, char **argv)
 
 	booth_config_file = strdup(BOOTH_CONFIG_FILE);
 	pid_file = strdup(PID_FILE);
-	crm_system_name = basename(argv[0]);
 
-	crm_log_init(crm_system_name, LOG_INFO, TRUE, FALSE, argc, argv, FALSE);
+	crm_log_init(basename(argv[0]), LOG_INFO, TRUE, FALSE, argc, argv, FALSE);
 
 	while (1) {
 #ifdef HAVE_GETOPT_H
