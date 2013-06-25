@@ -22,6 +22,8 @@ INCLUDES                = -I/usr/include/pacemaker \
                         -I$(srcdir)
 
 if RESOURCE_MONITOR
+noinst_HEADERS         = booth_resource_monitord.h
+
 sbin_PROGRAMS          = booth_resource_monitord
 
 # BUILD
