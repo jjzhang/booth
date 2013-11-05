@@ -32,7 +32,10 @@ booth_resource_monitord_SOURCES        = booth_resource_monitord.c
 booth_resource_monitord_LDADD          = -lcrmcommon \
                                          -lcrmcluster \
                                          -lpe_status \
-                                         -lcib
+                                         -lcib \
+                                         -lglib-2.0 \
+                                         -lqb \
+                                         -lxml2
 booth_resource_monitord_CPPFLAGS       = $(GLIB_CFLAGS)
 endif
 
