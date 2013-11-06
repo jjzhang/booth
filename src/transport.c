@@ -107,7 +107,60 @@ static void parse_rtattr(struct rtattr *tb[],
 	}
 }
 
-static int find_myself(struct booth_node **me)
+
+static int find_address(unsigned char ipaddr[BOOTH_IPADDR_LEN],
+		int family, int prefixlen,
+		int fuzzy_allowed,
+		struct booth_node **me)
+{
+	int i;
+	struct booth_node *node;
+	int bytes, bits_left, mask;
+	unsigned char node_bits, ip_bits;
+
+
+	bytes = prefixlen / 8;
+	bits_left = prefixlen % 8;
+	/* One bit left to check means ignore 7 lowest bits. */
+	mask = ~( (1 << (8 - bits_left)) -1);
+
+	for (i = 0; i < booth_conf->node_count; i++) {
+		node = booth_conf->node + i;
+		if (family != node->family)
+			continue;
+
+		if (memcmp(ipaddr, &node->in6, node->addrlen) == 0) {
+found:
+			*me = node;
+			return 1;
+		}
+
+		if (!fuzzy_allowed)
+			continue;
+
+
+//		assert(bytes <= node->addrlen);
+//#include <stdio.h>
+//		printf("node->addr %s, fam %d, prefix %d; %llx vs %llx, bytes %d\n", node->addr, node->family, prefixlen, *((long long*)&node->in6), *((long long*)ipaddr), bytes);
+		/* Check prefix, whole bytes */
+		if (memcmp(ipaddr, &node->in6, bytes) != 0)
+			continue;
+//printf("bits %d\n", bits_left);
+		if (!bits_left)
+			goto found;
+
+		node_bits = node->in6.s6_addr[bytes];
+		ip_bits = ipaddr[bytes];
+//printf("nodebits %x ip %x mask %x\n", node_bits, ip_bits, mask);
+		if (((node_bits ^ ip_bits) & mask) == 0)
+			goto found;
+	}
+
+	return 0;
+}
+
+
+int find_myself(struct booth_node **me, int fuzzy_allowed)
 {
 	int fd;
 	struct sockaddr_nl nladdr;
@@ -117,7 +170,6 @@ static int find_myself(struct booth_node **me)
 		struct nlmsghdr nlh;
 		struct rtgenmsg g;
 	} req;
-	int i;
 
 	*me = NULL;
 	fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
@@ -178,24 +230,19 @@ static int find_myself(struct booth_node **me)
 			if (h->nlmsg_type == RTM_NEWADDR) {
 				struct ifaddrmsg *ifa = NLMSG_DATA(h);
 				struct rtattr *tb[IFA_MAX+1];
-				struct booth_node *node;
 				int len = h->nlmsg_len 
-					  - NLMSG_LENGTH(sizeof(*ifa));
+					- NLMSG_LENGTH(sizeof(*ifa));
 
 				memset(tb, 0, sizeof(tb));
 				parse_rtattr(tb, IFA_MAX, IFA_RTA(ifa), len);
 				memset(ipaddr, 0, BOOTH_IPADDR_LEN);
 				memcpy(ipaddr, RTA_DATA(tb[IFA_ADDRESS]),
-					BOOTH_IPADDR_LEN);
+						BOOTH_IPADDR_LEN);
 
-				for (i = 0; i < booth_conf->node_count; i++) {
-					node = booth_conf->node + i;
-					if (ifa->ifa_family == node->family &&
-							memcmp(ipaddr, &node->in6, node->addrlen) == 0) {
-						*me = node;
-						goto out;
-					}
-				}
+				if (find_address(ipaddr,
+							ifa->ifa_family, ifa->ifa_prefixlen,
+							fuzzy_allowed, me))
+					goto out;
 			}
 			h = NLMSG_NEXT(h, status);
 		}
@@ -210,7 +257,7 @@ static int load_myid(void)
 {
 	struct booth_node *me;
 
-	if (find_myself(&me)) {
+	if (find_myself(&me, 0)) {
 		me->local = 1;
 		if (!local.family)
 			memcpy(&local, me, sizeof(struct booth_node));

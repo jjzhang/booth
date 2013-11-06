@@ -59,5 +59,6 @@ struct booth_transport {
 };
 
 struct booth_transport booth_transport[TRANSPORT_ENTRIES];
+int find_myself(struct booth_node **me, int fuzzy_allowed);
 
 #endif /* _TRANSPORT_H */
