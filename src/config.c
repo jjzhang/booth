@@ -47,6 +47,56 @@ static int ticket_realloc(void)
 	return 0;
 }
 
+
+int add_node(char *address, int type);
+int add_node(char *addr_string, int type)
+{
+	int rv;
+	struct booth_node *node;
+
+	rv = 1;
+	if (booth_conf->node_count == MAX_NODES) {
+		log_error("too many nodes");
+		goto out;
+	}
+	if (strlen(addr_string)+1 >= sizeof(booth_conf->node[0].addr)) {
+		log_error("node address \"%s\" too long", addr_string);
+		goto out;
+	}
+
+	node = booth_conf->node+booth_conf->node_count;
+
+	node->family = BOOTH_PROTO_FAMILY;
+	node->type = type;
+	node->nodeid = booth_conf->node_count;
+	strcpy(node->addr, addr_string);
+
+	booth_conf->node_count++;
+
+	memset(&node->in6, 0, sizeof(node->in6));
+	if (node->family == AF_INET) {
+		if (inet_pton(AF_INET, node->addr, &node->in4) < 0) {
+addr_bad:
+			log_error("Address string \"%s\" is bad", node->addr);
+			goto out;
+		}
+		node->addrlen = sizeof(struct in_addr);
+	} else if (node->family == AF_INET6) {
+		if (inet_pton(AF_INET6, node->addr, &node->in6) < 0)
+			goto addr_bad;
+		node->addrlen = sizeof(struct in6_addr);
+	} else {
+		log_error("invalid INET family");
+		goto out;
+	}
+
+	rv = 0;
+
+out:
+	return rv;
+}
+
+
 int read_config(const char *path)
 {
 	char line[1024];
@@ -55,7 +105,6 @@ int read_config(const char *path)
 	int in_quotes, got_equals, got_quotes, i;
 	int lineno = 0;
 	int got_transport = 0;
-	struct booth_node *node;
 
 	fp = fopen(path, "r");
 	if (!fp) {
@@ -186,50 +235,13 @@ int read_config(const char *path)
 			booth_conf->port = atoi(val);
 
 		if (!strcmp(key, "site")) {
-			if (booth_conf->node_count == MAX_NODES) {
-				log_error("too many nodes");
+			if (add_node(val, SITE))
 				goto out;
-			}
-			if (strlen(val)+1 >= sizeof(booth_conf->node[0].addr)) {
-				log_error("node address \"%s\" too long", val);
-				goto out;
-			}
-
-			node = booth_conf->node+booth_conf->node_count;
-			booth_conf->node_count++;
-
-			node->family = BOOTH_PROTO_FAMILY;
-			node->type = SITE;
-			node->nodeid = booth_conf->node_count;
-			strcpy(node->addr, val);
-
-			memset(&node->in6, 0, sizeof(node->in6));
-			if (node->family == AF_INET) {
-				inet_pton(AF_INET, node->addr, &node->in4);
-				node->addrlen = sizeof(struct in_addr);
-			} else if (node->family == AF_INET6) {
-				inet_pton(AF_INET6, node->addr, &node->in6);
-				node->addrlen = sizeof(struct in6_addr);
-			} else {
-				log_error("invalid INET family");
-				goto out;
-			}
-
 		}
 		
 		if (!strcmp(key, "arbitrator")) {
-			if (booth_conf->node_count == MAX_NODES) {
-				log_error("too many nodes");
+			if (add_node(val, ARBITRATOR))
 				goto out;
-			}
-			booth_conf->node[booth_conf->node_count].family =
-				BOOTH_PROTO_FAMILY;
-			booth_conf->node[booth_conf->node_count].type =
-				ARBITRATOR;
-			booth_conf->node[booth_conf->node_count].nodeid = 
-				booth_conf->node_count;
-			strcpy(booth_conf->node[booth_conf->node_count++].addr,
-				val);
 		}
 
 		if (!strcmp(key, "ticket")) {
