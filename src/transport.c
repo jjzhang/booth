@@ -295,7 +295,7 @@ static int setup_tcp_listener(void)
 		return s;
 	}
 
-	ipaddr_to_sockaddr(&local, BOOTH_CMD_PORT, &sockaddr, &addrlen);
+	ipaddr_to_sockaddr(&local, booth_conf->port, &sockaddr, &addrlen);
 	rv = bind(s, (struct sockaddr *)&sockaddr, addrlen);
 	if (rv == -1) {
 		log_error("failed to bind socket %s", strerror(errno));
@@ -389,7 +389,7 @@ static int booth_tcp_open(struct booth_node *to)
 	struct tcp_conn *conn;
 	int addrlen, rv, s, found = 0;
 
-	ipaddr_to_sockaddr(to, BOOTH_CMD_PORT, &sockaddr, &addrlen);
+	ipaddr_to_sockaddr(to, booth_conf->port, &sockaddr, &addrlen);
 	list_for_each_entry(conn, &tcp, list) {
 		if (!memcmp(&conn->to, &sockaddr, sizeof(sockaddr))) {
 			found = 1;
