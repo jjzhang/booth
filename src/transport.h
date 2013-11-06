@@ -27,6 +27,11 @@ struct booth_node {
 	int local;
 	unsigned short family;
 	char addr[BOOTH_NAME_LEN];
+	int addrlen;
+	union {
+		struct in_addr in4;
+		struct in6_addr in6;
+	};
 } __attribute__((packed));
 
 typedef enum {

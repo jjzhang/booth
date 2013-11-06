@@ -22,6 +22,8 @@
 #include <stdint.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
 
 #define BOOTH_LOG_DUMP_SIZE (1024*1024)
 

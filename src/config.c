@@ -55,6 +55,7 @@ int read_config(const char *path)
 	int in_quotes, got_equals, got_quotes, i;
 	int lineno = 0;
 	int got_transport = 0;
+	struct booth_node *node;
 
 	fp = fopen(path, "r");
 	if (!fp) {
@@ -189,13 +190,31 @@ int read_config(const char *path)
 				log_error("too many nodes");
 				goto out;
 			}
-			booth_conf->node[booth_conf->node_count].family =
-				BOOTH_PROTO_FAMILY;
-			booth_conf->node[booth_conf->node_count].type = SITE;
-			booth_conf->node[booth_conf->node_count].nodeid = 
-				booth_conf->node_count;
-			strcpy(booth_conf->node[booth_conf->node_count++].addr,
-				val);
+			if (strlen(val)+1 >= sizeof(booth_conf->node[0].addr)) {
+				log_error("node address \"%s\" too long", val);
+				goto out;
+			}
+
+			node = booth_conf->node+booth_conf->node_count;
+			booth_conf->node_count++;
+
+			node->family = BOOTH_PROTO_FAMILY;
+			node->type = SITE;
+			node->nodeid = booth_conf->node_count;
+			strcpy(node->addr, val);
+
+			memset(&node->in6, 0, sizeof(node->in6));
+			if (node->family == AF_INET) {
+				inet_pton(AF_INET, node->addr, &node->in4);
+				node->addrlen = sizeof(struct in_addr);
+			} else if (node->family == AF_INET6) {
+				inet_pton(AF_INET6, node->addr, &node->in6);
+				node->addrlen = sizeof(struct in6_addr);
+			} else {
+				log_error("invalid INET family");
+				goto out;
+			}
+
 		}
 		
 		if (!strcmp(key, "arbitrator")) {

@@ -107,30 +107,19 @@ static void parse_rtattr(struct rtattr *tb[],
 	}
 }
 
-static int find_myself(struct booth_node *node)
+static int find_myself(struct booth_node **me)
 {
-	int fd, addrlen, found = 0;
+	int fd;
 	struct sockaddr_nl nladdr;
-	unsigned char ndaddr[BOOTH_IPADDR_LEN];
 	unsigned char ipaddr[BOOTH_IPADDR_LEN];
 	static char rcvbuf[NETLINK_BUFSIZE];
 	struct {
 		struct nlmsghdr nlh;
 		struct rtgenmsg g;
 	} req;
+	int i;
 
-	memset(ndaddr, 0, BOOTH_IPADDR_LEN);
-	if (node->family == AF_INET) {
-		inet_pton(AF_INET, node->addr, ndaddr);
-		addrlen = sizeof(struct in_addr);
-	} else if (node->family == AF_INET6) {
-		inet_pton(AF_INET6, node->addr, ndaddr);
-		addrlen = sizeof(struct in6_addr);
-	} else {
-		log_error("invalid INET family");
-		return 0;
-	}
-
+	*me = NULL;
 	fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
 	if (fd < 0) {
 		log_error("failed to create netlink socket");
@@ -189,6 +178,7 @@ static int find_myself(struct booth_node *node)
 			if (h->nlmsg_type == RTM_NEWADDR) {
 				struct ifaddrmsg *ifa = NLMSG_DATA(h);
 				struct rtattr *tb[IFA_MAX+1];
+				struct booth_node *node;
 				int len = h->nlmsg_len 
 					  - NLMSG_LENGTH(sizeof(*ifa));
 
@@ -197,11 +187,15 @@ static int find_myself(struct booth_node *node)
 				memset(ipaddr, 0, BOOTH_IPADDR_LEN);
 				memcpy(ipaddr, RTA_DATA(tb[IFA_ADDRESS]),
 					BOOTH_IPADDR_LEN);
-				if (!memcmp(ipaddr, ndaddr, addrlen)) {
-					found = 1;
-					goto out;
+
+				for (i = 0; i < booth_conf->node_count; i++) {
+					node = booth_conf->node + i;
+					if (ifa->ifa_family == node->family &&
+							memcmp(ipaddr, &node->in6, node->addrlen) == 0) {
+						*me = node;
+						goto out;
+					}
 				}
-	
 			}
 			h = NLMSG_NEXT(h, status);
 		}
@@ -209,21 +203,18 @@ static int find_myself(struct booth_node *node)
 
 out:
 	close(fd);
-	return found;
+	return *me != NULL;
 }
 
 static int load_myid(void)
 {
-	int i;
+	struct booth_node *me;
 
-	for (i = 0; i < booth_conf->node_count; i++) {
-		if (find_myself(&booth_conf->node[i])) {
-			booth_conf->node[i].local = 1;
-			if (!local.family)
-				memcpy(&local, &booth_conf->node[i],
-				       sizeof(struct booth_node));
-			return booth_conf->node[i].nodeid;
-		}
+	if (find_myself(&me)) {
+		me->local = 1;
+		if (!local.family)
+			memcpy(&local, me, sizeof(struct booth_node));
+		return me->nodeid;
 	}
 
 	return -1;
