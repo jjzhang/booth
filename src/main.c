@@ -137,9 +137,14 @@ static int do_connect(const char *sock_path)
 	struct sockaddr_un sun;
 	socklen_t addrlen;
 	int rv, fd;
+	struct booth_node *node;
+	struct sockaddr_in sin4;
+	struct sockaddr_in6 sin6;
+
 
 	fd = socket(PF_UNIX, SOCK_STREAM, 0);
 	if (fd < 0) {
+sock_bad:
 		log_error("failed to create socket: %s (%d)", strerror(errno), errno);
 		goto out;
 	}
@@ -150,6 +155,37 @@ static int do_connect(const char *sock_path)
 	addrlen = sizeof(sa_family_t) + strlen(sun.sun_path+1) + 1;
 
 	rv = connect(fd, (struct sockaddr *) &sun, addrlen);
+	if (rv < 0) {
+		/* Fallback: locally reachable address, ie. in same cluster? */
+		if (find_myself(&node, 1)) {
+			close(fd);
+
+			/* Always use TCP within cluster. */
+			fd = socket(PF_INET, SOCK_STREAM, 0);
+			if (fd < 0)
+				goto sock_bad;
+			switch(node->family) {
+			case AF_INET:
+				sin4.sin_family = node->family;
+				sin4.sin_port = htons(booth_conf->port);
+				memcpy(&sin4.sin_addr, &node->in4, node->addrlen);
+				rv = connect(fd, (struct sockaddr *) &sin4, sizeof(sin4));
+				break;
+			case AF_INET6:
+				sin6.sin6_family = node->family;
+				sin6.sin6_flowinfo = 0;
+				sin6.sin6_port = htons(booth_conf->port);
+				memcpy(&sin6.sin6_addr, &node->in6, node->addrlen);
+				rv = connect(fd, (struct sockaddr *) &sin6, sizeof(sin6));
+				break;
+
+			default:
+				log_error("unknown family %d", node->family);
+				goto out;
+			}
+		}
+	}
+
 	if (rv < 0) {
 		if (errno == ECONNREFUSED)
 			log_error("Connection to boothd was refused; "
@@ -1049,6 +1085,12 @@ static int do_client(void)
 {
 	int rv = -1;
 
+	rv = setup_config(CLIENT);
+	if (rv < 0) {
+		log_error("cannot read config");
+		goto out;
+	}
+
 	switch (cl.op) {
 	case OP_LIST:
 		rv = do_list();
@@ -1063,6 +1105,7 @@ static int do_client(void)
 		break;
 	}
 	
+out:
 	return rv;
 }
 
