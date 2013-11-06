@@ -25,3 +25,13 @@ ncscope.*
 # ctags files
 tags
 
+autom4te.cache
+*.o
+
+test-driver
+tools/.deps/
+tools/booth_resource_monitord
+
+# vim temp files
+.*.sw?
+
