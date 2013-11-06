@@ -119,7 +119,6 @@ static int find_myself(struct booth_node *node)
 		struct rtgenmsg g;
 	} req;
 
-	memset(ipaddr, 0, BOOTH_IPADDR_LEN);
 	memset(ndaddr, 0, BOOTH_IPADDR_LEN);
 	if (node->family == AF_INET) {
 		inet_pton(AF_INET, node->addr, ndaddr);
@@ -195,6 +194,7 @@ static int find_myself(struct booth_node *node)
 
 				memset(tb, 0, sizeof(tb));
 				parse_rtattr(tb, IFA_MAX, IFA_RTA(ifa), len);
+				memset(ipaddr, 0, BOOTH_IPADDR_LEN);
 				memcpy(ipaddr, RTA_DATA(tb[IFA_ADDRESS]),
 					BOOTH_IPADDR_LEN);
 				if (!memcmp(ipaddr, ndaddr, addrlen)) {
