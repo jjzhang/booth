@@ -47,4 +47,10 @@ int read_config(const char *path);
 
 int check_config(int type);
 
+
+static inline struct booth_transport *transport(void) {
+	return booth_transport + booth_conf->proto;
+}
+
+
 #endif /* _CONFIG_H */

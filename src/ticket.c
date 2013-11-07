@@ -113,7 +113,7 @@ static int * ticket_priority(int i)
 
 static int ticket_get_myid(void)
 {
-	return booth_transport[booth_conf->proto].get_myid();
+	return transport()->get_myid();
 }
 
 static void end_acquire(pl_handle_t handle, int error)
