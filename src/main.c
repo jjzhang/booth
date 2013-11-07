@@ -132,65 +132,50 @@ retry:
 	return 0;
 }
 
-static int do_connect(const char *sock_path)
+static int do_connect(void)
 {
-	struct sockaddr_un sun;
-	socklen_t addrlen;
 	int rv, fd;
 	struct booth_node *node;
 	struct sockaddr_in sin4;
 	struct sockaddr_in6 sin6;
 
+	rv = -1;
+	/* Use locally reachable address, ie. in same cluster. */
+	if (find_myself(&node, 1)) {
 
-	fd = socket(PF_UNIX, SOCK_STREAM, 0);
-	if (fd < 0) {
-sock_bad:
-		log_error("failed to create socket: %s (%d)", strerror(errno), errno);
-		goto out;
-	}
+		/* Always use TCP within cluster. */
+		fd = socket(PF_INET, SOCK_STREAM, 0);
+		if (fd < 0) {
+			log_error("failed to create socket: %s (%d)", strerror(errno), errno);
+			goto out;
+		}
 
-	memset(&sun, 0, sizeof(sun));
-	sun.sun_family = AF_UNIX;
-	strcpy(&sun.sun_path[1], sock_path);
-	addrlen = sizeof(sa_family_t) + strlen(sun.sun_path+1) + 1;
+		switch(node->family) {
+		case AF_INET:
+			sin4.sin_family = node->family;
+			sin4.sin_port = htons(booth_conf->port);
+			memcpy(&sin4.sin_addr, &node->in4, node->addrlen);
+			rv = connect(fd, (struct sockaddr *) &sin4, sizeof(sin4));
+			break;
+		case AF_INET6:
+			sin6.sin6_family = node->family;
+			sin6.sin6_flowinfo = 0;
+			sin6.sin6_port = htons(booth_conf->port);
+			memcpy(&sin6.sin6_addr, &node->in6, node->addrlen);
+			rv = connect(fd, (struct sockaddr *) &sin6, sizeof(sin6));
+			break;
 
-	rv = connect(fd, (struct sockaddr *) &sun, addrlen);
-	if (rv < 0) {
-		/* Fallback: locally reachable address, ie. in same cluster? */
-		if (find_myself(&node, 1)) {
-			close(fd);
-
-			/* Always use TCP within cluster. */
-			fd = socket(PF_INET, SOCK_STREAM, 0);
-			if (fd < 0)
-				goto sock_bad;
-			switch(node->family) {
-			case AF_INET:
-				sin4.sin_family = node->family;
-				sin4.sin_port = htons(booth_conf->port);
-				memcpy(&sin4.sin_addr, &node->in4, node->addrlen);
-				rv = connect(fd, (struct sockaddr *) &sin4, sizeof(sin4));
-				break;
-			case AF_INET6:
-				sin6.sin6_family = node->family;
-				sin6.sin6_flowinfo = 0;
-				sin6.sin6_port = htons(booth_conf->port);
-				memcpy(&sin6.sin6_addr, &node->in6, node->addrlen);
-				rv = connect(fd, (struct sockaddr *) &sin6, sizeof(sin6));
-				break;
-
-			default:
-				log_error("unknown family %d", node->family);
-				goto out;
-			}
+		default:
+			log_error("unknown family %d", node->family);
+			goto out;
 		}
 	}
 
 	if (rv < 0) {
 		if (errno == ECONNREFUSED)
 			log_error("Connection to boothd was refused; "
-				  "please ensure that you are on a "
-				  "machine which has boothd running.");
+					"please ensure that you are on a "
+					"machine which has boothd running.");
 		else
 			log_error("failed to connect: %s (%d)", strerror(errno), errno);
 		close(fd);
@@ -275,39 +260,6 @@ again:
 	goto again;
 }
 
-static int setup_listener(const char *sock_path)
-{
-	struct sockaddr_un addr;
-	socklen_t addrlen;
-	int rv, s;
-
-	s = socket(AF_LOCAL, SOCK_STREAM, 0);
-	if (s < 0) {
-		log_error("socket error %d: %s (%d)", s, strerror(errno), errno);
-		return s;
-	}
-
-	memset(&addr, 0, sizeof(addr));
-
-	addr.sun_family = AF_LOCAL;
-	strcpy(&addr.sun_path[1], sock_path);
-	addrlen = sizeof(sa_family_t) + strlen(addr.sun_path+1) + 1;
-
-	rv = bind(s, (struct sockaddr *) &addr, addrlen);
-	if (rv < 0) {
-		log_error("bind error %d: %s (%d)", rv, strerror(errno), errno);
-		close(s);
-		return rv;
-	}
-
-	rv = listen(s, 5);
-	if (rv < 0) {
-		log_error("listen error %d: %s (%d)", rv, strerror(errno), errno);
-		close(s);
-		return rv;
-	}
-	return s;
-}
 
 void process_connection(int ci)
 {
@@ -537,9 +489,6 @@ static int loop(int fd)
 	if (rv < 0)
 		goto fail;
 
-	rv = setup_listener(BOOTHC_SOCK_PATH);
-	if (rv < 0)
-		goto fail;
 	client_add(rv, process_listener, NULL);
 
 	rv = write_daemon_state(fd, BOOTHD_STARTED);
@@ -597,7 +546,7 @@ static int do_list(void)
 
 	init_header(&h, BOOTHC_CMD_LIST, 0, 0);
 
-	fd = do_connect(BOOTHC_SOCK_PATH);
+	fd = do_connect();
 	if (fd < 0) {
 		rv = fd;
 		goto out;
@@ -660,7 +609,7 @@ static int do_command(cmd_request_t cmd)
 	strcpy(buf + sizeof(struct boothc_header), cl.site);
 	strcpy(buf + sizeof(struct boothc_header) + sizeof(cl.site), cl.ticket);
 
-        fd = do_connect(BOOTHC_SOCK_PATH);
+        fd = do_connect();
         if (fd < 0) {
                 rv = fd;
                 goto out_free;

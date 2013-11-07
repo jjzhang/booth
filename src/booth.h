@@ -37,7 +37,6 @@
 #define BOOTH_NAME_LEN		63
 #define BOOTH_PATH_LEN		127
 
-#define BOOTHC_SOCK_PATH		"boothc_lock"
 #define BOOTH_PROTO_FAMILY	AF_INET
 
 #define BOOTHC_MAGIC		0x5F1BA08C
