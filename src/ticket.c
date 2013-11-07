@@ -42,6 +42,7 @@ struct booth_msghdr {
         uint16_t magic;
         uint16_t checksum;
         uint32_t len;
+	char data[0];
 } __attribute__((packed));
 
 struct ticket_msg {
@@ -201,26 +202,18 @@ static int ticket_send(unsigned long id, void *value, int len)
 	return rv;
 }
 
-static int ticket_broadcast(void *value, int len)
+static int ticket_broadcast(void *value, int vlen)
 {
-	void *buf;
 	struct booth_msghdr *hdr;
-	int rv;
+	int tlen = sizeof(*hdr) + vlen;
+	char buf[tlen];
 
-	buf = malloc(sizeof(struct booth_msghdr) + len);
-	if (!buf)
-		return -ENOMEM;
-	memset(buf, 0, sizeof(struct booth_msghdr) + len);
-	hdr = buf;
+	hdr = (void*)buf;
 	hdr->magic = htons(PAXOS_MAGIC);
-	hdr->len = htonl(sizeof(struct booth_msghdr) + len);
-	memcpy((char *)buf + sizeof(struct booth_msghdr), value, len);
+	hdr->len = htonl(tlen);
+	memcpy(hdr->data, value, vlen);
 
-	rv = booth_transport[booth_conf->proto].broadcast(
-			buf, sizeof(struct booth_msghdr) + len);
-
-	free(buf);
-	return rv;	
+	return transport()->broadcast(hdr, tlen);
 }
 #if 0
 static int ticket_read(const void *name, int *owner, int *ballot, 
