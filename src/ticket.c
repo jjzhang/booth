@@ -1,5 +1,6 @@
 /* 
  * Copyright (C) 2011 Jiaju Zhang <jjzhang@suse.de>
+ * Copyright (C) 2013 Philipp Marek <philipp.marek@linbit.com>
  * 
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public
@@ -181,7 +182,7 @@ static int ticket_send(unsigned long id, void *value, int len)
 
 	for (i = 0; i < booth_conf->node_count; i++) {
 		if (booth_conf->node[i].nodeid == id)
-			to = &booth_conf->node[i];
+			to = booth_conf->node+i;
 	}
 	if (!to)
 		return rv;
@@ -195,8 +196,7 @@ static int ticket_send(unsigned long id, void *value, int len)
 	hdr->len = htonl(sizeof(struct booth_msghdr) + len);
 	memcpy((char *)buf + sizeof(struct booth_msghdr), value, len);
 
-	rv = booth_transport[booth_conf->proto].send(
-		(unsigned long)to, buf, sizeof(struct booth_msghdr) + len);
+	rv = transport()->send(to, buf, sizeof(struct booth_msghdr) + len);
 
 	free(buf);
 	return rv;
@@ -270,9 +270,10 @@ static int ticket_catchup(const void *name, int *owner, int *ballot,
 			  unsigned long long *expires)
 {	
 	struct ticket *tk;
-	int i, s, buflen, rv = 0;
+	int i, buflen, rv = 0;
 	char *buf = NULL;
 	struct boothc_header *h;
+	struct booth_node *node;
 	struct ticket_msg *tmsg;
 	int myid = ticket_get_myid();
 
@@ -305,28 +306,29 @@ static int ticket_catchup(const void *name, int *owner, int *ballot,
 	tmsg = (struct ticket_msg *)(buf + sizeof(struct boothc_header));
 	
 	for (i = 0; i < booth_conf->node_count; i++) {
-		if (booth_conf->node[i].type == SITE &&
-		    !(booth_conf->node[i].local)) {
+		node = booth_conf->node + i;
+		if (node->type == SITE &&
+		    !(node->local)) {
 			strncpy(tmsg->id, name, BOOTH_NAME_LEN + 1);
-			log_debug("attempting catchup from %s", booth_conf->node[i].addr);
-			s = booth_transport[TCP].open(&booth_conf->node[i]);
-			if (s < 0)
+			log_debug("attempting catchup from %s", node->addr);
+			rv = booth_transport[TCP].open(node);
+			if (rv < 0)
 				continue;
-			log_debug("connected to %s", booth_conf->node[i].addr);
-			rv = booth_transport[TCP].send(s, buf, buflen);
+			log_debug("connected to %s", node->addr);
+			rv = booth_transport[TCP].send(node, buf, buflen);
 			if (rv < 0) {
-				booth_transport[TCP].close(s);
-				continue;
+				goto close;
 			}
-			log_debug("sent catchup command to %s", booth_conf->node[i].addr);
+			log_debug("sent catchup command to %s", node->addr);
 			memset(tmsg, 0, sizeof(struct ticket_msg));
-			rv = booth_transport[TCP].recv(s, buf, buflen);
+			rv = booth_transport[TCP].recv(node, buf, buflen);
 			if (rv < 0) {
-				booth_transport[TCP].close(s);
+				booth_transport[TCP].close(node);
 				continue;
 			}
-			booth_transport[TCP].close(s);
 			ticket_parse(tmsg);
+close:
+			booth_transport[TCP].close(node);
 			memset(tmsg, 0, sizeof(struct ticket_msg)); 
 		}
 	}

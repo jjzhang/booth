@@ -26,6 +26,7 @@ struct booth_node {
 	int type;
 	int local;
 	unsigned short family;
+	int tcp_fd;
 	char addr[BOOTH_NAME_LEN];
 	int addrlen;
 	union {
@@ -52,10 +53,10 @@ struct booth_transport {
 	int (*init) (void *);
 	int (*get_myid) (void);
 	int (*open) (struct booth_node *);
-	int (*send) (unsigned long, void *, int);
-	int (*recv) (unsigned long, void *, int);
+	int (*send) (struct booth_node *, void *, int);
+	int (*recv) (struct booth_node *, void *, int);
 	int (*broadcast) (void *, int);
-	int (*close) (unsigned long);
+	int (*close) (struct booth_node *);
 	int (*exit) (void);
 };
 

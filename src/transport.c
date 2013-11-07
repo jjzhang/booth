@@ -1,5 +1,6 @@
 /* 
  * Copyright (C) 2011 Jiaju Zhang <jjzhang@suse.de>
+ * Copyright (C) 2013 Philipp Marek <philipp.marek@linbit.com>
  * 
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public
@@ -423,72 +424,52 @@ done:
 
 static int booth_tcp_open(struct booth_node *to)
 {
-	struct sockaddr_storage sockaddr;
-	struct tcp_conn *conn;
-	int addrlen, rv, s, found = 0;
+	int s, rv;
 
-	ipaddr_to_sockaddr(to, booth_conf->port, &sockaddr, &addrlen);
-	list_for_each_entry(conn, &tcp, list) {
-		if (!memcmp(&conn->to, &sockaddr, sizeof(sockaddr))) {
-			found = 1;
-			break;
-		}
+	if (to->tcp_fd >= 0)
+		goto found;
+
+	s = socket(BOOTH_PROTO_FAMILY, SOCK_STREAM, 0);
+	if (s == -1)
+		return -1;
+
+	rv = connect_nonb(s, (struct sockaddr *)&to->in6, to->addrlen, 10);
+	if (rv == -1) {
+		if( errno == ETIMEDOUT)
+			log_error("connection to %s timeout", to->addr);
+		else 
+			log_error("connection to %s error %s", to->addr,
+					strerror(errno));
+		goto error;
 	}
 
-	if (!found) {
-		s = socket(BOOTH_PROTO_FAMILY, SOCK_STREAM, 0);
-		if (s == -1)
-			return -1;
+	to->tcp_fd = s;
 
-		rv = connect_nonb(s, (struct sockaddr *)&sockaddr, addrlen, 10);
-		if (rv == -1) {
-			if( errno == ETIMEDOUT)
-				log_error("connection to %s timeout", to->addr);
-			else 
-	                        log_error("connection to %s error %s", to->addr,
-					  strerror(errno));
-			close(s);
-			return rv;
-		}
+found:
+	return 1;
 
-		conn = malloc(sizeof(struct tcp_conn));
-		if (!conn) {
-			log_error("failed to alloc mem");
-			close(s);
-			return -ENOMEM;
-		}
-		memset(conn, 0, sizeof(struct tcp_conn));
-		conn->s = s;
-		memcpy(&conn->to, &sockaddr, sizeof(struct sockaddr));
-		list_add_tail(&conn->list, &tcp);
+error:
+	if (s >= 0)
+		close(s);
+	return -1;
+}
+
+static int booth_tcp_send(struct booth_node *to, void *buf, int len)
+{
+	return do_write(to->tcp_fd, buf, len);
+}
+
+static int booth_tcp_recv(struct booth_node *from, void *buf, int len)
+{
+	return do_read(from->tcp_fd, buf, len);
+}
+
+static int booth_tcp_close(struct booth_node *to)
+{
+	if (to->tcp_fd >= 0) {
+		close(to->tcp_fd);
+		to->tcp_fd = -1;
 	}
-
-	return conn->s;
-}
-
-static int booth_tcp_send(unsigned long to, void *buf, int len)
-{
-	return do_write(to, buf, len);
-}
-
-static int booth_tcp_recv(unsigned long from, void *buf, int len)
-{
-	return do_read(from, buf, len);
-}
-
-static int booth_tcp_close(unsigned long s)
-{
-	struct tcp_conn *conn;
-
-	list_for_each_entry(conn, &tcp, list) {
-		if (conn->s == s) {
-			list_del(&conn->list);
-			close(s);
-			free(conn);
-			goto out;
-		}
-	}
-out:
 	return 0;
 }
 
@@ -590,7 +571,7 @@ static int booth_udp_init(void *f)
 	return 0;
 }
 
-static int booth_udp_send(unsigned long to, void *buf, int len)
+static int booth_udp_send(struct booth_node *to, void *buf, int len)
 {
 	struct msghdr msg;
 	struct sockaddr_storage sockaddr;
@@ -628,7 +609,7 @@ static int booth_udp_broadcast(void *buf, int len)
 		return -1;
 
 	for (i = 0; i < booth_conf->node_count; i++)
-		booth_udp_send((unsigned long)&booth_conf->node[i], buf, len);
+		booth_udp_send(booth_conf->node+i, buf, len);
 	
 	return 0;
 }
@@ -644,7 +625,7 @@ static int booth_sctp_init(void *f __attribute__((unused)))
 	return 0;
 }
 
-static int booth_sctp_send(unsigned long to __attribute__((unused)),
+static int booth_sctp_send(struct booth_node * to __attribute__((unused)),
 			   void *buf __attribute__((unused)),
 			   int len __attribute__((unused)))
 {

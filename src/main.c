@@ -1,5 +1,6 @@
 /* 
  * Copyright (C) 2011 Jiaju Zhang <jjzhang@suse.de>
+ * Copyright (C) 2013 Philipp Marek <philipp.marek@linbit.com>
  * 
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public
@@ -421,11 +422,10 @@ out:
 static int setup_transport(void)
 {
 	int rv;
-	transport_layer_t proto = booth_conf->proto;
 
-	rv = booth_transport[proto].init(ticket_recv);
+	rv = transport()->init(ticket_recv);
 	if (rv < 0) {
-		log_error("failed to init booth_transport[%d]", proto);
+		log_error("failed to init booth_transport %s", transport()->name);
 		goto out;
 	}
 
@@ -639,29 +639,27 @@ static int do_command(cmd_request_t cmd)
 	
 	if (reply.result == BOOTHC_RLT_REMOTE_OP) {
 		struct booth_node to;
-		int s;
 
 		memset(&to, 0, sizeof(struct booth_node));
 		to.family = BOOTH_PROTO_FAMILY;
 		strcpy(to.addr, cl.site);
 
-		s = booth_transport[TCP].open(&to);
-		if (s < 0) {
-			rv = -1;
-			goto out_close;
-		}
-		rv = booth_transport[TCP].send(s, buf, buflen);
+		rv = booth_transport[TCP].open(&to);
 		if (rv < 0) {
-			booth_transport[TCP].close(s);
 			goto out_close;
 		}
-		rv = booth_transport[TCP].recv(s, &reply,
+		rv = booth_transport[TCP].send(&to, buf, buflen);
+		if (rv < 0) {
+			booth_transport[TCP].close(&to);
+			goto out_close;
+		}
+		rv = booth_transport[TCP].recv(&to, &reply,
 					       sizeof(struct boothc_header));
 		if (rv < 0) {	
-			booth_transport[TCP].close(s);
+			booth_transport[TCP].close(&to);
 			goto out_close;
 		}
-		booth_transport[TCP].close(s);
+		booth_transport[TCP].close(&to);
 	}
  
 	if (reply.result == BOOTHC_RLT_ASYNC) {
