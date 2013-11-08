@@ -75,27 +75,40 @@ int add_node(char *addr_string, int type)
 
 	booth_conf->node_count++;
 
-	memset(&node->in6, 0, sizeof(node->in6));
+	memset(&node->sa6, 0, sizeof(node->sa6));
 	if (node->family == AF_INET) {
-		if (inet_pton(AF_INET, node->addr_string, &node->in4) < 0) {
-addr_bad:
-			log_error("Address string \"%s\" is bad", node->addr_string);
-			goto out;
-		}
+		if (inet_pton(AF_INET,
+					node->addr_string, 
+					&node->sa4.sin_addr) < 0)
+			goto addr_bad;
+
+		node->sa4.sin_family = node->family;
+		node->sa4.sin_port = htons(booth_conf->port);
 		node->addrlen = sizeof(struct in_addr);
 	} else if (node->family == AF_INET6) {
-		if (inet_pton(AF_INET6, node->addr_string, &node->in6) < 0)
+		if (inet_pton(AF_INET6,
+					node->addr_string,
+					&node->sa6.sin6_addr) < 0)
 			goto addr_bad;
+
+		node->sa6.sin6_family = node->family;
+		node->sa6.sin6_flowinfo = 0;
+		node->sa6.sin6_port = htons(booth_conf->port);
 		node->addrlen = sizeof(struct in6_addr);
 	} else {
 		log_error("invalid INET family");
 		goto out;
 	}
 
+
 	rv = 0;
 
 out:
 	return rv;
+
+addr_bad:
+	log_error("Address string \"%s\" is bad", node->addr_string);
+	goto out;
 }
 
 

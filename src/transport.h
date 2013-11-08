@@ -32,8 +32,8 @@ struct booth_node {
 
 	unsigned short family;
 	union {
-		struct in_addr in4;
-		struct in6_addr in6;
+		struct sockaddr_in  sa4;
+		struct sockaddr_in6 sa6;
 	};
 	int addrlen;
 } __attribute__((packed));
@@ -65,5 +65,13 @@ struct booth_transport {
 
 struct booth_transport booth_transport[TRANSPORT_ENTRIES];
 int find_myself(struct booth_node **me, int fuzzy_allowed);
+
+inline static void * node_to_addr_pointer(struct booth_node *node) {
+	switch (node->family) {
+	case AF_INET:  return &node->sa4.sin_addr;
+	case AF_INET6: return &node->sa6.sin6_addr;
+	}
+	return NULL;
+}
 
 #endif /* _TRANSPORT_H */

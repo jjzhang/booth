@@ -63,40 +63,6 @@ struct udp_context {
 
 static int (*deliver_fn) (void *msg, int msglen);
 
-static int ipaddr_to_sockaddr(struct booth_node *node,
-		       uint16_t port,
-		       struct sockaddr_storage *saddr,
-		       int *addrlen)
-{
-	int rv = -1;
-
-	if (node->family == AF_INET) {
-		struct in_addr addr;
-		struct sockaddr_in *sin = (struct sockaddr_in *)saddr;
-		memset(sin, 0, sizeof(struct sockaddr_in));
-		sin->sin_family = node->family;
-		sin->sin_port = htons(port);
-		inet_pton(AF_INET, node->addr_string, &addr);
-		memcpy(&sin->sin_addr, &addr, sizeof(struct in_addr));
-		*addrlen = sizeof(struct sockaddr_in);
-		rv = 0;
-	}
-
-	if (node->family == AF_INET6) {
-		struct in6_addr addr;
-		struct sockaddr_in6 *sin = (struct sockaddr_in6 *)saddr;
-		memset(sin, 0, sizeof(struct sockaddr_in6));
-		sin->sin6_family = node->family;
-		sin->sin6_port = htons(port);
-		sin->sin6_scope_id = 2;
-		inet_pton(AF_INET6, node->addr_string, &addr);
-		memcpy(&sin->sin6_addr, &addr, sizeof(struct in6_addr));
-		*addrlen = sizeof(struct sockaddr_in6);
-		rv = 0;
-	}
-
-	return rv;
-}
 
 static void parse_rtattr(struct rtattr *tb[],
 			 int max, struct rtattr *rta, int len)
@@ -118,6 +84,7 @@ static int find_address(unsigned char ipaddr[BOOTH_IPADDR_LEN],
 	struct booth_node *node;
 	int bytes, bits_left, mask;
 	unsigned char node_bits, ip_bits;
+	uint8_t *n_a;
 
 
 	bytes = prefixlen / 8;
@@ -129,8 +96,9 @@ static int find_address(unsigned char ipaddr[BOOTH_IPADDR_LEN],
 		node = booth_conf->node + i;
 		if (family != node->family)
 			continue;
+		n_a = node_to_addr_pointer(node);
 
-		if (memcmp(ipaddr, &node->in6, node->addrlen) == 0) {
+		if (memcmp(ipaddr, n_a, node->addrlen) == 0) {
 found:
 			*me = node;
 			return 1;
@@ -144,13 +112,13 @@ found:
 //#include <stdio.h>
 //		printf("node->addr %s, fam %d, prefix %d; %llx vs %llx, bytes %d\n", node->addr, node->family, prefixlen, *((long long*)&node->in6), *((long long*)ipaddr), bytes);
 		/* Check prefix, whole bytes */
-		if (memcmp(ipaddr, &node->in6, bytes) != 0)
+		if (memcmp(ipaddr, n_a, bytes) != 0)
 			continue;
 //printf("bits %d\n", bits_left);
 		if (!bits_left)
 			goto found;
 
-		node_bits = node->in6.s6_addr[bytes];
+		node_bits = n_a[bytes];
 		ip_bits = ipaddr[bytes];
 //printf("nodebits %x ip %x mask %x\n", node_bits, ip_bits, mask);
 		if (((node_bits ^ ip_bits) & mask) == 0)
@@ -325,8 +293,7 @@ static void process_tcp_listener(int ci)
 
 static int setup_tcp_listener(void)
 {
-	struct sockaddr_storage sockaddr;
-	int s, addrlen, rv;
+	int s, rv;
 
 	s = socket(local.family, SOCK_STREAM, 0);
 	if (s == -1) {
@@ -334,8 +301,7 @@ static int setup_tcp_listener(void)
 		return s;
 	}
 
-	ipaddr_to_sockaddr(&local, booth_conf->port, &sockaddr, &addrlen);
-	rv = bind(s, (struct sockaddr *)&sockaddr, addrlen);
+	rv = bind(s, &local.sa6, local.addrlen);
 	if (rv == -1) {
 		log_error("failed to bind socket %s", strerror(errno));
 		return rv;
@@ -433,7 +399,8 @@ static int booth_tcp_open(struct booth_node *to)
 	if (s == -1)
 		return -1;
 
-	rv = connect_nonb(s, (struct sockaddr *)&to->in6, to->addrlen, 10);
+
+	rv = connect_nonb(s, (struct sockaddr *)&to->sa6, to->addrlen, 10);
 	if (rv == -1) {
 		if( errno == ETIMEDOUT)
 			log_error("connection to %s timeout", to->addr_string);
@@ -480,8 +447,7 @@ static int booth_tcp_exit(void)
 
 static int setup_udp_server(void)
 {
-	struct sockaddr_storage sockaddr;
-	int addrlen, rv;
+	int rv;
 	unsigned int recvbuf_size;
 
 	udp.s = socket(local.family, SOCK_DGRAM, 0);
@@ -498,9 +464,7 @@ static int setup_udp_server(void)
 		return -1;
 	}
 
-	ipaddr_to_sockaddr(&local, booth_conf->port, &sockaddr, &addrlen);
-
-	rv = bind(udp.s, (struct sockaddr *)&sockaddr, addrlen);
+	rv = bind(udp.s, (struct sockaddr *)&local.sa6, local.addrlen);
 	if (rv == -1) {
 		log_error("failed to bind socket %s", strerror(errno));
 		close(udp.s);
@@ -574,20 +538,16 @@ static int booth_udp_init(void *f)
 static int booth_udp_send(struct booth_node *to, void *buf, int len)
 {
 	struct msghdr msg;
-	struct sockaddr_storage sockaddr;
 	struct iovec iovec;
 	unsigned int iov_len;
-	int addrlen = 0, rv;
+	int rv;
 
 	iovec.iov_base = (void *)buf;
 	iovec.iov_len = len;
 	iov_len = 1;
 
-	ipaddr_to_sockaddr((struct booth_node *)to, booth_conf->port,
-			   &sockaddr, &addrlen);
-	
-	msg.msg_name = &sockaddr;
-	msg.msg_namelen = addrlen;
+	msg.msg_name = &to->sa6;
+	msg.msg_namelen = to->addrlen;
 	msg.msg_iov = (void *)&iovec;
 	msg.msg_iovlen = iov_len;
 	msg.msg_control = 0;
