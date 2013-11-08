@@ -394,7 +394,9 @@ static void process_listener(int ci)
 	fd = accept(client[ci].fd, NULL, NULL);
 	if (fd < 0) {
 		log_error("process_listener: accept error for fd %d: %s (%d)",
-			  fd, strerror(errno), errno);
+			  client[ci].fd, strerror(errno), errno);
+		if (client[ci].deadfn)
+			client[ci].deadfn(ci);
 		return;
 	}
 
