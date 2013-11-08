@@ -60,7 +60,7 @@ int add_node(char *addr_string, int type)
 		log_error("too many nodes");
 		goto out;
 	}
-	if (strlen(addr_string)+1 >= sizeof(booth_conf->node[0].addr)) {
+	if (strlen(addr_string)+1 >= sizeof(booth_conf->node[0].addr_string)) {
 		log_error("node address \"%s\" too long", addr_string);
 		goto out;
 	}
@@ -70,21 +70,21 @@ int add_node(char *addr_string, int type)
 	node->family = BOOTH_PROTO_FAMILY;
 	node->type = type;
 	node->nodeid = booth_conf->node_count;
-	strcpy(node->addr, addr_string);
+	strcpy(node->addr_string, addr_string);
 	node->tcp_fd = -1;
 
 	booth_conf->node_count++;
 
 	memset(&node->in6, 0, sizeof(node->in6));
 	if (node->family == AF_INET) {
-		if (inet_pton(AF_INET, node->addr, &node->in4) < 0) {
+		if (inet_pton(AF_INET, node->addr_string, &node->in4) < 0) {
 addr_bad:
-			log_error("Address string \"%s\" is bad", node->addr);
+			log_error("Address string \"%s\" is bad", node->addr_string);
 			goto out;
 		}
 		node->addrlen = sizeof(struct in_addr);
 	} else if (node->family == AF_INET6) {
-		if (inet_pton(AF_INET6, node->addr, &node->in6) < 0)
+		if (inet_pton(AF_INET6, node->addr_string, &node->in6) < 0)
 			goto addr_bad;
 		node->addrlen = sizeof(struct in6_addr);
 	} else {
@@ -336,7 +336,7 @@ int find_site_in_config(unsigned char *site, struct booth_node **node)
 	for (i = 0; i < booth_conf->node_count; i++) {
 		n = booth_conf->node + i;
 		if (n->type == SITE &&
-		    strcmp(n->addr, site) == 0) {
+		    strcmp(n->addr_string, site) == 0) {
 			*node = n;
 			return 1;
 		}

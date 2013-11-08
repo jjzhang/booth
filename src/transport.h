@@ -26,8 +26,8 @@ struct booth_node {
 	int type;
 	int local;
 	unsigned short family;
+	char addr_string[BOOTH_NAME_LEN];
 	int tcp_fd;
-	char addr[BOOTH_NAME_LEN];
 	int addrlen;
 	union {
 		struct in_addr in4;

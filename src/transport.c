@@ -76,7 +76,7 @@ static int ipaddr_to_sockaddr(struct booth_node *node,
 		memset(sin, 0, sizeof(struct sockaddr_in));
 		sin->sin_family = node->family;
 		sin->sin_port = htons(port);
-		inet_pton(AF_INET, node->addr, &addr);
+		inet_pton(AF_INET, node->addr_string, &addr);
 		memcpy(&sin->sin_addr, &addr, sizeof(struct in_addr));
 		*addrlen = sizeof(struct sockaddr_in);
 		rv = 0;
@@ -89,7 +89,7 @@ static int ipaddr_to_sockaddr(struct booth_node *node,
 		sin->sin6_family = node->family;
 		sin->sin6_port = htons(port);
 		sin->sin6_scope_id = 2;
-		inet_pton(AF_INET6, node->addr, &addr);
+		inet_pton(AF_INET6, node->addr_string, &addr);
 		memcpy(&sin->sin6_addr, &addr, sizeof(struct in6_addr));
 		*addrlen = sizeof(struct sockaddr_in6);
 		rv = 0;
@@ -436,9 +436,9 @@ static int booth_tcp_open(struct booth_node *to)
 	rv = connect_nonb(s, (struct sockaddr *)&to->in6, to->addrlen, 10);
 	if (rv == -1) {
 		if( errno == ETIMEDOUT)
-			log_error("connection to %s timeout", to->addr);
+			log_error("connection to %s timeout", to->addr_string);
 		else 
-			log_error("connection to %s error %s", to->addr,
+			log_error("connection to %s error %s", to->addr_string,
 					strerror(errno));
 		goto error;
 	}

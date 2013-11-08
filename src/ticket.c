@@ -100,7 +100,7 @@ int check_site(char *site, int *local)
 {
 	struct booth_node *node;
 
-	if (!check_max_len_valid(site, sizeof(node->addr)))
+	if (!check_max_len_valid(site, sizeof(node->addr_string)))
 		return 0;
 
 	if (find_site_in_config(site, &node)) {
@@ -320,16 +320,16 @@ static int ticket_catchup(const void *name, int *owner, int *ballot,
 		if (node->type == SITE &&
 		    !(node->local)) {
 			strncpy(tmsg->id, name, BOOTH_NAME_LEN + 1);
-			log_debug("attempting catchup from %s", node->addr);
+			log_debug("attempting catchup from %s", node->addr_string);
 			rv = booth_transport[TCP].open(node);
 			if (rv < 0)
 				continue;
-			log_debug("connected to %s", node->addr);
+			log_debug("connected to %s", node->addr_string);
 			rv = booth_transport[TCP].send(node, buf, buflen);
 			if (rv < 0) {
 				goto close;
 			}
-			log_debug("sent catchup command to %s", node->addr);
+			log_debug("sent catchup command to %s", node->addr_string);
 			memset(tmsg, 0, sizeof(struct ticket_msg));
 			rv = booth_transport[TCP].recv(node, buf, buflen);
 			if (rv < 0) {
@@ -511,7 +511,7 @@ int list_ticket(char **pdata, unsigned int *len)
 		strncpy(node_name, "None", sizeof(node_name));
 
 		if (tk->owner < MAX_NODES && tk->owner > -1)
-			strncpy(node_name, booth_conf->node[tk->owner].addr,
+			strncpy(node_name, booth_conf->node[tk->owner].addr_string,
 					sizeof(node_name));
 		if (tk->expires != 0)
 			strftime(timeout_str, sizeof(timeout_str), "%Y/%m/%d %H:%M:%S",
