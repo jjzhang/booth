@@ -68,11 +68,24 @@ static LIST_HEAD(ticket_list);
 
 static unsigned char *role;
 
+/* Untrusted input, must fit (incl. \0) in a buffer of max chars. */
+int check_max_len_valid(char *s, int max)
+{
+	int i;
+	for(i=0; i<BOOTH_NAME_LEN; i++)
+		if (s[i] == 0)
+			return 1;
+	return 0;
+}
+
 int check_ticket(char *ticket)
 {
 	int i;
 
 	if (!booth_conf)
+		return 0;
+
+	if (!check_max_len_valid(ticket, sizeof(booth_conf->ticket[0].name)))
 		return 0;
 
 	for (i = 0; i < booth_conf->ticket_count; i++) {
@@ -86,6 +99,9 @@ int check_ticket(char *ticket)
 int check_site(char *site, int *local)
 {
 	struct booth_node *node;
+
+	if (!check_max_len_valid(site, sizeof(node->addr)))
+		return 0;
 
 	if (find_site_in_config(site, &node)) {
 		*local = node->local;
