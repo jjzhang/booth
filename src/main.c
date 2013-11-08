@@ -512,7 +512,7 @@ fail:
 }
 
 
-static int do_list(void)
+static int query_get_string_answer(cmd_request_t cmd)
 {
 	struct booth_node *node;
 	struct boothc_header h, *rh;
@@ -520,7 +520,7 @@ static int do_list(void)
 	int data_len;
 	int rv;
 
-	init_header(&h, BOOTHC_CMD_LIST, 0, 0);
+	init_header(&h, cmd, 0, 0);
 
 	rv = do_local_connect_and_write(&h, sizeof(h), &node);
 	if (rv < 0)
@@ -1001,7 +1001,7 @@ static int do_client(void)
 
 	switch (cl.op) {
 	case OP_LIST:
-		rv = do_list();
+		rv = query_get_string_answer(BOOTHC_CMD_LIST);
 		break;
 
 	case OP_GRANT:
