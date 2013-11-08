@@ -63,8 +63,11 @@ struct booth_transport {
 	int (*exit) (void);
 };
 
-struct booth_transport booth_transport[TRANSPORT_ENTRIES];
+const struct booth_transport booth_transport[TRANSPORT_ENTRIES];
 int find_myself(struct booth_node **me, int fuzzy_allowed);
+
+int booth_tcp_open(struct booth_node *to);
+int booth_tcp_send(struct booth_node *to, void *buf, int len);
 
 inline static void * node_to_addr_pointer(struct booth_node *node) {
 	switch (node->family) {
@@ -73,5 +76,7 @@ inline static void * node_to_addr_pointer(struct booth_node *node) {
 	}
 	return NULL;
 }
+
+extern const struct booth_transport *local_transport;
 
 #endif /* _TRANSPORT_H */

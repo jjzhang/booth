@@ -388,16 +388,18 @@ done:
 	return 0;
 }
 
-static int booth_tcp_open(struct booth_node *to)
+int booth_tcp_open(struct booth_node *to)
 {
 	int s, rv;
 
 	if (to->tcp_fd >= 0)
 		goto found;
 
-	s = socket(BOOTH_PROTO_FAMILY, SOCK_STREAM, 0);
-	if (s == -1)
+	s = socket(to->family, SOCK_STREAM, 0);
+	if (s == -1) {
+		log_error("cannot create socket of family %d", to->family);
 		return -1;
+}
 
 
 	rv = connect_nonb(s, (struct sockaddr *)&to->sa6, to->addrlen, 10);
@@ -421,7 +423,7 @@ error:
 	return -1;
 }
 
-static int booth_tcp_send(struct booth_node *to, void *buf, int len)
+int booth_tcp_send(struct booth_node *to, void *buf, int len)
 {
 	return do_write(to->tcp_fd, buf, len);
 }
@@ -603,8 +605,8 @@ static int booth_sctp_exit(void)
 	return 0;
 }
 
-struct booth_transport booth_transport[] = {
-	{
+const struct booth_transport booth_transport[TRANSPORT_ENTRIES] = {
+	[TCP] = {
 		.name = "TCP",
 		.init = booth_tcp_init,
 		.get_myid = booth_get_myid,
@@ -614,7 +616,7 @@ struct booth_transport booth_transport[] = {
 		.close = booth_tcp_close,
 		.exit = booth_tcp_exit
 	},
-	{
+	[UDP] = {
 		.name = "UDP",
 		.init = booth_udp_init,
 		.get_myid = booth_get_myid,
@@ -622,7 +624,7 @@ struct booth_transport booth_transport[] = {
 		.broadcast = booth_udp_broadcast,
 		.exit = booth_udp_exit
 	},
-	{
+	[SCTP] = {
 		.name = "SCTP",
 		.init = booth_sctp_init,
 		.get_myid = booth_get_myid,
@@ -632,3 +634,4 @@ struct booth_transport booth_transport[] = {
 	}
 };
 
+const struct booth_transport *local_transport = booth_transport+TCP;

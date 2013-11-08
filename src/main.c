@@ -133,58 +133,37 @@ retry:
 	return 0;
 }
 
-static int do_connect(void)
+
+static int do_local_connect_and_write(void *data, int len, struct booth_node **ret)
 {
-	int rv, fd;
 	struct booth_node *node;
-	struct sockaddr_in sin4;
-	struct sockaddr_in6 sin6;
+	int rv;
 
-	rv = -1;
+
+	if (ret)
+		*ret = NULL;
+
 	/* Use locally reachable address, ie. in same cluster. */
-	if (find_myself(&node, 1)) {
-
-		/* Always use TCP within cluster. */
-		fd = socket(PF_INET, SOCK_STREAM, 0);
-		if (fd < 0) {
-			log_error("failed to create socket: %s (%d)", strerror(errno), errno);
-			goto out;
-		}
-
-		switch(node->family) {
-		case AF_INET:
-			sin4.sin_family = node->family;
-			sin4.sin_port = htons(booth_conf->port);
-			memcpy(&sin4.sin_addr, &node->in4, node->addrlen);
-			rv = connect(fd, (struct sockaddr *) &sin4, sizeof(sin4));
-			break;
-		case AF_INET6:
-			sin6.sin6_family = node->family;
-			sin6.sin6_flowinfo = 0;
-			sin6.sin6_port = htons(booth_conf->port);
-			memcpy(&sin6.sin6_addr, &node->in6, node->addrlen);
-			rv = connect(fd, (struct sockaddr *) &sin6, sizeof(sin6));
-			break;
-
-		default:
-			log_error("unknown family %d", node->family);
-			goto out;
-		}
+	if (!find_myself(&node, 1)) {
+		log_error("Cannot find local cluster.");
+		return ENOENT;
 	}
 
-	if (rv < 0) {
-		if (errno == ECONNREFUSED)
-			log_error("Connection to boothd was refused; "
-					"please ensure that you are on a "
-					"machine which has boothd running.");
-		else
-			log_error("failed to connect: %s (%d)", strerror(errno), errno);
-		close(fd);
-		fd = rv;
-	}
+	if (ret)
+		*ret = node;
+
+
+	/* Always use TCP within cluster. */
+	rv = booth_tcp_open(node);
+	if (rv < 0)
+		goto out;
+
+	rv = booth_tcp_send(node, data, len);
+
 out:
-	return fd;
+	return rv;
 }
+
 
 static void init_header(struct boothc_header *h, int cmd,
 			int result, int data_len)
@@ -531,24 +510,20 @@ fail:
 	return -1;
 }
 
+
 static int do_list(void)
 {
+	struct booth_node *node;
 	struct boothc_header h, *rh;
 	char *reply = NULL, *data;
 	int data_len;
-	int fd, rv;
+	int rv;
 
 	init_header(&h, BOOTHC_CMD_LIST, 0, 0);
 
-	fd = do_connect();
-	if (fd < 0) {
-		rv = fd;
-		goto out;
-	}
-
-	rv = do_write(fd, &h, sizeof(h));
+	rv = do_local_connect_and_write(&h, sizeof(h), &node);
 	if (rv < 0)
-		goto out_close;
+		goto out;
 
 	reply = malloc(sizeof(struct boothc_header));
 	if (!reply) {
@@ -556,7 +531,7 @@ static int do_list(void)
 		goto out_close;
 	}
 
-	rv = do_read(fd, reply, sizeof(struct boothc_header));
+	rv = local_transport->recv(node, reply, sizeof(struct boothc_header));
 	if (rv < 0)
 		goto out_free;
 
@@ -569,7 +544,7 @@ static int do_list(void)
 		goto out_free;
 	}
 	data = reply + sizeof(struct boothc_header);
-	rv = do_read(fd, data, data_len);
+	rv = local_transport->recv(node, data, data_len);
 	if (rv < 0)
 		goto out_free;
 
@@ -579,30 +554,28 @@ static int do_list(void)
 out_free:
 	free(reply);
 out_close:
-	close(fd);
+	local_transport->close(node);
 out:
 	return rv;
 }
 
 static int do_command(cmd_request_t cmd)
 {
+	struct booth_node *node, *to;
 	struct boothc_header reply;
-	int fd, rv;
+	int rv;
+
+	node = NULL;
+	to = NULL;
 
 	init_header(&cl.msg.header, cmd, 0,
 			sizeof(cl.msg) - sizeof(cl.msg.header));
 
-        fd = do_connect();
-        if (fd < 0) {
-                rv = fd;
-                goto out;
-        }
-
-        rv = do_write(fd, &cl.msg, sizeof(cl.msg));
+	rv = do_local_connect_and_write(&cl.msg, sizeof(cl.msg), &node);
         if (rv < 0)
                 goto out_close;
 
-	rv = do_read(fd, &reply, sizeof(reply));
+	rv = local_transport->recv(node, &reply, sizeof(reply));
 	if (rv < 0)
 		goto out_close;
 
@@ -621,7 +594,6 @@ static int do_command(cmd_request_t cmd)
 	}
 	
 	if (reply.result == BOOTHC_RLT_REMOTE_OP) {
-		struct booth_node *to;
 
 		if (!find_site_in_config(cl.msg.site, &to)) {
 			log_error("Redirected to unknown site %s.", cl.msg.site);
@@ -677,8 +649,10 @@ static int do_command(cmd_request_t cmd)
 	}
 
 out_close:
-	close(fd);
-out:
+	if (node)
+		local_transport->close(node);
+	if (to)
+		booth_transport[TCP].close(to);
 	return rv;
 }
 
