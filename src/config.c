@@ -84,7 +84,8 @@ int add_node(char *addr_string, int type)
 
 		node->sa4.sin_family = node->family;
 		node->sa4.sin_port = htons(booth_conf->port);
-		node->addrlen = sizeof(struct in_addr);
+		node->saddrlen = sizeof(node->sa4);
+		node->addrlen = sizeof(node->sa4.sin_addr);
 	} else if (node->family == AF_INET6) {
 		if (inet_pton(AF_INET6,
 					node->addr_string,
@@ -94,7 +95,8 @@ int add_node(char *addr_string, int type)
 		node->sa6.sin6_family = node->family;
 		node->sa6.sin6_flowinfo = 0;
 		node->sa6.sin6_port = htons(booth_conf->port);
-		node->addrlen = sizeof(struct in6_addr);
+		node->saddrlen = sizeof(node->sa6);
+		node->addrlen = sizeof(node->sa6.sin6_addr);
 	} else {
 		log_error("invalid INET family");
 		goto out;

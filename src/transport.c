@@ -301,7 +301,7 @@ static int setup_tcp_listener(void)
 		return s;
 	}
 
-	rv = bind(s, &local.sa6, local.addrlen);
+	rv = bind(s, &local.sa6, local.saddrlen);
 	if (rv == -1) {
 		log_error("failed to bind socket %s", strerror(errno));
 		return rv;
@@ -402,7 +402,7 @@ int booth_tcp_open(struct booth_node *to)
 }
 
 
-	rv = connect_nonb(s, (struct sockaddr *)&to->sa6, to->addrlen, 10);
+	rv = connect_nonb(s, (struct sockaddr *)&to->sa6, to->saddrlen, 10);
 	if (rv == -1) {
 		if( errno == ETIMEDOUT)
 			log_error("connection to %s timeout", to->addr_string);

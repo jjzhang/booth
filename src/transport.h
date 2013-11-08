@@ -35,6 +35,7 @@ struct booth_node {
 		struct sockaddr_in  sa4;
 		struct sockaddr_in6 sa6;
 	};
+	int saddrlen;
 	int addrlen;
 } __attribute__((packed));
 
