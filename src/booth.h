@@ -69,8 +69,8 @@ typedef enum {
 
 struct client {
         int fd;
-        void *workfn;
-        void *deadfn;
+        void (*workfn)(int);
+        void (*deadfn)(int);
 };
 
 int client_add(int fd, void (*workfn)(int ci), void (*deadfn)(int ci));
