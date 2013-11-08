@@ -120,7 +120,8 @@ retry:
 	rv = write(fd, (char *)buf + off, count);
 	if (rv == -1 && errno == EINTR)
 		goto retry;
-	if (rv < 0) {
+	/* If we cannot write _any_ data, we'd be in an (potential) loop. */
+	if (rv <= 0) {
 		log_error("write failed: %s (%d)", strerror(errno), errno);
 		return rv;
 	}
