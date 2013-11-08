@@ -433,7 +433,7 @@ static int booth_tcp_recv(struct booth_node *from, void *buf, int len)
 
 static int booth_tcp_close(struct booth_node *to)
 {
-	if (to->tcp_fd >= 0) {
+	if (to && to->tcp_fd >= 0) {
 		close(to->tcp_fd);
 		to->tcp_fd = -1;
 	}
