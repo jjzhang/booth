@@ -30,7 +30,7 @@
 struct ticket_config {
 	int weight[MAX_NODES];
 	int expiry;
-	char name[BOOTH_NAME_LEN];
+	boothc_ticket name;
 };
 
 struct booth_config {
