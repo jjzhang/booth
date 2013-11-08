@@ -63,33 +63,33 @@ struct udp_context {
 
 static int (*deliver_fn) (void *msg, int msglen);
 
-static int ipaddr_to_sockaddr(struct booth_node *ipaddr,
+static int ipaddr_to_sockaddr(struct booth_node *node,
 		       uint16_t port,
 		       struct sockaddr_storage *saddr,
 		       int *addrlen)
 {
 	int rv = -1;
 
-	if (ipaddr->family == AF_INET) {
+	if (node->family == AF_INET) {
 		struct in_addr addr;
 		struct sockaddr_in *sin = (struct sockaddr_in *)saddr;
 		memset(sin, 0, sizeof(struct sockaddr_in));
-		sin->sin_family = ipaddr->family;
+		sin->sin_family = node->family;
 		sin->sin_port = htons(port);
-		inet_pton(AF_INET, ipaddr->addr, &addr);
+		inet_pton(AF_INET, node->addr, &addr);
 		memcpy(&sin->sin_addr, &addr, sizeof(struct in_addr));
 		*addrlen = sizeof(struct sockaddr_in);
 		rv = 0;
 	}
 
-	if (ipaddr->family == AF_INET6) {
+	if (node->family == AF_INET6) {
 		struct in6_addr addr;
 		struct sockaddr_in6 *sin = (struct sockaddr_in6 *)saddr;
 		memset(sin, 0, sizeof(struct sockaddr_in6));
-		sin->sin6_family = ipaddr->family;
+		sin->sin6_family = node->family;
 		sin->sin6_port = htons(port);
 		sin->sin6_scope_id = 2;
-		inet_pton(AF_INET6, ipaddr->addr, &addr);
+		inet_pton(AF_INET6, node->addr, &addr);
 		memcpy(&sin->sin6_addr, &addr, sizeof(struct in6_addr));
 		*addrlen = sizeof(struct sockaddr_in6);
 		rv = 0;
