@@ -89,8 +89,8 @@ struct command_line {
 	int op;			/* OP_ */
 	char configfile[BOOTH_PATH_LEN];
 	char lockfile[BOOTH_PATH_LEN];
-	char site[BOOTH_NAME_LEN];
-	char ticket[BOOTH_NAME_LEN]; 
+
+	struct boothc_site_ticket_msg msg;
 };
 
 static struct command_line cl;
@@ -264,14 +264,13 @@ again:
 
 void process_connection(int ci)
 {
-	struct boothc_header h;
+	struct boothc_site_ticket_msg msg;
 	char *data = NULL;
-	char *site, *ticket;
 	int ticket_owner;
 	int local, rv;
 	void (*deadfn) (int ci);
 
-	rv = do_read(client[ci].fd, &h, sizeof(h));
+	rv = do_read(client[ci].fd, &msg.header, sizeof(msg.header));
 
 	if (rv < 0) {
 		if (errno == ECONNRESET)
@@ -284,102 +283,95 @@ void process_connection(int ci)
 		}
 		return;
 	}
-	if (h.magic != BOOTHC_MAGIC) {
-		log_error("connection %d magic error %x", ci, h.magic);
+	if (msg.header.magic != BOOTHC_MAGIC) {
+		log_error("connection %d magic error %x", ci, msg.header.magic);
 		return;
 	}
-	if (h.version != BOOTHC_VERSION) {
-		log_error("connection %d version error %x", ci, h.version);
+	if (msg.header.version != BOOTHC_VERSION) {
+		log_error("connection %d version error %x", ci, msg.header.version);
 		return;
 	}
 
-	if (h.len) {
-		data = malloc(h.len+1);
-		if (!data) {
-			log_error("process_connection no mem %u", h.len);
+	if (msg.header.len) {
+		if (msg.header.len != sizeof(msg) - sizeof(msg.header)) {
+			log_error("got wrong length %u", msg.header.len);
 			return;
 		}
-		memset(data, 0, h.len+1);
-
-		rv = do_read(client[ci].fd, data, h.len);
+		rv = do_read(client[ci].fd, msg.header.data, msg.header.len);
 		if (rv < 0) {
 			log_error("connection %d read data error %d", ci, rv);
 			goto out;
 		}
 	}
 
-	switch (h.cmd) {
+	switch (msg.header.cmd) {
 	case BOOTHC_CMD_LIST:
 		assert(!data);
-		h.result = list_ticket(&data, &h.len);
+		msg.header.result = list_ticket(&data, &msg.header.len);
 		break;
 
 	case BOOTHC_CMD_GRANT:
-		h.len = 0;
-		site = data;
-		ticket = data + BOOTH_NAME_LEN;
+		msg.header.len = 0;
 
-		if (!check_ticket(ticket)) {
-			h.result = BOOTHC_RLT_INVALID_ARG;
+		if (!check_ticket(msg.ticket)) {
+			msg.header.result = BOOTHC_RLT_INVALID_ARG;
 			goto reply;
 		}
 
-		if (get_ticket_info(ticket, &ticket_owner, NULL) == 0) {
+		if (get_ticket_info(msg.ticket, &ticket_owner, NULL) == 0) {
 			if (ticket_owner > -1) {
 				log_error("client want to get an granted "
-					  "ticket %s", ticket);
-				h.result = BOOTHC_RLT_OVERGRANT;
+					  "ticket %s", msg.ticket);
+				msg.header.result = BOOTHC_RLT_OVERGRANT;
 				goto reply;
 			}
 		} else {
-			log_error("can not get ticket %s's info", ticket);
-			h.result = BOOTHC_RLT_INVALID_ARG;
+			log_error("can not get ticket %s's info", msg.ticket);
+			msg.header.result = BOOTHC_RLT_INVALID_ARG;
 			goto reply;
 		}
 
-		if (!check_site(site, &local)) {
-			h.result = BOOTHC_RLT_INVALID_ARG;
+		if (!check_site(msg.site, &local)) {
+			msg.header.result = BOOTHC_RLT_INVALID_ARG;
 			goto reply;
 		}
 		if (local)
-			h.result = grant_ticket(ticket);
+			msg.header.result = grant_ticket(msg.ticket);
 		else
-			h.result = BOOTHC_RLT_REMOTE_OP;
+			msg.header.result = BOOTHC_RLT_REMOTE_OP;
 		break;
 
 	case BOOTHC_CMD_REVOKE:
-		h.len = 0;
-		site = data;
-		ticket = data + BOOTH_NAME_LEN;
-		if (!check_ticket(ticket)) {
-			h.result = BOOTHC_RLT_INVALID_ARG;
+		msg.header.len = 0;
+		if (!check_ticket(msg.ticket)) {
+			msg.header.result = BOOTHC_RLT_INVALID_ARG;
 			goto reply;
 		}
-		if (!check_site(site, &local)) {
-			h.result = BOOTHC_RLT_INVALID_ARG;
+		if (!check_site(msg.site, &local)) {
+			msg.header.result = BOOTHC_RLT_INVALID_ARG;
 			goto reply;
 		}
 		if (local)
-			h.result = revoke_ticket(ticket);
+			msg.header.result = revoke_ticket(msg.ticket);
 		else
-			h.result = BOOTHC_RLT_REMOTE_OP;
+			msg.header.result = BOOTHC_RLT_REMOTE_OP;
 		break;
 
 	case BOOTHC_CMD_CATCHUP:
-		h.result = catchup_ticket(&data, h.len);	
+		msg.header.result = catchup_ticket(&data, msg.header.len);	
 		break;
 
 	default:
-		log_error("connection %d cmd %x unknown", ci, h.cmd);
+		log_error("connection %d cmd %x unknown", ci, msg.header.cmd);
 		break;
 	}
 
 reply:
-	rv = do_write(client[ci].fd, &h, sizeof(h));
+	rv = do_write(client[ci].fd, &msg.header, sizeof(msg.header));
 	if (rv < 0)
 		log_error("connection %d write error %d", ci, rv);
-	if (h.len) {
-		rv = do_write(client[ci].fd, data, h.len);
+	if (msg.header.len) {
+		rv = do_write(client[ci].fd, data, msg.header.len);
 		if (rv < 0)
 			log_error("connection %d write error %d", ci, rv);
 	}
@@ -594,34 +586,23 @@ out:
 
 static int do_command(cmd_request_t cmd)
 {
-	char *buf;
-	struct boothc_header *h, reply;
-	int buflen;
+	struct boothc_header reply;
 	int fd, rv;
 
-	buflen = sizeof(struct boothc_header) + 
-		 sizeof(cl.site) + sizeof(cl.ticket);
-	buf = malloc(buflen);
-	if (!buf) {
-		rv = -ENOMEM;
-		goto out;
-	}
-	h = (struct boothc_header *)buf;
-	init_header(h, cmd, 0, sizeof(cl.site) + sizeof(cl.ticket));
-	strcpy(buf + sizeof(struct boothc_header), cl.site);
-	strcpy(buf + sizeof(struct boothc_header) + sizeof(cl.site), cl.ticket);
+	init_header(&cl.msg.header, cmd, 0,
+			sizeof(cl.msg) - sizeof(cl.msg.header));
 
         fd = do_connect();
         if (fd < 0) {
                 rv = fd;
-                goto out_free;
+                goto out;
         }
 
-        rv = do_write(fd, buf, buflen);
+        rv = do_write(fd, &cl.msg, sizeof(cl.msg));
         if (rv < 0)
                 goto out_close;
 
-	rv = do_read(fd, &reply, sizeof(struct boothc_header));
+	rv = do_read(fd, &reply, sizeof(reply));
 	if (rv < 0)
 		goto out_close;
 
@@ -640,28 +621,30 @@ static int do_command(cmd_request_t cmd)
 	}
 	
 	if (reply.result == BOOTHC_RLT_REMOTE_OP) {
-		struct booth_node to;
+		struct booth_node *to;
 
-		memset(&to, 0, sizeof(struct booth_node));
-		to.family = BOOTH_PROTO_FAMILY;
-		strcpy(to.addr, cl.site);
+		if (!find_site_in_config(cl.msg.site, &to)) {
+			log_error("Redirected to unknown site %s.", cl.msg.site);
+			rv = -1;
+			goto out_close;
+		}
 
-		rv = booth_transport[TCP].open(&to);
+		rv = booth_transport[TCP].open(to);
 		if (rv < 0) {
 			goto out_close;
 		}
-		rv = booth_transport[TCP].send(&to, buf, buflen);
+		rv = booth_transport[TCP].send(to, &cl.msg, sizeof(cl.msg));
 		if (rv < 0) {
-			booth_transport[TCP].close(&to);
+			booth_transport[TCP].close(to);
 			goto out_close;
 		}
-		rv = booth_transport[TCP].recv(&to, &reply,
+		rv = booth_transport[TCP].recv(to, &reply,
 					       sizeof(struct boothc_header));
 		if (rv < 0) {	
-			booth_transport[TCP].close(&to);
+			booth_transport[TCP].close(to);
 			goto out_close;
 		}
-		booth_transport[TCP].close(&to);
+		booth_transport[TCP].close(to);
 	}
  
 	if (reply.result == BOOTHC_RLT_ASYNC) {
@@ -695,8 +678,6 @@ static int do_command(cmd_request_t cmd)
 
 out_close:
 	close(fd);
-out_free:
-	free(buf);
 out:
 	return rv;
 }
@@ -910,7 +891,7 @@ static int read_arguments(int argc, char **argv)
 			break;
 		case 't':
 			if (cl.op == OP_GRANT || cl.op == OP_REVOKE) {
-				safe_copy(cl.ticket, optarg, sizeof(cl.ticket), "ticket name");
+				safe_copy(cl.msg.ticket, optarg, sizeof(cl.msg.ticket), "ticket name");
 			} else {
 				print_usage();
 				exit(EXIT_FAILURE);
@@ -921,9 +902,9 @@ static int read_arguments(int argc, char **argv)
 			if (cl.op == OP_GRANT || cl.op == OP_REVOKE) {
 				int re = host_convert(optarg, site_arg, INET_ADDRSTRLEN);
 				if (re == 0) {
-					safe_copy(cl.site, site_arg, sizeof(cl.ticket), "site name");
+					safe_copy(cl.msg.site, site_arg, sizeof(cl.msg.ticket), "site name");
 				} else {
-					safe_copy(cl.site, optarg, sizeof(cl.ticket), "site name");
+					safe_copy(cl.msg.site, optarg, sizeof(cl.msg.ticket), "site name");
 				}
 			} else {
 				print_usage();

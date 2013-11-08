@@ -1,5 +1,6 @@
 /* 
  * Copyright (C) 2011 Jiaju Zhang <jjzhang@suse.de>
+ * Copyright (C) 2013 Philipp Marek <philipp.marek@linbit.com>
  * 
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public
@@ -49,7 +50,19 @@ struct boothc_header {
 	uint32_t expiry;
 	uint32_t len;
 	uint32_t result;
-};
+	char data[0];
+} __attribute__((packed));
+
+
+typedef unsigned char boothc_site  [BOOTH_NAME_LEN];
+typedef unsigned char boothc_ticket[BOOTH_NAME_LEN];
+
+struct boothc_site_ticket_msg {
+	struct boothc_header header;
+	boothc_site site;
+	boothc_ticket ticket;
+} __attribute__((packed));
+
 
 typedef enum {
 	BOOTHC_CMD_LIST = 1,
