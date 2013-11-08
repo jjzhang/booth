@@ -1,6 +1,7 @@
 MAINTAINERCLEANFILES	= Makefile.in
 
-AM_CFLAGS		= -fPIC -Werror
+AM_CFLAGS		= -fPIC -Werror -funsigned-char -Wno-pointer-sign
+
 
 AM_CPPFLAGS		= -I$(top_builddir)/include
 
