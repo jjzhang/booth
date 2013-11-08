@@ -323,3 +323,24 @@ int check_config(int type)
 	return -1;*/
 	return 0;
 }
+
+
+int find_site_in_config(unsigned char *site, struct booth_node **node)
+{
+	struct booth_node *n;
+	int i;
+
+	if (!booth_conf)
+		return 0;
+
+	for (i = 0; i < booth_conf->node_count; i++) {
+		n = booth_conf->node + i;
+		if (n->type == SITE &&
+		    strcmp(n->addr, site) == 0) {
+			*node = n;
+			return 1;
+		}
+	}
+
+	return 0;
+}

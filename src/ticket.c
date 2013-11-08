@@ -85,17 +85,11 @@ int check_ticket(char *ticket)
 
 int check_site(char *site, int *local)
 {
-	int i;
+	struct booth_node *node;
 
-	if (!booth_conf)
-		return 0;
-
-	for (i = 0; i < booth_conf->node_count; i++) {
-		if (booth_conf->node[i].type == SITE
-		    && !strcmp(booth_conf->node[i].addr, site)) {
-			*local = booth_conf->node[i].local;
-			return 1;
-		}
+	if (find_site_in_config(site, &node)) {
+		*local = node->local;
+		return 1;
 	}
 
 	return 0;
