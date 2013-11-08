@@ -294,12 +294,12 @@ void process_connection(int ci)
 	}
 
 	if (h.len) {
-		data = malloc(h.len);
+		data = malloc(h.len+1);
 		if (!data) {
 			log_error("process_connection no mem %u", h.len);
 			return;
 		}
-		memset(data, 0, h.len);
+		memset(data, 0, h.len+1);
 
 		rv = do_read(client[ci].fd, data, h.len);
 		if (rv < 0) {
@@ -791,12 +791,15 @@ static void print_usage(void)
 static char *logging_entity = NULL;
 
 void safe_copy(char *dest, char *value, size_t buflen, const char *description) {
-	if (strlen(value) >= buflen) {
-		fprintf(stderr, "'%s' exceeds maximum %s length of %ld\n",
-			value, description, (long)(buflen - 1));
+	int content_len = buflen - 1;
+
+	if (strlen(value) >= content_len) {
+		fprintf(stderr, "'%s' exceeds maximum %s length of %d\n",
+			value, description, content_len);
 		exit(EXIT_FAILURE);
 	}
-	strncpy(dest, value, buflen - 1);
+	strncpy(dest, value, content_len);
+	dest[content_len] = 0;
 }
 
 static int host_convert(char *hostname, char *ip_str, size_t ip_size)
