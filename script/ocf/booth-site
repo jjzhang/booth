@@ -107,7 +107,8 @@ booth_check_daemon_state(){
 		pidnum="$1"
 		daemonstate="$2"
 		act_type="$3"
-		act_site="$4"
+		config_name="$4"
+		act_site="$5"
 
 		if test "$act_type" != "$OCF_RESKEY_type" then
 			case  $daemonstate in 

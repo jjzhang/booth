@@ -420,15 +420,18 @@ static int setup_timer(void)
 
 static int write_daemon_state(int fd, int state)
 {
-	char buf[16 + 16 + sizeof(local->addr_string)];
+	char buf[16 + 16 +
+	    sizeof(local->addr_string) +
+	    sizeof(booth_conf->name)];
 	int rv=0;
 	
 	memset(buf, 0, sizeof(buf));
-	snprintf(buf, sizeof(buf), "%d %d %s %s",
+	snprintf(buf, sizeof(buf), "%d %d %s %s %s",
 		getpid(), state, 
 		local->type == ARBITRATOR ? "arbitrator" :
 		local->type == SITE ? "site" :
 		"??invalid??",
+		booth_conf->name,
 		local->addr_string);
 
 	rv = lseek(fd, 0, SEEK_SET);
