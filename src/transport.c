@@ -169,7 +169,7 @@ int find_myself(struct booth_node **mep, int fuzzy_allowed)
 	req.g.rtgen_family = AF_INET;
 
 	if (sendto(fd, (void *)&req, sizeof(req), 0,
-		(struct sockaddr*)&nladdr, sizeof(nladdr)) < 0)  {
+				(struct sockaddr*)&nladdr, sizeof(nladdr)) < 0)  {
 		close(fd);
 		log_error("failed to send data to netlink socket");
 		return 0;
