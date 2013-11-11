@@ -345,6 +345,7 @@ int read_config(const char *path)
 
 out:
 	free(booth_conf);
+	booth_conf = NULL;
 	return -1;
 }
 
