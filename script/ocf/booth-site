@@ -99,6 +99,7 @@ Expects to have a fully populated OCF RA-compliant environment set.
 END
 }
 
+
 booth_check_daemon_state(){
 	set -- `"$OCF_RESKEY_daemon" "$OCF_RESKEY_type" -S $OCF_RESKEY_args`
 	rc=$?
@@ -165,7 +166,11 @@ booth_stop() {
 	*) return $OCF_ERR_GENERIC;;
 	esac
 
-	killall -TERM ${OCF_RESKEY_daemon}; rc=$?
+
+	if [ "$pidnum" == "" ] ; then
+		return $OCF_ERR_GENERIC
+	fi
+	kill -TERM $pidnum; rc=$?
 
 	if [ $rc != 0 ]; then
 		return $OCF_ERR_GENERIC
