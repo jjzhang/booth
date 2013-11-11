@@ -135,7 +135,7 @@ case "$1" in
 	[ ! -f "$lockfile" ] || restart
         ;;
   status)
-        status $prog
+        status
         ;;
   *)
         echo $"Usage: $0 {start|stop|restart|try-restart|condrestart|reload|force-reload|status}"
