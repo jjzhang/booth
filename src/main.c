@@ -247,7 +247,7 @@ void process_connection(int ci)
 	struct boothc_site_ticket_msg msg;
 	char *data = NULL;
 	int ticket_owner;
-	int local, rv;
+	int is_local, rv;
 	void (*deadfn) (int ci);
 
 	rv = do_read(client[ci].fd, &msg.header, sizeof(msg.header));
@@ -311,11 +311,11 @@ void process_connection(int ci)
 			goto reply;
 		}
 
-		if (!check_site(msg.site, &local)) {
+		if (!check_site(msg.site, &is_local)) {
 			msg.header.result = BOOTHC_RLT_INVALID_ARG;
 			goto reply;
 		}
-		if (local)
+		if (is_local)
 			msg.header.result = grant_ticket(msg.ticket);
 		else
 			msg.header.result = BOOTHC_RLT_REMOTE_OP;
@@ -327,11 +327,11 @@ void process_connection(int ci)
 			msg.header.result = BOOTHC_RLT_INVALID_ARG;
 			goto reply;
 		}
-		if (!check_site(msg.site, &local)) {
+		if (!check_site(msg.site, &is_local)) {
 			msg.header.result = BOOTHC_RLT_INVALID_ARG;
 			goto reply;
 		}
-		if (local)
+		if (is_local)
 			msg.header.result = revoke_ticket(msg.ticket);
 		else
 			msg.header.result = BOOTHC_RLT_REMOTE_OP;
