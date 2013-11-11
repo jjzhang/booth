@@ -32,6 +32,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/poll.h>
+#include <pacemaker/crm/services.h>
 #include <fcntl.h>
 #include <string.h>
 #include <assert.h>
@@ -58,6 +59,7 @@ int log_logfile_priority = LOG_INFO;
 int log_syslog_priority = LOG_ERR;
 int log_stderr_priority = LOG_ERR;
 int daemonize = 0;
+int status_only = 0;
 
 static int client_maxi;
 static int client_size = 0;
@@ -757,11 +759,13 @@ static void print_usage(void)
 	printf("  -l LOCKFILE   Specify lock file [default " BOOTH_DEFAULT_LOCKFILE "]\n");
 	printf("  -D            Enable debugging to stderr and don't fork\n");
 	printf("  -t            ticket name\n");
+	printf("  -S            report local daemon status (for site and arbitrator)\n");
+	printf("                RA script compliant return codes.\n");
 	printf("  -s            site name\n");
 	printf("  -h            Print this help, then exit\n");
 }
 
-#define OPTION_STRING		"c:Dl:t:s:h"
+#define OPTION_STRING		"c:Dl:t:s:hS"
 
 static char *logging_entity = NULL;
 
@@ -890,6 +894,18 @@ static int read_arguments(int argc, char **argv)
 			}
 			break;
 
+		case 'S':
+			/* TODO: better written as "booth status site"?
+			 * Would be more explicit. */
+			if (cl.type != ARBITRATOR &&
+					cl.type != SITE) {
+				print_usage();
+				exit(EXIT_FAILURE);
+			}
+
+			status_only = 1;
+			break;
+
 		case 's':
 			if (cl.op == OP_GRANT || cl.op == OP_REVOKE) {
 				int re = host_convert(optarg, site_arg, INET_ADDRSTRLEN);
@@ -964,6 +980,61 @@ static void set_oom_adj(int val)
         fprintf(fp, "%i", val);
         fclose(fp);
 }
+
+static int do_status(int type)
+{
+    int rv, lock_fd, ret;
+    const char *reason = NULL;
+
+
+    ret = PCMK_OCF_NOT_RUNNING;
+    /* TODO: query all, and return quit only if it's _cleanly_ not
+     * running, ie. _neither_ of port/lockfile/process is available?
+     *
+     * Currently a single failure says "not running", even if "only" the
+     * lockfile has been removed. */
+
+    rv = setup_config(type);
+    if (rv) {
+	reason = "Error reading configuration.";
+	ret = PCMK_LSB_UNKNOWN_ERROR;
+	goto quit;
+    }
+
+
+    if (!local) {
+	reason = "No Service IP active here.";
+	goto quit;
+    }
+
+
+    rv = _lockfile(O_RDWR, &lock_fd);
+    if (lock_fd != -1 && rv == 0) {
+	reason = "PID file not locked.";
+	goto quit;
+    }
+
+    rv = setup_udp_server(1);
+    if (rv == 0) {
+	reason = "UDP port not in use.";
+	goto quit;
+    }
+
+
+    if (daemonize)
+	printf("Booth at %s:%d seems to be running.\n",
+		local->addr_string, booth_conf->port);
+    return 0;
+
+
+quit:
+    log_debug("not running: %s", reason);
+    /* Ie. "DEBUG" */
+    if (daemonize)
+	printf("not running: %s\n", reason);
+    return ret;
+}
+
 
 static int do_server(int type)
 {
@@ -1052,6 +1123,12 @@ int main(int argc, char *argv[])
 	if (rv < 0)
 		goto out;
 
+
+	if (status_only) {
+		return do_status(cl.type);
+	}
+
+
 	if (cl.type == CLIENT) {
 		cl_log_enable_stderr(TRUE);
 		cl_log_set_facility(0);
@@ -1061,6 +1138,7 @@ int main(int argc, char *argv[])
 		cl_log_set_facility(HA_LOG_FACILITY);
 	}
 	cl_inherit_logging_environment(0);
+
 
 	switch (cl.type) {
 	case ARBITRATOR:
