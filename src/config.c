@@ -141,6 +141,7 @@ int read_config(const char *path)
 		+ TICKET_ALLOC * sizeof(struct ticket_config));
 	ticket_size = TICKET_ALLOC;
 
+	log_debug("reading config file %s", path);
 	while (fgets(line, sizeof(line), fp)) {
 		lineno++;
 		s = line;
