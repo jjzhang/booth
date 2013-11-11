@@ -32,29 +32,32 @@ BOOTH_ERROR_GENERIC=4
 
 . /etc/rc.status
 
-internal_status() {
-	checkproc $exec > /dev/null 2>&1
-	return $?
-}
-
 check_status() {
-	internal_status ; rc=$?
+	pidnum=
+	set -- `"$exec" "$type" -S "${cnf:+-c $cnf}"`
+	rc=$?
+	case $rc in 
+	$OCF_SUCCESS)
+		pidnum="$1"
+		daemonstate="$2"
+		act_type="$3"
+		config_name="$4"
+		act_site="$5"
 
-	if [ $rc == 0 ];then
-		pidnum=$(cat $lockfile|awk '{print $1}')
-		daemonstate=$(cat $lockfile |awk '{print $2}')
-		if cat /proc/$pidnum/cmdline |grep $type > /dev/null 2>&1 ; then
-			case $daemonstate in
+		if test "$act_type" != "$OCF_RESKEY_type" then
+			case  $daemonstate in 
 			$BOOTH_DAEMON_STARTED) return $BOOTH_DAEMON_STARTED;;
-			$BOOTH_DAEMON_STARTING) return $BOOTH_DAEMON_STARTING;; #arbitrator daemon is Running
-			*) return $BOOTH_ERROR_GENERIC;;
+			$BOOTH_DAEMON_STARTING) return $BOOTH_DAEMON_STARTING;;
+			*) return $BOOTH_ERROR_GENERIC;;	
 			esac
 		else
-			return $BOOTH_DAEMON_EXIST  #site daemon is Running
+			return $BOOTH_DAEMON_EXIST;
 		fi
-	else
-		return $BOOTH_DAEMON_NOT_RUNNING #BOOTH daemon is not running    
-	fi    
+	;;
+	$OCF_NOT_RUNNING) return $BOOTH_DAEMON_NOT_RUNNING;;
+	$OCF_ERR_GENERIC) return $BOOTH_ERROR_GENERIC;;
+	*) return $BOOTH_ERROR_GENERIC;;
+	esac
 }
 
 status() {
@@ -86,7 +89,7 @@ start() {
 		;;
 	$BOOTH_DAEMON_NOT_RUNNING)
 		echo -n $"Starting BOOTH arbitrator daemon: "		
-		startproc $exec $type
+		startproc $exec $type "${cnf:+-c $cnf}"
 		rc_status -v
 		;;
 	esac
@@ -99,7 +102,7 @@ stop() {
 	$BOOTH_DAEMON_STARTING);;
 	$BOOTH_DAEMON_EXIST) 
 		echo "BOOTH site daemon is running."
-		return $OCF_ERR_GENERIC;;
+		return 1
 	$BOOTH_DAEMON_NOT_RUNNING)
 		echo "BOOTH arbitrator daemon is not running."
 		return $OCF_SUCCESS 
@@ -108,13 +111,28 @@ stop() {
 	esac
 	
 	echo -n $"Stopping BOOTH arbitrator daemon: "
-	killproc -p $lockfile $prog -TERM
+	kill -TERM $pidnum
 	rc_status -v
 }
 
 wait_for_stop() {
 	while [ -e $lockfile ]; do
 		sleep .5
+	done
+}
+
+foreach() {
+	cd /etc/booth
+	set -- ${BOOTH_CONF_FILE:-*.conf}
+	for cnf in "$@" ; do
+		if [ $# != 1 ] ; then
+			echo "== For configuration file $cnf:"
+		fi
+		cnf_base=`basename $cnf`
+		"$@"
+		if [ $# != 1 ] ; then
+			echo "== configuration file $cnf done"
+		fi
 	done
 }
 
@@ -126,16 +144,16 @@ restart() {
 
 case "$1" in
 	start|stop|restart)
-        $1
+        foreach $1
         ;;
 	reload|force-reload)
-        restart
+        foreach restart
         ;;
 	condrestart|try-restart)
 	[ ! -f "$lockfile" ] || restart
         ;;
   status)
-        status
+        foreach status
         ;;
   *)
         echo $"Usage: $0 {start|stop|restart|try-restart|condrestart|reload|force-reload|status}"
