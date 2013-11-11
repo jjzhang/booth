@@ -951,9 +951,9 @@ static int read_arguments(int argc, char **argv)
 
 static void set_scheduler(void)
 {
-        struct sched_param sched_param;
+	struct sched_param sched_param;
 	struct rlimit rlimit;
-        int rv;
+	int rv;
 
 	rlimit.rlim_cur = RLIM_INFINITY;
 	rlimit.rlim_max = RLIM_INFINITY;
@@ -963,18 +963,18 @@ static void set_scheduler(void)
 		log_error("mlockall failed");
 	}
 
-        rv = sched_get_priority_max(SCHED_RR);
-        if (rv != -1) {
-                sched_param.sched_priority = rv;
-                rv = sched_setscheduler(0, SCHED_RR, &sched_param);
-                if (rv == -1)
-                        log_error("could not set SCHED_RR priority %d: %s (%d)",
-                                  sched_param.sched_priority,
-                                  strerror(errno), errno);
-        } else {
-                log_error("could not get maximum scheduler priority err %d",
-                          errno);
-        }
+	rv = sched_get_priority_max(SCHED_RR);
+	if (rv != -1) {
+		sched_param.sched_priority = rv;
+		rv = sched_setscheduler(0, SCHED_RR, &sched_param);
+		if (rv == -1)
+			log_error("could not set SCHED_RR priority %d: %s (%d)",
+					sched_param.sched_priority,
+					strerror(errno), errno);
+	} else {
+		log_error("could not get maximum scheduler priority err %d",
+				errno);
+	}
 }
 
 static void set_oom_adj(int val)
@@ -1087,9 +1087,9 @@ static int do_server(int type)
 	}
 
 	/*
-	  The lock cannot be obtained before the call to daemon(), otherwise
-	  the lockfile would contain the pid of the parent, not the daemon.
-	*/
+	   The lock cannot be obtained before the call to daemon(), otherwise
+	   the lockfile would contain the pid of the parent, not the daemon.
+	   */
 	lock_fd = lockfile();
 	if (lock_fd < 0)
 		return lock_fd;
