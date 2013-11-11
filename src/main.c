@@ -967,7 +967,7 @@ static void set_oom_adj(int val)
 
 static int do_server(int type)
 {
-	int fd = -1;
+	int lock_fd = -1;
 	int rv = -1;
 
 	rv = setup_config(type);
@@ -991,9 +991,9 @@ static int do_server(int type)
 	  The lock cannot be obtained before the call to daemon(), otherwise
 	  the lockfile would contain the pid of the parent, not the daemon.
 	*/
-	fd = lockfile();
-	if (fd < 0)
-		return fd;
+	lock_fd = lockfile();
+	if (lock_fd < 0)
+		return lock_fd;
 
 	if (type == ARBITRATOR)
 		log_info("BOOTH arbitrator daemon is starting.");
@@ -1003,11 +1003,11 @@ static int do_server(int type)
 	set_scheduler();
 	set_oom_adj(-16);
 
-	rv = loop(fd);
+	rv = loop(lock_fd);
 
 out:
-	if (fd >= 0)
-		unlink_lockfile(fd);
+	if (lock_fd >= 0)
+		unlink_lockfile(lock_fd);
 
 	return rv;
 }
