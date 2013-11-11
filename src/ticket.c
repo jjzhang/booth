@@ -96,7 +96,7 @@ int check_ticket(char *ticket)
 	return 0;
 }
 
-int check_site(char *site, int *local)
+int check_site(char *site, int *is_local)
 {
 	struct booth_node *node;
 
@@ -104,7 +104,7 @@ int check_site(char *site, int *local)
 		return 0;
 
 	if (find_site_in_config(site, &node)) {
-		*local = node->local;
+		*is_local = node->local;
 		return 1;
 	}
 
