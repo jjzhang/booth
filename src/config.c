@@ -18,6 +18,7 @@
  */
 
 #include <stdio.h>
+#include <ctype.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
@@ -119,6 +120,7 @@ int read_config(const char *path)
 	char line[1024];
 	FILE *fp;
 	char *s, *key, *val, *expiry, *weight, *c;
+	const char *cp;
 	int in_quotes, got_equals, got_quotes, i;
 	int lineno = 0;
 	int got_transport = 0;
@@ -251,6 +253,13 @@ int read_config(const char *path)
 		if (!strcmp(key, "port"))
 			booth_conf->port = atoi(val);
 
+		if (!strcmp(key, "name")) {
+			if(strlen(val)+1 >= BOOTH_NAME_LEN) {
+				log_error("Config name too long.");
+				goto out;
+			}
+		}
+
 		if (!strcmp(key, "site")) {
 			if (add_node(val, SITE))
 				goto out;
@@ -313,6 +322,23 @@ int read_config(const char *path)
 	if (!got_transport) {
 		log_error("config file was missing transport line");
 		goto out;
+	}
+
+
+	/* Default: make config name match config filename. */
+	if (!booth_conf->name[0]) {
+		cp = strrchr(path, '/');
+		if (!cp)
+			cp = path;
+
+		/* TODO: locale? */
+		/* NUL-termination by memset. */
+		for(i=0; i<BOOTH_NAME_LEN-1 && isalnum(*cp); i++)
+			booth_conf->name[i] = *(cp++);
+
+		/* Last resort. */
+		if (!booth_conf->name[0])
+			strcpy(booth_conf->name, "booth");
 	}
 
 	return 0;
