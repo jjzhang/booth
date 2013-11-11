@@ -51,6 +51,8 @@ int check_config(int type);
 
 int find_site_in_config(unsigned char *site, struct booth_node **node);
 
+const char *type_to_string(int type);
+
 static inline struct booth_transport const *transport(void) {
 	return booth_transport + booth_conf->proto;
 }

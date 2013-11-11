@@ -428,9 +428,7 @@ static int write_daemon_state(int fd, int state)
 	memset(buf, 0, sizeof(buf));
 	snprintf(buf, sizeof(buf), "%d %d %s %s %s",
 		getpid(), state, 
-		local->type == ARBITRATOR ? "arbitrator" :
-		local->type == SITE ? "site" :
-		"??invalid??",
+		type_to_string(local->type),
 		booth_conf->name,
 		local->addr_string);
 

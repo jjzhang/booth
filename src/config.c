@@ -387,3 +387,15 @@ int find_site_in_config(unsigned char *site, struct booth_node **node)
 
 	return 0;
 }
+
+
+const char *type_to_string(int type)
+{
+	switch (type)
+	{
+		case ARBITRATOR: return "arbitrator";
+		case SITE:       return "site";
+		case CLIENT:     return "client";
+	}
+	return "??invalid-type??";
+}
