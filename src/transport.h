@@ -79,5 +79,6 @@ inline static void * node_to_addr_pointer(struct booth_node *node) {
 }
 
 extern const struct booth_transport *local_transport;
+extern struct booth_node *local;
 
 #endif /* _TRANSPORT_H */

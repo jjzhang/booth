@@ -45,7 +45,7 @@
 extern struct client *client;
 extern struct pollfd *pollfd;
 
-static struct booth_node local;
+struct booth_node *local = NULL;
 
 struct tcp_conn {
 	int s;
@@ -129,10 +129,11 @@ found:
 }
 
 
-int find_myself(struct booth_node **me, int fuzzy_allowed)
+int find_myself(struct booth_node **mep, int fuzzy_allowed)
 {
 	int fd;
 	struct sockaddr_nl nladdr;
+	struct booth_node *me;
 	unsigned char ipaddr[BOOTH_IPADDR_LEN];
 	static char rcvbuf[NETLINK_BUFSIZE];
 	struct {
@@ -140,7 +141,14 @@ int find_myself(struct booth_node **me, int fuzzy_allowed)
 		struct rtgenmsg g;
 	} req;
 
-	*me = NULL;
+
+	if (local)
+		goto found;
+
+
+	me = NULL;
+	if (mep)
+		*mep = NULL;
 	fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
 	if (fd < 0) {
 		log_error("failed to create netlink socket");
@@ -210,7 +218,7 @@ int find_myself(struct booth_node **me, int fuzzy_allowed)
 
 				if (find_address(ipaddr,
 							ifa->ifa_family, ifa->ifa_prefixlen,
-							fuzzy_allowed, me))
+							fuzzy_allowed, &me))
 					goto out;
 			}
 			h = NLMSG_NEXT(h, status);
@@ -219,29 +227,21 @@ int find_myself(struct booth_node **me, int fuzzy_allowed)
 
 out:
 	close(fd);
-	return *me != NULL;
-}
 
-static int load_myid(void)
-{
-	struct booth_node *me;
+	if (!me)
+		return 0;
 
-	if (find_myself(&me, 0)) {
-		me->local = 1;
-		if (!local.family)
-			memcpy(&local, me, sizeof(struct booth_node));
-		return me->nodeid;
-	}
-
-	return -1;
+	me->local = 1;
+	local = me;
+found:
+	if (mep)
+		*mep = local;
+	return 1;
 }
 
 static int booth_get_myid(void)
 {
-	if (local.local)
-		return local.nodeid;
-	else
-		return -1;
+	return local ? local->nodeid : -1;
 }
 
 static void process_dead(int ci)
@@ -295,13 +295,13 @@ static int setup_tcp_listener(void)
 {
 	int s, rv;
 
-	s = socket(local.family, SOCK_STREAM, 0);
+	s = socket(local->family, SOCK_STREAM, 0);
 	if (s == -1) {
 		log_error("failed to create tcp socket %s", strerror(errno));
 		return s;
 	}
 
-	rv = bind(s, &local.sa6, local.saddrlen);
+	rv = bind(s, &local->sa6, local->saddrlen);
 	if (rv == -1) {
 		log_error("failed to bind socket %s", strerror(errno));
 		return rv;
@@ -320,7 +320,7 @@ static int booth_tcp_init(void * unused __attribute__((unused)))
 {
 	int rv;
 
-	if (!local.local)
+	if (booth_get_myid() < 0)
 		return -1;
 
 	rv = setup_tcp_listener();
@@ -452,7 +452,7 @@ static int setup_udp_server(void)
 	int rv;
 	unsigned int recvbuf_size;
 
-	udp.s = socket(local.family, SOCK_DGRAM, 0);
+	udp.s = socket(local->family, SOCK_DGRAM, 0);
 	if (udp.s == -1) {
 		log_error("failed to create udp socket %s", strerror(errno));
 		return -1;
@@ -466,7 +466,7 @@ static int setup_udp_server(void)
 		return -1;
 	}
 
-	rv = bind(udp.s, (struct sockaddr *)&local.sa6, local.addrlen);
+	rv = bind(udp.s, (struct sockaddr *)&local->sa6, local->saddrlen);
 	if (rv == -1) {
 		log_error("failed to bind socket %s", strerror(errno));
 		close(udp.s);
@@ -512,16 +512,6 @@ static void process_recv(int ci)
 
 static int booth_udp_init(void *f)
 {
-	int myid = -1;
-
-	memset(&local, 0, sizeof(struct booth_node));
-
-	myid = load_myid();
-	if (myid < 0) {
-		log_error("can't find myself in config file");
-		return -1;
-	}
-
 	memset(&udp, 0, sizeof(struct udp_context));
 	udp.iov_recv.iov_base = udp.iov_buffer;
 	udp.iov_recv.iov_len = FRAME_SIZE_MAX;   
