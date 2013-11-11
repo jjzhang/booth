@@ -990,6 +990,7 @@ static int do_status(int type)
 {
     int rv, lock_fd, ret;
     const char *reason = NULL;
+    char lockfile_data[128], *cp;
 
 
     ret = PCMK_OCF_NOT_RUNNING;
@@ -1019,6 +1020,24 @@ static int do_status(int type)
 	goto quit;
     }
 
+    rv = read(lock_fd, lockfile_data, sizeof(lockfile_data) - 1);
+    if (rv < 4) {
+	reason = "Cannot read lockfile data.";
+	ret = PCMK_LSB_UNKNOWN_ERROR;
+	goto quit;
+
+    }
+    lockfile_data[rv] = 0;
+
+/* Make sure it's only a single line */
+    cp = strchr(lockfile_data, '\r');
+    if (cp)
+	*cp = 0;
+    cp = strchr(lockfile_data, '\n');
+    if (cp)
+	*cp = 0;
+
+
     rv = setup_udp_server(1);
     if (rv == 0) {
 	reason = "UDP port not in use.";
@@ -1026,8 +1045,9 @@ static int do_status(int type)
     }
 
 
+    fprintf(stdout, "%s\n", lockfile_data);
     if (daemonize)
-	printf("Booth at %s:%d seems to be running.\n",
+	fprintf(stderr, "Booth at %s:%d seems to be running.\n",
 		local->addr_string, booth_conf->port);
     return 0;
 
@@ -1036,7 +1056,7 @@ quit:
     log_debug("not running: %s", reason);
     /* Ie. "DEBUG" */
     if (daemonize)
-	printf("not running: %s\n", reason);
+	fprintf(stderr, "not running: %s\n", reason);
     return ret;
 }
 
