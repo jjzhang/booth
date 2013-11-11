@@ -385,6 +385,10 @@ static int setup_config(int type)
 	if (rv < 0)
 		goto out;
 
+	/* Set "local" pointer, ignoring errors. */
+	find_myself(NULL, 0);
+
+
 	rv = check_config(type);
 	if (rv < 0)
 		goto out;
