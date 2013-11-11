@@ -667,48 +667,67 @@ static int do_revoke(void)
 
 
 
-static int lockfile(void)
+static int _lockfile(int mode, int *fdp)
 {
-	struct flock lock;
-	int fd, rv;
+    struct flock lock;
+    int fd;
 
-	fd = open(cl.lockfile, O_CREAT|O_WRONLY, 0666);
-	if (fd < 0) {
-                log_error("lockfile open error %s: %s",
-                          cl.lockfile, strerror(errno));
-            return -1;
-    }       
+    *fdp = -1;
+    fd = open(cl.lockfile, mode, 0666);
+    if (fd < 0)
+	return errno;
+
+    *fdp = fd;
 
     lock.l_type = F_WRLCK;
     lock.l_start = 0;
     lock.l_whence = SEEK_SET;
     lock.l_len = 0;
-    
-    rv = fcntl(fd, F_SETLK, &lock);
+
+    if (fcntl(fd, F_SETLK, &lock) == 0)
+	return 0;
+
+    return errno;
+}
+
+
+static int lockfile(void) {
+    int rv, fd;
+
+    fd = -1;
+    rv = _lockfile(O_CREAT | O_WRONLY, &fd);
+
+    if (fd == -1) {
+	log_error("lockfile %s open error %d: %s",
+		cl.lockfile, rv, strerror(rv));
+	return -1;
+    }       
+
     if (rv < 0) {
-            log_error("lockfile setlk error %s: %s",
-                      cl.lockfile, strerror(errno));
-            goto fail;
+	log_error("lockfile %s setlk error %d: %s",
+		cl.lockfile, rv, strerror(rv));
+	goto fail;
     }
 
     rv = ftruncate(fd, 0);
     if (rv < 0) {
-            log_error("lockfile truncate error %s: %s",
-                      cl.lockfile, strerror(errno));
-            goto fail;
+	log_error("lockfile %s truncate error %d: %s",
+		cl.lockfile, errno, strerror(errno));
+	goto fail;
     }
 
     rv = write_daemon_state(fd, BOOTHD_STARTING);
     if (rv != 0) {
-		log_error("write daemon state %d to lockfile error %s: %s",
-                      BOOTHD_STARTING, cl.lockfile, strerror(errno));
-		goto fail;
+	log_error("write daemon state %d to lockfile error %s: %s",
+		BOOTHD_STARTING, cl.lockfile, strerror(errno));
+	goto fail;
     }
 
     return fd;
- fail:
-        close(fd);
-        return -1;
+
+fail:
+    close(fd);
+    return -1;
 }
 
 static void unlink_lockfile(int fd)
