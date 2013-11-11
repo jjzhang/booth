@@ -1094,9 +1094,9 @@ static int do_server(int type)
 	if (lock_fd < 0)
 		return lock_fd;
 
-	if (type == ARBITRATOR)
+	if (local->type == ARBITRATOR)
 		log_info("BOOTH arbitrator daemon is starting.");
-	else if (type == SITE)
+	else if (local->type == SITE)
 		log_info("BOOTH cluster site daemon is starting.");
 
 	set_scheduler();
