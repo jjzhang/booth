@@ -1099,6 +1099,10 @@ static int do_server(int type)
 
 	set_scheduler();
 	set_oom_adj(-16);
+	setproctitle("%s for [%s]:%d",
+			type_to_string(local->type),
+			local->addr_string,
+			local->port);
 
 	rv = loop(lock_fd);
 
