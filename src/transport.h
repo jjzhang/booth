@@ -67,6 +67,8 @@ struct booth_transport {
 const struct booth_transport booth_transport[TRANSPORT_ENTRIES];
 int find_myself(struct booth_node **me, int fuzzy_allowed);
 
+int setup_udp_server(int try_only);
+
 int booth_tcp_open(struct booth_node *to);
 int booth_tcp_send(struct booth_node *to, void *buf, int len);
 

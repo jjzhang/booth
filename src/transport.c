@@ -447,7 +447,7 @@ static int booth_tcp_exit(void)
 	return 0;
 }
 
-static int setup_udp_server(void)
+int setup_udp_server(int try_only)
 {
 	int rv;
 	unsigned int recvbuf_size;
@@ -467,6 +467,12 @@ static int setup_udp_server(void)
 	}
 
 	rv = bind(udp.s, (struct sockaddr *)&local->sa6, local->saddrlen);
+	if (try_only) {
+		rv = (rv == -1) ? errno : 0;
+		close(udp.s);
+		return rv;
+	}
+
 	if (rv == -1) {
 		log_error("failed to bind socket %s", strerror(errno));
 		close(udp.s);
@@ -516,7 +522,7 @@ static int booth_udp_init(void *f)
 	udp.iov_recv.iov_base = udp.iov_buffer;
 	udp.iov_recv.iov_len = FRAME_SIZE_MAX;   
 
-	udp.s = setup_udp_server();
+	udp.s = setup_udp_server(0);
 	if (udp.s == -1)
 		return -1;
 
