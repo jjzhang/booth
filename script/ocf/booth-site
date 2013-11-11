@@ -25,8 +25,6 @@
 #######################################################################
 # Initialization:
 
-lockfile="/var/run/booth.pid"
-
 BOOTH_DAEMON_STARTED=0
 BOOTH_DAEMON_STARTING=1
 BOOTH_DAEMON_EXIST=2
@@ -101,24 +99,17 @@ Expects to have a fully populated OCF RA-compliant environment set.
 END
 }
 
-booth_check_daemon_exist(){
-	killall -0 ${OCF_RESKEY_daemon} >/dev/null 2>&1; rc=$?
-	
-	case $rc in
-	0) return $OCF_SUCCESS;;
-	1) return $OCF_NOT_RUNNING;;
-	*) return $OCF_ERR_GENERIC;; 
-	esac
-}
-
 booth_check_daemon_state(){
-	booth_check_daemon_exist ; rc=$?
-	
+	set -- `"$OCF_RESKEY_daemon" "$OCF_RESKEY_type" -S $OCF_RESKEY_args`
+	rc=$?
 	case $rc in 
 	$OCF_SUCCESS)
-		pidnum=$(cat $lockfile |awk '{print $1}')
-		daemonstate=$(cat $lockfile |awk '{print $2}')
-		if cat /proc/$pidnum/cmdline |grep $OCF_RESKEY_type >/dev/null 2>&1; then
+		pidnum="$1"
+		daemonstate="$2"
+		act_type="$3"
+		act_site="$4"
+
+		if test "$act_type" != "$OCF_RESKEY_type" then
 			case  $daemonstate in 
 			$BOOTH_DAEMON_STARTED) return $BOOTH_DAEMON_STARTED;;
 			$BOOTH_DAEMON_STARTING) return $BOOTH_DAEMON_STARTING;;
