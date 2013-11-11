@@ -265,7 +265,7 @@ int read_config(const char *path)
 			if (add_node(val, SITE))
 				goto out;
 		}
-		
+
 		if (!strcmp(key, "arbitrator")) {
 			if (add_node(val, ARBITRATOR))
 				goto out;
