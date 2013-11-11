@@ -73,12 +73,6 @@ typedef enum
 int poll_timeout = -1;
 
 typedef enum {
-	ACT_ARBITRATOR = 1,
-	ACT_SITE,
-	ACT_CLIENT,
-} booth_role_t;
-
-typedef enum {
 	OP_LIST = 1,
 	OP_GRANT,
 	OP_REVOKE,
@@ -808,15 +802,15 @@ static int read_arguments(int argc, char **argv)
 	}
 
 	if (!strcmp(arg1, "arbitrator")) {
-		cl.type = ACT_ARBITRATOR;
+		cl.type = ARBITRATOR;
 		logging_entity = (char *) DAEMON_NAME "-arbitrator";
 		optind = 2;
 	} else if (!strcmp(arg1, "site")) {
-		cl.type = ACT_SITE;
+		cl.type = SITE;
 		logging_entity = (char *) DAEMON_NAME "-site";
 		optind = 2;
 	} else if (!strcmp(arg1, "client")) {
-		cl.type = ACT_CLIENT;
+		cl.type = CLIENT;
 		if (argc < 3) {
 			print_usage();
 			exit(EXIT_FAILURE);
@@ -824,19 +818,19 @@ static int read_arguments(int argc, char **argv)
 		op = argv[2];
 		optind = 3;
 	} else {
-		cl.type = ACT_CLIENT;
+		cl.type = CLIENT;
 		op = argv[1];
 		optind = 2;
 	}
 
 	switch (cl.type) {
-	case ACT_ARBITRATOR:
+	case ARBITRATOR:
 		break;
 
-	case ACT_SITE:
+	case SITE:
 		break;
 
-	case ACT_CLIENT:
+	case CLIENT:
 		if (!strcmp(op, "list"))
 			cl.op = OP_LIST;
 		else if (!strcmp(op, "grant"))
@@ -1039,7 +1033,7 @@ int main(int argc, char *argv[])
 	if (rv < 0)
 		goto out;
 
-	if (cl.type == ACT_CLIENT) {
+	if (cl.type == CLIENT) {
 		cl_log_enable_stderr(TRUE);
 		cl_log_set_facility(0);
 	} else {
@@ -1050,15 +1044,12 @@ int main(int argc, char *argv[])
 	cl_inherit_logging_environment(0);
 
 	switch (cl.type) {
-	case ACT_ARBITRATOR:
-		rv = do_server(ARBITRATOR);
+	case ARBITRATOR:
+	case SITE:
+		rv = do_server(cl.type);
 		break;
 
-	case ACT_SITE:
-		rv = do_server(SITE);
-		break;
-
-	case ACT_CLIENT:
+	case CLIENT:
 		rv = do_client();
 		break;
 	}
