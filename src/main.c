@@ -961,6 +961,12 @@ static int do_server(int type)
 	if (rv < 0)
 		goto out;
 
+
+	if (!local) {
+		log_error("Cannot find myself in the configuration.");
+		exit(EXIT_FAILURE);
+	}
+
 	if (!daemonize) {
 		if (daemon(0, 0) < 0) {
 			perror("daemon error");
