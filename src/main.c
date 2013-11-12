@@ -33,6 +33,7 @@
 #include <sys/un.h>
 #include <sys/poll.h>
 #include <pacemaker/crm/services.h>
+#include <clplumbing/setproctitle.h>
 #include <fcntl.h>
 #include <string.h>
 #include <assert.h>
@@ -59,7 +60,6 @@ int log_logfile_priority = LOG_INFO;
 int log_syslog_priority = LOG_ERR;
 int log_stderr_priority = LOG_ERR;
 int daemonize = 0;
-int status_only = 0;
 
 static int client_maxi;
 static int client_size = 0;
@@ -420,17 +420,32 @@ static int setup_timer(void)
 
 static int write_daemon_state(int fd, int state)
 {
-	char buf[16 + 16 +
-	    sizeof(local->addr_string) +
-	    sizeof(booth_conf->name)];
-	int rv=0;
-	
-	memset(buf, 0, sizeof(buf));
-	snprintf(buf, sizeof(buf), "%d %d %s %s %s",
-		getpid(), state, 
+	char buffer[1024];
+	int rv, size;
+
+	size = sizeof(buffer) - 1;
+	rv = snprintf(buffer, size,
+			"booth_pid=%d "
+			"booth_state=%s "
+			"booth_type=%s "
+			"booth_cfg_name='%s' "
+			"booth_addr_string='%s' "
+			"booth_port=%d\n",
+		getpid(), 
+		( state == BOOTHD_STARTED  ? "started"  : 
+		  state == BOOTHD_STARTING ? "starting" : 
+		  "invalid"), 
 		type_to_string(local->type),
 		booth_conf->name,
-		local->addr_string);
+		local->addr_string,
+		booth_conf->port);
+
+	if (rv < 0 || rv == size) {
+		log_error("Buffer filled up in write_daemon_state().");
+		return -1;
+	}
+	size = rv;
+
 
 	rv = lseek(fd, 0, SEEK_SET);
 	if (rv < 0) {
@@ -439,18 +454,20 @@ static int write_daemon_state(int fd, int state)
 		rv = -1;
 		return rv;
 	} 
-	
-	rv = write(fd, buf, strlen(buf));
-	if (rv <= 0) {
-		log_error("write to fd(%d) error, return(%d), message(%s)",
-                      fd, rv, strerror(errno));
-		rv = -1;
-		return rv;    
+
+
+	rv = write(fd, buffer, size);
+
+	if (rv != size) {
+		log_error("write to fd(%d, %d) returned %d, errno %d, message(%s)",
+                      fd, size,
+		      rv, errno, strerror(errno));
+		return -1;
 	}
 
-	rv = 0;
-	return rv;
+	return 0;
 }
+
 static int loop(int fd)
 {
 	void (*workfn) (int ci);
@@ -830,15 +847,16 @@ static int read_arguments(int argc, char **argv)
 		exit(EXIT_SUCCESS);
 	}
 
-	if (!strcmp(arg1, "arbitrator")) {
-		cl.type = ARBITRATOR;
-		logging_entity = (char *) DAEMON_NAME "-arbitrator";
+	if (strcmp(arg1, "arbitrator") == 0 ||
+			strcmp(arg1, "site") == 0 ||
+			strcmp(arg1, "start") == 0 ||
+			strcmp(arg1, "daemon") == 0) {
+		cl.type = DAEMON;
 		optind = 2;
-	} else if (!strcmp(arg1, "site")) {
-		cl.type = SITE;
-		logging_entity = (char *) DAEMON_NAME "-site";
+	} else if (strcmp(arg1, "status") == 0) {
+		cl.type = STATUS;
 		optind = 2;
-	} else if (!strcmp(arg1, "client")) {
+	} else if (strcmp(arg1, "client") == 0) {
 		cl.type = CLIENT;
 		if (argc < 3) {
 			print_usage();
@@ -898,18 +916,6 @@ static int read_arguments(int argc, char **argv)
 				print_usage();
 				exit(EXIT_FAILURE);
 			}
-			break;
-
-		case 'S':
-			/* TODO: better written as "booth status site"?
-			 * Would be more explicit. */
-			if (cl.type != ARBITRATOR &&
-					cl.type != SITE) {
-				print_usage();
-				exit(EXIT_FAILURE);
-			}
-
-			status_only = 1;
 			break;
 
 		case 's':
@@ -991,7 +997,7 @@ static int do_status(int type)
 {
     int rv, lock_fd, ret;
     const char *reason = NULL;
-    char lockfile_data[128], *cp;
+    char lockfile_data[1024], *cp;
 
 
     ret = PCMK_OCF_NOT_RUNNING;
@@ -1030,13 +1036,14 @@ static int do_status(int type)
     }
     lockfile_data[rv] = 0;
 
-/* Make sure it's only a single line */
+    /* Make sure it's only a single line */
     cp = strchr(lockfile_data, '\r');
     if (cp)
 	*cp = 0;
     cp = strchr(lockfile_data, '\n');
     if (cp)
 	*cp = 0;
+
 
 
     rv = setup_udp_server(1);
@@ -1046,7 +1053,8 @@ static int do_status(int type)
     }
 
 
-    fprintf(stdout, "%s\n", lockfile_data);
+    fprintf(stdout, "booth_lockfile='%s' %s\n",
+		    cl.lockfile, lockfile_data);
     if (daemonize)
 	fprintf(stderr, "Booth at %s:%d seems to be running.\n",
 		local->addr_string, booth_conf->port);
@@ -1066,6 +1074,7 @@ static int do_server(int type)
 {
 	int lock_fd = -1;
 	int rv = -1;
+	static char log_ent[128] = DAEMON_NAME "-";
 
 	rv = setup_config(type);
 	if (rv < 0)
@@ -1087,7 +1096,7 @@ static int do_server(int type)
 	/*
 	   The lock cannot be obtained before the call to daemon(), otherwise
 	   the lockfile would contain the pid of the parent, not the daemon.
-	   */
+	 */
 	lock_fd = lockfile();
 	if (lock_fd < 0)
 		return lock_fd;
@@ -1097,12 +1106,16 @@ static int do_server(int type)
 	else if (local->type == SITE)
 		log_info("BOOTH cluster site daemon is starting.");
 
+	strcat(log_ent, type_to_string(local->type));
+	logging_entity = log_ent;
+
 	set_scheduler();
 	set_oom_adj(-16);
-	setproctitle("%s for [%s]:%d",
+	set_proc_title("%s %s for [%s]:%d",
+			DAEMON_NAME,
 			type_to_string(local->type),
 			local->addr_string,
-			local->port);
+			booth_conf->port);
 
 	rv = loop(lock_fd);
 
@@ -1141,10 +1154,11 @@ out:
 	return rv;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char *argv[], char *envp[])
 {
 	int rv;
 
+	init_set_proc_title(argc, argv, envp);
 	memset(&cl, 0, sizeof(cl));
 	strncpy(cl.configfile, BOOTH_DEFAULT_CONF,     BOOTH_PATH_LEN - 1);
 	strncpy(cl.lockfile,   BOOTH_DEFAULT_LOCKFILE, BOOTH_PATH_LEN - 1);
@@ -1154,7 +1168,7 @@ int main(int argc, char *argv[])
 		goto out;
 
 
-	if (status_only) {
+	if (cl.type == STATUS) {
 		return do_status(cl.type);
 	}
 
@@ -1172,6 +1186,7 @@ int main(int argc, char *argv[])
 
 	switch (cl.type) {
 	case ARBITRATOR:
+	case DAEMON:
 	case SITE:
 		rv = do_server(cl.type);
 		break;

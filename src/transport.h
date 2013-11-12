@@ -50,7 +50,9 @@ typedef enum {
 	ARBITRATOR = 1,
 	SITE,
 	CLIENT,
-} node_type_t;
+	DAEMON,
+	STATUS,
+} action_t;
 
 struct booth_transport {
 	const char *name;
