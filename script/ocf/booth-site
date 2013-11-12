@@ -52,20 +52,20 @@ In most cases, it should be run as a primitive resource.
 
 <parameters>
 
+<parameter name="config" unique="1">
+<longdesc lang="en">
+The configuration name (or configuration filename) to use.
+</longdesc>
+<shortdesc lang="en">BOOTH Options</shortdesc>
+<content type="string" default="/etc/booth/booth.conf" />
+</parameter>
+
 <parameter name="args" unique="1">
 <longdesc lang="en">
 Any additional options to start the BOOTH daemon with
 </longdesc>
 <shortdesc lang="en">BOOTH Options</shortdesc>
 <content type="string" default="" />
-</parameter>
-
-<parameter name="type" unique="1">
-<longdesc lang="en">
-The type of BOOTH daemon which should be started
-</longdesc>
-<shortdesc lang="en">BOOTH Type</shortdesc>
-<content type="string" default="site" />
 </parameter>
 
 <parameter name="daemon" unique="1">
@@ -101,25 +101,19 @@ END
 
 
 booth_check_daemon_state(){
-	set -- `"$OCF_RESKEY_daemon" "$OCF_RESKEY_type" -S $OCF_RESKEY_args`
+	pidnum=
+	rc=$BOOTH_ERROR_GENERIC
+	eval `"$OCF_RESKEY_daemon" status "-c$OCF_RESKEY_config" ; echo rc=$?`
+	case $rc in 
+	0)
 	rc=$?
 	case $rc in 
-	$OCF_SUCCESS)
-		pidnum="$1"
-		daemonstate="$2"
-		act_type="$3"
-		config_name="$4"
-		act_site="$5"
-
-		if test "$act_type" != "$OCF_RESKEY_type" then
-			case  $daemonstate in 
-			$BOOTH_DAEMON_STARTED) return $BOOTH_DAEMON_STARTED;;
-			$BOOTH_DAEMON_STARTING) return $BOOTH_DAEMON_STARTING;;
-			*) return $BOOTH_ERROR_GENERIC;;	
-			esac
-		else
-			return $BOOTH_DAEMON_EXIST;
-		fi
+	0)
+		case  "$booth_state" in 
+		started)  return $BOOTH_DAEMON_STARTED;;
+		starting) return $BOOTH_DAEMON_STARTING;;
+		*) return $BOOTH_ERROR_GENERIC;;	
+		esac
 	;;
 	$OCF_NOT_RUNNING) return $BOOTH_DAEMON_NOT_RUNNING;;
 	$OCF_ERR_GENERIC) return $BOOTH_ERROR_GENERIC;;
@@ -134,22 +128,21 @@ booth_start() {
 	$BOOTH_DAEMON_STARTED)     return $OCF_SUCCESS;;
 	$BOOTH_DAEMON_STARTING) 
 		while [ $rc != $BOOTH_DAEMON_STARTED ]; do
-			sleep 1
+			sleep .5
 			booth_check_daemon_state ; rc=$?
 		done
 		return $OCF_SUCCESS;;
-	$BOOTH_DAEMON_EXIST) return $OCF_ERR_GENERIC;;
 	$BOOTH_DAEMON_NOT_RUNNING) ;;
 	*) return $OCF_ERR_GENERIC;;
 	esac
 
-	${OCF_RESKEY_daemon} $OCF_RESKEY_type $OCF_RESKEY_args
+	"$OCF_RESKEY_daemon" daemon "-c$OCF_RESKEY_config" $OCF_RESKEY_args
 
 	sleep 1
 	rc=$BOOTH_DAEMON_STARTING
 	while [ $rc != $BOOTH_DAEMON_STARTED ]; do
 		booth_check_daemon_state; rc=$?
-		sleep 1
+		sleep .5
 	done
 	
 	return $OCF_SUCCESS
@@ -161,19 +154,17 @@ booth_stop() {
 	case $rc in
 	$BOOTH_DAEMON_STARTED) ;;
 	$BOOTH_DAEMON_STARTING) ;;
-	$BOOTH_DAEMON_EXIST) return $OCF_ERR_GENERIC;;
 	$BOOTH_DAEMON_NOT_RUNNING) return $OCF_SUCCESS;;
 	*) return $OCF_ERR_GENERIC;;
 	esac
 
 
-	if [ "$pidnum" == "" ] ; then
+	if [ "$booth_pid" == "" ] ; then
 		return $OCF_ERR_GENERIC
 	fi
-	kill -TERM $pidnum; rc=$?
-
-	if [ $rc != 0 ]; then
-		return $OCF_ERR_GENERIC
+	if pkill -TERM -s $booth_pid boothd ; then
+	    sleep 1
+	    pkill -KILL -s $booth_pid boothd
 	fi
 
 	rc=$BOOTH_DAEMON_STARTED
