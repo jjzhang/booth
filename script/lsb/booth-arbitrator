@@ -21,8 +21,9 @@
 
 prog="boothd"
 exec="/usr/sbin/$prog"
-type="arbitrator"       
-lockfile="/var/run/booth.pid"
+
+CONF_DIR=/etc/booth
+
 
 BOOTH_DAEMON_STARTED=0
 BOOTH_DAEMON_STARTING=1
@@ -34,25 +35,15 @@ BOOTH_ERROR_GENERIC=4
 
 check_status() {
 	pidnum=
-	set -- `"$exec" "$type" -S "${cnf:+-c $cnf}"`
-	rc=$?
+	rc=$BOOTH_ERROR_GENERIC
+	eval `"$exec" status "${cnf:+-c$cnf}" ; echo rc=$?`
 	case $rc in 
-	$OCF_SUCCESS)
-		pidnum="$1"
-		daemonstate="$2"
-		act_type="$3"
-		config_name="$4"
-		act_site="$5"
-
-		if test "$act_type" != "$OCF_RESKEY_type" then
-			case  $daemonstate in 
-			$BOOTH_DAEMON_STARTED) return $BOOTH_DAEMON_STARTED;;
-			$BOOTH_DAEMON_STARTING) return $BOOTH_DAEMON_STARTING;;
-			*) return $BOOTH_ERROR_GENERIC;;	
-			esac
-		else
-			return $BOOTH_DAEMON_EXIST;
-		fi
+	0)
+		case  "$booth_state" in 
+		started)  return $BOOTH_DAEMON_STARTED;;
+		starting) return $BOOTH_DAEMON_STARTING;;
+		*) return $BOOTH_ERROR_GENERIC;;	
+		esac
 	;;
 	$OCF_NOT_RUNNING) return $BOOTH_DAEMON_NOT_RUNNING;;
 	$OCF_ERR_GENERIC) return $BOOTH_ERROR_GENERIC;;
@@ -61,12 +52,12 @@ check_status() {
 }
 
 status() {
-	echo -n "BOOTH arbitrator daemon is "
+	echo -n "BOOTH daemon is "
 	if check_status; then
-		echo "Running"
+		echo "running - PID $booth_pid for $booth_cfg_name, $booth_addr_string:$booth_port"
 		return 0
 	else
-		echo "Stopped"
+		echo "stopped"
 		return 7
 	fi
 }
@@ -75,23 +66,16 @@ start() {
 	[ -x $exec ] || exit 5
 	check_status; rc=$?
 	case "$rc" in
-	$BOOTH_DAEMON_STARTED)
-		echo "BOOTH arbitrator daemon is Running"
+	$BOOTH_DAEMON_STARTED|$BOOTH_DAEMON_STARTING|$BOOTH_DAEMON_EXIST)
+		echo "BOOTH daemon is running - PID $booth_pid for $booth_cfg_name, $booth_addr_string:$booth_port"
 		return 0
 		;;
-	$BOOTH_DAEMON_STARTING)
-		echo "BOOTH arbitrator daemon is Running"
-		return 0
-		;;
-	$BOOTH_DAEMON_EXIST)
-		echo "BOOTH site daemon is Running"
-		return 1
-		;;
-	$BOOTH_DAEMON_NOT_RUNNING)
-		echo -n $"Starting BOOTH arbitrator daemon: "		
-		startproc $exec $type "${cnf:+-c $cnf}"
+	$BOOTH_ERROR_GENERIC|$BOOTH_DAEMON_NOT_RUNNING)
+		echo -n $"Starting BOOTH arbitrator daemon: "
+		startproc $exec start "${cnf:+-c$cnf}"
 		rc_status -v
 		;;
+	*) return $OCF_ERR_GENERIC;;
 	esac
 }
 
@@ -100,9 +84,7 @@ stop() {
 	case $rc in
 	$BOOTH_DAEMON_STARTED);;
 	$BOOTH_DAEMON_STARTING);;
-	$BOOTH_DAEMON_EXIST) 
-		echo "BOOTH site daemon is running."
-		return 1
+	$BOOTH_DAEMON_EXIST);;
 	$BOOTH_DAEMON_NOT_RUNNING)
 		echo "BOOTH arbitrator daemon is not running."
 		return $OCF_SUCCESS 
@@ -111,20 +93,32 @@ stop() {
 	esac
 	
 	echo -n $"Stopping BOOTH arbitrator daemon: "
-	kill -TERM $pidnum
+#	$exec stop "${cnf:+-c$cnf}"
+#	sleep 1
+	if pkill -TERM -s $booth_pid boothd ; then
+		sleep 1
+		pkill -KILL -s $booth_pid boothd
+	fi
 	rc_status -v
 }
 
 wait_for_stop() {
-	while [ -e $lockfile ]; do
+#	while true ; do
+#		check_status ; rc=$?
+#		case $rc in
+#		$BOOTH_DAEMON_STARTED);;
+#                $BOOTH_DAEMON_STARTING);;
+#		*) return 0;;
+#		esac
+#	done
+		
+	while [ -e $booth_lockfile ]; do
 		sleep .5
 	done
 }
 
 foreach() {
-	cd /etc/booth
-	set -- ${BOOTH_CONF_FILE:-*.conf}
-	for cnf in "$@" ; do
+	for cnf in ${BOOTH_CONF_FILE:-$CONF_DIR/*.conf} ; do
 		if [ $# != 1 ] ; then
 			echo "== For configuration file $cnf:"
 		fi
@@ -138,7 +132,6 @@ foreach() {
 
 restart() {
 	stop
-	wait_for_stop
 	start
 }
 
@@ -150,7 +143,7 @@ case "$1" in
         foreach restart
         ;;
 	condrestart|try-restart)
-	[ ! -f "$lockfile" ] || restart
+	[ ! -f "$booth_lockfile" ] || restart
         ;;
   status)
         foreach status
