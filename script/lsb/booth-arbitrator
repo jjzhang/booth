@@ -34,7 +34,6 @@ BOOTH_ERROR_GENERIC=4
 . /etc/rc.status
 
 check_status() {
-	pidnum=
 	rc=$BOOTH_ERROR_GENERIC
 	eval `"$exec" status "${cnf:+-c$cnf}" ; echo rc=$?`
 	case $rc in 
@@ -54,7 +53,7 @@ check_status() {
 status() {
 	echo -n "BOOTH daemon is "
 	if check_status; then
-		echo "running - PID $booth_pid for $booth_cfg_name, $booth_addr_string:$booth_port"
+		echo "running - PID $booth_lockpid for $booth_cfg_name, $booth_addr_string:$booth_port"
 		return 0
 	else
 		echo "stopped"
@@ -67,7 +66,7 @@ start() {
 	check_status; rc=$?
 	case "$rc" in
 	$BOOTH_DAEMON_STARTED|$BOOTH_DAEMON_STARTING|$BOOTH_DAEMON_EXIST)
-		echo "BOOTH daemon is running - PID $booth_pid for $booth_cfg_name, $booth_addr_string:$booth_port"
+		echo "BOOTH daemon is running - PID $booth_lockpid for $booth_cfg_name, $booth_addr_string:$booth_port"
 		return 0
 		;;
 	$BOOTH_ERROR_GENERIC|$BOOTH_DAEMON_NOT_RUNNING)
@@ -95,9 +94,9 @@ stop() {
 	echo -n $"Stopping BOOTH arbitrator daemon: "
 #	$exec stop "${cnf:+-c$cnf}"
 #	sleep 1
-	if pkill -TERM -s $booth_pid boothd ; then
+	if pkill -TERM -s $booth_lockpid boothd ; then
 		sleep 1
-		pkill -KILL -s $booth_pid boothd
+		pkill -KILL -s $booth_lockpid boothd
 	fi
 	rc_status -v
 }

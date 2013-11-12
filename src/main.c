@@ -692,10 +692,13 @@ static int do_revoke(void)
 
 
 
-static int _lockfile(int mode, int *fdp)
+static int _lockfile(int mode, int *fdp, pid_t *locked_by)
 {
     struct flock lock;
     int fd;
+
+    if (locked_by)
+	*locked_by = 0;
 
     *fdp = -1;
     fd = open(cl.lockfile, mode, 0666);
@@ -708,9 +711,15 @@ static int _lockfile(int mode, int *fdp)
     lock.l_start = 0;
     lock.l_whence = SEEK_SET;
     lock.l_len = 0;
+    lock.l_pid = 0;
+
 
     if (fcntl(fd, F_SETLK, &lock) == 0)
 	return 0;
+
+    if (locked_by)
+	if (fcntl(fd, F_GETLK, &lock) == 0)
+	    *locked_by = lock.l_pid;
 
     return errno;
 }
@@ -720,7 +729,7 @@ static int lockfile(void) {
     int rv, fd;
 
     fd = -1;
-    rv = _lockfile(O_CREAT | O_WRONLY, &fd);
+    rv = _lockfile(O_CREAT | O_WRONLY, &fd, NULL);
 
     if (fd == -1) {
 	log_error("lockfile %s open error %d: %s",
@@ -995,6 +1004,7 @@ static void set_oom_adj(int val)
 
 static int do_status(int type)
 {
+    pid_t pid;
     int rv, lock_fd, ret;
     const char *reason = NULL;
     char lockfile_data[1024], *cp;
@@ -1021,11 +1031,17 @@ static int do_status(int type)
     }
 
 
-    rv = _lockfile(O_RDWR, &lock_fd);
+    rv = _lockfile(O_RDWR, &lock_fd, &pid);
     if (lock_fd != -1 && rv == 0) {
 	reason = "PID file not locked.";
 	goto quit;
     }
+
+    if (pid) {
+	fprintf(stdout, "booth_lockpid=%d ", pid);
+	fflush(stdout);
+    }
+
 
     rv = read(lock_fd, lockfile_data, sizeof(lockfile_data) - 1);
     if (rv < 4) {
@@ -1035,6 +1051,10 @@ static int do_status(int type)
 
     }
     lockfile_data[rv] = 0;
+
+    if (lock_fd != -1)
+	close(lock_fd);
+
 
     /* Make sure it's only a single line */
     cp = strchr(lockfile_data, '\r');

@@ -101,7 +101,6 @@ END
 
 
 booth_check_daemon_state(){
-	pidnum=
 	rc=$BOOTH_ERROR_GENERIC
 	eval `"$OCF_RESKEY_daemon" status "-c$OCF_RESKEY_config" ; echo rc=$?`
 	case $rc in 
@@ -159,12 +158,12 @@ booth_stop() {
 	esac
 
 
-	if [ "$booth_pid" == "" ] ; then
+	if [ "$booth_lockpid" == "" ] ; then
 		return $OCF_ERR_GENERIC
 	fi
-	if pkill -TERM -s $booth_pid boothd ; then
+	if pkill -TERM -s $booth_lockpid boothd ; then
 	    sleep 1
-	    pkill -KILL -s $booth_pid boothd
+	    pkill -KILL -s $booth_lockpid boothd
 	fi
 
 	rc=$BOOTH_DAEMON_STARTED
