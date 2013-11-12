@@ -1,4 +1,5 @@
-#!/bin/sh
+#!/bin/bash
+# vim: set sw=4 et :
 #
 #	Resource Agent for BOOTH site daemon.
 #
@@ -105,9 +106,6 @@ booth_check_daemon_state(){
 	eval `"$OCF_RESKEY_daemon" status "-c$OCF_RESKEY_config" ; echo rc=$?`
 	case $rc in 
 	0)
-	rc=$?
-	case $rc in 
-	0)
 		case  "$booth_state" in 
 		started)  return $BOOTH_DAEMON_STARTED;;
 		starting) return $BOOTH_DAEMON_STARTING;;
@@ -208,12 +206,20 @@ booth_validate() {
 
 # Set OCF_RESKEY_daemon to boothd as default if not set
 if [ ! ${OCF_RESKEY_daemon} ]; then
-    OCF_RESKEY_daemon=boothd
+    OCF_RESKEY_daemon=`which boothd`
 fi
-# Set OCF_RESKEY_type to site as default if not set
-if [ ! ${OCF_RESKEY_type} ]; then
-    OCF_RESKEY_type=site
+
+if ! test -x "$OCF_RESKEY_daemon" ; then
+    exit $OCF_ERR_INSTALLED
 fi
+
+if [ "$OCF_RESKEY_config" == "" ] ; then
+    OCF_RESKEY_config=/etc/booth/booth.conf
+fi
+
+
+# for testing:
+# ocf-tester -n p_booth -v /usr/lib/ocf/resource.d/pacemaker/booth-site
 
 case $__OCF_ACTION in
 meta-data)	meta_data
@@ -225,6 +231,9 @@ monitor)	booth_validate; booth_monitor;;
 validate-all)	booth_validate;;
 usage|help)	booth_usage
 		exit $OCF_SUCCESS
+		;;
+migrate_to|migrate_from|reload|demote|promote|notify)
+		exit $OCF_ERR_UNIMPLEMENTED
 		;;
 *)		booth_usage
 		exit $OCF_ERR_UNIMPLEMENTED
