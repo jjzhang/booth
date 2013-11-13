@@ -701,7 +701,7 @@ static int _lockfile(int mode, int *fdp, pid_t *locked_by)
 	*locked_by = 0;
 
     *fdp = -1;
-    fd = open(cl.lockfile, mode, 0666);
+    fd = open(cl.lockfile, mode, 0664);
     if (fd < 0)
 	return errno;
 
