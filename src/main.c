@@ -1032,8 +1032,12 @@ static int do_status(int type)
 
 
     rv = _lockfile(O_RDWR, &lock_fd, &pid);
-    if (lock_fd != -1 && rv == 0) {
+    if (rv == 0) {
 	reason = "PID file not locked.";
+	goto quit;
+    }
+    if (lock_fd == -1) {
+	reason = "No PID file.";
 	goto quit;
     }
 
