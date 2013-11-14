@@ -136,6 +136,8 @@ int read_config(const char *path)
 		+ TICKET_ALLOC * sizeof(struct ticket_config));
 	ticket_size = TICKET_ALLOC;
 
+	booth_conf->proto = UDP;
+
 	log_debug("reading config file %s", path);
 	while (fgets(line, sizeof(line), fp)) {
 		lineno++;
@@ -235,6 +237,11 @@ int read_config(const char *path)
 		}
 
 		if (!strcmp(key, "transport")) {
+			if (got_transport) {
+				log_error("config file has multiple transport lines");
+				goto out;
+			}
+
 			if (!strcmp(val, "UDP"))
 				booth_conf->proto = UDP;
 			else if (!strcmp(val, "SCTP"))
@@ -313,11 +320,6 @@ int read_config(const char *path)
 			}
 			booth_conf->ticket_count++;
 		}
-	}
-
-	if (!got_transport) {
-		log_error("config file was missing transport line");
-		goto out;
 	}
 
 
