@@ -129,7 +129,8 @@ found:
 }
 
 
-int find_myself(struct booth_node **mep, int fuzzy_allowed)
+int _find_myself(int family, struct booth_node **mep, int fuzzy_allowed);
+int _find_myself(int family, struct booth_node **mep, int fuzzy_allowed)
 {
 	int fd;
 	struct sockaddr_nl nladdr;
@@ -166,7 +167,7 @@ int find_myself(struct booth_node **mep, int fuzzy_allowed)
 	req.nlh.nlmsg_flags = NLM_F_ROOT|NLM_F_MATCH|NLM_F_REQUEST;
 	req.nlh.nlmsg_pid = 0;
 	req.nlh.nlmsg_seq = 1;
-	req.g.rtgen_family = AF_INET;
+	req.g.rtgen_family = family;
 
 	if (sendto(fd, (void *)&req, sizeof(req), 0,
 				(struct sockaddr*)&nladdr, sizeof(nladdr)) < 0)  {
@@ -237,6 +238,12 @@ found:
 	if (mep)
 		*mep = local;
 	return 1;
+}
+
+int find_myself(struct booth_node **mep, int fuzzy_allowed)
+{
+	return _find_myself(AF_INET6, mep, fuzzy_allowed) ||
+		_find_myself(AF_INET, mep, fuzzy_allowed);
 }
 
 static int booth_get_myid(void)
