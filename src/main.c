@@ -742,42 +742,42 @@ static int _lockfile(int mode, int *fdp, pid_t *locked_by)
 
 
 static int lockfile(void) {
-    int rv, fd;
+	int rv, fd;
 
-    fd = -1;
-    rv = _lockfile(O_CREAT | O_WRONLY, &fd, NULL);
+	fd = -1;
+	rv = _lockfile(O_CREAT | O_WRONLY, &fd, NULL);
 
-    if (fd == -1) {
-	log_error("lockfile %s open error %d: %s",
-		cl.lockfile, rv, strerror(rv));
-	return -1;
-    }       
+	if (fd == -1) {
+		log_error("lockfile %s open error %d: %s",
+				cl.lockfile, rv, strerror(rv));
+		return -1;
+	}       
 
-    if (rv < 0) {
-	log_error("lockfile %s setlk error %d: %s",
-		cl.lockfile, rv, strerror(rv));
-	goto fail;
-    }
+	if (rv < 0) {
+		log_error("lockfile %s setlk error %d: %s",
+				cl.lockfile, rv, strerror(rv));
+		goto fail;
+	}
 
-    rv = ftruncate(fd, 0);
-    if (rv < 0) {
-	log_error("lockfile %s truncate error %d: %s",
-		cl.lockfile, errno, strerror(errno));
-	goto fail;
-    }
+	rv = ftruncate(fd, 0);
+	if (rv < 0) {
+		log_error("lockfile %s truncate error %d: %s",
+				cl.lockfile, errno, strerror(errno));
+		goto fail;
+	}
 
-    rv = write_daemon_state(fd, BOOTHD_STARTING);
-    if (rv != 0) {
-	log_error("write daemon state %d to lockfile error %s: %s",
-		BOOTHD_STARTING, cl.lockfile, strerror(errno));
-	goto fail;
-    }
+	rv = write_daemon_state(fd, BOOTHD_STARTING);
+	if (rv != 0) {
+		log_error("write daemon state %d to lockfile error %s: %s",
+				BOOTHD_STARTING, cl.lockfile, strerror(errno));
+		goto fail;
+	}
 
-    return fd;
+	return fd;
 
 fail:
-    close(fd);
-    return -1;
+	close(fd);
+	return -1;
 }
 
 static void unlink_lockfile(int fd)
