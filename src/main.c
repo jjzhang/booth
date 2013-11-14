@@ -389,6 +389,14 @@ static int setup_config(int type)
 	if (rv < 0)
 		goto out;
 
+
+	/* Per default the PID file name is derived from the
+	 * configuration name. */
+	if (!cl.lockfile[0]) {
+		snprintf(cl.lockfile, sizeof(cl.lockfile)-1,
+				"%s/%s.pid", BOOTH_RUN_DIR, booth_conf->name);
+	}
+
 out:
 	return rv;
 }
@@ -697,13 +705,21 @@ static int _lockfile(int mode, int *fdp, pid_t *locked_by)
     struct flock lock;
     int fd;
 
+
+    /* After reboot the directory may not yet exist.
+     * Try to create it, but ignore errors. */
+    if (strncmp(cl.lockfile, BOOTH_RUN_DIR,
+		strlen(BOOTH_RUN_DIR)) == 0)
+	mkdir(BOOTH_RUN_DIR, 0775);
+
+
     if (locked_by)
-	*locked_by = 0;
+		*locked_by = 0;
 
     *fdp = -1;
     fd = open(cl.lockfile, mode, 0664);
     if (fd < 0)
-	return errno;
+		return errno;
 
     *fdp = fd;
 
@@ -788,7 +804,7 @@ static void print_usage(void)
 	printf("\n");
 	printf("Options:\n");
 	printf("  -c FILE       Specify config file [default " BOOTH_DEFAULT_CONF "]\n");
-	printf("  -l LOCKFILE   Specify lock file [default " BOOTH_DEFAULT_LOCKFILE "]\n");
+	printf("  -l LOCKFILE   Specify lock file path\n");
 	printf("  -D            Enable debugging to stderr and don't fork\n");
 	printf("  -t            ticket name\n");
 	printf("  -S            report local daemon status (for site and arbitrator)\n");
@@ -1185,7 +1201,7 @@ int main(int argc, char *argv[], char *envp[])
 	init_set_proc_title(argc, argv, envp);
 	memset(&cl, 0, sizeof(cl));
 	strncpy(cl.configfile, BOOTH_DEFAULT_CONF,     BOOTH_PATH_LEN - 1);
-	strncpy(cl.lockfile,   BOOTH_DEFAULT_LOCKFILE, BOOTH_PATH_LEN - 1);
+	cl.lockfile[0] = 0;
 
 	rv = read_arguments(argc, argv);
 	if (rv < 0)

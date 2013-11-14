@@ -28,10 +28,9 @@
 
 #define BOOTH_LOG_DUMP_SIZE (1024*1024)
 
-#define BOOTH_RUN_DIR "/var/run"
+#define BOOTH_RUN_DIR "/var/run/booth/"
 #define BOOTH_LOG_DIR "/var/log"
 #define BOOTH_LOGFILE_NAME "booth.log"
-#define BOOTH_DEFAULT_LOCKFILE BOOTH_RUN_DIR "/booth.pid"
 #define BOOTH_DEFAULT_CONF "/etc/booth/booth.conf"
 
 #define DAEMON_NAME		"booth"
