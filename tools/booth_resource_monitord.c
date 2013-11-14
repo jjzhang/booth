@@ -1885,7 +1885,7 @@ int crmd_connect(void)
 	while (src == NULL && attempts++ < max_failures) {
 		crm_trace("Connecting to CRMd. attempt %d", attempts);
 		src = mainloop_add_ipc_client(CRM_SYSTEM_CRMD,
-					      G_PRIORITY_DEFAULT, 0,
+					      G_PRIORITY_DEFAULT, 0, NULL,
 					      &crm_callbacks);
 
 		if (src == NULL) {
