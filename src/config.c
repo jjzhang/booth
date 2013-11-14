@@ -347,18 +347,9 @@ out:
 
 int check_config(int type)
 {
-//	int i;
-
 	if (!booth_conf)
 		return -1;
 
-/*	for (i = 0; i < booth_conf->node_count; i++) {
-		if (booth_conf->node[i].local && booth_conf->node[i].type ==
-			type)
-			return 0;
-	}
-
-	return -1;*/
 	return 0;
 }
 
