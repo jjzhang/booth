@@ -110,13 +110,35 @@ out:
 }
 
 
+inline static char *skip_while(char *cp, int (*fn)(int))
+{
+	while (fn(*cp))
+		cp++;
+	return cp;
+}
+
+inline static char *skip_until(char *cp, char expected)
+{
+	while (*cp && *cp != expected)
+		cp++;
+	return cp;
+}
+
+
+static inline int is_end_of_line(char *cp)
+{
+	char c = *cp;
+	return c == '\n' || c == 0 || c == '#';
+}
+
+
 int read_config(const char *path)
 {
 	char line[1024];
 	FILE *fp;
-	char *s, *key, *val, *expiry, *weight, *c;
-	const char *cp;
-	int in_quotes, got_equals, got_quotes, i;
+	char *s, *key, *val, *expiry, *weight, *c, *end_of_key;
+	const char *cp, *error;
+	int i;
 	int lineno = 0;
 	int got_transport = 0;
 
@@ -127,13 +149,13 @@ int read_config(const char *path)
 	}
 
 	booth_conf = malloc(sizeof(struct booth_config)
-			  + TICKET_ALLOC * sizeof(struct ticket_config));
+			+ TICKET_ALLOC * sizeof(struct ticket_config));
 	if (!booth_conf) {
 		log_error("failed to alloc memory for booth config");
 		return -ENOMEM;
 	}
 	memset(booth_conf, 0, sizeof(struct booth_config)
-		+ TICKET_ALLOC * sizeof(struct ticket_config));
+			+ TICKET_ALLOC * sizeof(struct ticket_config));
 	ticket_size = TICKET_ALLOC;
 
 	booth_conf->proto = UDP;
@@ -141,139 +163,131 @@ int read_config(const char *path)
 	log_debug("reading config file %s", path);
 	while (fgets(line, sizeof(line), fp)) {
 		lineno++;
-		s = line;
-		while (*s == ' ')
-			s++;
-		if (*s == '#' || *s == '\n')
+
+		s = skip_while(line, isspace);
+		if (is_end_of_line(s))
 			continue;
-		if (*s == '-' || *s == '.' || *s =='/'
-		    || *s == '+' || *s == '(' || *s == ')'
-		    || *s == ':' || *s == ',' || *s == '@'
-		    || *s == '=' || *s == '"') {
-			log_error("invalid key name in config file "
-				  "('%c', line %d char %ld)", *s, lineno, (long)(s - line));
-			goto out;
+		key = s;
+
+
+		/* Key */
+		end_of_key = skip_while(key, isalnum);
+		if (end_of_key == key) {
+			error = "No key";
+			goto err;
 		}
-		key = s;        /* will point to the key on the left hand side    */
-		val = NULL;     /* will point to the value on the right hand side */
-		in_quotes = 0;  /* true iff we're inside a double-quoted string   */
-		got_equals = 0; /* true iff we're on the RHS of the = assignment  */
-		got_quotes = 0; /* true iff the RHS is quoted                     */
-		while (*s != '\n' && *s != '\0') {
-			if (!(*s >='a' && *s <= 'z')
-			     && !(*s >= 'A' && *s <= 'Z')
-			     && !(*s >= '0' && *s <= '9')
-			     && !(*s == '_')
-			     && !(*s == '-')
-			     && !(*s == '.')
-			     && !(*s == '/')
-			     && !(*s == ' ')
-			     && !(*s == '+')
-			     && !(*s == '(')
-			     && !(*s == ')')
-			     && !(*s == ':')
-			     && !(*s == ';')
-			     && !(*s == ',')
-			     && !(*s == '@')
-			     && !(*s == '=')
-			     && !(*s == '"')) {
-				log_error("invalid character ('%c', line %d char %ld)"
-					  " in config file", *s, lineno, (long)(s - line));
-				goto out;
-			}
-			if (*s == '=' && !got_equals) {
-				got_equals = 1;
-				*s = '\0';
-				val = s + 1;
-			} else if ((*s == '=' || *s == '_' || *s == '-' || *s == '.')
-				   && got_equals && !in_quotes) {
-				log_error("invalid config file format: unquoted '%c' "
-					  "(line %d char %ld)", *s, lineno, (long)(s - line));
-				goto out;
-			} else if ((*s == '/' || *s == '+'
-				    || *s == '(' || *s == ')' || *s == ':'
-				    || *s == ',' || *s == '@') && !in_quotes) {
-				log_error("invalid config file format: unquoted '%c' "
-					  "(line %d char %ld)", *s, lineno, (long)(s - line));
-				goto out;
-			} else if ((*s == ' ')
-				   && !in_quotes && !got_quotes) {
-				log_error("invalid config file format: unquoted whitespace "
-					  "(line %d char %ld)", lineno, (long)(s - line));
-				goto out;
-			} else if (*s == '"' && !got_equals) {
-				log_error("invalid config file format: unexpected quotes "
-					  "(line %d char %ld)", lineno, (long)(s - line));
-				goto out;
-			} else if (*s == '"' && !in_quotes) {
-				in_quotes = 1;
-				if (val) {
-					val++;
-					got_quotes = 1;
+
+		if (!*end_of_key)
+			goto exp_equal;
+
+
+		/* whitespace, and something else but nothing more? */
+		s = skip_while(end_of_key, isspace);
+
+
+		if (*s != '=') {
+exp_equal:
+			error = "Expected '=' after key";
+			goto err;
+		} 
+		s++;
+
+		/* It's my buffer, and I terminate if I want to. */
+		/* But not earlier than that, because we had to check for = */
+		*end_of_key = 0;
+
+
+		/* Value tokenizing */
+		s = skip_while(s, isspace);
+		switch (*s) {
+			case '"':
+			case '\'':
+				val = s+1;
+				s = skip_until(val, *s);
+				/* Terminate value */
+				if (!*s) {
+					error = "Unterminated quoted string";
+					goto err;
 				}
-			} else if (*s == '"' && in_quotes) {
-				in_quotes = 0;
-				*s = '\0';
-			}
-			s++;		 
+
+				/* Remove and skip quote */
+				*s = 0;
+				s++;
+				if (* skip_while(s, isspace)) {
+					error = "Surplus data after value";
+					goto err;
+				}
+
+				*s = 0;
+
+				break;
+
+			case 0:
+no_value:
+				error = "No value";
+				goto err;
+				break;
+
+			default:
+				val = s;
+				/* Rest of line. */
+				i = strlen(s);
+				/* Cannot be 0 because of "case 0" above. */
+				if (s[i-1] == '\n')
+					i--;
+				if (i > 0 && s[i-1] == '\r')
+					i--;
+				s[i] = 0;
 		}
-		if (!got_equals) {
-			log_error("invalid config file format: missing '=' (lineno %d)",
-				  lineno);
-			goto out;
-		}
-		if (in_quotes) {
-			log_error("invalid config file format: unterminated quotes (lineno %d)",
-				  lineno);
-			goto out;
-		}
-		if (!got_quotes)
-			*s = '\0';
+
+		if (val == s)
+			goto no_value;
+
 
 		if (strlen(key) > BOOTH_NAME_LEN
-		    || strlen(val) > BOOTH_NAME_LEN) {
-			log_error("key/value too long");
-			goto out;
+				|| strlen(val) > BOOTH_NAME_LEN) {
+			error = "key/value too long";
+			goto err;
 		}
 
-		if (!strcmp(key, "transport")) {
+		if (strcmp(key, "transport") == 0) {
 			if (got_transport) {
-				log_error("config file has multiple transport lines");
-				goto out;
+				error = "config file has multiple transport lines";
+				goto err;
 			}
 
-			if (!strcmp(val, "UDP"))
+			if (strcasecmp(val, "UDP") == 0)
 				booth_conf->proto = UDP;
-			else if (!strcmp(val, "SCTP"))
+			else if (strcasecmp(val, "SCTP") == 0)
 				booth_conf->proto = SCTP;
 			else {
-				log_error("invalid transport protocol");
-				goto out;
+				error = "invalid transport protocol";
+				goto err;
 			}
 			got_transport = 1;
 		}
 
-		if (!strcmp(key, "port"))
+		if (strcmp(key, "port") == 0)
 			booth_conf->port = atoi(val);
 
-		if (!strcmp(key, "name")) {
+		if (strcmp(key, "name") == 0) {
 			if(strlen(val)+1 >= BOOTH_NAME_LEN) {
-				log_error("Config name too long.");
-				goto out;
+				error = "Config name too long.";
+				goto err;
 			}
 		}
 
-		if (!strcmp(key, "site")) {
+		if (strcmp(key, "site") == 0) {
 			if (add_node(val, SITE))
 				goto out;
 		}
 
-		if (!strcmp(key, "arbitrator")) {
+		if (strcmp(key, "arbitrator") == 0) {
 			if (add_node(val, ARBITRATOR))
 				goto out;
 		}
 
-		if (!strcmp(key, "ticket")) {
+		if (strcmp(key, "ticket") == 0) {
 			int count = booth_conf->ticket_count;
 			if (booth_conf->ticket_count == ticket_size) {
 				if (ticket_realloc() < 0)
@@ -285,9 +299,9 @@ int read_config(const char *path)
 				strcpy(booth_conf->ticket[count].name, val);
 				booth_conf->ticket[count].expiry = DEFAULT_TICKET_EXPIRY;
 				log_info("expire is not set in %s."
-					 " Set the default value %ds.",
-					 booth_conf->ticket[count].name,
-					 DEFAULT_TICKET_EXPIRY);
+						" Set the default value %ds.",
+						booth_conf->ticket[count].name,
+						DEFAULT_TICKET_EXPIRY);
 			}
 			else if (expiry && expiry == weight) {
 				*expiry++ = '\0';
@@ -313,8 +327,8 @@ int read_config(const char *path)
 						c++;
 					weight = c;
 					if (i == MAX_NODES) {
-						log_error("too many weights");
-						break;
+						error = "too many weights";
+						goto err;
 					}
 				}
 			}
@@ -340,6 +354,11 @@ int read_config(const char *path)
 	}
 
 	return 0;
+
+
+err:
+	log_error("%s in config file line %d",
+			error, lineno);
 
 out:
 	free(booth_conf);
