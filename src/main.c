@@ -703,7 +703,7 @@ static int do_revoke(void)
 static int _lockfile(int mode, int *fdp, pid_t *locked_by)
 {
 	struct flock lock;
-	int fd;
+	int fd, rv;
 
 
 	/* After reboot the directory may not yet exist.
@@ -733,11 +733,13 @@ static int _lockfile(int mode, int *fdp, pid_t *locked_by)
 	if (fcntl(fd, F_SETLK, &lock) == 0)
 		return 0;
 
+	rv = errno;
+
 	if (locked_by)
 		if (fcntl(fd, F_GETLK, &lock) == 0)
 			*locked_by = lock.l_pid;
 
-	return errno;
+	return rv;
 }
 
 
