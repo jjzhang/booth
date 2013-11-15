@@ -1016,93 +1016,93 @@ static void set_oom_adj(int val)
 
 static int do_status(int type)
 {
-    pid_t pid;
-    int rv, lock_fd, ret;
-    const char *reason = NULL;
-    char lockfile_data[1024], *cp;
+	pid_t pid;
+	int rv, lock_fd, ret;
+	const char *reason = NULL;
+	char lockfile_data[1024], *cp;
 
 
-    ret = PCMK_OCF_NOT_RUNNING;
-    /* TODO: query all, and return quit only if it's _cleanly_ not
-     * running, ie. _neither_ of port/lockfile/process is available?
-     *
-     * Currently a single failure says "not running", even if "only" the
-     * lockfile has been removed. */
+	ret = PCMK_OCF_NOT_RUNNING;
+	/* TODO: query all, and return quit only if it's _cleanly_ not
+	 * running, ie. _neither_ of port/lockfile/process is available?
+	 *
+	 * Currently a single failure says "not running", even if "only" the
+	 * lockfile has been removed. */
 
-    rv = setup_config(type);
-    if (rv) {
-	reason = "Error reading configuration.";
-	ret = PCMK_LSB_UNKNOWN_ERROR;
-	goto quit;
-    }
-
-
-    if (!local) {
-	reason = "No Service IP active here.";
-	goto quit;
-    }
+	rv = setup_config(type);
+	if (rv) {
+		reason = "Error reading configuration.";
+		ret = PCMK_LSB_UNKNOWN_ERROR;
+		goto quit;
+	}
 
 
-    rv = _lockfile(O_RDWR, &lock_fd, &pid);
-    if (rv == 0) {
-	reason = "PID file not locked.";
-	goto quit;
-    }
-    if (lock_fd == -1) {
-	reason = "No PID file.";
-	goto quit;
-    }
-
-    if (pid) {
-	fprintf(stdout, "booth_lockpid=%d ", pid);
-	fflush(stdout);
-    }
+	if (!local) {
+		reason = "No Service IP active here.";
+		goto quit;
+	}
 
 
-    rv = read(lock_fd, lockfile_data, sizeof(lockfile_data) - 1);
-    if (rv < 4) {
-	reason = "Cannot read lockfile data.";
-	ret = PCMK_LSB_UNKNOWN_ERROR;
-	goto quit;
+	rv = _lockfile(O_RDWR, &lock_fd, &pid);
+	if (rv == 0) {
+		reason = "PID file not locked.";
+		goto quit;
+	}
+	if (lock_fd == -1) {
+		reason = "No PID file.";
+		goto quit;
+	}
 
-    }
-    lockfile_data[rv] = 0;
-
-    if (lock_fd != -1)
-	close(lock_fd);
-
-
-    /* Make sure it's only a single line */
-    cp = strchr(lockfile_data, '\r');
-    if (cp)
-	*cp = 0;
-    cp = strchr(lockfile_data, '\n');
-    if (cp)
-	*cp = 0;
+	if (pid) {
+		fprintf(stdout, "booth_lockpid=%d ", pid);
+		fflush(stdout);
+	}
 
 
+	rv = read(lock_fd, lockfile_data, sizeof(lockfile_data) - 1);
+	if (rv < 4) {
+		reason = "Cannot read lockfile data.";
+		ret = PCMK_LSB_UNKNOWN_ERROR;
+		goto quit;
 
-    rv = setup_udp_server(1);
-    if (rv == 0) {
-	reason = "UDP port not in use.";
-	goto quit;
-    }
+	}
+	lockfile_data[rv] = 0;
+
+	if (lock_fd != -1)
+		close(lock_fd);
 
 
-    fprintf(stdout, "booth_lockfile='%s' %s\n",
-	    cl.lockfile, lockfile_data);
-    if (daemonize)
-	fprintf(stderr, "Booth at %s port %d seems to be running.\n",
-		local->addr_string, booth_conf->port);
-    return 0;
+	/* Make sure it's only a single line */
+	cp = strchr(lockfile_data, '\r');
+	if (cp)
+		*cp = 0;
+	cp = strchr(lockfile_data, '\n');
+	if (cp)
+		*cp = 0;
+
+
+
+	rv = setup_udp_server(1);
+	if (rv == 0) {
+		reason = "UDP port not in use.";
+		goto quit;
+	}
+
+
+	fprintf(stdout, "booth_lockfile='%s' %s\n",
+			cl.lockfile, lockfile_data);
+	if (daemonize)
+		fprintf(stderr, "Booth at %s port %d seems to be running.\n",
+				local->addr_string, booth_conf->port);
+	return 0;
 
 
 quit:
-    log_debug("not running: %s", reason);
-    /* Ie. "DEBUG" */
-    if (daemonize)
-	fprintf(stderr, "not running: %s\n", reason);
-    return ret;
+	log_debug("not running: %s", reason);
+	/* Ie. "DEBUG" */
+	if (daemonize)
+		fprintf(stderr, "not running: %s\n", reason);
+	return ret;
 }
 
 
