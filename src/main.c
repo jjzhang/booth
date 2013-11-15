@@ -1096,7 +1096,7 @@ static int do_status(int type)
 
 
     fprintf(stdout, "booth_lockfile='%s' %s\n",
-		    cl.lockfile, lockfile_data);
+	    cl.lockfile, lockfile_data);
     if (daemonize)
 	fprintf(stderr, "Booth at %s port %d seems to be running.\n",
 		local->addr_string, booth_conf->port);
