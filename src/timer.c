@@ -28,15 +28,6 @@
 extern int poll_timeout;
 static LIST_HEAD(timer_head);
 
-unsigned long long current_time(void)
-{
-	struct timeval tv;
-
-	gettimeofday(&tv, NULL);
-
-	return tv.tv_sec;
-}
-
 struct timerlist * add_timer(unsigned long expires,
 			     unsigned long data, 
 			     void (*function) (unsigned long data))

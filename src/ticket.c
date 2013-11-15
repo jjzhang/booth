@@ -39,19 +39,12 @@
 
 #define CATCHED_VALID_TMSG	1
 
+#if 0
 struct booth_msghdr {
         uint16_t magic;
         uint16_t checksum;
         uint32_t len;
 	char data[0];
-} __attribute__((packed));
-
-struct ticket_msg {
-	char id[BOOTH_NAME_LEN+1];
-	uint32_t owner;
-	uint32_t expiry;
-	uint32_t ballot;
-	uint32_t result;
 } __attribute__((packed));
 
 struct ticket {
@@ -66,7 +59,12 @@ struct ticket {
 
 static LIST_HEAD(ticket_list);
 
+/* Put into node data */
 static unsigned char *role;
+#endif
+
+#define foreach_ticket(i_,t_) for(i=0; (t_=booth_conf->ticket+i, i<booth_conf->ticket_count); i++)
+#define foreach_node(i_,n_) for(i=0; (n_=booth_conf->node+i, i<booth_conf->node_count); i++)
 
 /* Untrusted input, must fit (incl. \0) in a buffer of max chars. */
 int check_max_len_valid(char *s, int max)
@@ -78,22 +76,53 @@ int check_max_len_valid(char *s, int max)
 	return 0;
 }
 
-int check_ticket(char *ticket)
+int find_ticket_by_name(const char *ticket, struct ticket_config **found)
 {
 	int i;
 
+	if (found)
+		*found = NULL;
+
+	for (i = 0; i < booth_conf->ticket_count; i++) {
+		if (!strcmp(booth_conf->ticket[i].name, ticket)) {
+			if (found)
+				*found = booth_conf->ticket + i;
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+int find_ticket_by_handle(pl_handle_t handle, struct ticket_config **found)
+{
+	int i;
+
+	if (found)
+		*found = NULL;
+
+	for (i = 0; i < booth_conf->ticket_count; i++) {
+		if (booth_conf->ticket[i].handle == handle) {
+			if (found)
+				*found = booth_conf->ticket + i;
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+
+int check_ticket(char *ticket, struct ticket_config **found)
+{
+	if (found)
+		*found = NULL;
 	if (!booth_conf)
 		return 0;
 
 	if (!check_max_len_valid(ticket, sizeof(booth_conf->ticket[0].name)))
 		return 0;
-
-	for (i = 0; i < booth_conf->ticket_count; i++) {
-		if (!strcmp(booth_conf->ticket[i].name, ticket))
-			return 1;
-	}
-
-	return 0;
+	return find_ticket_by_name(ticket, found);
 }
 
 int check_site(char *site, int *is_local)
@@ -116,6 +145,7 @@ static int * ticket_priority(int i)
 	int j;
 
 	/* TODO: need more precise check */
+	/* WHAT???? node_count ticket?*/
 	for (j = 0; j < booth_conf->node_count; j++) {
 		if (booth_conf->ticket[i].weight[j] == 0)
 			return NULL;
@@ -130,92 +160,78 @@ static int ticket_get_myid(void)
 
 static void end_acquire(pl_handle_t handle, int error)
 {
-	struct ticket *tk;
-	int found = 0;
+	struct ticket_config *tk;
 
 	log_debug("enter end_acquire");
-	list_for_each_entry(tk, &ticket_list, list) {
-		if (tk->handle == handle) {
-			found = 1;
-			break;
-		}
-	}
-
-	if (!found) {
+	if (!find_ticket_by_handle(handle, &tk)) {
 		log_error("BUG: ticket handle %ld does not exist", handle);
 		return;
 	}
 
 	if (error)
-		log_info("ticket %s was granted failed (site %d), error:%s",
-				tk->id, ticket_get_myid(), strerror(error));
+		log_info("ticket %s failed granting for site %s, error:%s",
+				tk->name, local->addr_string, strerror(error));
 	else
-		log_info("ticket %s was granted successfully (site %d)",
-				tk->id, ticket_get_myid());
+		log_info("ticket %s was granted successfully for site %s",
+				tk->name, local->addr_string);
 	log_debug("exit end_acquire");
 }
 
 static void end_release(pl_handle_t handle, int error)
 {
-	struct ticket *tk;
-	int found = 0;
+	struct ticket_config *tk;
 
 	log_debug("enter end_release");
-	list_for_each_entry(tk, &ticket_list, list) {
-		if (tk->handle == handle) {
-			found = 1;
-			break;
-		}
-	}
-
-	if (!found) {
+	if (!find_ticket_by_handle(handle, &tk)) {
 		log_error("BUG: ticket handle %ld does not exist", handle);
 		return;
 	}
 
 	if (error)
-		log_info("ticket %s was reovked failed (site %d), error:%s",
-				tk->id, ticket_get_myid(), strerror(error));
+		log_info("ticket %s failed revoking on site %s, error:%s",
+				tk->name, local->addr_string, strerror(error));
 	else
-		log_info("ticket %s was reovked successfully (site %d)",
-				tk->id, ticket_get_myid());
+		log_info("ticket %s was revoked successfully on site %s",
+				tk->name, local->addr_string);
 
 	log_debug("exit end_release");
 }
 
 static int ticket_send(unsigned long id, void *value, int len)
 {
+#if 0
 	int i, rv = -1;
 	struct booth_node *to = NULL;
-	struct booth_msghdr *hdr;
-	void *buf;
+	struct boothc_ticket_msg msg;
 
-	for (i = 0; i < booth_conf->node_count; i++) {
-		if (booth_conf->node[i].nodeid == id)
+	foreach_node(i, to)
+		if (booth_conf->node[i].nodeid == id) {
 			to = booth_conf->node+i;
-	}
+			break;
+		}
 	if (!to)
 		return rv;
 
-	buf = malloc(sizeof(struct booth_msghdr) + len);
-	if (!buf)
-		return -ENOMEM;
-	memset(buf, 0, sizeof(struct booth_msghdr) + len);
-	hdr = buf;
+	memset(&msg, 0, sizeof(msg));
 	hdr->magic = htons(PAXOS_MAGIC);
 	hdr->len = htonl(sizeof(struct booth_msghdr) + len);
 	memcpy((char *)buf + sizeof(struct booth_msghdr), value, len);
 
 	rv = transport()->send(to, buf, sizeof(struct booth_msghdr) + len);
 
-	free(buf);
+	frdee(buf);
+	*/
 	return rv;
+#endif
+	assert(0);
 }
 
 static int ticket_broadcast(void *value, int vlen)
 {
 	struct booth_msghdr *hdr;
-	int tlen = sizeof(*hdr) + vlen;
+	int tlen ;
+#if 0
+	= sizeof(*hdr) + vlen;
 	char buf[tlen];
 
 	hdr = (void*)buf;
@@ -223,6 +239,7 @@ static int ticket_broadcast(void *value, int vlen)
 	hdr->len = htonl(tlen);
 	memcpy(hdr->data, value, vlen);
 
+#endif
 	return transport()->broadcast(hdr, tlen);
 }
 #if 0
@@ -252,154 +269,120 @@ static int ticket_read(const void *name, int *owner, int *ballot,
 	return 0;
 }
 #endif
-static int ticket_parse(struct ticket_msg *tmsg)
+static int ticket_parse(struct boothc_ticket_msg *tmsg)
 {
-	struct ticket *tk;
-	int found = 0;
+	struct ticket_config *tk;
 
-	list_for_each_entry(tk, &ticket_list, list) {
-		if (!strcmp(tk->id, tmsg->id)) {
-			found = 1;
-			if (tk->ballot < tmsg->ballot)
-				tk->ballot = tmsg->ballot;
-			if (CATCHED_VALID_TMSG == tmsg->result) {
-				tk->owner = tmsg->owner;
-				tk->expires = current_time() + tmsg->expiry;
-			}
-			break;
-		}
-	}
-
-	if (!found)
+	if (!find_ticket_by_name(tmsg->ticket.id, &tk))
 		return -1;
-	else
-		return 0;
+
+	if (tk->ballot < ntohl(tmsg->ticket.ballot))
+		tk->ballot = ntohl(tmsg->ticket.ballot);
+	if (CATCHED_VALID_TMSG == ntohl(tmsg->header.result)) {
+		tk->owner = ntohl(tmsg->ticket.owner);
+		tk->expires = current_time() + ntohl(tmsg->header.expiry);
+	}
 }
 
 static int ticket_catchup(const void *name, int *owner, int *ballot,
 			  unsigned long long *expires)
-{	
-	struct ticket *tk;
-	int i, buflen, rv = 0;
-	char *buf = NULL;
-	struct boothc_header *h;
+{
+	struct ticket_config *tk;
+	int i, rv = 0;
 	struct booth_node *node;
-	struct ticket_msg *tmsg;
-	int myid = ticket_get_myid();
+	struct boothc_ticket_msg msg;
+	time_t now;
 
-	if (booth_conf->node[myid].type != ARBITRATOR) {
-		list_for_each_entry(tk, &ticket_list, list) {
-			if (!strcmp(tk->id, name)) {
-				pcmk_handler.load_ticket(tk->id,
-							 &tk->owner,
-							 &tk->ballot,
-							 &tk->expires);
-				if (current_time() >= tk->expires) {
-					tk->owner = -1;
-					tk->expires = 0;
-				} 
-			}
+	time(&now);
+	if (local->type != ARBITRATOR &&
+			find_ticket_by_name(name, &tk)) {
+		pcmk_handler.load_ticket(tk->name,
+				&tk->owner,
+				&tk->ballot,
+				&tk->expires);
+		if (now >= tk->expires) {
+			tk->owner = NO_OWNER;
+			tk->expires = 0;
 		}
 	}
 
-	buflen = sizeof(struct boothc_header) + sizeof(struct ticket_msg);
-	buf = malloc(buflen);
-	if (!buf)
-		return -ENOMEM;
-	memset(buf, 0, buflen);
-
-	h = (struct boothc_header *)buf;
-	h->magic = BOOTHC_MAGIC;
-	h->version = BOOTHC_VERSION;
-	h->cmd = BOOTHC_CMD_CATCHUP;
-	h->len = sizeof(struct ticket_msg);
-	tmsg = (struct ticket_msg *)(buf + sizeof(struct boothc_header));
-	
-	for (i = 0; i < booth_conf->node_count; i++) {
-		node = booth_conf->node + i;
+	foreach_node(i, node) {
 		if (node->type == SITE &&
-		    !(node->local)) {
-			strncpy(tmsg->id, name, BOOTH_NAME_LEN + 1);
+				!(node->local)) {
+			init_ticket_msg(&msg, BOOTHC_CMD_CATCHUP);
+			strncpy(msg.ticket.id, name, BOOTH_NAME_LEN + 1);
+
 			log_debug("attempting catchup from %s", node->addr_string);
+
 			rv = booth_transport[TCP].open(node);
 			if (rv < 0)
 				continue;
 			log_debug("connected to %s", node->addr_string);
-			rv = booth_transport[TCP].send(node, buf, buflen);
-			if (rv < 0) {
+
+			rv = booth_transport[TCP].send(node, &msg, sizeof(msg));
+			if (rv != sizeof(msg))
 				goto close;
-			}
+
 			log_debug("sent catchup command to %s", node->addr_string);
-			memset(tmsg, 0, sizeof(struct ticket_msg));
-			rv = booth_transport[TCP].recv(node, buf, buflen);
-			if (rv < 0) {
-				booth_transport[TCP].close(node);
-				continue;
-			}
-			ticket_parse(tmsg);
+
+			rv = booth_transport[TCP].recv(node, &msg, sizeof(&msg));
+			if (rv != sizeof(msg))
+				goto close;
+
+			log_debug("got catchup result from %s", node->addr_string);
+			ticket_parse(&msg);
 close:
 			booth_transport[TCP].close(node);
-			memset(tmsg, 0, sizeof(struct ticket_msg)); 
-		}
-	}
-		
-	list_for_each_entry(tk, &ticket_list, list) {
-		if (!strcmp(tk->id, name)) {
-			if (booth_conf->node[myid].type != ARBITRATOR) {
-				if (current_time() >= tk->expires) {
-					tk->owner = -1;
-					tk->expires = 0;
-				}
-				pcmk_handler.store_ticket(tk->id,
-							  tk->owner,
-							  tk->ballot,
-							  tk->expires);
-				if (tk->owner == myid)
-					pcmk_handler.grant_ticket(tk->id);
-				else
-					pcmk_handler.revoke_ticket(tk->id);
-			}
-			*owner = tk->owner;
-			*expires = tk->expires;
-			*ballot = tk->ballot;
 		}
 	}
 
-	free(buf);
+
+	if (find_ticket_by_name(name, &tk)) {
+		if (local->type != ARBITRATOR) {
+			if (current_time() >= tk->expires) {
+				tk->owner = NO_OWNER;
+				tk->expires = 0;
+			}
+			pcmk_handler.store_ticket(tk->name,
+					tk->owner,
+					tk->ballot,
+					tk->expires);
+			if (tk->owner == ticket_get_myid())
+				pcmk_handler.grant_ticket(tk->name);
+			else
+				pcmk_handler.revoke_ticket(tk->name);
+		}
+		*owner = tk->owner;
+		*expires = tk->expires;
+		*ballot = tk->ballot;
+	}
+
 	return rv;
 }
 
 static int ticket_write(pl_handle_t handle, struct paxos_lease_result *result)
 {
-	struct ticket *tk;
-	int found = 0;
-	
-	list_for_each_entry(tk, &ticket_list, list) {
-		if (tk->handle == handle) {
-			found = 1;
-			break;
-		}
-	}
-	if (!found) {
+	struct ticket_config *tk;
+
+	if (!find_ticket_by_handle(handle, &tk)) {
 		log_error("BUG: ticket_write failed "
 			  "(ticket handle %ld does not exist)", handle);
 		return -1;
 	}
 
+	/* TODO: ntohl? */
 	tk->owner = result->owner;
 	tk->expires = result->expires;
 	tk->ballot = result->ballot;
 
+	pcmk_handler.store_ticket(tk->name, tk->owner, tk->ballot, tk->expires);
 	if (tk->owner == ticket_get_myid()) {
-		pcmk_handler.store_ticket(tk->id, tk->owner, tk->ballot, tk->expires);
-		pcmk_handler.grant_ticket(tk->id);
-	} else if (tk->owner == -1) {
-		pcmk_handler.store_ticket(tk->id, tk->owner, tk->ballot, tk->expires);
-		pcmk_handler.revoke_ticket(tk->id);
-	} else
-		pcmk_handler.store_ticket(tk->id, tk->owner, tk->ballot, tk->expires);
+		pcmk_handler.grant_ticket(tk->name);
+	} else if (tk->owner == NO_OWNER) {
+		pcmk_handler.revoke_ticket(tk->name);
+	}
 
-	return 0; 
+	return 0;
 }
 
 static void ticket_status_recovery(pl_handle_t handle)
@@ -407,21 +390,17 @@ static void ticket_status_recovery(pl_handle_t handle)
 	paxos_lease_status_recovery(handle);
 }
 
-int ticket_recv(void *msg, int msglen)
+int ticket_recv(struct boothc_ticket_msg *msg, int msglen)
 {
 	struct booth_msghdr *hdr;
 	char *data;
 
-	hdr = msg;
-	if (ntohs(hdr->magic) != PAXOS_MAGIC ||
-	    ntohl(hdr->len) != msglen) {
-		log_error("message received error");
+	if (check_boothc_header(hdr, sizeof(*msg)) < 0 ||
+			msglen != sizeof(*msg)) {
+		log_error("message receive error");
 		return -1;
 	}
-	data = (char *)msg + sizeof(struct booth_msghdr);
-
-	return paxos_lease_on_receive(data,
-				      msglen - sizeof(struct booth_msghdr));
+	return paxos_recvmsg(msg);
 }
 
 int grant_ticket(char *ticket)
@@ -469,7 +448,7 @@ int revoke_ticket(char *ticket)
 		return BOOTHC_RLT_SYNC_FAIL;
 	}
 
-	if (tk->owner == -1)
+	if (tk->owner == NO_OWNER)
 		return BOOTHC_RLT_SYNC_SUCC;
 	else {
 		int ret = paxos_lease_release(tk->handle, end_release);
@@ -510,7 +489,7 @@ int list_ticket(char **pdata, unsigned int *len)
 		strncpy(timeout_str, "INF", sizeof(timeout_str));
 		strncpy(node_name, "None", sizeof(node_name));
 
-		if (tk->owner < MAX_NODES && tk->owner > -1)
+		if (tk->owner < MAX_NODES && tk->owner > NO_OWNER)
 			strncpy(node_name, booth_conf->node[tk->owner].addr_string,
 					sizeof(node_name));
 		if (tk->expires != 0)
@@ -529,27 +508,17 @@ int list_ticket(char **pdata, unsigned int *len)
 	return 0;
 }
 
-int catchup_ticket(char **pdata, unsigned int len)
+int catchup_ticket(struct ticket_msg *msg, struct ticket_config *tc)
 {
-	struct ticket_msg *tmsg;
-	struct ticket *tk;
-
-	assert(len == sizeof(struct ticket_msg));
-	tmsg = (struct ticket_msg *)(*pdata);
-	list_for_each_entry(tk, &ticket_list, list) {
-		if (strcmp(tk->id, tmsg->id))
-			continue;
-
-		tmsg->ballot = tk->ballot;
-		if (tk->owner == ticket_get_myid()
-				&& current_time() < tk->expires) {
-			tmsg->result = CATCHED_VALID_TMSG;
-			tmsg->expiry = tk->expires - current_time();
-			tmsg->owner = tk->owner;
-		}
+	msg->ballot = htonl(tk->ballot);
+	if (tk->owner == ticket_get_myid()
+			&& current_time() < tk->expires) {
+		msg->expiry = htonl(tk->expires - current_time());
+		msg->owner = htonl(tk->owner);
+		return CATCHED_VALID_TMSG;
 	}
 
-	return 0;
+	return -1;
 }
 
 const struct paxos_lease_operations ticket_operations = {
@@ -586,7 +555,7 @@ int setup_ticket(void)
 		}
 		memset(tk, 0, sizeof(struct ticket));
 		strcpy(tk->id, booth_conf->ticket[i].name);
-		tk->owner = -1;
+		tk->owner = NO_OWNER;
 		tk->expiry = booth_conf->ticket[i].expiry;
 		list_add_tail(&tk->list, &ticket_list); 
 

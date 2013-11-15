@@ -125,7 +125,7 @@ booth_start() {
 	$BOOTH_DAEMON_STARTED)     return $OCF_SUCCESS;;
 	$BOOTH_DAEMON_STARTING) 
 		while [ $rc != $BOOTH_DAEMON_STARTED ]; do
-			sleep .5
+			sleep .7
 			booth_check_daemon_state ; rc=$?
 		done
 		return $OCF_SUCCESS;;
@@ -135,11 +135,11 @@ booth_start() {
 
 	"$OCF_RESKEY_daemon" daemon "-c$OCF_RESKEY_config" $OCF_RESKEY_args
 
-	sleep 1
+	sleep 1.1
 	rc=$BOOTH_DAEMON_STARTING
 	while [ $rc != $BOOTH_DAEMON_STARTED ]; do
 		booth_check_daemon_state; rc=$?
-		sleep .5
+		sleep .8
 	done
 	
 	return $OCF_SUCCESS
@@ -167,7 +167,7 @@ booth_stop() {
 	rc=$BOOTH_DAEMON_STARTED
 	while [ $rc != $BOOTH_DAEMON_NOT_RUNNING ]; do
 		booth_check_daemon_state; rc=$?
-		sleep 1
+		sleep 0.9
 	done
 
 	if [ $rc = $BOOTH_DAEMON_NOT_RUNNING ]; then

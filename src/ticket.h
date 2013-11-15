@@ -19,17 +19,22 @@
 #ifndef _TICKET_H
 #define _TICKET_H
 
+#include "config.h"
+
 #define DEFAULT_TICKET_EXPIRY	600
 
-int check_ticket(char *ticket);
+int check_ticket(char *ticket, struct ticket_config **tc);
 int check_site(char *site, int *local);
 int grant_ticket(char *ticket);
 int revoke_ticket(char *ticket);
 int list_ticket(char **pdata, unsigned int *len);
-int catchup_ticket(char **pdata, unsigned int len);
+int catchup_ticket(struct ticket_msg *msg, struct ticket_config *tc);
 int ticket_recv(void *msg, int msglen);
 int setup_ticket(void);
 int get_ticket_info(char *name, int *owner, int *expires);
 int check_max_len_valid(char *s, int max);
+
+int find_ticket_by_name(const char *ticket, struct ticket_config **found);
+int find_ticket_by_handle(pl_handle_t handle, struct ticket_config **found);
 
 #endif /* _TICKET_H */

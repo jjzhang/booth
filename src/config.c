@@ -66,11 +66,13 @@ int add_node(char *addr_string, int type)
 		goto out;
 	}
 
-	node = booth_conf->node+booth_conf->node_count;
+	node = booth_conf->node + booth_conf->node_count;
 
 	node->family = BOOTH_PROTO_FAMILY;
 	node->type = type;
-	node->nodeid = booth_conf->node_count;
+	/* Make nodeid start at a non-zero point.
+	 * Perhaps use hash over string or address? */
+	node->nodeid = booth_conf->node_count * 0x11 + 0x98989011;
 	strcpy(node->addr_string, addr_string);
 	node->tcp_fd = -1;
 

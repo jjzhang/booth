@@ -22,15 +22,29 @@
 
 #include <stdint.h>
 #include "booth.h"
+#include "config.h"
+#include "paxos_lease.h"
 #include "transport.h"
 
 #define MAX_NODES	16
 #define TICKET_ALLOC	16
 
+#define NO_OWNER (-1)
+
 struct ticket_config {
-	int weight[MAX_NODES];
-	int expiry;
 	boothc_ticket name;
+
+	/* How many seconds to hold it */
+	int expiry;
+	/* Who has it. */
+	int owner; struct booth_node *owner; ??
+
+	/** Timestamp of expiration. */
+	time_t expires;
+
+//	pl_handle_t handle; not needed?
+
+	int weight[MAX_NODES];
 };
 
 struct booth_config {

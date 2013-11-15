@@ -21,17 +21,21 @@
 #include <errno.h>
 #include <arpa/inet.h>
 #include "list.h"
+#include "booth.h"
+#include "config.h"
 #include "paxos.h"
 #include "log.h"
 
+/* Use numbers that are unlikely to conflict with other enums. */
 typedef enum {
-	INIT = 1,
+	INIT      = 0x5104,
 	PREPARING,
 	PROMISING,
 	PROPOSING,
 	ACCEPTING,
 	RECOVERY,
 	COMMITTED,
+	REJECTED,
 } paxos_state_t;
 
 struct proposal {
@@ -166,73 +170,53 @@ static int next_ballot_number(struct paxos_instance *pi)
 	return ballot;
 }
 
+
+static void prepare_a_message(struct boothc_ticket_msg *msg, int state, struct paxos_instance *pax_inst)
+{
+	msg->ticket.state = htonl(state);
+	msg->ticket.proposer_id =
+		msg->header.from =
+		htonl(booth_get_myid());
+//	strcpy(hdr->psname, pax_inst->ps->name);
+//	strcpy(hdr->piname, pax_inst->name);
+	msg->ticket.ballot = htonl(pax_inst->round);
+//	hdr->extralen = htonl(pax_inst->ps->extralen);
+//	extra = (char *)msg + sizeof(struct paxos_msghdr);
+//	memcpy((char *)msg + sizeof(struct paxos_msghdr) + pi->ps->extralen,
+//		value, pax_inst->ps->valuelen);
+
+}
+
 static void proposer_prepare(struct paxos_instance *pi, int *round)
 {
-	struct paxos_msghdr *hdr;
-	void *msg, *extra;
-	int msglen = sizeof(struct paxos_msghdr) + pi->ps->extralen;
+	struct boothc_ticket_msg msg;
 	int ballot;
 
 	log_debug("preposer prepare ...");
-	msg = malloc(msglen);
-	if (!msg) {
-		log_error("no mem for msg");
-		*round = -ENOMEM;
-		return;
-	}
-	memset(msg, 0, msglen);
-	hdr = msg;
-	extra = (char *)msg + sizeof(struct paxos_msghdr);
 
 	if (*round > pi->round)
 		pi->round = *round;
 	ballot = next_ballot_number(pi);
 	pi->proposer->ballot = ballot;
 
-	hdr->state = htonl(PREPARING);
-	hdr->from = htonl(pi->ps->p_op->get_myid());
-	hdr->proposer_id = hdr->from;
-	strcpy(hdr->psname, pi->ps->name);
-	strcpy(hdr->piname, pi->name);
-	hdr->ballot_number = htonl(ballot);
-	hdr->extralen = htonl(pi->ps->extralen);
+	prepare_a_message(&msg, PREPARING, pi);
 
-	if (pi->ps->p_op->prepare &&
-		pi->ps->p_op->prepare((pi_handle_t)pi, extra) < 0)
+	if (lease_prepare(pi, &msg) < 0)
 		return;
 
-	if (pi->ps->p_op->broadcast)
-		pi->ps->p_op->broadcast(msg, msglen);
-	else {
-		int i;
-		for (i = 0; i < pi->ps->number; i++) {
-			if (pi->ps->role[i] & ACCEPTOR)
-				pi->ps->p_op->send(i, msg, msglen);
-		}
-	}
+	transport()->broadcast(&msg, sizeof(msg));
 
-	free(msg);
 	*round = ballot;
 }
 
 static void proposer_propose(struct paxos_space *ps,
 			     struct paxos_instance *pi,
-			     void *msg, int msglen)
+			     struct boothc_ticket_msg *msg, int msglen)
 {
 	struct paxos_msghdr *hdr;
-	pi_handle_t pih = (pi_handle_t)pi;
-	void *extra, *value, *message;
 	int ballot;
 
 	log_debug("proposer propose ...");
-	if (msglen != sizeof(struct paxos_msghdr) + ps->extralen) {
-		log_error("message length incorrect, "
-			  "msglen: %d, msghdr len: %lu, extralen: %u",
-			  msglen, (long)sizeof(struct paxos_msghdr),
-			  ps->extralen);
-		return;
-	}
-	hdr = msg;
 
 	ballot = ntohl(hdr->ballot_number);
 	if (pi->proposer->ballot != ballot) {
@@ -241,11 +225,7 @@ static void proposer_propose(struct paxos_space *ps,
 		return;
 	}
 
-	extra = (char *)msg + sizeof(struct paxos_msghdr);
-	if (ps->p_op->is_prepared) {
-		if (ps->p_op->is_prepared(pih, extra))
-			pi->proposer->open_number++;
-	} else
+	if (lease_is_prepared(pi, msg))
 		pi->proposer->open_number++;
 
 	if (!have_quorum(ps, pi->proposer->open_number))
@@ -256,35 +236,12 @@ static void proposer_propose(struct paxos_space *ps,
 	pi->proposer->proposed = 1;
 
 	value = pi->proposer->proposal->value;
-	if (ps->p_op->propose
-		&& ps->p_op->propose(pih, extra, ballot, value) < 0)
+	if (lease_propose(pih, &msg, ballot, value) < 0)
 		return;
 
-	hdr->valuelen = htonl(ps->valuelen); 
-	message = malloc(msglen + ps->valuelen);
-	if (!message) {
-		log_error("no mem for value");
-		return;
-	}
-	memset(message, 0, msglen + ps->valuelen);
-	memcpy(message, msg, msglen);
-	memcpy((char *)message + msglen, value, ps->valuelen);
-	pi->proposer->state = PROPOSING;
-	hdr = message;
-	hdr->from = htonl(ps->p_op->get_myid());
-	hdr->state = htonl(PROPOSING);
+	prepare_a_message(&msg, PROPOSING, pi);
 
-	if (ps->p_op->broadcast)
-		ps->p_op->broadcast(message, msglen + ps->valuelen);
-	else {
-		int i;
-		for (i = 0; i < ps->number; i++) {
-			if (ps->role[i] & ACCEPTOR)
-				ps->p_op->send(i, message,
-					       msglen + ps->valuelen);
-		}
-	}
-	free(message);
+	transport()->broadcast(&msg, sizeof(msg))
 }
 
 static void proposer_commit(struct paxos_space *ps,
@@ -801,7 +758,7 @@ int paxos_catchup(pi_handle_t handle)
 	return pi->ps->p_op->catchup(handle);
 }
 
-int paxos_recvmsg(void *msg, int msglen)
+int paxos_recvmsg(struct boothc_ticket_msg *msg)
 {
 	struct paxos_msghdr *hdr = msg;
 	struct paxos_space *ps;

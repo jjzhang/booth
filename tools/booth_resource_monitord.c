@@ -457,7 +457,7 @@ void failover_ticket(gpointer key, gpointer value, gpointer user_data)
 			  expires);
 
 		if (cluster_ticket->granted == FALSE &&
-		    safe_str_eq(owner, "-1") && safe_str_eq(expires, "0")) {
+		    safe_str_eq(owner, "NO_OWNER") && safe_str_eq(expires, "0")) {
 			revoke_succeed = TRUE;
 			cleanup_calculations(&data_set);
 

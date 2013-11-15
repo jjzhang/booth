@@ -65,7 +65,7 @@ struct lease_state {
 
 struct paxos_lease {
 	char name[PAXOS_NAME_LEN+1];
-	pi_handle_t pih;
+	struct paxos_instance pip;
 	struct lease_action action;
 	struct lease_state proposer;
 	struct lease_state acceptor;
@@ -73,7 +73,7 @@ struct paxos_lease {
 	int expiry;
 	int renew;
 	int failover;
-	int release;
+	int release; /* LEASE_STARTED, LEASE_STOPPED */
 	unsigned long long expires;
 	void (*end_lease) (pi_handle_t, int);
 	struct timerlist *timer;
@@ -87,13 +87,13 @@ static struct paxos_operations *px_op = NULL;
 const struct paxos_lease_operations *p_l_op;
 ps_handle_t ps_handle = 0;
 
-static int find_paxos_lease(pi_handle_t handle, struct paxos_lease **pl)
+static int find_paxos_lease(struct paxos_instance *pi, struct paxos_lease **pl)
 {
 	struct paxos_lease *lpl;
 	int found = 0;
 
 	list_for_each_entry(lpl, &lease_head, list) {
-		if (lpl->pih == handle) {
+		if (lpl->pip == pi) {
 			found = 1;
 			break;
 		}
@@ -124,8 +124,8 @@ static void end_paxos_request(pi_handle_t handle, int round, int result)
 
 	if (pl->end_lease)
 		pl->end_lease((pl_handle_t)pl, result);
-		
-	return;	
+
+	return;
 }
 
 static void renew_expires(unsigned long data)
@@ -155,9 +155,9 @@ static void lease_expires(unsigned long data)
 
 	log_info("lease expires ... owner [%d] ticket [%s]",
 		pl->owner, pl->name);
-	pl->owner = -1;
+	pl->owner = NO_OWNER;
 	strcpy(plr.name, pl->name);
-	plr.owner = -1;
+	plr.owner = NO_OWNER;
 	plr.expires = 0;
 	plr.ballot = pl->acceptor.round;
 	p_l_op->notify(plh, &plr);
@@ -184,7 +184,7 @@ static void lease_retry(unsigned long data)
 	log_debug("lease_retry ...");
 	if (pl->proposer.timer2)
 		del_timer(&pl->proposer.timer2);
-	if (pl->owner != -1) {
+	if (pl->owner != NO_OWNER) {
 		log_debug("someone already got the lease, no need to retry");
 		return;
 	}
@@ -291,7 +291,7 @@ static int lease_catchup(pi_handle_t handle)
 		pl->release = LEASE_STARTED;
 
 	if (current_time() > pl->expires) {
-		plr.owner = pl->owner = -1;
+		plr.owner = pl->owner = NO_OWNER;
 		plr.expires = pl->expires = 0;
 		strcpy(plr.name, pl->name);
 		p_l_op->notify((pl_handle_t)pl, &plr);
@@ -322,7 +322,7 @@ static int lease_catchup(pi_handle_t handle)
 	return 0;	
 }
 
-static int lease_prepare(pi_handle_t handle, void *header)
+int lease_prepare(pi_handle_t handle, struct boothc_ticket_msg *msg)
 {
 	struct paxos_lease_msghdr *msghdr = header;
 	struct paxos_lease *pl;
@@ -365,21 +365,21 @@ static inline int stop_lease_is_prepared(pi_handle_t handle __attribute__((unuse
 	return 1;
 }
 
-static int lease_is_prepared(pi_handle_t handle, void *header)
+int lease_is_prepared(struct paxos_instance *pi, struct boothc_ticket_msg *msg)
 {
-	struct paxos_lease_msghdr *hdr = header;
 	int ret = 0;
-	int op = ntohl(hdr->op);
+	int op = ntohl(msg->ticket.op);
 
 	log_debug("enter lease_is_prepared");
-	assert(OP_START_LEASE == op || OP_STOP_LEASE == op);
 	switch (op) {
 	case OP_START_LEASE:
-		ret = start_lease_is_prepared(handle, header);
+		ret = start_lease_is_prepared(pi, msg);
 		break;
 	case OP_STOP_LEASE:
-		ret = stop_lease_is_prepared(handle, header);
+		ret = stop_lease_is_prepared(pi, msg);
 		break;
+	default:
+		assert(!"wrong lease op");
 	}
 
 	log_debug("exit lease_is_prepared");
@@ -524,7 +524,7 @@ static int stop_lease_propose(pi_handle_t handle,
 	return 0;
 }
 
-static int lease_propose(pi_handle_t handle, void *extra,
+static int lease_propose(pi_handle_t handle, struct boothc_ticket_msg *msg,
 			int round, void *value)
 {
 	struct paxos_lease_msghdr *hdr = extra;
@@ -692,7 +692,7 @@ static int stop_lease_commit(pi_handle_t handle,
 	pl->release = LEASE_STOPPED;
 
 	strcpy(plr.name, pl->proposer.plv->name);
-	plr.owner = pl->owner = -1;
+	plr.owner = pl->owner = NO_OWNER;
 	plr.ballot = round;
 	plr.expires = 0;
 	p_l_op->notify((pl_handle_t)pl, &plr);
@@ -786,7 +786,7 @@ static int stop_lease_learned(pi_handle_t handle,
 
 	pl->release = LEASE_STOPPED;
 	strcpy(plr.name, pl->acceptor.plv->name);
-	plr.owner = pl->owner = -1;
+	plr.owner = pl->owner = NO_OWNER;
 	plr.ballot = round;
 	plr.expires = 0;
 	p_l_op->notify((pl_handle_t)pl, &plr);
@@ -878,7 +878,7 @@ pl_handle_t paxos_lease_init(const void *name,
 	}
 	memset(lease, 0, sizeof(struct paxos_lease));
 	strncpy(lease->name, name, PAXOS_NAME_LEN + 1);
-	lease->owner = -1;
+	lease->owner = NO_OWNER;
 	lease->expiry = expiry;
 	lease->failover = failover;
 	list_add_tail(&lease->list, &lease_head);
@@ -907,11 +907,11 @@ int paxos_lease_status_recovery(pl_handle_t handle)
 	return 0;	
 }
 
-int paxos_lease_on_receive(void *msg, int msglen)
-{
-	return paxos_recvmsg(msg, msglen);
-}
-
+//int paxos_lease_on_receive(void *msg, int msglen)
+//{
+//	return paxos_recvmsg(msg, msglen);
+//}
+//
 int paxos_lease_exit(pl_handle_t handle)
 {
 	struct paxos_lease *pl = (struct paxos_lease *)handle;

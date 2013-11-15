@@ -21,33 +21,15 @@
 
 #include "booth.h"
 
-struct booth_node {
-	int nodeid;
-	int type;
-	int local;
-
-	char addr_string[BOOTH_NAME_LEN];
-
-	int tcp_fd;
-
-	unsigned short family;
-	union {
-		struct sockaddr_in  sa4;
-		struct sockaddr_in6 sa6;
-	};
-	int saddrlen;
-	int addrlen;
-} __attribute__((packed));
-
 typedef enum {
-	TCP = 0,
-	UDP = 1,
-	SCTP = 2,
-	TRANSPORT_ENTRIES = 3,
+	TCP = 1,
+	UDP,
+	SCTP,
+	TRANSPORT_ENTRIES,
 } transport_layer_t;
 
 typedef enum {
-	ARBITRATOR = 1,
+	ARBITRATOR = 0x50,
 	SITE,
 	CLIENT,
 	DAEMON,
@@ -69,6 +51,8 @@ struct booth_transport {
 const struct booth_transport booth_transport[TRANSPORT_ENTRIES];
 int find_myself(struct booth_node **me, int fuzzy_allowed);
 
+int check_boothc_header(struct boothc_header *data, int len_incl_data);
+
 int setup_udp_server(int try_only);
 
 int booth_tcp_open(struct booth_node *to);
@@ -83,6 +67,6 @@ inline static void * node_to_addr_pointer(struct booth_node *node) {
 }
 
 extern const struct booth_transport *local_transport;
-extern struct booth_node *local;
+
 
 #endif /* _TRANSPORT_H */

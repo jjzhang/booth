@@ -246,9 +246,42 @@ int find_myself(struct booth_node **mep, int fuzzy_allowed)
 		_find_myself(AF_INET, mep, fuzzy_allowed);
 }
 
-static int booth_get_myid(void)
+
+/** Checks the header fields for validity.
+ * cf. init_header().
+ * For @len_incl_data < 0 the length is not checked.
+ * Return <0 if error, else bytes read. */
+int check_boothc_header(struct boothc_header *h, int len_incl_data)
 {
-	return local ? local->nodeid : -1;
+	int l;
+
+	if (h->magic != htonl(BOOTHC_MAGIC)) {
+		log_error("magic error %x", ntohl(h->magic));
+		return -EINVAL;
+	}
+	if (h->version != htonl(BOOTHC_VERSION)) {
+		log_error("version error %x", ntohl(h->version));
+		return -EINVAL;
+	}
+
+
+	l = ntohl(h->len);
+	if (l < sizeof(*h) ||
+			l > sizeof(boothc_ticket_site_msg)) {
+		log_error("length %d out of range", l);
+		return -EINVAL;
+
+
+	if (len_incl_data < 0)
+		return 0;
+
+	if (l != len_incl_data) {
+		log_error("length error - got %d, wanted %d",
+				l, len_incl_data);
+		return -EINVAL;
+	}
+
+	return len_incl_data;
 }
 
 static void process_dead(int ci)
@@ -399,14 +432,14 @@ int booth_tcp_open(struct booth_node *to)
 {
 	int s, rv;
 
-	if (to->tcp_fd >= 0)
+	if (to->tcp_fd >= STDERR_FILENO)
 		goto found;
 
 	s = socket(to->family, SOCK_STREAM, 0);
 	if (s == -1) {
 		log_error("cannot create socket of family %d", to->family);
 		return -1;
-}
+	}
 
 
 	rv = connect_nonb(s, (struct sockaddr *)&to->sa6, to->saddrlen, 10);
@@ -437,13 +470,21 @@ int booth_tcp_send(struct booth_node *to, void *buf, int len)
 
 static int booth_tcp_recv(struct booth_node *from, void *buf, int len)
 {
-	return do_read(from->tcp_fd, buf, len);
+	int got;
+	/* Needs timeouts! */
+	got = do_read(from->tcp_fd, buf, len);
+	if (got < 0)
+		return got;
+	if (got != len)
+		return -EINVAL;
+	return len;
 }
 
 static int booth_tcp_close(struct booth_node *to)
 {
-	if (to && to->tcp_fd >= 0) {
-		close(to->tcp_fd);
+	if (to) {
+		if (to->tcp_fd > STDERR_FILENO)
+			close(to->tcp_fd);
 		to->tcp_fd = -1;
 	}
 	return 0;
@@ -505,6 +546,7 @@ static void process_recv(int ci)
 	int received;
 	unsigned char *msg_offset;
 
+	/* TODO: allocate on stack? */
 	msg_recv.msg_name = &system_from;
 	msg_recv.msg_namelen = sizeof (struct sockaddr_storage);
 	msg_recv.msg_iov = &udp.iov_recv;

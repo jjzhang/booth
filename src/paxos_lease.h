@@ -19,6 +19,9 @@
 #ifndef _PAXOS_LEASE_H
 #define _PAXOS_LEASE_H
 
+#include "booth.h"
+#include "paxos.h"
+
 #define PLEASE_NAME_LEN		63
 
 #define NOT_CLEAR_RELEASE	0
@@ -70,5 +73,8 @@ int paxos_lease_release(pl_handle_t handle,
 			void (*end_release) (pl_handle_t handle, int result));
 
 int paxos_lease_exit(pl_handle_t handle);
+
+int lease_prepare(struct paxos_instance *pi, struct boothc_ticket_msg *msg);
+int lease_is_prepared(struct paxos_instance *pi, struct boothc_ticket_msg *msg);
 
 #endif /* _PAXOS_LEASE_H */

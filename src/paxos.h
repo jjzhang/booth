@@ -45,6 +45,7 @@ struct paxos_operations {
 };
 
 int paxos_recvmsg(void *msg, int msglen);
+struct paxos_instance;
 
 ps_handle_t paxos_space_init(const void *name,
 			     unsigned int number,
