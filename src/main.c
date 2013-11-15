@@ -56,9 +56,6 @@
 
 #define CLIENT_NALLOC		32
 
-int log_logfile_priority = LOG_INFO;
-int log_syslog_priority = LOG_ERR;
-int log_stderr_priority = LOG_ERR;
 int daemonize = 0;
 
 static int client_maxi;
@@ -817,7 +814,6 @@ static void print_usage(void)
 
 #define OPTION_STRING		"c:Dl:t:s:hS"
 
-static char *logging_entity = NULL;
 
 void safe_copy(char *dest, char *value, size_t buflen, const char *description) {
 	int content_len = buflen - 1;
@@ -928,9 +924,7 @@ static int read_arguments(int argc, char **argv)
 			break;
 		case 'D':
 			daemonize = 1;
-			debug_level = 1;
-			log_logfile_priority = LOG_DEBUG;
-			log_syslog_priority = LOG_DEBUG;
+			debug_level++;
 			break;
 
 		case 'l':
@@ -1135,21 +1129,24 @@ static int do_server(int type)
 		}
 	}
 
-	/*
-	   The lock cannot be obtained before the call to daemon(), otherwise
-	   the lockfile would contain the pid of the parent, not the daemon.
-	 */
+	/* The lockfile must be written to _after_ the call to daemon(), so
+	 * that the lockfile contains the pid of the daemon, not the parent. */
 	lock_fd = lockfile();
 	if (lock_fd < 0)
 		return lock_fd;
+
+	strcat(log_ent, type_to_string(local->type));
+	cl_log_set_entity(log_ent);
+	cl_log_enable_stderr(debug_level ? TRUE : FALSE);
+	cl_log_set_facility(HA_LOG_FACILITY);
+	cl_inherit_logging_environment(0);
+
 
 	if (local->type == ARBITRATOR)
 		log_info("BOOTH arbitrator daemon is starting.");
 	else if (local->type == SITE)
 		log_info("BOOTH cluster site daemon is starting.");
 
-	strcat(log_ent, type_to_string(local->type));
-	logging_entity = log_ent;
 
 	set_scheduler();
 	set_oom_adj(-16);
@@ -1201,32 +1198,27 @@ int main(int argc, char *argv[], char *envp[])
 	int rv;
 
 	init_set_proc_title(argc, argv, envp);
+
 	memset(&cl, 0, sizeof(cl));
-	strncpy(cl.configfile, BOOTH_DEFAULT_CONF,     BOOTH_PATH_LEN - 1);
+	strncpy(cl.configfile,
+			BOOTH_DEFAULT_CONF, BOOTH_PATH_LEN - 1);
 	cl.lockfile[0] = 0;
+	debug_level = 0;
+	cl_log_set_entity("booth");
+	cl_log_enable_stderr(TRUE);
+	cl_log_set_facility(0);
+
 
 	rv = read_arguments(argc, argv);
 	if (rv < 0)
 		goto out;
 
 
-	if (cl.type == STATUS) {
-		return do_status(cl.type);
-	}
-
-
-	if (cl.type == CLIENT) {
-		cl_log_enable_stderr(TRUE);
-		cl_log_set_facility(0);
-	} else {
-		cl_log_set_entity(logging_entity);
-		cl_log_enable_stderr(debug_level ? TRUE : FALSE);
-		cl_log_set_facility(HA_LOG_FACILITY);
-	}
-	cl_inherit_logging_environment(0);
-
-
 	switch (cl.type) {
+	case STATUS:
+		rv = do_status(cl.type);
+		break;
+
 	case ARBITRATOR:
 	case DAEMON:
 	case SITE:
@@ -1239,5 +1231,6 @@ int main(int argc, char *argv[], char *envp[])
 	}
 
 out:
-	return rv ? EXIT_FAILURE : EXIT_SUCCESS;
+	/* Normalize values. 0x100 would be seen as "OK" by waitpid(). */
+	return rv >= 0 && rv < 0x70 ? rv : 1;
 }
