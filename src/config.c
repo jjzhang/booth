@@ -232,12 +232,11 @@ no_value:
 				val = s;
 				/* Rest of line. */
 				i = strlen(s);
-				/* Cannot be 0 because of "case 0" above. */
-				if (s[i-1] == '\n')
+				/* i > 0 because of "case 0" above. */
+				while (i > 0 && isspace(s[i-1]))
 					i--;
-				if (i > 0 && s[i-1] == '\r')
-					i--;
-				s[i] = 0;
+				s += i;
+				*s = 0;
 		}
 
 		if (val == s)
