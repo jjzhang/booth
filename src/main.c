@@ -229,12 +229,13 @@ void process_connection(int ci)
 {
 	struct boothc_ticket_site_msg msg;
 	struct ticket_config *tc;
-	int is_local, rv, len, exp, olen;
+	int is_local, rv, len, exp, olen, fd;
 	void (*deadfn) (int ci);
 	char *data;
 
 
-	rv = do_read(client[ci].fd, &msg.header, sizeof(msg.header));
+	fd = client[ci].fd;
+	rv = do_read(fd, &msg.header, sizeof(msg.header));
 
 	if (rv < 0) {
 		if (errno == ECONNRESET)
