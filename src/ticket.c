@@ -66,10 +66,10 @@ static LIST_HEAD(ticket_list);
 #define foreach_node(i_,n_) for(i=0; (n_=booth_conf->node+i, i<booth_conf->node_count); i++)
 
 /* Untrusted input, must fit (incl. \0) in a buffer of max chars. */
-int check_max_len_valid(char *s, int max)
+int check_max_len_valid(const char *s, int max)
 {
 	int i;
-	for(i=0; i<BOOTH_NAME_LEN; i++)
+	for(i=0; i<max; i++)
 		if (s[i] == 0)
 			return 1;
 	return 0;
