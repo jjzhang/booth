@@ -26,18 +26,7 @@
 #include "paxos.h"
 #include "log.h"
 
-/* Use numbers that are unlikely to conflict with other enums. */
-typedef enum {
-	OP_INIT      = 0x5104,
-	OP_PREPARING,
-	OP_PROMISING,
-	OP_PROPOSING,
-	OP_ACCEPTING,
-	OP_RECOVERY,
-	OP_COMMITTED,
-	OP_REJECTED,
-} paxos_state_t;
-
+#if 0
 struct proposal {
 	int ballot_number;
 	char value[0];
@@ -46,17 +35,6 @@ struct proposal {
 struct learned {
 	int ballot;
 	int number;
-};
-
-struct paxos_msghdr {
-	paxos_state_t state;
-	int from;
-	char psname[PAXOS_NAME_LEN+1];
-	char piname[PAXOS_NAME_LEN+1];
-	int ballot_number;
-	int proposer_id;
-	unsigned int extralen;
-	unsigned int valuelen;
 };
 
 struct proposer {
@@ -173,10 +151,9 @@ static int next_ballot_number(struct paxos_instance *pi)
 
 static void prepare_a_message(struct boothc_ticket_msg *msg, int state, struct paxos_instance *pax_inst)
 {
-	msg->ticket.state = htonl(state);
-	msg->ticket.proposer_id =
-		msg->header.from =
-		htonl(booth_get_myid());
+	init_ticket_msg(msg, state);
+
+	msg->header.from = htonl(booth_get_myid());
 //	strcpy(hdr->psname, pax_inst->ps->name);
 //	strcpy(hdr->piname, pax_inst->name);
 	msg->ticket.ballot = htonl(pax_inst->round);
@@ -814,3 +791,5 @@ int paxos_recvmsg(struct boothc_ticket_msg *msg)
 
 	return 0;
 }
+
+#endif

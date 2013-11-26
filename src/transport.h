@@ -39,7 +39,6 @@ typedef enum {
 struct booth_transport {
 	const char *name;
 	int (*init) (void *);
-	int (*get_myid) (void);
 	int (*open) (struct booth_node *);
 	int (*send) (struct booth_node *, void *, int);
 	int (*recv) (struct booth_node *, void *, int);
@@ -48,7 +47,7 @@ struct booth_transport {
 	int (*exit) (void);
 };
 
-const struct booth_transport booth_transport[TRANSPORT_ENTRIES];
+extern const struct booth_transport booth_transport[TRANSPORT_ENTRIES];
 int find_myself(struct booth_node **me, int fuzzy_allowed);
 
 int check_boothc_header(struct boothc_header *data, int len_incl_data);

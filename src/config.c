@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <stdlib.h>
+#include <assert.h>
 #include <zlib.h>
 #include <errno.h>
 #include <string.h>
@@ -92,6 +93,12 @@ int add_node(char *addr_string, int type)
 
 
 	node->tcp_fd = -1;
+
+	if (node->type == SITE)
+		node->role = PROPOSER | ACCEPTOR | LEARNER;
+	else if (node->type == ARBITRATOR)
+		node->role = ACCEPTOR | LEARNER;
+
 
 	booth_conf->node_count++;
 
@@ -313,6 +320,7 @@ no_value:
 			}
 			expiry = index(val, ';');
 			weight = rindex(val, ';');
+			/* CLEANUP */
 			if (!expiry) {
 				strcpy(booth_conf->ticket[count].name, val);
 				booth_conf->ticket[count].expiry = DEFAULT_TICKET_EXPIRY;
@@ -412,6 +420,31 @@ int find_site_in_config(unsigned char *site, struct booth_node **node)
 
 	return 0;
 }
+
+int find_nodeid_in_config(uint32_t nodeid, struct booth_node **node)
+{
+	struct booth_node *n;
+	int i;
+
+	if (nodeid == NO_OWNER) {
+		*node = NULL;
+		return 1;
+	}
+
+	if (!booth_conf)
+		return 0;
+
+	for (i = 0; i < booth_conf->node_count; i++) {
+		n = booth_conf->node + i;
+		if (n->nodeid == nodeid) {
+			*node = n;
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
 
 
 const char *type_to_string(int type)

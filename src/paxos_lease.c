@@ -29,6 +29,7 @@
 #include "list.h"
 #include "log.h"
 
+#if 0
 #define PAXOS_LEASE_SPACE		"paxoslease"
 #define PLEASE_VALUE_LEN		1024
 
@@ -934,3 +935,4 @@ int paxos_lease_exit(pl_handle_t handle)
 
 	return 0;
 }
+#endif

@@ -28,6 +28,7 @@
 #include "config.h"
 #include "pacemaker.h"
 #include "list.h"
+#include "inline-fn.h"
 #include "log.h"
 #include "booth.h"
 #include "timer.h"
@@ -59,8 +60,6 @@ struct ticket {
 
 static LIST_HEAD(ticket_list);
 
-/* Put into node data */
-static unsigned char *role;
 #endif
 
 #define foreach_ticket(i_,t_) for(i=0; (t_=booth_conf->ticket+i, i<booth_conf->ticket_count); i++)
@@ -94,6 +93,7 @@ int find_ticket_by_name(const char *ticket, struct ticket_config **found)
 	return 0;
 }
 
+#if 0
 int find_ticket_by_handle(pl_handle_t handle, struct ticket_config **found)
 {
 	int i;
@@ -111,6 +111,7 @@ int find_ticket_by_handle(pl_handle_t handle, struct ticket_config **found)
 
 	return 0;
 }
+#endif
 
 
 int check_ticket(char *ticket, struct ticket_config **found)
@@ -140,25 +141,10 @@ int check_site(char *site, int *is_local)
 	return 0;
 }
 
-static int * ticket_priority(int i)
-{
-	int j;
 
-	/* TODO: need more precise check */
-	/* WHAT???? node_count ticket?*/
-	for (j = 0; j < booth_conf->node_count; j++) {
-		if (booth_conf->ticket[i].weight[j] == 0)
-			return NULL;
-	}
-	return booth_conf->ticket[i].weight;
-}
-
-static int ticket_get_myid(void)
-{
-	return transport()->get_myid();
-}
-
-static void end_acquire(pl_handle_t handle, int error)
+#if 0
+void end_acquire(pl_handle_t handle, int error);
+void end_acquire(pl_handle_t handle, int error)
 {
 	struct ticket_config *tk;
 
@@ -177,7 +163,8 @@ static void end_acquire(pl_handle_t handle, int error)
 	log_debug("exit end_acquire");
 }
 
-static void end_release(pl_handle_t handle, int error)
+void end_release(pl_handle_t handle, int error);
+void end_release(pl_handle_t handle, int error)
 {
 	struct ticket_config *tk;
 
@@ -197,9 +184,9 @@ static void end_release(pl_handle_t handle, int error)
 	log_debug("exit end_release");
 }
 
-static int ticket_send(unsigned long id, void *value, int len)
+int ticket_send(unsigned long id, void *value, int len);
+int ticket_send(unsigned long id, void *value, int len)
 {
-#if 0
 	int i, rv = -1;
 	struct booth_node *to = NULL;
 	struct boothc_ticket_msg msg;
@@ -222,7 +209,6 @@ static int ticket_send(unsigned long id, void *value, int len)
 	frdee(buf);
 	*/
 	return rv;
-#endif
 	assert(0);
 }
 
@@ -230,7 +216,6 @@ static int ticket_broadcast(void *value, int vlen)
 {
 	struct booth_msghdr *hdr;
 	int tlen ;
-#if 0
 	= sizeof(*hdr) + vlen;
 	char buf[tlen];
 
@@ -239,10 +224,9 @@ static int ticket_broadcast(void *value, int vlen)
 	hdr->len = htonl(tlen);
 	memcpy(hdr->data, value, vlen);
 
-#endif
 	return transport()->broadcast(hdr, tlen);
 }
-#if 0
+
 static int ticket_read(const void *name, int *owner, int *ballot, 
 		       unsigned long long *expires)
 {
@@ -269,48 +253,64 @@ static int ticket_read(const void *name, int *owner, int *ballot,
 	return 0;
 }
 #endif
-static int ticket_parse(struct boothc_ticket_msg *tmsg)
+
+
+static void ticket_parse(struct ticket_config *tk,
+		struct boothc_ticket_msg *tmsg)
 {
-	struct ticket_config *tk;
+	struct ticket_paxos_state *tps;
 
-	if (!find_ticket_by_name(tmsg->ticket.id, &tk))
-		return -1;
+	tps = &tk->current_state;
 
-	if (tk->ballot < ntohl(tmsg->ticket.ballot))
-		tk->ballot = ntohl(tmsg->ticket.ballot);
+	if (tps->ballot < ntohl(tmsg->ticket.ballot))
+		tps->ballot = ntohl(tmsg->ticket.ballot);
 	if (CATCHED_VALID_TMSG == ntohl(tmsg->header.result)) {
-		tk->owner = ntohl(tmsg->ticket.owner);
-		tk->expires = current_time() + ntohl(tmsg->header.expiry);
+		tps->expires = current_time() + ntohl(tmsg->ticket.expiry);
+
+		if (!find_nodeid_in_config( ntohl(tmsg->ticket.owner),
+					&tps->owner))
+			log_error("wrong nodeid %x as ticket owner, msg from %x",
+					tmsg->ticket.owner, tmsg->header.from);
 	}
 }
 
-static int ticket_catchup(const void *name, int *owner, int *ballot,
-			  unsigned long long *expires)
+
+/** Find out what others think about this ticket.
+ *
+ * If we're a SITE, we can ask (and have to tell) Pacemaker.
+ * An ARBITRATOR can only ask others. */
+static int ticket_catchup(struct ticket_config *tk)
 {
-	struct ticket_config *tk;
+	struct ticket_paxos_state *tps;
 	int i, rv = 0;
+	uint32_t owner;
 	struct booth_node *node;
 	struct boothc_ticket_msg msg;
 	time_t now;
 
 	time(&now);
-	if (local->type != ARBITRATOR &&
-			find_ticket_by_name(name, &tk)) {
+	tps = &tk->current_state;
+
+	if (local->type != ARBITRATOR) {
 		pcmk_handler.load_ticket(tk->name,
-				&tk->owner,
-				&tk->ballot,
-				&tk->expires);
-		if (now >= tk->expires) {
-			tk->owner = NO_OWNER;
-			tk->expires = 0;
+				&owner,
+				&tps->ballot,
+				&tps->expires);
+
+		/* No check, node could have been deconfigured. */
+		find_nodeid_in_config(owner, &tps->owner);
+		if (now >= tps->expires) {
+			tps->owner = NULL;
+			tps->expires = 0;
 		}
 	}
+
 
 	foreach_node(i, node) {
 		if (node->type == SITE &&
 				!(node->local)) {
 			init_ticket_msg(&msg, BOOTHC_CMD_CATCHUP);
-			strncpy(msg.ticket.id, name, BOOTH_NAME_LEN + 1);
+			strncpy(msg.ticket.id, tk->name, sizeof(msg.ticket.id));
 
 			log_debug("attempting catchup from %s", node->addr_string);
 
@@ -329,67 +329,63 @@ static int ticket_catchup(const void *name, int *owner, int *ballot,
 			if (rv != sizeof(msg))
 				goto close;
 
+			/* TODO: check header? in tcp recv? */
+
 			log_debug("got catchup result from %s", node->addr_string);
-			ticket_parse(&msg);
+			ticket_parse(tk, &msg);
 close:
 			booth_transport[TCP].close(node);
 		}
 	}
 
 
-	if (find_ticket_by_name(name, &tk)) {
-		if (local->type != ARBITRATOR) {
-			if (current_time() >= tk->expires) {
-				tk->owner = NO_OWNER;
-				tk->expires = 0;
-			}
-			pcmk_handler.store_ticket(tk->name,
-					tk->owner,
-					tk->ballot,
-					tk->expires);
-			if (tk->owner == ticket_get_myid())
-				pcmk_handler.grant_ticket(tk->name);
-			else
-				pcmk_handler.revoke_ticket(tk->name);
-		}
-		*owner = tk->owner;
-		*expires = tk->expires;
-		*ballot = tk->ballot;
+	if (now >= tps->expires) {
+		tps->owner = NULL;
+		tps->expires = 0;
+	}
+
+	if (local->type != ARBITRATOR) {
+		pcmk_handler.store_ticket(tk->name,
+				tps->owner->nodeid,
+				tps->ballot,
+				tps->expires);
+		if (tps->owner == local)
+			pcmk_handler.grant_ticket(tk->name);
+		else
+			pcmk_handler.revoke_ticket(tk->name);
 	}
 
 	return rv;
 }
 
-static int ticket_write(pl_handle_t handle, struct paxos_lease_result *result)
+
+int ticket_write(struct ticket_config *tk);
+int ticket_write(struct ticket_config *tk)
 {
-	struct ticket_config *tk;
+	struct ticket_paxos_state *tps;
 
-	if (!find_ticket_by_handle(handle, &tk)) {
-		log_error("BUG: ticket_write failed "
-			  "(ticket handle %ld does not exist)", handle);
-		return -1;
-	}
+	tps = &tk->current_state;
 
-	/* TODO: ntohl? */
-	tk->owner = result->owner;
-	tk->expires = result->expires;
-	tk->ballot = result->ballot;
+	pcmk_handler.store_ticket(tk->name,
+			tps->owner->nodeid, tps->ballot, tps->expires);
 
-	pcmk_handler.store_ticket(tk->name, tk->owner, tk->ballot, tk->expires);
-	if (tk->owner == ticket_get_myid()) {
+	if (tps->owner == local) {
 		pcmk_handler.grant_ticket(tk->name);
-	} else if (tk->owner == NO_OWNER) {
+	} else if (!tps->owner) {
 		pcmk_handler.revoke_ticket(tk->name);
 	}
 
 	return 0;
 }
 
-static void ticket_status_recovery(pl_handle_t handle)
+
+void ticket_status_recovery(pl_handle_t handle);
+void ticket_status_recovery(pl_handle_t handle)
 {
 	paxos_lease_status_recovery(handle);
 }
 
+#if 0
 int ticket_recv(struct boothc_ticket_msg *msg, int msglen)
 {
 	struct booth_msghdr *hdr;
@@ -402,112 +398,92 @@ int ticket_recv(struct boothc_ticket_msg *msg, int msglen)
 	}
 	return paxos_recvmsg(msg);
 }
+#endif
 
-int grant_ticket(char *ticket)
+int grant_ticket(struct ticket_config *tk)
 {
-	struct ticket *tk;
-	int found = 0;
+	struct ticket_paxos_state *tps;
 
-	list_for_each_entry(tk, &ticket_list, list) {
-		if (!strcmp(tk->id, ticket)) {
-			found = 1;
-			break;
-		}
-	}
-
-	if (!found) {
-		log_error("ticket %s does not exist", ticket);
-		return BOOTHC_RLT_SYNC_FAIL;
-	}
-
-	if (tk->owner == ticket_get_myid())
+	tps = &tk->current_state;
+	if (tps->owner == local)
 		return BOOTHC_RLT_SYNC_SUCC;
-	else {
-		int ret = paxos_lease_acquire(tk->handle, CLEAR_RELEASE,
-				1, end_acquire);
-		if (ret >= 0)
-			tk->ballot = ret;
-		return (ret < 0)? BOOTHC_RLT_SYNC_FAIL: BOOTHC_RLT_ASYNC;
-	}
+
+	/* TODO */
+#if 0
+	int ret = paxos_lease_acquire(tk->handle, CLEAR_RELEASE,
+			1, end_acquire);
+	if (ret >= 0)
+		tk->ballot = ret;
+	return (ret < 0)? BOOTHC_RLT_SYNC_FAIL: BOOTHC_RLT_ASYNC;
+#endif
+	return 0;
 }
 
-int revoke_ticket(char *ticket)
+
+int revoke_ticket(struct ticket_config *tk)
 {
-	struct ticket *tk;
-	int found = 0;
+	struct ticket_paxos_state *tps;
 
-	list_for_each_entry(tk, &ticket_list, list) {
-		if (!strcmp(tk->id, ticket)) {
-			found = 1;
-			break;
-		}
-	}
-
-	if (!found) {
-		log_error("ticket %s does not exist", ticket);
-		return BOOTHC_RLT_SYNC_FAIL;
-	}
-
-	if (tk->owner == NO_OWNER)
+	tps = &tk->current_state;
+	if (!tps->owner)
 		return BOOTHC_RLT_SYNC_SUCC;
-	else {
-		int ret = paxos_lease_release(tk->handle, end_release);
-		if (ret >= 0)
-			tk->ballot = ret;
-		return (ret < 0)? BOOTHC_RLT_SYNC_FAIL: BOOTHC_RLT_ASYNC;
-	}	
+
+	/* TODO */
+#if 0
+	int ret = paxos_lease_release(tk->handle, end_release);
+	if (ret >= 0)
+		tk->ballot = ret;
+	return (ret < 0)? BOOTHC_RLT_SYNC_FAIL: BOOTHC_RLT_ASYNC;
+#endif
+	return 0;
 }
 
-int get_ticket_info(char *name, int *owner, int *expires)
-{
-	struct ticket *tk;
-
-	list_for_each_entry(tk, &ticket_list, list) {
-		if (!strncmp(tk->id, name, BOOTH_NAME_LEN + 1)) {
-			if(owner)
-				*owner = tk->owner;
-			if(expires)
-				*expires = tk->expires;
-			return 0;
-		}
-	}
-
-	return -1;
-}
 
 int list_ticket(char **pdata, unsigned int *len)
 {
-	struct ticket *tk;
-	char timeout_str[100];
-	char node_name[BOOTH_NAME_LEN];
-	char tmp[TK_LINE];
+	struct ticket_config *tk;
+	struct ticket_paxos_state *tps;
+	char timeout_str[64];
+	char *data, *cp;
+	int i, alloc;
 
 	*pdata = NULL;
 	*len = 0;
-	list_for_each_entry(tk, &ticket_list, list) {
-		memset(tmp, 0, TK_LINE);
-		strncpy(timeout_str, "INF", sizeof(timeout_str));
-		strncpy(node_name, "None", sizeof(node_name));
 
-		if (tk->owner < MAX_NODES && tk->owner > NO_OWNER)
-			strncpy(node_name, booth_conf->node[tk->owner].addr_string,
-					sizeof(node_name));
-		if (tk->expires != 0)
-			strftime(timeout_str, sizeof(timeout_str), "%Y/%m/%d %H:%M:%S",
-					localtime((time_t *)&tk->expires));
-		snprintf(tmp, TK_LINE, "ticket: %s, owner: %s, expires: %s\n",
-			 tk->id, node_name, timeout_str);
-		*pdata = realloc(*pdata, *len + TK_LINE);
-		if (*pdata == NULL)
-			return -ENOMEM;
-		memset(*pdata + *len, 0, TK_LINE);
-		memcpy(*pdata + *len, tmp, TK_LINE);
-		*len += TK_LINE;
+	alloc = 256 +
+		booth_conf->ticket_count * (BOOTH_NAME_LEN * 2 + 128);
+	data = malloc(alloc);
+	if (!data)
+		return -ENOMEM;
+
+	cp = data;
+	foreach_ticket(i, tk) {
+		tps = &tk->current_state;
+
+		if (tps->expires != 0)
+			strftime(timeout_str, sizeof(timeout_str), "%G",
+					localtime(&tps->expires));
+		else
+			strcpy(timeout_str, "INF");
+
+
+		cp += sprintf(cp,
+				"ticket: %s, owner: %s, expires: %s\n",
+				tk->name,
+				tps->owner ? tps->owner->addr_string : "None",
+				timeout_str);
+
+		*len = cp - data;
+		assert(*len < alloc);
 	}
+
+	*pdata = data;
 
 	return 0;
 }
 
+
+#if 0
 int catchup_ticket(struct ticket_msg *msg, struct ticket_config *tc)
 {
 	msg->ballot = htonl(tk->ballot);
@@ -522,74 +498,23 @@ int catchup_ticket(struct ticket_msg *msg, struct ticket_config *tc)
 }
 
 const struct paxos_lease_operations ticket_operations = {
-	.get_myid	= ticket_get_myid,
 	.send		= ticket_send,
 	.broadcast	= ticket_broadcast,
 	.catchup	= ticket_catchup,
 	.notify		= ticket_write,
 };
+#endif
 
 int setup_ticket(void)
 {
-	struct ticket *tk, *tmp;
-	int i, rv;
-	pl_handle_t plh;
-	int myid;
-		
-	role = malloc(booth_conf->node_count * sizeof(unsigned char));
-	if (!role)
-		return -ENOMEM;
-	memset(role, 0, booth_conf->node_count * sizeof(unsigned char));
-	for (i = 0; i < booth_conf->node_count; i++) {
-		if (booth_conf->node[i].type == SITE)
-			role[i] = PROPOSER | ACCEPTOR | LEARNER;
-		else if (booth_conf->node[i].type == ARBITRATOR)
-			role[i] = ACCEPTOR | LEARNER;
+	struct ticket_config *tk;
+	int i;
+
+	 /* TODO */
+	foreach_ticket(i, tk) {
+		ticket_catchup(tk);
 	}
 
-	for (i = 0; i < booth_conf->ticket_count; i++) {
-		tk = malloc(sizeof(struct ticket));
-		if (!tk) {
-			rv = -ENOMEM;
-			goto out;
-		}
-		memset(tk, 0, sizeof(struct ticket));
-		strcpy(tk->id, booth_conf->ticket[i].name);
-		tk->owner = NO_OWNER;
-		tk->expiry = booth_conf->ticket[i].expiry;
-		list_add_tail(&tk->list, &ticket_list); 
-
-		plh = paxos_lease_init(tk->id,
-				       BOOTH_NAME_LEN,
-				       tk->expiry,
-				       booth_conf->node_count,
-				       1,
-				       role,
-				       ticket_priority(i),
-				       &ticket_operations);
-		if (plh <= 0) {
-			log_error("paxos lease initialization failed");
-			rv = plh;
-			goto out;
-		}
-		tk->handle = plh;
-	}
-
-	myid = ticket_get_myid();
-	assert(myid < booth_conf->node_count);
-	if (role[myid] & ACCEPTOR) {
-		list_for_each_entry(tk, &ticket_list, list) {
-			ticket_status_recovery(tk->handle);
-		}
-	}
 
 	return 0;
-
-out:
-	list_for_each_entry_safe(tk, tmp, &ticket_list, list) {
-		list_del(&tk->list);
-	}
-	free(role);
-
-	return rv;
 }

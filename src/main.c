@@ -49,6 +49,7 @@
 #include "config.h"
 #include "transport.h"
 #include "timer.h"
+#include "inline-fn.h"
 #include "pacemaker.h"
 #include "ticket.h"
 
@@ -86,6 +87,7 @@ struct command_line {
 	struct boothc_ticket_site_msg msg;
 };
 
+struct booth_config *booth_conf;
 static struct command_line cl;
 
 int do_read(int fd, void *buf, size_t count)
@@ -285,7 +287,7 @@ bad_len:
 				goto reply;
 			}
 
-			if (tc->owner != NO_OWNER) {
+			if (tc->current_state.owner) {
 				log_error("client want to get an granted "
 						"ticket %s", msg.ticket.id);
 				rv = BOOTHC_RLT_OVERGRANT;
@@ -297,7 +299,7 @@ bad_len:
 				goto reply;
 			}
 			if (is_local)
-				rv = grant_ticket(msg.ticket.id);
+				rv = grant_ticket(tc);
 			else
 				rv = BOOTHC_RLT_REMOTE_OP;
 			break;
@@ -318,7 +320,7 @@ bad_len:
 				goto reply;
 			}
 			if (is_local)
-				msg.header.result = revoke_ticket(msg.ticket.id);
+				msg.header.result = revoke_ticket(tc);
 			else
 				msg.header.result = BOOTHC_RLT_REMOTE_OP;
 			break;
@@ -507,7 +509,7 @@ static int loop(int fd)
 	void (*workfn) (int ci);
 	void (*deadfn) (int ci);
 	int rv, i;
-	
+
 	rv = setup_timer();
 	if (rv < 0)
 		goto fail;

@@ -31,6 +31,7 @@
 #include <poll.h>
 #include "list.h"
 #include "booth.h"
+#include "inline-fn.h"
 #include "log.h"
 #include "config.h"
 #include "paxos_lease.h"
@@ -265,11 +266,11 @@ int check_boothc_header(struct boothc_header *h, int len_incl_data)
 	}
 
 
-	l = ntohl(h->len);
-	if (l < sizeof(*h) ||
-			l > sizeof(boothc_ticket_site_msg)) {
+	l = ntohl(h->length);
+	if (l < sizeof(*h)) {
 		log_error("length %d out of range", l);
 		return -EINVAL;
+	}
 
 
 	if (len_incl_data < 0)
@@ -360,7 +361,7 @@ static int booth_tcp_init(void * unused __attribute__((unused)))
 {
 	int rv;
 
-	if (booth_get_myid() < 0)
+	if (get_local_id() < 0)
 		return -1;
 
 	rv = setup_tcp_listener();
@@ -654,7 +655,6 @@ const struct booth_transport booth_transport[TRANSPORT_ENTRIES] = {
 	[TCP] = {
 		.name = "TCP",
 		.init = booth_tcp_init,
-		.get_myid = booth_get_myid,
 		.open = booth_tcp_open,
 		.send = booth_tcp_send,
 		.recv = booth_tcp_recv,
@@ -664,7 +664,6 @@ const struct booth_transport booth_transport[TRANSPORT_ENTRIES] = {
 	[UDP] = {
 		.name = "UDP",
 		.init = booth_udp_init,
-		.get_myid = booth_get_myid,
 		.send = booth_udp_send,
 		.broadcast = booth_udp_broadcast,
 		.exit = booth_udp_exit
@@ -672,7 +671,6 @@ const struct booth_transport booth_transport[TRANSPORT_ENTRIES] = {
 	[SCTP] = {
 		.name = "SCTP",
 		.init = booth_sctp_init,
-		.get_myid = booth_get_myid,
 		.send = booth_sctp_send,
 		.broadcast = booth_sctp_broadcast,
 		.exit = booth_sctp_exit

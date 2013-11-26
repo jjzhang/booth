@@ -41,7 +41,7 @@ struct timerlist * add_timer(unsigned long expires,
 	}
 	memset(timer, 0, sizeof(struct timerlist));
 
-	timer->expires = current_time() + expires;
+	timer->expires = time(NULL) + expires;
 	timer->data = data;
 	timer->function = function;
 	list_add_tail(&timer->entry, &timer_head);
@@ -70,7 +70,7 @@ void process_timerlist(void)
 		if (timer->expires == -2) {
 			list_del(&timer->entry);
 			free(timer);
-		} else if (current_time() >= timer->expires) {
+		} else if (time(NULL) >= timer->expires) {
 			timer->expires = -1;
 			timer->function(timer->data);
 		}

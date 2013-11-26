@@ -22,29 +22,50 @@
 
 #include <stdint.h>
 #include "booth.h"
-#include "config.h"
 #include "paxos_lease.h"
 #include "transport.h"
+
+
+/** @{ */
+/** Definitions for in-RAM data. */
 
 #define MAX_NODES	16
 #define TICKET_ALLOC	16
 
-#define NO_OWNER (-1)
 
-struct ticket_config {
-	boothc_ticket name;
+struct ticket_paxos_state {
+	/** See booth_node:nodeid. */
+	uint32_t proposer;
+	struct booth_node *_proposer;
 
-	/* How many seconds to hold it */
-	int expiry;
-	/* Who has it. */
-	int owner; struct booth_node *owner; ??
+	/** See booth_node:nodeid. */
+	struct booth_node *owner;
 
 	/** Timestamp of expiration. */
 	time_t expires;
 
+	/** Current ballot number. Might be < prev_ballot if overflown. */
+	uint32_t ballot;
+	/** Previous ballot. */
+	uint32_t prev_ballot;
+};
+
+
+struct ticket_config {
+	boothc_ticket name;
+
+	/** How many seconds until expiration. */
+	int expiry;
+
 //	pl_handle_t handle; not needed?
 
 	int weight[MAX_NODES];
+
+	/* Only used on the owner */
+	struct timerlist *refresh_ticket;
+
+	struct ticket_paxos_state current_state;
+	struct ticket_paxos_state proposed_state;
 };
 
 struct booth_config {
@@ -57,19 +78,18 @@ struct booth_config {
     struct ticket_config ticket[0];
 };
 
-struct booth_config *booth_conf;
+
+extern struct booth_config *booth_conf;
+
 
 int read_config(const char *path);
 
 int check_config(int type);
 
 int find_site_in_config(unsigned char *site, struct booth_node **node);
+int find_nodeid_in_config(uint32_t nodeid, struct booth_node **node);
 
 const char *type_to_string(int type);
-
-static inline struct booth_transport const *transport(void) {
-	return booth_transport + booth_conf->proto;
-}
 
 
 #endif /* _CONFIG_H */

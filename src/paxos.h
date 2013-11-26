@@ -19,12 +19,15 @@
 #ifndef _PAXOS_H
 #define _PAXOS_H
 
+struct paxos_instance;
+
 #define PAXOS_NAME_LEN	63
 
 #define PROPOSER	0x4
 #define ACCEPTOR	0x2
 #define LEARNER		0x1
 
+#if 0
 typedef long ps_handle_t;
 typedef long pi_handle_t;
 
@@ -45,7 +48,6 @@ struct paxos_operations {
 };
 
 int paxos_recvmsg(void *msg, int msglen);
-struct paxos_instance;
 
 ps_handle_t paxos_space_init(const void *name,
 			     unsigned int number,
@@ -80,5 +82,7 @@ int paxos_propose(pi_handle_t handle, void *value, int round);
 int paxos_instance_exit(pi_handle_t handle);
 
 int paxos_space_exit(ps_handle_t handle);
+
+#endif
 
 #endif /* _PAXOS_H */
