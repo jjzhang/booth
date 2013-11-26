@@ -490,7 +490,7 @@ int find_site_by_name(unsigned char *site, struct booth_site **node)
 	return 0;
 }
 
-int find_nodeid_in_config(uint32_t site_id, struct booth_site **node)
+int find_site_by_id(uint32_t site_id, struct booth_site **node)
 {
 	struct booth_site *n;
 	int i;

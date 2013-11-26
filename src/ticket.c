@@ -267,7 +267,7 @@ static void ticket_parse(struct ticket_config *tk,
 	if (CATCHED_VALID_TMSG == ntohl(tmsg->header.result)) {
 		tps->expires = current_time() + ntohl(tmsg->ticket.expiry);
 
-		if (!find_nodeid_in_config( ntohl(tmsg->ticket.owner),
+		if (!find_site_by_id( ntohl(tmsg->ticket.owner),
 					&tps->owner))
 			log_error("wrong site_id %x as ticket owner, msg from %x",
 					tmsg->ticket.owner, tmsg->header.from);
@@ -298,7 +298,7 @@ static int ticket_catchup(struct ticket_config *tk)
 				&tps->expires);
 
 		/* No check, node could have been deconfigured. */
-		find_nodeid_in_config(owner, &tps->owner);
+		find_site_by_id(owner, &tps->owner);
 		if (now >= tps->expires) {
 			tps->owner = NULL;
 			tps->expires = 0;
