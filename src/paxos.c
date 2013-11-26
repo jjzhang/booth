@@ -28,14 +28,14 @@
 
 /* Use numbers that are unlikely to conflict with other enums. */
 typedef enum {
-	INIT      = 0x5104,
-	PREPARING,
-	PROMISING,
-	PROPOSING,
-	ACCEPTING,
-	RECOVERY,
-	COMMITTED,
-	REJECTED,
+	OP_INIT      = 0x5104,
+	OP_PREPARING,
+	OP_PROMISING,
+	OP_PROPOSING,
+	OP_ACCEPTING,
+	OP_RECOVERY,
+	OP_COMMITTED,
+	OP_REJECTED,
 } paxos_state_t;
 
 struct proposal {
@@ -199,7 +199,7 @@ static void proposer_prepare(struct paxos_instance *pi, int *round)
 	ballot = next_ballot_number(pi);
 	pi->proposer->ballot = ballot;
 
-	prepare_a_message(&msg, PREPARING, pi);
+	prepare_a_message(&msg, OP_PREPARING, pi);
 
 	if (lease_prepare(pi, &msg) < 0)
 		return;
@@ -239,7 +239,7 @@ static void proposer_propose(struct paxos_space *ps,
 	if (lease_propose(pih, &msg, ballot, value) < 0)
 		return;
 
-	prepare_a_message(&msg, PROPOSING, pi);
+	prepare_a_message(&msg, OP_PROPOSING, pi);
 
 	transport()->broadcast(&msg, sizeof(msg))
 }
@@ -277,14 +277,14 @@ static void proposer_commit(struct paxos_space *ps,
 	if (!have_quorum(ps, pi->proposer->accepted_number))
 		return;
 
-	if (pi->proposer->state == COMMITTED)
+	if (pi->proposer->state == OP_COMMITTED)
 		return;
 
 	pi->round = ballot;
 	if (ps->p_op->commit
 		&& ps->p_op->commit(pih, extra, pi->round) < 0)
 		return;
-	pi->proposer->state = COMMITTED;
+	pi->proposer->state = OP_COMMITTED;
 
 	if (pi->end)
 		pi->end(pih, pi->round, 0);	
@@ -300,7 +300,7 @@ static void acceptor_promise(struct paxos_space *ps,
 	void *extra;
 
 	log_debug("acceptor promise ...");
-	if (pi->acceptor->state == RECOVERY) {
+	if (pi->acceptor->state == OP_RECOVERY) {
 		log_debug("still in recovery");
 		return;
 	}
@@ -327,10 +327,10 @@ static void acceptor_promise(struct paxos_space *ps,
 		return;
 
 	pi->acceptor->highest_promised = ntohl(hdr->ballot_number);
-	pi->acceptor->state = PROMISING;
+	pi->acceptor->state = OP_PROMISING;
 	to = ntohl(hdr->from);
 	hdr->from = htonl(ps->p_op->get_myid());
-	hdr->state = htonl(PROMISING);
+	hdr->state = htonl(OP_PROMISING);
 	ps->p_op->send(to, msg, msglen);	
 }
 
@@ -346,7 +346,7 @@ static void acceptor_accepted(struct paxos_space *ps,
 	int ballot;
 
 	log_debug("acceptor accepted ...");
-	if (pi->acceptor->state == RECOVERY) {
+	if (pi->acceptor->state == OP_RECOVERY) {
 		log_debug("still in recovery");
 		return;
 	}
@@ -376,10 +376,10 @@ static void acceptor_accepted(struct paxos_space *ps,
 		&& ps->p_op->accepted(pih, extra, ballot, value) < 0)
 		return;
 
-	pi->acceptor->state = ACCEPTING;
+	pi->acceptor->state = OP_ACCEPTING;
 	to = ntohl(hdr->from);
 	hdr->from = htonl(myid);
-	hdr->state = htonl(ACCEPTING);
+	hdr->state = htonl(OP_ACCEPTING);
 
 	if (ps->p_op->broadcast)
 		ps->p_op->broadcast(msg, sizeof(struct paxos_msghdr)
@@ -502,7 +502,7 @@ ps_handle_t paxos_space_init(const void *name,
 	ps->l_op = &generic_learner_operations;
 
 	list_add_tail(&ps->list, &ps_head);
-	INIT_LIST_HEAD(&ps->pi_head);
+	OP_INIT_LIST_HEAD(&ps->pi_head);
 
 	return (ps_handle_t)ps;
 }
@@ -556,7 +556,7 @@ pi_handle_t paxos_instance_init(ps_handle_t handle, const void *name, int *prio)
 			goto out_prio;
 		}
 		memset(proposer, 0, sizeof(struct proposer));
-		proposer->state = INIT;
+		proposer->state = OP_INIT;
 
 		proposer->proposal = malloc(sizeof(struct proposal) + valuelen);
 		if (!proposer->proposal) {
@@ -577,7 +577,7 @@ pi_handle_t paxos_instance_init(ps_handle_t handle, const void *name, int *prio)
 			goto out_proposal;
 		}
 		memset(acceptor, 0, sizeof(struct acceptor));
-		acceptor->state = INIT;
+		acceptor->state = OP_INIT;
 
 		acceptor->accepted_proposal = malloc(sizeof(struct proposal)
 						     + valuelen);
@@ -591,9 +591,9 @@ pi_handle_t paxos_instance_init(ps_handle_t handle, const void *name, int *prio)
 		pi->acceptor = acceptor;
 	
 		if (ps->p_op->catchup)
-			pi->acceptor->state = RECOVERY;
+			pi->acceptor->state = OP_RECOVERY;
 		else
-			pi->acceptor->state = INIT;
+			pi->acceptor->state = OP_INIT;
 	}
 
 	if (ps->role[myid] & LEARNER) {
@@ -607,7 +607,7 @@ pi_handle_t paxos_instance_init(ps_handle_t handle, const void *name, int *prio)
 		memset(learner, 0,
 		       sizeof(struct learner) 
 		       + ps->number * sizeof(struct learned));
-		learner->state = INIT;
+		learner->state = OP_INIT;
 		pi->learner = learner;
 	}
 
@@ -653,7 +653,7 @@ int paxos_round_request(pi_handle_t handle,
 		return -EOPNOTSUPP;
 	}
 
-	pi->proposer->state = PREPARING;
+	pi->proposer->state = OP_PREPARING;
 	pi->proposer->open_number = 0;
 	pi->proposer->accepted_number = 0;
 	pi->proposer->proposed = 0; 
@@ -673,7 +673,7 @@ int paxos_recovery_status_get(pi_handle_t handle)
 	if (!(pi->ps->role[myid] & ACCEPTOR))
 		return -EOPNOTSUPP;
 
-	if (pi->acceptor->state == RECOVERY)
+	if (pi->acceptor->state == OP_RECOVERY)
 		return 1;
 	else
 		return 0;
@@ -688,9 +688,9 @@ int paxos_recovery_status_set(pi_handle_t handle, int recovery)
 		return -EOPNOTSUPP;
 
 	if (recovery)
-		pi->acceptor->state = RECOVERY;
+		pi->acceptor->state = OP_RECOVERY;
 	else
-		pi->acceptor->state = INIT;
+		pi->acceptor->state = OP_INIT;
 
 	return 0;
 }
@@ -716,14 +716,14 @@ int paxos_propose(pi_handle_t handle, void *value, int round)
 		return -ENOMEM;
 	}
 
-	pi->proposer->state = PROPOSING;
+	pi->proposer->state = OP_PROPOSING;
 	strcpy(pi->proposer->proposal->value, value);
 	pi->proposer->accepted_number = 0;
 	pi->round = round;
 
 	memset(msg, 0, len);
 	hdr = msg;
-	hdr->state = htonl(PROPOSING);
+	hdr->state = htonl(OP_PROPOSING);
 	hdr->from = htonl(pi->ps->p_op->get_myid());
 	hdr->proposer_id = hdr->from;
 	strcpy(hdr->psname, pi->ps->name);
@@ -790,18 +790,18 @@ int paxos_recvmsg(struct boothc_ticket_msg *msg)
 		paxos_instance_init((ps_handle_t)ps, hdr->piname, NULL);
 
 	switch (ntohl(hdr->state)) {
-	case PREPARING:
+	case OP_PREPARING:
 		if (ps->role[myid] & ACCEPTOR)
 			ps->a_op->promise(ps, pi, msg, msglen);
 		break;
-	case PROMISING:
+	case OP_PROMISING:
 		ps->r_op->propose(ps, pi, msg, msglen);
 		break;
-	case PROPOSING:
+	case OP_PROPOSING:
 		if (ps->role[myid] & ACCEPTOR)
 			ps->a_op->accepted(ps, pi, msg, msglen);
 		break;
-	case ACCEPTING:
+	case OP_ACCEPTING:
 		if (ntohl(hdr->proposer_id) == myid)
 			ps->r_op->commit(ps, pi, msg, msglen);
 		else if (ps->role[myid] & LEARNER)

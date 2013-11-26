@@ -1190,7 +1190,7 @@ static int do_client(void)
 
 	switch (cl.op) {
 	case OP_LIST:
-		rv = query_get_string_answer(BOOTHC_CMD_LIST);
+		rv = query_get_string_answer(CMD_LIST);
 		break;
 
 	case OP_GRANT:
