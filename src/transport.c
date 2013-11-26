@@ -686,8 +686,20 @@ int send_header_only(int fd, struct boothc_header *hdr)
 	int rv;
 
 	rv = do_write(fd, hdr, sizeof(*hdr));
-	if (rv < 0)
-		log_error("connection %d write error %d", ci, rv);
 
 	return rv;
 }
+
+int send_header_plus(int fd, struct boothc_header *hdr, void *data, int len)
+{
+	int rv;
+
+
+	rv = send_header_only(fd, hdr);
+
+	if (rv >= 0 && len)
+		rv = do_write(fd, data, len);
+
+	return rv;
+}
+

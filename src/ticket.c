@@ -535,12 +535,6 @@ int ticket_answer_list(int fd, struct boothc_ticket_msg *msg)
 		goto ex;
 
 	init_header(&hdr, CMD_LIST, RLT_SUCCESS, sizeof(hdr) + olen);
-	if (send_header_only(fd, &hdr) < 0)
-		goto ex;
 
-	if (olen)
-		do_write(fd, data, olen);
-
-ex:
-	return;
+	return send_header_plus(fd, &hdr, data, olen);
 }
