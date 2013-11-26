@@ -1159,7 +1159,7 @@ static int do_server(int type)
 
 	log_info("BOOTH %s daemon is starting, node id is %08X.",
 			type_to_string(local->type),
-			local->nodeid);
+			local->site_id);
 
 
 	set_scheduler();

@@ -29,7 +29,7 @@ static inline void init_header(struct boothc_header *h, int cmd,
 	h->version = htonl(BOOTHC_VERSION);
 	h->length  = htonl(data_len);
 	h->cmd     = htonl(cmd);
-	h->from    = htonl(local->nodeid);
+	h->from    = htonl(local->site_id);
 	h->result  = htonl(result);
 }
 
@@ -60,13 +60,13 @@ static inline struct booth_transport const *transport(void) {
 
 inline static uint32_t get_local_id(void)
 {
-	return local ? local->nodeid : -1;
+	return local ? local->site_id : -1;
 }
 
 
 inline static uint32_t get_node_id(struct booth_site *node)
 {
-	return node ? node->nodeid : NO_OWNER;
+	return node ? node->site_id : NO_OWNER;
 }
 
 

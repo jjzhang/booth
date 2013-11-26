@@ -34,11 +34,11 @@
 
 
 struct ticket_paxos_state {
-	/** See booth_site:nodeid. */
+	/** See booth_site:site_id. */
 	uint32_t proposer;
 	struct booth_site *_proposer;
 
-	/** See booth_site:nodeid. */
+	/** See booth_site:site_id. */
 	struct booth_site *owner;
 
 	/** Timestamp of expiration. */
@@ -93,7 +93,7 @@ int read_config(const char *path);
 int check_config(int type);
 
 int find_site_in_config(unsigned char *site, struct booth_site **node);
-int find_nodeid_in_config(uint32_t nodeid, struct booth_site **node);
+int find_nodeid_in_config(uint32_t site_id, struct booth_site **node);
 
 const char *type_to_string(int type);
 

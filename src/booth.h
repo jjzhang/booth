@@ -61,7 +61,7 @@ struct boothc_header {
 	/** BOOTHC_VERSION */
 	uint32_t version;
 
-	/** Packet source; nodeid. See add_node(). */
+	/** Packet source; site_id. See add_node(). */
 	uint32_t from;
 
 	/** Length including header */
@@ -151,7 +151,7 @@ typedef enum {
 /** @{ */
 
 struct booth_site {
-	int nodeid;
+	int site_id;
 	int type;
 	int local;
 

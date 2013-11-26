@@ -79,21 +79,21 @@ int add_node(char *addr_string, int type)
 
 	node->family = BOOTH_PROTO_FAMILY;
 	node->type = type;
-	/* Make nodeid start at a non-zero point.
+	/* Make site_id start at a non-zero point.
 	 * Perhaps use hash over string or address? */
 	strcpy(node->addr_string, addr_string);
 
 	nid = crc32(0L, NULL, 0);
 	/* booth_config() uses memset(), so sizeof() is guaranteed to give
 	 * the same result everywhere - no uninitialized bytes. */
-	node->nodeid = crc32(nid, node->addr_string,
+	node->site_id = crc32(nid, node->addr_string,
 			sizeof(node->addr_string));
 	/* Make sure we will never collide with NO_OWNER,
 	 * or be negative (to get "get_local_id() < 0" working). */
-	mask = 1 << (sizeof(node->nodeid)*4 -1);
+	mask = 1 << (sizeof(node->site_id)*4 -1);
 	assert(NO_OWNER & mask);
 	assert(NO_OWNER >= 0);
-	node->nodeid &= ~mask;
+	node->site_id &= ~mask;
 
 
 	node->tcp_fd = -1;
@@ -490,12 +490,12 @@ int find_site_in_config(unsigned char *site, struct booth_site **node)
 	return 0;
 }
 
-int find_nodeid_in_config(uint32_t nodeid, struct booth_site **node)
+int find_nodeid_in_config(uint32_t site_id, struct booth_site **node)
 {
 	struct booth_site *n;
 	int i;
 
-	if (nodeid == NO_OWNER) {
+	if (site_id == NO_OWNER) {
 		*node = NULL;
 		return 1;
 	}
@@ -505,7 +505,7 @@ int find_nodeid_in_config(uint32_t nodeid, struct booth_site **node)
 
 	for (i = 0; i < booth_conf->node_count; i++) {
 		n = booth_conf->node + i;
-		if (n->nodeid == nodeid) {
+		if (n->site_id == site_id) {
 			*node = n;
 			return 1;
 		}

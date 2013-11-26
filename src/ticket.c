@@ -192,7 +192,7 @@ int ticket_send(unsigned long id, void *value, int len)
 	struct boothc_ticket_msg msg;
 
 	foreach_node(i, to)
-		if (booth_conf->node[i].nodeid == id) {
+		if (booth_conf->node[i].site_id == id) {
 			to = booth_conf->node+i;
 			break;
 		}
@@ -269,7 +269,7 @@ static void ticket_parse(struct ticket_config *tk,
 
 		if (!find_nodeid_in_config( ntohl(tmsg->ticket.owner),
 					&tps->owner))
-			log_error("wrong nodeid %x as ticket owner, msg from %x",
+			log_error("wrong site_id %x as ticket owner, msg from %x",
 					tmsg->ticket.owner, tmsg->header.from);
 	}
 }
@@ -346,7 +346,7 @@ close:
 
 	if (local->type != ARBITRATOR) {
 		pcmk_handler.store_ticket(tk->name,
-				tps->owner->nodeid,
+				tps->owner->site_id,
 				tps->ballot,
 				tps->expires);
 		if (tps->owner == local)
@@ -367,7 +367,7 @@ int ticket_write(struct ticket_config *tk)
 	tps = &tk->current_state;
 
 	pcmk_handler.store_ticket(tk->name,
-			tps->owner->nodeid, tps->ballot, tps->expires);
+			tps->owner->site_id, tps->ballot, tps->expires);
 
 	if (tps->owner == local) {
 		pcmk_handler.grant_ticket(tk->name);
