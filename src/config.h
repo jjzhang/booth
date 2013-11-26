@@ -34,12 +34,12 @@
 
 
 struct ticket_paxos_state {
-	/** See booth_node:nodeid. */
+	/** See booth_site:nodeid. */
 	uint32_t proposer;
-	struct booth_node *_proposer;
+	struct booth_site *_proposer;
 
-	/** See booth_node:nodeid. */
-	struct booth_node *owner;
+	/** See booth_site:nodeid. */
+	struct booth_site *owner;
 
 	/** Timestamp of expiration. */
 	time_t expires;
@@ -77,7 +77,7 @@ struct booth_config {
     uint16_t port;
 
     int node_count;
-    struct booth_node node[MAX_NODES];
+    struct booth_site node[MAX_NODES];
 
     int ticket_count;
     int ticket_allocated;
@@ -92,8 +92,8 @@ int read_config(const char *path);
 
 int check_config(int type);
 
-int find_site_in_config(unsigned char *site, struct booth_node **node);
-int find_nodeid_in_config(uint32_t nodeid, struct booth_node **node);
+int find_site_in_config(unsigned char *site, struct booth_site **node);
+int find_nodeid_in_config(uint32_t nodeid, struct booth_site **node);
 
 const char *type_to_string(int type);
 

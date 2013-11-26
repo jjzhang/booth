@@ -150,7 +150,7 @@ typedef enum {
 
 /** @{ */
 
-struct booth_node {
+struct booth_site {
 	int nodeid;
 	int type;
 	int local;
@@ -172,7 +172,7 @@ struct booth_node {
 
 
 
-extern struct booth_node *local;
+extern struct booth_site *local;
 
 /** @} */
 

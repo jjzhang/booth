@@ -46,7 +46,7 @@
 extern struct client *client;
 extern struct pollfd *pollfd;
 
-struct booth_node *local = NULL;
+struct booth_site *local = NULL;
 
 struct tcp_conn {
 	int s;
@@ -79,10 +79,10 @@ static void parse_rtattr(struct rtattr *tb[],
 static int find_address(unsigned char ipaddr[BOOTH_IPADDR_LEN],
 		int family, int prefixlen,
 		int fuzzy_allowed,
-		struct booth_node **me)
+		struct booth_site **me)
 {
 	int i;
-	struct booth_node *node;
+	struct booth_site *node;
 	int bytes, bits_left, mask;
 	unsigned char node_bits, ip_bits;
 	uint8_t *n_a;
@@ -130,12 +130,12 @@ found:
 }
 
 
-int _find_myself(int family, struct booth_node **mep, int fuzzy_allowed);
-int _find_myself(int family, struct booth_node **mep, int fuzzy_allowed)
+int _find_myself(int family, struct booth_site **mep, int fuzzy_allowed);
+int _find_myself(int family, struct booth_site **mep, int fuzzy_allowed)
 {
 	int fd;
 	struct sockaddr_nl nladdr;
-	struct booth_node *me;
+	struct booth_site *me;
 	unsigned char ipaddr[BOOTH_IPADDR_LEN];
 	static char rcvbuf[NETLINK_BUFSIZE];
 	struct {
@@ -241,7 +241,7 @@ found:
 	return 1;
 }
 
-int find_myself(struct booth_node **mep, int fuzzy_allowed)
+int find_myself(struct booth_site **mep, int fuzzy_allowed)
 {
 	return _find_myself(AF_INET6, mep, fuzzy_allowed) ||
 		_find_myself(AF_INET, mep, fuzzy_allowed);
@@ -429,7 +429,7 @@ done:
 	return 0;
 }
 
-int booth_tcp_open(struct booth_node *to)
+int booth_tcp_open(struct booth_site *to)
 {
 	int s, rv;
 
@@ -464,12 +464,12 @@ error:
 	return -1;
 }
 
-int booth_tcp_send(struct booth_node *to, void *buf, int len)
+int booth_tcp_send(struct booth_site *to, void *buf, int len)
 {
 	return do_write(to->tcp_fd, buf, len);
 }
 
-static int booth_tcp_recv(struct booth_node *from, void *buf, int len)
+static int booth_tcp_recv(struct booth_site *from, void *buf, int len)
 {
 	int got;
 	/* Needs timeouts! */
@@ -481,7 +481,7 @@ static int booth_tcp_recv(struct booth_node *from, void *buf, int len)
 	return len;
 }
 
-static int booth_tcp_close(struct booth_node *to)
+static int booth_tcp_close(struct booth_site *to)
 {
 	if (to) {
 		if (to->tcp_fd > STDERR_FILENO)
@@ -583,7 +583,7 @@ static int booth_udp_init(void *f)
 	return 0;
 }
 
-static int booth_udp_send(struct booth_node *to, void *buf, int len)
+static int booth_udp_send(struct booth_site *to, void *buf, int len)
 {
 	struct msghdr msg;
 	struct iovec iovec;
@@ -633,7 +633,7 @@ static int booth_sctp_init(void *f __attribute__((unused)))
 	return 0;
 }
 
-static int booth_sctp_send(struct booth_node * to __attribute__((unused)),
+static int booth_sctp_send(struct booth_site * to __attribute__((unused)),
 			   void *buf __attribute__((unused)),
 			   int len __attribute__((unused)))
 {

@@ -130,9 +130,9 @@ retry:
 }
 
 
-static int do_local_connect_and_write(void *data, int len, struct booth_node **ret)
+static int do_local_connect_and_write(void *data, int len, struct booth_site **ret)
 {
-	struct booth_node *node;
+	struct booth_site *node;
 	int rv;
 
 
@@ -573,7 +573,7 @@ fail:
 
 static int query_get_string_answer(cmd_request_t cmd)
 {
-	struct booth_node *node;
+	struct booth_site *node;
 	struct boothc_header h, reply;
 	char *data;
 	int data_len;
@@ -613,7 +613,7 @@ out:
 
 static int do_command(cmd_request_t cmd)
 {
-	struct booth_node *node, *to;
+	struct booth_site *node, *to;
 	struct boothc_header reply;
 	int rv;
 

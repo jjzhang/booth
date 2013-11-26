@@ -60,7 +60,7 @@ int add_node(char *address, int type);
 int add_node(char *addr_string, int type)
 {
 	int rv;
-	struct booth_node *node;
+	struct booth_site *node;
 	uLong nid;
 	uint32_t mask;
 
@@ -470,9 +470,9 @@ int check_config(int type)
 }
 
 
-int find_site_in_config(unsigned char *site, struct booth_node **node)
+int find_site_in_config(unsigned char *site, struct booth_site **node)
 {
-	struct booth_node *n;
+	struct booth_site *n;
 	int i;
 
 	if (!booth_conf)
@@ -490,9 +490,9 @@ int find_site_in_config(unsigned char *site, struct booth_node **node)
 	return 0;
 }
 
-int find_nodeid_in_config(uint32_t nodeid, struct booth_node **node)
+int find_nodeid_in_config(uint32_t nodeid, struct booth_site **node)
 {
-	struct booth_node *n;
+	struct booth_site *n;
 	int i;
 
 	if (nodeid == NO_OWNER) {

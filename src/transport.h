@@ -39,25 +39,25 @@ typedef enum {
 struct booth_transport {
 	const char *name;
 	int (*init) (void *);
-	int (*open) (struct booth_node *);
-	int (*send) (struct booth_node *, void *, int);
-	int (*recv) (struct booth_node *, void *, int);
+	int (*open) (struct booth_site *);
+	int (*send) (struct booth_site *, void *, int);
+	int (*recv) (struct booth_site *, void *, int);
 	int (*broadcast) (void *, int);
-	int (*close) (struct booth_node *);
+	int (*close) (struct booth_site *);
 	int (*exit) (void);
 };
 
 extern const struct booth_transport booth_transport[TRANSPORT_ENTRIES];
-int find_myself(struct booth_node **me, int fuzzy_allowed);
+int find_myself(struct booth_site **me, int fuzzy_allowed);
 
 int check_boothc_header(struct boothc_header *data, int len_incl_data);
 
 int setup_udp_server(int try_only);
 
-int booth_tcp_open(struct booth_node *to);
-int booth_tcp_send(struct booth_node *to, void *buf, int len);
+int booth_tcp_open(struct booth_site *to);
+int booth_tcp_send(struct booth_site *to, void *buf, int len);
 
-inline static void * node_to_addr_pointer(struct booth_node *node) {
+inline static void * node_to_addr_pointer(struct booth_site *node) {
 	switch (node->family) {
 	case AF_INET:  return &node->sa4.sin_addr;
 	case AF_INET6: return &node->sa6.sin6_addr;

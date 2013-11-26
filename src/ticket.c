@@ -128,7 +128,7 @@ int check_ticket(char *ticket, struct ticket_config **found)
 
 int check_site(char *site, int *is_local)
 {
-	struct booth_node *node;
+	struct booth_site *node;
 
 	if (!check_max_len_valid(site, sizeof(node->addr_string)))
 		return 0;
@@ -188,7 +188,7 @@ int ticket_send(unsigned long id, void *value, int len);
 int ticket_send(unsigned long id, void *value, int len)
 {
 	int i, rv = -1;
-	struct booth_node *to = NULL;
+	struct booth_site *to = NULL;
 	struct boothc_ticket_msg msg;
 
 	foreach_node(i, to)
@@ -284,7 +284,7 @@ static int ticket_catchup(struct ticket_config *tk)
 	struct ticket_paxos_state *tps;
 	int i, rv = 0;
 	uint32_t owner;
-	struct booth_node *node;
+	struct booth_site *node;
 	struct boothc_ticket_msg msg;
 	time_t now;
 

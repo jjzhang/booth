@@ -64,7 +64,7 @@ inline static uint32_t get_local_id(void)
 }
 
 
-inline static uint32_t get_node_id(struct booth_node *node)
+inline static uint32_t get_node_id(struct booth_site *node)
 {
 	return node ? node->nodeid : NO_OWNER;
 }
