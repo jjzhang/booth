@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <stdlib.h>
+#include <zlib.h>
 #include <errno.h>
 #include <string.h>
 #include "booth.h"
@@ -55,6 +56,9 @@ int add_node(char *addr_string, int type)
 {
 	int rv;
 	struct booth_node *node;
+	uLong nid;
+	uint32_t mask;
+
 
 	rv = 1;
 	if (booth_conf->node_count == MAX_NODES) {
@@ -72,8 +76,21 @@ int add_node(char *addr_string, int type)
 	node->type = type;
 	/* Make nodeid start at a non-zero point.
 	 * Perhaps use hash over string or address? */
-	node->nodeid = booth_conf->node_count * 0x11 + 0x98989011;
 	strcpy(node->addr_string, addr_string);
+
+	nid = crc32(0L, NULL, 0);
+	/* booth_config() uses memset(), so sizeof() is guaranteed to give
+	 * the same result everywhere - no uninitialized bytes. */
+	node->nodeid = crc32(nid, node->addr_string,
+			sizeof(node->addr_string));
+	/* Make sure we will never collide with NO_OWNER,
+	 * or be negative (to get "get_local_id() < 0" working). */
+	mask = 1 << (sizeof(node->nodeid)*4 -1);
+	assert(NO_OWNER & mask);
+	assert(NO_OWNER >= 0);
+	node->nodeid &= ~mask;
+
+
 	node->tcp_fd = -1;
 
 	booth_conf->node_count++;

@@ -1155,10 +1155,9 @@ static int do_server(int type)
 	cl_inherit_logging_environment(0);
 
 
-	if (local->type == ARBITRATOR)
-		log_info("BOOTH arbitrator daemon is starting.");
-	else if (local->type == SITE)
-		log_info("BOOTH cluster site daemon is starting.");
+	log_info("BOOTH %s daemon is starting, node id is %08X.",
+			type_to_string(local->type),
+			local->nodeid);
 
 
 	set_scheduler();
