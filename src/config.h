@@ -71,11 +71,12 @@ struct ticket_config {
 struct booth_config {
     char name[BOOTH_NAME_LEN];
     int node_count;
-    int ticket_count;
     transport_layer_t proto;
     uint16_t port;
     struct booth_node node[MAX_NODES];
-    struct ticket_config ticket[0];
+    int ticket_count;
+    int ticket_allocated;
+    struct ticket_config *ticket;
 };
 
 

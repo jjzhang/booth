@@ -33,20 +33,24 @@ static int ticket_size = 0;
 
 static int ticket_realloc(void)
 {
+	const int added = 5;
+	int had, want;
 	void *p;
 
-	booth_conf = realloc(booth_conf, sizeof(struct booth_config)
-					 + (ticket_size + TICKET_ALLOC)
-					 * sizeof(struct ticket_config));
+	had = booth_conf->ticket_allocated;
+	want = had + added;
+
+	p = realloc(booth_conf->ticket,
+			sizeof(struct ticket_config) * want);
 	if (!booth_conf) {
-		log_error("can't alloc more booth config");
+		log_error("can't alloc more tickets");
 		return -ENOMEM;
 	}
 
-	p = (char *) booth_conf + sizeof(struct booth_config)
-	    + ticket_size * sizeof(struct ticket_config);
-	memset(p, 0, TICKET_ALLOC * sizeof(struct ticket_config));
-	ticket_size += TICKET_ALLOC;
+	memset(booth_conf->ticket + had, 0,
+			sizeof(struct ticket_config) * added);
+	booth_conf->ticket_allocated = want;
+	booth_conf->ticket = p;
 
 	return 0;
 }
