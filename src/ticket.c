@@ -483,12 +483,14 @@ int list_ticket(char **pdata, unsigned int *len)
 }
 
 
-#if 0
-int catchup_ticket(struct ticket_msg *msg, struct ticket_config *tc)
+int ticket_answer_catchup(struct ticket_msg *msg, struct ticket_config *tk)
 {
-	msg->ballot = htonl(tk->ballot);
-	if (tk->owner == ticket_get_myid()
-			&& current_time() < tk->expires) {
+	struct ticket_paxos_state *tps;
+
+	tps = &tk->current_state;
+	msg->ballot = htonl(tps->ballot);
+
+	if (tps->owner == local && time(NULL) < tps->expires) {
 		msg->expiry = htonl(tk->expires - current_time());
 		msg->owner = htonl(tk->owner);
 		return CATCHED_VALID_TMSG;
@@ -496,6 +498,8 @@ int catchup_ticket(struct ticket_msg *msg, struct ticket_config *tc)
 
 	return -1;
 }
+
+#if 0
 
 const struct paxos_lease_operations ticket_operations = {
 	.send		= ticket_send,

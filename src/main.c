@@ -338,7 +338,7 @@ bad_len:
 				goto reply;
 			}
 
-			rv = catchup_ticket(&msg.ticket, tc);
+			rv = ticket_answer_catchup(&msg.ticket, tc);
 			/* Only answer if we're the owner. */
 			if (rv == -1)
 				goto kill;

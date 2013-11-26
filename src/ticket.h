@@ -28,12 +28,14 @@ int check_site(char *site, int *local);
 int grant_ticket(struct ticket_config *ticket);
 int revoke_ticket(struct ticket_config *ticket);
 int list_ticket(char **pdata, unsigned int *len);
-int catchup_ticket(struct ticket_msg *msg, struct ticket_config *tc);
+
 int ticket_recv(void *msg, int msglen);
 int setup_ticket(void);
 int check_max_len_valid(const char *s, int max);
 
 int ticket_answer_list(int fd, struct boothc_ticket_msg *msg);
+int ticket_answer_catchup(struct ticket_msg *msg, struct ticket_config *tc);
+
 int find_ticket_by_name(const char *ticket, struct ticket_config **found);
 int find_ticket_by_handle(pl_handle_t handle, struct ticket_config **found);
 
