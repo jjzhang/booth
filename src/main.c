@@ -646,7 +646,7 @@ static int do_command(cmd_request_t cmd)
 
 	if (reply.result == RLT_REMOTE_OP) {
 
-		if (!find_site_in_config(cl.msg.site.site, &to)) {
+		if (!find_site_by_name(cl.msg.site.site, &to)) {
 			log_error("Redirected to unknown site %s.", cl.msg.site.site);
 			rv = -1;
 			goto out_close;

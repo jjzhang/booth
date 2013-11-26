@@ -470,7 +470,7 @@ int check_config(int type)
 }
 
 
-int find_site_in_config(unsigned char *site, struct booth_site **node)
+int find_site_by_name(unsigned char *site, struct booth_site **node)
 {
 	struct booth_site *n;
 	int i;
