@@ -19,13 +19,16 @@
 #ifndef _PACEMAKER_H
 #define _PACEMAKER_H
 
+#include <stdint.h>
+
 struct ticket_handler {
-	void (*grant_ticket) (const void *);
-	void (*revoke_ticket) (const void *);
-	void (*store_ticket) (const void *, int, int, unsigned long long);
-	void (*load_ticket) (const void *, int *, int *, unsigned long long *);
+	void (*grant_ticket) (const char *);
+	void (*revoke_ticket) (const char *);
+	void (*store_ticket) (const char *, uint32_t, uint32_t, time_t);
+	void (*load_ticket) (const char *, uint32_t *, uint32_t *, time_t *);
 };
 
 struct ticket_handler pcmk_handler;
+
 
 #endif /* _PACEMAKER_H */

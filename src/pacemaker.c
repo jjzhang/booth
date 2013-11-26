@@ -22,7 +22,7 @@
 
 #define COMMAND_MAX	256
 
-static void pcmk_grant_ticket(const void *ticket)
+static void pcmk_grant_ticket(const char *ticket)
 {
 	FILE *p;
 	char cmd[COMMAND_MAX];
@@ -40,7 +40,7 @@ static void pcmk_grant_ticket(const void *ticket)
 	return;
 }
 
-static void pcmk_revoke_ticket(const void *ticket)
+static void pcmk_revoke_ticket(const char *ticket)
 {
 	FILE *p;
 	char cmd[COMMAND_MAX];
@@ -58,8 +58,9 @@ static void pcmk_revoke_ticket(const void *ticket)
 	return;
 }
 
-static void pcmk_store_ticket(const void *ticket, int owner, int ballot,
-			      unsigned long long expires)
+static void pcmk_store_ticket(const char* ticket,
+		uint32_t owner, uint32_t ballot,
+		time_t expires)
 {
 	FILE *p;
 	char cmd[COMMAND_MAX];
@@ -77,7 +78,7 @@ static void pcmk_store_ticket(const void *ticket, int owner, int ballot,
 
 	snprintf(cmd, COMMAND_MAX,
 		 "crm_ticket -t %s -S expires -v %llu",
-		 (char *)ticket, expires);
+		 (char *)ticket, (unsigned long long)expires);
 	log_info("command: '%s' was executed", cmd);
 	p = popen(cmd, "r");
 	if (p == NULL) {
@@ -100,8 +101,9 @@ static void pcmk_store_ticket(const void *ticket, int owner, int ballot,
 	return;
 }
 
-static void pcmk_load_ticket(const void *ticket, int *owner, int *ballot,
-			     unsigned long long *expires)
+static void pcmk_load_ticket(const char *ticket,
+		uint32_t *owner, uint32_t *ballot,
+		time_t *expires)
 {
 	FILE *p;
 	char cmd[COMMAND_MAX];
