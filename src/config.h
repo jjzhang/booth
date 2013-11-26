@@ -44,6 +44,8 @@ struct ticket_paxos_state {
 	/** Timestamp of expiration. */
 	time_t expires;
 
+	cmd_request_t state;
+
 	/** Current ballot number. Might be < prev_ballot if overflown. */
 	uint32_t ballot;
 	/** Previous ballot. */
@@ -70,10 +72,13 @@ struct ticket_config {
 
 struct booth_config {
     char name[BOOTH_NAME_LEN];
-    int node_count;
+
     transport_layer_t proto;
     uint16_t port;
+
+    int node_count;
     struct booth_node node[MAX_NODES];
+
     int ticket_count;
     int ticket_allocated;
     struct ticket_config *ticket;

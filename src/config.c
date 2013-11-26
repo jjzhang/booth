@@ -140,6 +140,39 @@ out:
 }
 
 
+static int add_ticket(const char *name, struct ticket_config **tkp,
+		int expiry, int weights[MAX_NODES])
+{
+	int rv;
+	struct ticket_config *tk;
+
+	if (booth_conf->ticket_count == booth_conf->ticket_allocated) {
+		rv = ticket_realloc();
+		if (rv < 0)
+			return rv;
+	}
+
+
+	tk = booth_conf->ticket + booth_conf->ticket_count;
+	booth_conf->ticket_count++;
+
+
+	if (!check_max_len_valid(name, sizeof(tk->name))) {
+		log_error("ticket name \"%s\" too long.", name);
+		return -EINVAL;
+	}
+
+	strcpy(tk->name, name);
+	tk->expiry = expiry;
+	memcpy(tk->weight, weights, sizeof(tk->weight));
+	tk->current_state.state = OP_INIT;
+
+	if (tkp)
+		*tkp = tk;
+	return 0;
+}
+
+
 inline static char *skip_while(char *cp, int (*fn)(int))
 {
 	while (fn(*cp))
@@ -162,15 +195,64 @@ static inline int is_end_of_line(char *cp)
 }
 
 
+/* returns number of weights, or -1 on bad input. */
+static int parse_weights(const char *input, int weights[MAX_NODES])
+{
+	int i, v;
+	char *cp;
+
+	for(i=0; i<MAX_NODES; i++) {
+		/* End of input? */
+		if (*input == 0)
+			break;
+
+		v = strtol(input, &cp, 0);
+		if (input == cp) {
+			log_error("No integer weight value at \"%s\"", input);
+			return -1;
+		}
+
+		while (*cp) {
+			/* Separator characters */
+			if (isspace(*cp) ||
+					strchr(",;:-+", *cp))
+				cp++;
+			/* Next weight */
+			else if (isdigit(*cp))
+				break;
+			/* Rest */
+			else {
+				log_error("Invalid character at \"%s\"", cp);
+				return -1;
+			}
+		}
+
+		input = cp;
+	}
+
+
+	/* Fill rest of vector. */
+	for(v=i; v<MAX_NODES; v++) {
+		weights[v] = 1;
+	}
+
+	return i;
+}
+
+
 int read_config(const char *path)
 {
 	char line[1024];
 	FILE *fp;
-	char *s, *key, *val, *expiry, *weight, *c, *end_of_key;
+	char *s, *key, *val, *end_of_key;
 	const char *cp, *error;
 	int i;
 	int lineno = 0;
 	int got_transport = 0;
+	int def_expire = DEFAULT_TICKET_EXPIRY;
+	int weights[MAX_NODES];
+	struct ticket_config *last_ticket = NULL;
+
 
 	fp = fopen(path, "r");
 	if (!fp) {
@@ -189,6 +271,8 @@ int read_config(const char *path)
 	ticket_size = TICKET_ALLOC;
 
 	booth_conf->proto = UDP;
+	parse_weights("", weights);
+	error = "";
 
 	log_debug("reading config file %s", path);
 	while (fgets(line, sizeof(line), fp)) {
@@ -219,7 +303,7 @@ int read_config(const char *path)
 exp_equal:
 			error = "Expected '=' after key";
 			goto err;
-		} 
+		}
 		s++;
 
 		/* It's my buffer, and I terminate if I want to. */
@@ -317,52 +401,33 @@ no_value:
 		}
 
 		if (strcmp(key, "ticket") == 0) {
-			int count = booth_conf->ticket_count;
-			if (booth_conf->ticket_count == ticket_size) {
-				if (ticket_realloc() < 0)
-					goto out;
+			if (add_ticket(val, &last_ticket,
+						def_expire, weights))
+				goto out;
+
+			/* last_ticket is valid until another one is needed -
+			 * and then it already has the new address and
+			 * is valid again. */
+		}
+
+		if (strcmp(key, "expire") == 0) {
+			def_expire = strtol(val, &s, 0);
+			if (*s || s == val) {
+				error = "Expected plain integer value for expire";
+				goto err;
 			}
-			expiry = index(val, ';');
-			weight = rindex(val, ';');
-			/* CLEANUP */
-			if (!expiry) {
-				strcpy(booth_conf->ticket[count].name, val);
-				booth_conf->ticket[count].expiry = DEFAULT_TICKET_EXPIRY;
-				log_info("expire is not set in %s."
-						" Set the default value %ds.",
-						booth_conf->ticket[count].name,
-						DEFAULT_TICKET_EXPIRY);
-			}
-			else if (expiry && expiry == weight) {
-				*expiry++ = '\0';
-				while (*expiry == ' ')
-					expiry++;
-				strcpy(booth_conf->ticket[count].name, val);
-				booth_conf->ticket[count].expiry = atoi(expiry);
-			} else {
-				*expiry++ = '\0';
-				*weight++ = '\0';
-				while (*expiry == ' ')
-					expiry++;
-				while (*weight == ' ')
-					weight++;
-				strcpy(booth_conf->ticket[count].name, val);
-				booth_conf->ticket[count].expiry = atoi(expiry);
-				i = 0;
-				while ((c = index(weight, ','))) {
-					*c++ = '\0';
-					booth_conf->ticket[count].weight[i++]
-						= atoi(weight);
-					while (*c == ' ')
-						c++;
-					weight = c;
-					if (i == MAX_NODES) {
-						error = "too many weights";
-						goto err;
-					}
-				}
-			}
-			booth_conf->ticket_count++;
+
+			if (last_ticket)
+				last_ticket->expiry = def_expire;
+		}
+
+		if (strcmp(key, "weights") == 0) {
+			if (parse_weights(val, weights) < 0)
+				goto out;
+
+			if (last_ticket)
+				memcpy(last_ticket->weight, weights,
+						sizeof(last_ticket->weight));
 		}
 	}
 
@@ -387,10 +452,10 @@ no_value:
 
 
 err:
+out:
 	log_error("%s in config file line %d",
 			error, lineno);
 
-out:
 	free(booth_conf);
 	booth_conf = NULL;
 	return -1;
