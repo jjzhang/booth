@@ -26,6 +26,7 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
+/* TODO: Remove */
 #define BOOTH_LOG_DUMP_SIZE (1024*1024)
 
 #define BOOTH_RUN_DIR "/var/run/booth/"
@@ -37,10 +38,12 @@
 #define BOOTH_NAME_LEN		63
 #define BOOTH_PATH_LEN		127
 
+/* TODO: remove */
 #define BOOTH_PROTO_FAMILY	AF_INET
 
 #define BOOTHC_MAGIC		0x5F1BA08C
 #define BOOTHC_VERSION		0x00010002
+
 
 struct boothc_header {
 	/** BOOTHC_MAGIC */
