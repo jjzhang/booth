@@ -269,12 +269,12 @@ bad_len:
 	/* Commands have input msg;
 	 * and output rv, data and olen (excluding header).  */
 	switch (ntohl(msg.header.cmd)) {
-		case BOOTHC_CMD_LIST:
+		case CMD_LIST:
 			assert(!data);
 			rv = list_ticket(&data, &olen);
 			goto reply;
 
-		case BOOTHC_CMD_GRANT:
+		case CMD_GRANT:
 			/* Expect boothc_ticket_site_msg. */
 			if (len != sizeof(msg))
 				goto bad_len;
@@ -283,28 +283,28 @@ bad_len:
 			olen = len;
 			data = msg.header.data;
 			if (!check_ticket(msg.ticket.id, &tc)) {
-				rv = BOOTHC_RLT_INVALID_ARG;
+				rv = RLT_INVALID_ARG;
 				goto reply;
 			}
 
 			if (tc->current_state.owner) {
 				log_error("client want to get an granted "
 						"ticket %s", msg.ticket.id);
-				rv = BOOTHC_RLT_OVERGRANT;
+				rv = RLT_OVERGRANT;
 				goto reply;
 			}
 
 			if (!check_site(msg.site.site, &is_local)) {
-				rv = BOOTHC_RLT_INVALID_ARG;
+				rv = RLT_INVALID_ARG;
 				goto reply;
 			}
 			if (is_local)
 				rv = grant_ticket(tc);
 			else
-				rv = BOOTHC_RLT_REMOTE_OP;
+				rv = RLT_REMOTE_OP;
 			break;
 
-		case BOOTHC_CMD_REVOKE:
+		case CMD_REVOKE:
 			/* Expect boothc_ticket_site_msg. */
 			if (len != sizeof(msg))
 				goto bad_len;
@@ -312,20 +312,20 @@ bad_len:
 			olen = len;
 			data = msg.header.data;
 			if (!check_ticket(msg.ticket.id, &tc)) {
-				msg.header.result = BOOTHC_RLT_INVALID_ARG;
+				msg.header.result = RLT_INVALID_ARG;
 				goto reply;
 			}
 			if (!check_site(msg.site.site, &is_local)) {
-				msg.header.result = BOOTHC_RLT_INVALID_ARG;
+				msg.header.result = RLT_INVALID_ARG;
 				goto reply;
 			}
 			if (is_local)
 				msg.header.result = revoke_ticket(tc);
 			else
-				msg.header.result = BOOTHC_RLT_REMOTE_OP;
+				msg.header.result = RLT_REMOTE_OP;
 			break;
 
-		case BOOTHC_CMD_CATCHUP:
+		case CMD_CATCHUP:
 			/* Expect boothc_ticket_site_msg. */
 			if (len != sizeof(msg))
 				goto bad_len;
@@ -335,7 +335,7 @@ bad_len:
 			data = msg.header.data;
 
 			if (!check_ticket(msg.ticket.id, &tc)) {
-				rv = BOOTHC_RLT_INVALID_ARG;
+				rv = RLT_INVALID_ARG;
 				goto reply;
 			}
 
@@ -630,13 +630,13 @@ static int do_command(cmd_request_t cmd)
 	if (rv < 0)
 		goto out_close;
 
-	if (reply.result == BOOTHC_RLT_INVALID_ARG) {
+	if (reply.result == RLT_INVALID_ARG) {
 		log_info("invalid argument!");
 		rv = -1;
 		goto out_close;
 	}
 
-	if (reply.result == BOOTHC_RLT_OVERGRANT) {
+	if (reply.result == RLT_OVERGRANT) {
 		log_info("You're granting a granted ticket "
 			 "If you wanted to migrate a ticket,"
 			 "use revoke first, then use grant");
@@ -644,7 +644,7 @@ static int do_command(cmd_request_t cmd)
 		goto out_close;
 	}
 
-	if (reply.result == BOOTHC_RLT_REMOTE_OP) {
+	if (reply.result == RLT_REMOTE_OP) {
 
 		if (!find_site_in_config(cl.msg.site.site, &to)) {
 			log_error("Redirected to unknown site %s.", cl.msg.site.site);
@@ -670,28 +670,28 @@ static int do_command(cmd_request_t cmd)
 		booth_transport[TCP].close(to);
 	}
  
-	if (reply.result == BOOTHC_RLT_ASYNC) {
-		if (cmd == BOOTHC_CMD_GRANT)
+	if (reply.result == RLT_ASYNC) {
+		if (cmd == CMD_GRANT)
 			log_info("grant command sent, result will be returned "
 				 "asynchronously, you can get the result from "
 				 "the log files");
-		else if (cmd == BOOTHC_CMD_REVOKE)
+		else if (cmd == CMD_REVOKE)
 			log_info("revoke command sent, result will be returned "
 				 "asynchronously, you can get the result from "
 				 "the log files.");
 		else
 			log_error("internal error reading reply result!");
 		rv = 0;
-	} else if (reply.result == BOOTHC_RLT_SYNC_SUCC) {
-		if (cmd == BOOTHC_CMD_GRANT)
+	} else if (reply.result == RLT_SYNC_SUCC) {
+		if (cmd == CMD_GRANT)
 			log_info("grant succeeded!");
-		else if (cmd == BOOTHC_CMD_REVOKE)
+		else if (cmd == CMD_REVOKE)
 			log_info("revoke succeeded!");
 		rv = 0;
-	} else if (reply.result == BOOTHC_RLT_SYNC_FAIL) {
-		if (cmd == BOOTHC_CMD_GRANT)
+	} else if (reply.result == RLT_SYNC_FAIL) {
+		if (cmd == CMD_GRANT)
 			log_info("grant failed!");
-		else if (cmd == BOOTHC_CMD_REVOKE)
+		else if (cmd == CMD_REVOKE)
 			log_info("revoke failed!");
 		rv = -1;
 	} else {
@@ -709,12 +709,12 @@ out_close:
 
 static int do_grant(void)
 {
-	return do_command(BOOTHC_CMD_GRANT);
+	return do_command(CMD_GRANT);
 }
 
 static int do_revoke(void)
 {
-	return do_command(BOOTHC_CMD_REVOKE);
+	return do_command(CMD_REVOKE);
 }
 
 

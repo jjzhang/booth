@@ -309,7 +309,7 @@ static int ticket_catchup(struct ticket_config *tk)
 	foreach_node(i, node) {
 		if (node->type == SITE &&
 				!(node->local)) {
-			init_ticket_msg(&msg, BOOTHC_CMD_CATCHUP);
+			init_ticket_msg(&msg, CMD_CATCHUP);
 			strncpy(msg.ticket.id, tk->name, sizeof(msg.ticket.id));
 
 			log_debug("attempting catchup from %s", node->addr_string);
@@ -406,7 +406,7 @@ int grant_ticket(struct ticket_config *tk)
 
 	tps = &tk->current_state;
 	if (tps->owner == local)
-		return BOOTHC_RLT_SYNC_SUCC;
+		return RLT_SYNC_SUCC;
 
 	/* TODO */
 #if 0
@@ -414,7 +414,7 @@ int grant_ticket(struct ticket_config *tk)
 			1, end_acquire);
 	if (ret >= 0)
 		tk->ballot = ret;
-	return (ret < 0)? BOOTHC_RLT_SYNC_FAIL: BOOTHC_RLT_ASYNC;
+	return (ret < 0)? RLT_SYNC_FAIL: RLT_ASYNC;
 #endif
 	return 0;
 }
@@ -426,14 +426,14 @@ int revoke_ticket(struct ticket_config *tk)
 
 	tps = &tk->current_state;
 	if (!tps->owner)
-		return BOOTHC_RLT_SYNC_SUCC;
+		return RLT_SYNC_SUCC;
 
 	/* TODO */
 #if 0
 	int ret = paxos_lease_release(tk->handle, end_release);
 	if (ret >= 0)
 		tk->ballot = ret;
-	return (ret < 0)? BOOTHC_RLT_SYNC_FAIL: BOOTHC_RLT_ASYNC;
+	return (ret < 0)? RLT_SYNC_FAIL: RLT_ASYNC;
 #endif
 	return 0;
 }

@@ -108,12 +108,6 @@ struct site_msg {
 	boothc_site site;
 } __attribute__((packed));
 
-struct boothc_ticket_site_msg {
-	struct boothc_header header;
-	struct ticket_msg ticket;
-	struct site_msg site;
-} __attribute__((packed));
-
 struct boothc_ticket_msg {
 	struct boothc_header header;
 	struct ticket_msg ticket;
@@ -124,10 +118,10 @@ struct boothc_ticket_msg {
  * All these have to be swabbed to network order before sending. */
 typedef enum {
 	/* 0x43 = "C"ommands */
-	BOOTHC_CMD_LIST    = 0x436f6d4c,
-	BOOTHC_CMD_GRANT   = 0x436f6d47,
-	BOOTHC_CMD_REVOKE  = 0x436f6d52,
-	BOOTHC_CMD_CATCHUP = 0x436f6d43,
+	CMD_LIST    = 0x436f6d4c,
+	CMD_GRANT   = 0x436f6d47,
+	CMD_REVOKE  = 0x436f6d52,
+	CMD_CATCHUP = 0x436f6d43,
 
 	/* 0x50 = "P"axos */
 	OP_INIT      = 0x50617801,
@@ -142,12 +136,13 @@ typedef enum {
 
 
 typedef enum {
-	BOOTHC_RLT_ASYNC = 0x40,
-	BOOTHC_RLT_SYNC_SUCC,
-	BOOTHC_RLT_SYNC_FAIL,
-	BOOTHC_RLT_INVALID_ARG,
-	BOOTHC_RLT_REMOTE_OP,
-	BOOTHC_RLT_OVERGRANT,
+	RLT_ASYNC = 0x526c5401,
+	RLT_SUCCESS,
+	RLT_SYNC_SUCC,
+	RLT_SYNC_FAIL,
+	RLT_INVALID_ARG,
+	RLT_REMOTE_OP,
+	RLT_OVERGRANT,
 } cmd_result_t;
 
 
