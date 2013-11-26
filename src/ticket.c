@@ -518,3 +518,25 @@ int setup_ticket(void)
 
 	return 0;
 }
+
+
+int ticket_answer_list(int fd, struct boothc_ticket_msg *msg)
+{
+	char *data;
+	int olen, rv;
+	struct boothc_header hdr;
+
+	rv = list_ticket(&data, &olen);
+	if (rv < 0)
+		goto ex;
+
+	init_header(&hdr, CMD_LIST, RLT_SUCCESS, sizeof(hdr) + olen);
+	if (send_header_only(fd, &hdr) < 0)
+		goto ex;
+
+	if (olen)
+		do_write(fd, data, olen);
+
+ex:
+	return;
+}

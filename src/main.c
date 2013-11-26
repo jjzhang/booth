@@ -270,9 +270,8 @@ bad_len:
 	 * and output rv, data and olen (excluding header).  */
 	switch (ntohl(msg.header.cmd)) {
 		case CMD_LIST:
-			assert(!data);
-			rv = list_ticket(&data, &olen);
-			goto reply;
+			ticket_answer_list(fd, &msg);
+			goto kill;
 
 		case CMD_GRANT:
 			/* Expect boothc_ticket_site_msg. */

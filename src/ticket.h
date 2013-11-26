@@ -33,6 +33,7 @@ int ticket_recv(void *msg, int msglen);
 int setup_ticket(void);
 int check_max_len_valid(const char *s, int max);
 
+int ticket_answer_list(int fd, struct boothc_ticket_msg *msg);
 int find_ticket_by_name(const char *ticket, struct ticket_config **found);
 int find_ticket_by_handle(pl_handle_t handle, struct ticket_config **found);
 
