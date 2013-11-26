@@ -678,3 +678,16 @@ const struct booth_transport booth_transport[TRANSPORT_ENTRIES] = {
 };
 
 const struct booth_transport *local_transport = booth_transport+TCP;
+
+
+
+int send_header_only(int fd, struct boothc_header *hdr)
+{
+	int rv;
+
+	rv = do_write(fd, hdr, sizeof(*hdr));
+	if (rv < 0)
+		log_error("connection %d write error %d", ci, rv);
+
+	return rv;
+}

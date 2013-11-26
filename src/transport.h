@@ -67,5 +67,7 @@ inline static void * node_to_addr_pointer(struct booth_node *node) {
 
 extern const struct booth_transport *local_transport;
 
+int send_header_only(int fd, struct boothc_header *hdr);
+
 
 #endif /* _TRANSPORT_H */
