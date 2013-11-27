@@ -181,18 +181,21 @@ extern struct booth_site *local;
 
 /** @} */
 
+struct booth_transport;
 
 struct client {
-        int fd;
-        void (*workfn)(int);
-        void (*deadfn)(int);
+	int fd;
+	const struct booth_transport *transport;
+	void (*workfn)(int);
+	void (*deadfn)(int);
 };
 
 extern struct client *clients;
 extern struct pollfd *pollfds;
 
 
-int client_add(int fd, void (*workfn)(int ci), void (*deadfn)(int ci));
+int client_add(int fd, const struct booth_transport *tpt,
+		void (*workfn)(int ci), void (*deadfn)(int ci));
 int do_read(int fd, void *buf, size_t count);
 int do_write(int fd, void *buf, size_t count);
 void process_connection(int ci);

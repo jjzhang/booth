@@ -325,7 +325,8 @@ static void process_tcp_listener(int ci)
 	memcpy(&conn->to, &addr, sizeof(struct sockaddr));
 	list_add_tail(&conn->list, &tcp);
 
-	i = client_add(fd, process_connection, process_dead);
+	i = client_add(fd, clients[ci].transport,
+			process_connection, process_dead);
 
 	log_debug("client connection %d fd %d", i, fd);
 }
@@ -366,7 +367,8 @@ static int booth_tcp_init(void * unused __attribute__((unused)))
 	if (rv < 0)
 		return rv;
 
-	client_add(rv, process_tcp_listener, NULL);
+	client_add(rv, booth_transport + TCP,
+			process_tcp_listener, NULL);
 
 	return 0;
 }

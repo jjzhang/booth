@@ -199,28 +199,38 @@ static void client_dead(int ci)
 	pollfds[ci].fd = -1;
 }
 
-int client_add(int fd, void (*workfn)(int ci), void (*deadfn)(int ci))
+int client_add(int fd, const struct booth_transport *tpt,
+		void (*workfn)(int ci),
+		void (*deadfn)(int ci))
 {
 	int i;
+	struct client *c;
+
 
 	if (client_size + 2 >= client_maxi ) {
 		client_alloc();
 	}
 
 	for (i = 0; i < client_size; i++) {
-		if (clients[i].fd == -1) {
-			clients[i].workfn = workfn;
-			if (deadfn)
-				clients[i].deadfn = deadfn;
-			else
-				clients[i].deadfn = client_dead;
-			clients[i].fd = fd;
-			pollfds[i].fd = fd;
-			pollfds[i].events = POLLIN;
-			if (i > client_maxi)
-				client_maxi = i;
-			return i;
-		}
+		c = clients + i;
+		if (c->fd != -1)
+			continue;
+
+		c->workfn = workfn;
+		if (deadfn)
+			c->deadfn = deadfn;
+		else
+			c->deadfn = client_dead;
+
+		c->transport = tpt;
+		c->fd = fd;
+
+		pollfds[i].fd = fd;
+		pollfds[i].events = POLLIN;
+		if (i > client_maxi)
+			client_maxi = i;
+
+		return i;
 	}
 
 	assert(!"no client");
@@ -312,6 +322,8 @@ kill:
 	return;
 }
 
+
+/** Callback function for the listening TCP socket. */
 static void process_listener(int ci)
 {
 	int fd, i;
@@ -325,7 +337,7 @@ static void process_listener(int ci)
 		return;
 	}
 
-	i = client_add(fd, process_connection, NULL);
+	i = client_add(fd, clients[ci].transport, process_connection, NULL);
 
 	log_debug("add client connection %d fd %d", i, fd);
 }
@@ -459,7 +471,10 @@ static int loop(int fd)
 	if (rv < 0)
 		goto fail;
 
-	client_add(rv, process_listener, NULL);
+
+	client_add(local->tcp_fd, booth_transport + TCP,
+			process_listener, NULL);
+
 
 	rv = write_daemon_state(fd, BOOTHD_STARTED);
 	if (rv != 0) {
@@ -485,6 +500,7 @@ static int loop(int fd)
 		for (i = 0; i <= client_maxi; i++) {
 			if (clients[i].fd < 0)
 				continue;
+
 			if (pollfds[i].revents & POLLIN) {
 				workfn = clients[i].workfn;
 				if (workfn)
