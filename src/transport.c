@@ -646,11 +646,15 @@ static int booth_sctp_broadcast(void *buf __attribute__((unused)),
 	return 0;
 }
 
-static int booth_sctp_exit(void)
+static int return_0_booth_site(struct booth_site *v __attribute((unused)))
 {
 	return 0;
 }
 
+static int return_0(void)
+{
+	return 0;
+}
 const struct booth_transport booth_transport[TRANSPORT_ENTRIES] = {
 	[TCP] = {
 		.name = "TCP",
@@ -664,6 +668,7 @@ const struct booth_transport booth_transport[TRANSPORT_ENTRIES] = {
 	[UDP] = {
 		.name = "UDP",
 		.init = booth_udp_init,
+		.open = return_0_booth_site,
 		.send = booth_udp_send,
 		.broadcast = booth_udp_broadcast,
 		.exit = booth_udp_exit
@@ -671,9 +676,10 @@ const struct booth_transport booth_transport[TRANSPORT_ENTRIES] = {
 	[SCTP] = {
 		.name = "SCTP",
 		.init = booth_sctp_init,
+		.open = return_0_booth_site,
 		.send = booth_sctp_send,
 		.broadcast = booth_sctp_broadcast,
-		.exit = booth_sctp_exit
+		.exit = return_0,
 	}
 };
 
