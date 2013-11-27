@@ -47,10 +47,10 @@ static int ticket_realloc(void)
 		return -ENOMEM;
 	}
 
+	booth_conf->ticket = p;
 	memset(booth_conf->ticket + had, 0,
 			sizeof(struct ticket_config) * added);
 	booth_conf->ticket_allocated = want;
-	booth_conf->ticket = p;
 
 	return 0;
 }
@@ -92,7 +92,6 @@ int add_site(char *addr_string, int type)
 	 * or be negative (to get "get_local_id() < 0" working). */
 	mask = 1 << (sizeof(node->site_id)*4 -1);
 	assert(NO_OWNER & mask);
-	assert(NO_OWNER >= 0);
 	node->site_id &= ~mask;
 
 
