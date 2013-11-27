@@ -308,7 +308,9 @@ bad_len:
 			/* Expect boothc_ticket_site_msg. */
 			if (len != sizeof(msg))
 				goto bad_len;
-			ticket_answer_catchup(fd, &msg);
+			rv = ticket_answer_catchup(&msg);
+			if (rv >= 0)
+				rv = send_ticket_msg(fd, &msg);
 			goto kill;
 
 		default:

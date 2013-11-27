@@ -285,7 +285,7 @@ static void ticket_parse(struct ticket_config *tk,
 
 	if (local->type != ARBITRATOR) {
 		pcmk_handler.store_ticket(tk->name,
-				tps->owner->site_id,
+				get_node_id(tps->owner),
 				tps->ballot,
 				tps->expires);
 		if (tps->owner == local)
@@ -372,7 +372,10 @@ void ticket_status_recovery(pl_handle_t handle)
 
 int message_recv(struct boothc_ticket_msg *msg, int msglen)
 {
-	int cmd;
+	int cmd, rv;
+	uint32_t from;
+	struct booth_site *dest;
+
 
 	if (check_boothc_header(&msg->header, sizeof(*msg)) < 0 ||
 			msglen != sizeof(*msg)) {
@@ -380,8 +383,22 @@ int message_recv(struct boothc_ticket_msg *msg, int msglen)
 		return -1;
 	}
 
+
+	from = ntohl(msg->header.from);
+	if (!find_site_by_id(from, &dest)) {
+		log_error("unknown sender: %08x", from);
+		return -1;
+	}
+
+
 	cmd = ntohl(msg->header.cmd);
 	switch (cmd) {
+	case CMD_CATCHUP:
+		rv = ticket_answer_catchup(msg);
+		if (rv < 0)
+			return rv;
+		return booth_udp_send(dest, msg, sizeof(*msg));
+
 	case CMR_CATCHUP:
 		return ticket_process_catchup(msg);
 
@@ -567,7 +584,7 @@ reply:
 }
 
 
-int ticket_answer_catchup(int fd, struct boothc_ticket_msg *msg)
+int ticket_answer_catchup(struct boothc_ticket_msg *msg)
 {
 	struct ticket_paxos_state *tps;
 	struct ticket_config *tk;
@@ -595,7 +612,7 @@ int ticket_answer_catchup(int fd, struct boothc_ticket_msg *msg)
 
 reply:
 	init_header(&msg->header, CMR_CATCHUP, rv, sizeof(*msg));
-	return send_ticket_msg(fd, msg);
+	return 1;
 }
 
 
