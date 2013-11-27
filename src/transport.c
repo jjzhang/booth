@@ -54,11 +54,6 @@ struct tcp_conn {
 
 static LIST_HEAD(tcp);
 
-struct udp_context {
-	int s;
-	struct iovec iov_recv;
-	char iov_buffer[FRAME_SIZE_MAX];
-} udp;
 
 static int (*deliver_fn) (void *msg, int msglen);
 
@@ -498,117 +493,97 @@ static int booth_tcp_exit(void)
 
 int setup_udp_server(int try_only)
 {
-	int rv;
+	int rv, fd;
 	unsigned int recvbuf_size;
 
-	udp.s = socket(local->family, SOCK_DGRAM, 0);
-	if (udp.s == -1) {
-		log_error("failed to create udp socket %s", strerror(errno));
-		return -1;
+	fd = socket(local->family, SOCK_DGRAM, 0);
+	if (fd == -1) {
+		log_error("failed to create UDP socket %s", strerror(errno));
+		goto ex;
 	}
 
-	rv = fcntl(udp.s, F_SETFL, O_NONBLOCK);
+	rv = fcntl(fd, F_SETFL, O_NONBLOCK);
 	if (rv == -1) {
 		log_error("failed to set non-blocking operation "
-			  "on udp socket: %s", strerror(errno));
-		close(udp.s);
-		return -1;
+			  "on UDP socket: %s", strerror(errno));
+		goto ex;
 	}
 
-	rv = bind(udp.s, (struct sockaddr *)&local->sa6, local->saddrlen);
+	rv = bind(fd, (struct sockaddr *)&local->sa6, local->saddrlen);
 	if (try_only) {
 		rv = (rv == -1) ? errno : 0;
-		close(udp.s);
+		close(fd);
 		return rv;
 	}
 
 	if (rv == -1) {
-		log_error("failed to bind socket %s", strerror(errno));
-		close(udp.s);
-		return -1;
+		log_error("failed to bind UDP socket to [%s]:%d: %s",
+				local->addr_string, booth_conf->port,
+				strerror(errno));
+		goto ex;
 	}
 
 	recvbuf_size = SOCKET_BUFFER_SIZE;
-	rv = setsockopt(udp.s, SOL_SOCKET, SO_RCVBUF, 
+	rv = setsockopt(fd, SOL_SOCKET, SO_RCVBUF,
 			&recvbuf_size, sizeof(recvbuf_size));
 	if (rv == -1) {
 		log_error("failed to set recvbuf size");
-		close(udp.s);
-		return -1;
+		goto ex;
 	}
 
-	return udp.s;
+	local->udp_fd = fd;
+	return 0;
+
+ex:
+	if (fd >= 0)
+		close(fd);
+	return rv;
 }
 
 
 /* Receive/process callback for UDP */
 static void process_recv(int ci)
 {
-	struct msghdr msg_recv;
-	struct sockaddr_storage system_from;
-	int received;
-	unsigned char *msg_offset;
+	struct sockaddr_storage sa;
+	int rv;
+	socklen_t sa_len;
+	char buffer[2048];
 
-	/* TODO: allocate on stack? */
-	msg_recv.msg_name = &system_from;
-	msg_recv.msg_namelen = sizeof (struct sockaddr_storage);
-	msg_recv.msg_iov = &udp.iov_recv;
-	msg_recv.msg_iovlen = 1;
-	msg_recv.msg_control = 0;
-	msg_recv.msg_controllen = 0;
-	msg_recv.msg_flags = 0;
 
-	received = recvmsg(clients[ci].fd, &msg_recv,
-			   MSG_NOSIGNAL | MSG_DONTWAIT);
-	if (received == -1)
+	sa_len = sizeof(sa);
+	rv = recvfrom(clients[ci].fd,
+			buffer, sizeof(buffer),
+			MSG_NOSIGNAL | MSG_DONTWAIT,
+			(struct sockaddr *)&sa, &sa_len);
+	if (rv == -1)
 		return;
 
-	msg_offset = udp.iov_recv.iov_base;
-
-	deliver_fn(msg_offset, received);
+	deliver_fn(buffer, rv);
 }
 
 static int booth_udp_init(void *f)
 {
-	memset(&udp, 0, sizeof(struct udp_context));
-	udp.iov_recv.iov_base = udp.iov_buffer;
-	udp.iov_recv.iov_len = FRAME_SIZE_MAX;   
+	int rv;
 
-	udp.s = setup_udp_server(0);
-	if (udp.s == -1)
-		return -1;
+	rv = setup_udp_server(0);
+	if (rv < 0)
+		return rv;
 
 	deliver_fn = f;
-
-	client_add(udp.s, process_recv, NULL);
+	client_add(local->udp_fd,
+			booth_transport + UDP,
+			process_recv, NULL);
 
 	return 0;
 }
 
 static int booth_udp_send(struct booth_site *to, void *buf, int len)
 {
-	struct msghdr msg;
-	struct iovec iovec;
-	unsigned int iov_len;
 	int rv;
 
-	iovec.iov_base = (void *)buf;
-	iovec.iov_len = len;
-	iov_len = 1;
-
-	msg.msg_name = &to->sa6;
-	msg.msg_namelen = to->addrlen;
-	msg.msg_iov = (void *)&iovec;
-	msg.msg_iovlen = iov_len;
-	msg.msg_control = 0;
-	msg.msg_controllen = 0;
-	msg.msg_flags = 0;
-
-	rv = sendmsg(udp.s, &msg, MSG_NOSIGNAL);
-	if (rv < 0)
-		return rv;
-
-	return 0;
+	rv = sendto(local->udp_fd, buf, len, MSG_NOSIGNAL,
+			(struct sockaddr *)&to->sa6, to->saddrlen);
+	return rv;
 }
 
 static int booth_udp_broadcast(void *buf, int len)
@@ -620,7 +595,7 @@ static int booth_udp_broadcast(void *buf, int len)
 
 	for (i = 0; i < booth_conf->node_count; i++)
 		booth_udp_send(booth_conf->node+i, buf, len);
-	
+
 	return 0;
 }
 

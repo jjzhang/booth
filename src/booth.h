@@ -165,6 +165,7 @@ struct booth_site {
 	char addr_string[BOOTH_NAME_LEN];
 
 	int tcp_fd;
+	int udp_fd;
 
 	unsigned short family;
 	union {
