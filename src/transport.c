@@ -44,9 +44,6 @@
 #define SOCKET_BUFFER_SIZE	160000
 #define FRAME_SIZE_MAX		10000
 
-extern struct client *client;
-extern struct pollfd *pollfd;
-
 struct booth_site *local = NULL;
 
 struct tcp_conn {
@@ -291,16 +288,16 @@ static void process_dead(int ci)
 	struct tcp_conn *conn, *safe;
 
 	list_for_each_entry_safe(conn, safe, &tcp, list) {
-		if (conn->s == client[ci].fd) {
+		if (conn->s == clients[ci].fd) {
 			list_del(&conn->list);
 			free(conn);
 			break;
 		}
 	}
-	close(client[ci].fd);
-	client[ci].workfn = NULL;
-	client[ci].fd = -1;
-	pollfd[ci].fd = -1;
+	close(clients[ci].fd);
+	clients[ci].workfn = NULL;
+	clients[ci].fd = -1;
+	pollfds[ci].fd = -1;
 }
 
 static void process_tcp_listener(int ci)
@@ -310,7 +307,7 @@ static void process_tcp_listener(int ci)
 	struct sockaddr addr;
 	struct tcp_conn *conn;
 
-	fd = accept(client[ci].fd, &addr, &addrlen);
+	fd = accept(clients[ci].fd, &addr, &addrlen);
 	if (fd < 0) {
 		log_error("process_tcp_listener: accept error %d %d",
 			  fd, errno);
@@ -557,7 +554,7 @@ static void process_recv(int ci)
 	msg_recv.msg_controllen = 0;
 	msg_recv.msg_flags = 0;
 
-	received = recvmsg(client[ci].fd, &msg_recv,
+	received = recvmsg(clients[ci].fd, &msg_recv,
 			   MSG_NOSIGNAL | MSG_DONTWAIT);
 	if (received == -1)
 		return;

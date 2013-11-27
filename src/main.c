@@ -61,8 +61,8 @@ int daemonize = 0;
 
 static int client_maxi;
 static int client_size = 0;
-struct client *client = NULL;
-struct pollfd *pollfd = NULL;
+struct client *clients = NULL;
+struct pollfd *pollfds = NULL;
 
 typedef enum 
 {
@@ -166,63 +166,64 @@ static void client_alloc(void)
 {
 	int i;
 
-	if (!client) {
-		client = malloc(CLIENT_NALLOC * sizeof(struct client));
-		pollfd = malloc(CLIENT_NALLOC * sizeof(struct pollfd));
+	if (!clients) {
+		clients = malloc(CLIENT_NALLOC * sizeof(struct client));
+		pollfds = malloc(CLIENT_NALLOC * sizeof(struct pollfd));
 	} else {
-		client = realloc(client, (client_size + CLIENT_NALLOC) *
+		clients = realloc(clients, (client_size + CLIENT_NALLOC) *
 					sizeof(struct client));
-		pollfd = realloc(pollfd, (client_size + CLIENT_NALLOC) *
+		pollfds = realloc(pollfds, (client_size + CLIENT_NALLOC) *
 					sizeof(struct pollfd));
-		if (!pollfd)
-			log_error("can't alloc for pollfd");
 	}
-	if (!client || !pollfd)
+	if (!clients || !pollfds)
 		log_error("can't alloc for client array");
 
 	for (i = client_size; i < client_size + CLIENT_NALLOC; i++) {
-		client[i].workfn = NULL;
-		client[i].deadfn = NULL;
-		client[i].fd = -1;
-		pollfd[i].fd = -1;
-		pollfd[i].revents = 0;
+		clients[i].workfn = NULL;
+		clients[i].deadfn = NULL;
+		clients[i].fd = -1;
+		pollfds[i].fd = -1;
+		pollfds[i].revents = 0;
 	}
 	client_size += CLIENT_NALLOC;
 }
 
 static void client_dead(int ci)
 {
-	close(client[ci].fd);
-	client[ci].workfn = NULL;
-	client[ci].fd = -1;
-	pollfd[ci].fd = -1;
+	if (clients[ci].fd != -1)
+		close(clients[ci].fd);
+
+	clients[ci].fd = -1;
+	clients[ci].workfn = NULL;
+
+	pollfds[ci].fd = -1;
 }
 
 int client_add(int fd, void (*workfn)(int ci), void (*deadfn)(int ci))
 {
 	int i;
 
-	if (!client)
+	if (client_size + 2 >= client_maxi ) {
 		client_alloc();
-again:
+	}
+
 	for (i = 0; i < client_size; i++) {
-		if (client[i].fd == -1) {
-			client[i].workfn = workfn;
+		if (clients[i].fd == -1) {
+			clients[i].workfn = workfn;
 			if (deadfn)
-				client[i].deadfn = deadfn;
+				clients[i].deadfn = deadfn;
 			else
-				client[i].deadfn = client_dead;
-			client[i].fd = fd;
-			pollfd[i].fd = fd;
-			pollfd[i].events = POLLIN;
+				clients[i].deadfn = client_dead;
+			clients[i].fd = fd;
+			pollfds[i].fd = fd;
+			pollfds[i].events = POLLIN;
 			if (i > client_maxi)
 				client_maxi = i;
 			return i;
 		}
 	}
 
-	client_alloc();
-	goto again;
+	assert(!"no client");
 }
 
 
@@ -233,13 +234,13 @@ void process_connection(int ci)
 	void (*deadfn) (int ci);
 
 
-	fd = client[ci].fd;
+	fd = clients[ci].fd;
 	rv = do_read(fd, &msg.header, sizeof(msg.header));
 
 	if (rv < 0) {
 		if (errno == ECONNRESET)
 			log_debug("client %d connection reset for fd %d",
-					ci, client[ci].fd);
+					ci, clients[ci].fd);
 
 		goto kill;
 	}
@@ -256,7 +257,7 @@ bad_len:
 			return;
 		}
 		exp = len - sizeof(msg.header);
-		rv = do_read(client[ci].fd, msg.header.data, exp);
+		rv = do_read(clients[ci].fd, msg.header.data, exp);
 		if (rv != exp) {
 			log_error("connection %d read data error %d, wanted %d",
 					ci, rv, exp);
@@ -304,7 +305,7 @@ bad_len:
 	return;
 
 kill:
-	deadfn = client[ci].deadfn;
+	deadfn = clients[ci].deadfn;
 	if(deadfn) {
 		deadfn(ci);
 	}
@@ -315,12 +316,12 @@ static void process_listener(int ci)
 {
 	int fd, i;
 
-	fd = accept(client[ci].fd, NULL, NULL);
+	fd = accept(clients[ci].fd, NULL, NULL);
 	if (fd < 0) {
 		log_error("process_listener: accept error for fd %d: %s (%d)",
-			  client[ci].fd, strerror(errno), errno);
-		if (client[ci].deadfn)
-			client[ci].deadfn(ci);
+			  clients[ci].fd, strerror(errno), errno);
+		if (clients[ci].deadfn)
+			clients[ci].deadfn(ci);
 		return;
 	}
 
@@ -473,7 +474,7 @@ static int loop(int fd)
 		log_info("BOOTH cluster site daemon started");
 
 	while (1) {
-		rv = poll(pollfd, client_maxi + 1, poll_timeout);
+		rv = poll(pollfds, client_maxi + 1, poll_timeout);
 		if (rv == -1 && errno == EINTR)
 			continue;
 		if (rv < 0) {
@@ -482,16 +483,16 @@ static int loop(int fd)
 		}
 
 		for (i = 0; i <= client_maxi; i++) {
-			if (client[i].fd < 0)
+			if (clients[i].fd < 0)
 				continue;
-			if (pollfd[i].revents & POLLIN) {
-				workfn = client[i].workfn;
+			if (pollfds[i].revents & POLLIN) {
+				workfn = clients[i].workfn;
 				if (workfn)
 					workfn(i);
 			}
-			if (pollfd[i].revents &
+			if (pollfds[i].revents &
 					(POLLERR | POLLHUP | POLLNVAL)) {
-				deadfn = client[i].deadfn;
+				deadfn = clients[i].deadfn;
 				if (deadfn)
 					deadfn(i);
 			}

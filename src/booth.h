@@ -188,6 +188,10 @@ struct client {
         void (*deadfn)(int);
 };
 
+extern struct client *clients;
+extern struct pollfd *pollfds;
+
+
 int client_add(int fd, void (*workfn)(int ci), void (*deadfn)(int ci));
 int do_read(int fd, void *buf, size_t count);
 int do_write(int fd, void *buf, size_t count);
