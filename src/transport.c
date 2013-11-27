@@ -25,6 +25,7 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+#include <assert.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
@@ -696,16 +697,35 @@ int send_header_only(int fd, struct boothc_header *hdr)
 	return rv;
 }
 
-int send_header_plus(int fd, struct boothc_header *hdr, void *data, int len)
+
+int send_ticket_msg(int fd, struct boothc_ticket_msg *msg)
 {
 	int rv;
 
-
-	rv = send_header_only(fd, hdr);
-
-	if (rv >= 0 && len)
-		rv = do_write(fd, data, len);
+	rv = do_write(fd, msg, sizeof(*msg));
 
 	return rv;
 }
 
+
+int send_header_plus(int fd, struct boothc_header *hdr, void *data, int len)
+{
+	int rv;
+	int l;
+
+	if (data == hdr->data) {
+		l = sizeof(*hdr) + len;
+		assert(l == ntohl(hdr->length));
+
+		/* One struct */
+		rv = do_write(fd, hdr, l);
+	} else {
+		/* Header and data in two locations */
+		rv = send_header_only(fd, hdr);
+
+		if (rv >= 0 && len)
+			rv = do_write(fd, data, len);
+	}
+
+	return rv;
+}

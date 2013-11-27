@@ -69,6 +69,7 @@ extern const struct booth_transport *local_transport;
 
 int send_header_only(int fd, struct boothc_header *hdr);
 int send_header_plus(int fd, struct boothc_header *hdr, void *data, int len);
+int send_ticket_msg(int fd, struct boothc_ticket_msg *msg);
 
 
 #endif /* _TRANSPORT_H */
