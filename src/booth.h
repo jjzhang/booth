@@ -61,7 +61,7 @@ struct boothc_header {
 	/** BOOTHC_VERSION */
 	uint32_t version;
 
-	/** Packet source; site_id. See add_node(). */
+	/** Packet source; site_id. See add_site(). */
 	uint32_t from;
 
 	/** Length including header */
@@ -80,7 +80,7 @@ struct ticket_msg {
 	/** Ticket name. */
 	boothc_ticket id;
 
-	/** Owner. May be NO_OWNER. See add_node().  */
+	/** Owner. May be NO_OWNER. See add_site().  */
 	uint32_t owner;
 
 	/** Current ballot number. Might be < prev_ballot if overflown. */
@@ -155,6 +155,7 @@ typedef enum {
 /** @{ */
 
 struct booth_site {
+	/** Calculated ID. See add_site(). */
 	int site_id;
 	int type;
 	int local;

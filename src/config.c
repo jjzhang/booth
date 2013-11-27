@@ -56,8 +56,8 @@ static int ticket_realloc(void)
 }
 
 
-int add_node(char *address, int type);
-int add_node(char *addr_string, int type)
+int add_site(char *address, int type);
+int add_site(char *addr_string, int type)
 {
 	int rv;
 	struct booth_site *node;
@@ -391,12 +391,12 @@ no_value:
 		}
 
 		if (strcmp(key, "site") == 0) {
-			if (add_node(val, SITE))
+			if (add_site(val, SITE))
 				goto out;
 		}
 
 		if (strcmp(key, "arbitrator") == 0) {
-			if (add_node(val, ARBITRATOR))
+			if (add_site(val, ARBITRATOR))
 				goto out;
 		}
 
