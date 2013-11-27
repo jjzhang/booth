@@ -114,17 +114,17 @@ struct boothc_ticket_msg {
  * All these have to be swabbed to network order before sending. */
 typedef enum {
 	/* 0x43 = "C"ommands */
-	CMD_LIST    = 0x436f6d4c,
-	CMD_GRANT   = 0x436f6d47,
-	CMD_REVOKE  = 0x436f6d52,
-	CMD_CATCHUP = 0x436f6d43,
+	CMD_LIST    = 0x436d644c,
+	CMD_GRANT   = 0x436d6447,
+	CMD_REVOKE  = 0x436d6452,
+	CMD_CATCHUP = 0x436d6443,
 
 	/* Replies */
-	CMR_GENERAL = 0x436f5267,
-	CMR_LIST    = 0x436f524c,
-	CMR_GRANT   = 0x436f5247,
-	CMR_REVOKE  = 0x436f5252,
-	CMR_CATCHUP = 0x436f5243,
+	CMR_GENERAL = 0x43526467,
+	CMR_LIST    = 0x4352644c,
+	CMR_GRANT   = 0x43526447,
+	CMR_REVOKE  = 0x43526452,
+	CMR_CATCHUP = 0x43526443,
 
 	/* 0x50 = "P"axos */
 	OP_INIT      = 0x50617801,
