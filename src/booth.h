@@ -91,6 +91,7 @@ struct ticket_msg {
 	/** Seconds until expiration. */
 	uint32_t expiry;
 
+#if 0
 	/* From lease - not needed? */
 	uint32_t clear; /* NOT_CLEAR_RELEASE ? */
 	uint32_t leased;  /* has_been_leased by another node? */
@@ -99,14 +100,9 @@ struct ticket_msg {
 	/* needed?? */
 	/* From lease */
 	uint32_t op; /* OP_START_LEASE, OP_STOP_LEASE? ?*/
+#endif
 } __attribute__((packed));
 
-
-
-
-struct site_msg {
-	boothc_site site;
-} __attribute__((packed));
 
 struct boothc_ticket_msg {
 	struct boothc_header header;
@@ -123,6 +119,13 @@ typedef enum {
 	CMD_REVOKE  = 0x436f6d52,
 	CMD_CATCHUP = 0x436f6d43,
 
+	/* Replies */
+	CMR_GENERAL = 0x436f5267,
+	CMR_LIST    = 0x436f524c,
+	CMR_GRANT   = 0x436f5247,
+	CMR_REVOKE  = 0x436f5252,
+	CMR_CATCHUP = 0x436f5243,
+
 	/* 0x50 = "P"axos */
 	OP_INIT      = 0x50617801,
 	OP_PREPARING,
@@ -136,8 +139,9 @@ typedef enum {
 
 
 typedef enum {
+	/* for compatibility with other functions */
+	RLT_SUCCESS = 0,
 	RLT_ASYNC = 0x526c5401,
-	RLT_SUCCESS,
 	RLT_SYNC_SUCC,
 	RLT_SYNC_FAIL,
 	RLT_INVALID_ARG,

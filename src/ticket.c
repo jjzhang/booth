@@ -265,7 +265,7 @@ static void ticket_parse(struct ticket_config *tk,
 	if (tps->ballot < ntohl(tmsg->ticket.ballot))
 		tps->ballot = ntohl(tmsg->ticket.ballot);
 	if (CATCHED_VALID_TMSG == ntohl(tmsg->header.result)) {
-		tps->expires = current_time() + ntohl(tmsg->ticket.expiry);
+		tps->expires = time(NULL) + ntohl(tmsg->ticket.expiry);
 
 		if (!find_site_by_id( ntohl(tmsg->ticket.owner),
 					&tps->owner))
@@ -382,31 +382,30 @@ int ticket_write(struct ticket_config *tk)
 void ticket_status_recovery(pl_handle_t handle);
 void ticket_status_recovery(pl_handle_t handle)
 {
-	paxos_lease_status_recovery(handle);
+//	paxos_lease_status_recovery(handle);
 }
 
-#if 0
+
 int ticket_recv(struct boothc_ticket_msg *msg, int msglen)
 {
-	struct booth_msghdr *hdr;
-	char *data;
-
-	if (check_boothc_header(hdr, sizeof(*msg)) < 0 ||
+	if (check_boothc_header(&msg->header, sizeof(*msg)) < 0 ||
 			msglen != sizeof(*msg)) {
 		log_error("message receive error");
 		return -1;
 	}
-	return paxos_recvmsg(msg);
+	/* TODO */
+	return 0;
+//	return paxos_recvmsg(msg);
 }
-#endif
 
-int grant_ticket(struct ticket_config *tk)
+
+int do_grant_ticket(struct ticket_config *tk)
 {
 	struct ticket_paxos_state *tps;
 
 	tps = &tk->current_state;
 	if (tps->owner == local)
-		return RLT_SYNC_SUCC;
+		return RLT_SUCCESS;
 
 	/* TODO */
 #if 0
@@ -416,17 +415,17 @@ int grant_ticket(struct ticket_config *tk)
 		tk->ballot = ret;
 	return (ret < 0)? RLT_SYNC_FAIL: RLT_ASYNC;
 #endif
-	return 0;
+	return RLT_SUCCESS;
 }
 
 
-int revoke_ticket(struct ticket_config *tk)
+int do_revoke_ticket(struct ticket_config *tk)
 {
 	struct ticket_paxos_state *tps;
 
 	tps = &tk->current_state;
 	if (!tps->owner)
-		return RLT_SYNC_SUCC;
+		return RLT_SUCCESS;
 
 	/* TODO */
 #if 0
@@ -435,7 +434,7 @@ int revoke_ticket(struct ticket_config *tk)
 		tk->ballot = ret;
 	return (ret < 0)? RLT_SYNC_FAIL: RLT_ASYNC;
 #endif
-	return 0;
+	return RLT_SUCCESS;
 }
 
 
@@ -483,22 +482,6 @@ int list_ticket(char **pdata, unsigned int *len)
 }
 
 
-int ticket_answer_catchup(struct ticket_msg *msg, struct ticket_config *tk)
-{
-	struct ticket_paxos_state *tps;
-
-	tps = &tk->current_state;
-	msg->ballot = htonl(tps->ballot);
-
-	if (tps->owner == local && time(NULL) < tps->expires) {
-		msg->expiry = htonl(tk->expires - current_time());
-		msg->owner = htonl(tk->owner);
-		return CATCHED_VALID_TMSG;
-	}
-
-	return -1;
-}
-
 #if 0
 
 const struct paxos_lease_operations ticket_operations = {
@@ -532,9 +515,94 @@ int ticket_answer_list(int fd, struct boothc_ticket_msg *msg)
 
 	rv = list_ticket(&data, &olen);
 	if (rv < 0)
-		goto ex;
+		return rv;
 
-	init_header(&hdr, CMD_LIST, RLT_SUCCESS, sizeof(hdr) + olen);
+	init_header(&hdr, CMR_LIST, RLT_SUCCESS, sizeof(hdr) + olen);
 
 	return send_header_plus(fd, &hdr, data, olen);
 }
+
+
+int ticket_answer_grant(int fd, struct boothc_ticket_msg *msg)
+{
+	int rv;
+	struct ticket_config *tk;
+
+
+	if (!check_ticket(msg->ticket.id, &tk)) {
+		rv = RLT_INVALID_ARG;
+		goto reply;
+	}
+
+	if (tk->current_state.owner) {
+		log_error("client want to get an granted "
+				"ticket %s", msg->ticket.id);
+		rv = RLT_OVERGRANT;
+		goto reply;
+	}
+
+	rv = do_grant_ticket(tk);
+
+reply:
+	init_header(&msg->header, CMR_GRANT, rv, sizeof(*msg));
+	return send_ticket_msg(fd, msg);
+}
+
+
+int ticket_answer_revoke(int fd, struct boothc_ticket_msg *msg)
+{
+	int rv;
+	struct ticket_config *tk;
+
+	if (!check_ticket(msg->ticket.id, &tk)) {
+		rv = RLT_INVALID_ARG;
+		goto reply;
+	}
+
+	if (!tk->current_state.owner) {
+		log_info("client want to revoke a free ticket \"%s\"",
+				msg->ticket.id);
+		rv = RLT_SUCCESS;
+		goto reply;
+	}
+
+	rv = do_revoke_ticket(tk);
+
+reply:
+	init_header(&msg->header, CMR_REVOKE, rv, sizeof(*msg));
+	return send_ticket_msg(fd, msg);
+}
+
+
+int ticket_answer_catchup(int fd, struct boothc_ticket_msg *msg)
+{
+	struct ticket_paxos_state *tps;
+	struct ticket_config *tk;
+	int rv, mine;
+
+
+	if (!check_ticket(msg->ticket.id, &tk)) {
+		rv = RLT_INVALID_ARG;
+		goto reply;
+	}
+
+	tps = &tk->current_state;
+
+	mine = owner_and_valid(tk);
+
+	/* We do _always_ answer.
+	 * In case all booth daemons are restarted at the same time, nobody
+	 * would answer any questions, leading to timeouts and delays.
+	 * Just admit we don't know. */
+
+	msg->ticket.expiry = htonl( mine );
+	msg->ticket.owner  = htonl( get_node_id(tps->owner) );
+	msg->ticket.ballot = htonl(tps->ballot);
+	rv = RLT_SUCCESS;
+
+reply:
+	init_header(&msg->header, CMR_CATCHUP, rv, sizeof(*msg));
+	return send_ticket_msg(fd, msg);
+}
+
+

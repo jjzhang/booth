@@ -84,7 +84,8 @@ struct command_line {
 	char configfile[BOOTH_PATH_LEN];
 	char lockfile[BOOTH_PATH_LEN];
 
-	struct boothc_ticket_site_msg msg;
+	char site[BOOTH_NAME_LEN];
+	struct boothc_ticket_msg msg;
 };
 
 struct booth_config *booth_conf;
@@ -227,11 +228,9 @@ again:
 
 void process_connection(int ci)
 {
-	struct boothc_ticket_site_msg msg;
-	struct ticket_config *tc;
-	int is_local, rv, len, exp, olen, fd;
+	struct boothc_ticket_msg msg;
+	int rv, len, exp, fd;
 	void (*deadfn) (int ci);
-	char *data;
 
 
 	fd = client[ci].fd;
@@ -266,9 +265,6 @@ bad_len:
 	}
 
 
-	olen = 0;
-	/* Commands have input msg;
-	 * and output rv, data and olen (excluding header).  */
 	switch (ntohl(msg.header.cmd)) {
 		case CMD_LIST:
 			ticket_answer_list(fd, &msg);
@@ -278,93 +274,33 @@ bad_len:
 			/* Expect boothc_ticket_site_msg. */
 			if (len != sizeof(msg))
 				goto bad_len;
-
-			/* Need to return ticket name etc. */
-			olen = len;
-			data = msg.header.data;
-			if (!check_ticket(msg.ticket.id, &tc)) {
-				rv = RLT_INVALID_ARG;
-				goto reply;
-			}
-
-			if (tc->current_state.owner) {
-				log_error("client want to get an granted "
-						"ticket %s", msg.ticket.id);
-				rv = RLT_OVERGRANT;
-				goto reply;
-			}
-
-			if (!check_site(msg.site.site, &is_local)) {
-				rv = RLT_INVALID_ARG;
-				goto reply;
-			}
-			if (is_local)
-				rv = grant_ticket(tc);
-			else
-				rv = RLT_REMOTE_OP;
-			break;
+			ticket_answer_grant(fd, &msg);
+			goto kill;
 
 		case CMD_REVOKE:
 			/* Expect boothc_ticket_site_msg. */
 			if (len != sizeof(msg))
 				goto bad_len;
 
-			olen = len;
-			data = msg.header.data;
-			if (!check_ticket(msg.ticket.id, &tc)) {
-				msg.header.result = RLT_INVALID_ARG;
-				goto reply;
-			}
-			if (!check_site(msg.site.site, &is_local)) {
-				msg.header.result = RLT_INVALID_ARG;
-				goto reply;
-			}
-			if (is_local)
-				msg.header.result = revoke_ticket(tc);
-			else
-				msg.header.result = RLT_REMOTE_OP;
-			break;
+			ticket_answer_revoke(fd, &msg);
+			goto kill;
 
 		case CMD_CATCHUP:
 			/* Expect boothc_ticket_site_msg. */
 			if (len != sizeof(msg))
 				goto bad_len;
-
-			/* Need to return ticket name etc. */
-			olen = len;
-			data = msg.header.data;
-
-			if (!check_ticket(msg.ticket.id, &tc)) {
-				rv = RLT_INVALID_ARG;
-				goto reply;
-			}
-
-			rv = ticket_answer_catchup(&msg.ticket, tc);
-			/* Only answer if we're the owner. */
-			if (rv == -1)
-				goto kill;
-			break;
+			ticket_answer_catchup(fd, &msg);
+			goto kill;
 
 		default:
 			log_error("connection %d cmd %x unknown",
 					ci, ntohl(msg.header.cmd));
+			init_header(&msg.header,CMR_GENERAL, RLT_INVALID_ARG, sizeof(msg.header));
+			send_header_only(fd, &msg.header);
 			goto kill;
 	}
 
-
-reply:
-	msg.header.result = htonl(rv);
-	msg.header.length = htonl(olen + sizeof(msg.header));
-
-	rv = do_write(client[ci].fd, &msg.header, sizeof(msg.header));
-	if (rv < 0)
-		log_error("connection %d write error %d", ci, rv);
-	if (len) {
-		rv = do_write(client[ci].fd, data, olen);
-		if (rv < 0)
-			log_error("connection %d write error %d", ci, rv);
-	}
-
+	assert(0);
 	return;
 
 kill:
@@ -613,20 +549,34 @@ out:
 
 static int do_command(cmd_request_t cmd)
 {
-	struct booth_site *node, *to;
+	struct booth_site *site, *to;
 	struct boothc_header reply;
+	struct booth_transport const *tpt;
 	int rv;
 
-	node = NULL;
+	rv = 0;
+	site = NULL;
 	to = NULL;
 
-	init_ticket_site_header(&cl.msg, cmd);
+	if (!find_site_by_name(cl.site, &site)) {
+		log_error("Site \"%s\" not configured.", cl.site);
+		goto out_close;
+	}
 
-	rv = do_local_connect_and_write(&cl.msg, sizeof(cl.msg), &node);
-        if (rv < 0)
-                goto out_close;
+	init_header(&cl.msg.header, cmd, 0, sizeof(cl.msg));
 
-	rv = local_transport->recv(node, &reply, sizeof(reply));
+	/* Always use TCP for client - at least for now. */
+	tpt = booth_transport + TCP;
+	rv = tpt->open(site);
+	if (rv < 0)
+		goto out_close;
+
+	rv = tpt->send(site, &cl.msg, sizeof(cl.msg));
+	if (rv < 0)
+		goto out_close;
+
+
+	rv = tpt->recv(site, &reply, sizeof(reply));
 	if (rv < 0)
 		goto out_close;
 
@@ -645,32 +595,14 @@ static int do_command(cmd_request_t cmd)
 	}
 
 	if (reply.result == RLT_REMOTE_OP) {
-
-		if (!find_site_by_name(cl.msg.site.site, &to)) {
-			log_error("Redirected to unknown site %s.", cl.msg.site.site);
-			rv = -1;
-			goto out_close;
-		}
-
-		rv = booth_transport[TCP].open(to);
-		if (rv < 0) {
-			goto out_close;
-		}
-		rv = booth_transport[TCP].send(to, &cl.msg, sizeof(cl.msg));
-		if (rv < 0) {
-			booth_transport[TCP].close(to);
-			goto out_close;
-		}
-		rv = booth_transport[TCP].recv(to, &reply,
-					       sizeof(struct boothc_header));
-		if (rv < 0) {
-			booth_transport[TCP].close(to);
-			goto out_close;
-		}
-		booth_transport[TCP].close(to);
+		log_info("Cannot do that operation here.");
+		rv = -1;
+		goto out_close;
 	}
- 
-	if (reply.result == RLT_ASYNC) {
+
+
+	switch (ntohl(reply.result)) {
+	case RLT_ASYNC:
 		if (cmd == CMD_GRANT)
 			log_info("grant command sent, result will be returned "
 				 "asynchronously, you can get the result from "
@@ -682,26 +614,33 @@ static int do_command(cmd_request_t cmd)
 		else
 			log_error("internal error reading reply result!");
 		rv = 0;
-	} else if (reply.result == RLT_SYNC_SUCC) {
+		break;
+
+	case RLT_SYNC_SUCC:
 		if (cmd == CMD_GRANT)
 			log_info("grant succeeded!");
 		else if (cmd == CMD_REVOKE)
 			log_info("revoke succeeded!");
 		rv = 0;
-	} else if (reply.result == RLT_SYNC_FAIL) {
+		break;
+
+	case RLT_SYNC_FAIL:
 		if (cmd == CMD_GRANT)
 			log_info("grant failed!");
 		else if (cmd == CMD_REVOKE)
 			log_info("revoke failed!");
 		rv = -1;
-	} else {
+		break;
+
+	default:
 		log_error("internal error!");
 		rv = -1;
 	}
 
+
 out_close:
-	if (node)
-		local_transport->close(node);
+	if (site)
+		local_transport->close(site);
 	if (to)
 		booth_transport[TCP].close(to);
 	return rv;
@@ -958,9 +897,9 @@ static int read_arguments(int argc, char **argv)
 			if (cl.op == OP_GRANT || cl.op == OP_REVOKE) {
 				int re = host_convert(optarg, site_arg, INET_ADDRSTRLEN);
 				if (re == 0) {
-					safe_copy(cl.msg.site.site, site_arg, sizeof(cl.msg.ticket), "site name");
+					safe_copy(cl.site, site_arg, sizeof(cl.site), "site name");
 				} else {
-					safe_copy(cl.msg.site.site, optarg, sizeof(cl.msg.ticket), "site name");
+					safe_copy(cl.site, optarg, sizeof(cl.site), "site name");
 				}
 			} else {
 				print_usage();
@@ -1202,7 +1141,7 @@ static int do_client(void)
 		rv = do_revoke();
 		break;
 	}
-	
+
 out:
 	return rv;
 }

@@ -34,7 +34,7 @@ static inline void init_header(struct boothc_header *h, int cmd,
 	h->result  = htonl(result);
 }
 
-static inline void init_ticket_site_header(struct boothc_ticket_site_msg *msg, int cmd)
+static inline void init_ticket_site_header(struct boothc_ticket_msg *msg, int cmd)
 {
 	init_header(&msg->header, cmd, 0, sizeof(*msg));
 }
@@ -42,14 +42,6 @@ static inline void init_ticket_site_header(struct boothc_ticket_site_msg *msg, i
 static inline void init_ticket_msg(struct boothc_ticket_msg *msg, int cmd)
 {
 	init_header(&msg->header, cmd, 0, sizeof(*msg));
-	memset(&msg->ticket, 0, sizeof(msg->ticket));
-}
-
-
-static inline void init_ticket_site_msg(struct boothc_ticket_site_msg *msg, int cmd)
-{
-	init_ticket_site_header(msg, cmd);
-	memset(&msg->site, 0, sizeof(msg->site));
 	memset(&msg->ticket, 0, sizeof(msg->ticket));
 }
 
