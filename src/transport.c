@@ -577,7 +577,7 @@ static int booth_udp_init(void *f)
 	return 0;
 }
 
-static int booth_udp_send(struct booth_site *to, void *buf, int len)
+int booth_udp_send(struct booth_site *to, void *buf, int len)
 {
 	int rv;
 

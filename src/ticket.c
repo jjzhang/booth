@@ -259,18 +259,39 @@ static void ticket_parse(struct ticket_config *tk,
 		struct boothc_ticket_msg *tmsg)
 {
 	struct ticket_paxos_state *tps;
+	time_t now;
+
 
 	tps = &tk->current_state;
+	time(&now);
 
 	if (tps->ballot < ntohl(tmsg->ticket.ballot))
 		tps->ballot = ntohl(tmsg->ticket.ballot);
+
 	if (CATCHED_VALID_TMSG == ntohl(tmsg->header.result)) {
-		tps->expires = time(NULL) + ntohl(tmsg->ticket.expiry);
+		tps->expires = now + ntohl(tmsg->ticket.expiry);
 
 		if (!find_site_by_id( ntohl(tmsg->ticket.owner),
 					&tps->owner))
 			log_error("wrong site_id %x as ticket owner, msg from %x",
 					tmsg->ticket.owner, tmsg->header.from);
+	}
+
+
+	if (now >= tps->expires) {
+		tps->owner = NULL;
+		tps->expires = 0;
+	}
+
+	if (local->type != ARBITRATOR) {
+		pcmk_handler.store_ticket(tk->name,
+				tps->owner->site_id,
+				tps->ballot,
+				tps->expires);
+		if (tps->owner == local)
+			pcmk_handler.grant_ticket(tk->name);
+		else
+			pcmk_handler.revoke_ticket(tk->name);
 	}
 }
 
@@ -284,7 +305,7 @@ static int ticket_catchup(struct ticket_config *tk)
 	struct ticket_paxos_state *tps;
 	int i, rv = 0;
 	uint32_t owner;
-	struct booth_site *node;
+	struct booth_site *site;
 	struct boothc_ticket_msg msg;
 	time_t now;
 
@@ -306,54 +327,17 @@ static int ticket_catchup(struct ticket_config *tk)
 	}
 
 
-	foreach_node(i, node) {
-		if (node->type == SITE &&
-				!(node->local)) {
+	foreach_node(i, site) {
+		if (!site->local) {
 			init_ticket_msg(&msg, CMD_CATCHUP);
 			strncpy(msg.ticket.id, tk->name, sizeof(msg.ticket.id));
 
-			log_debug("attempting catchup from %s", node->addr_string);
+			log_debug("attempting catchup from %s", site->addr_string);
 
-			rv = booth_transport[TCP].open(node);
-			if (rv < 0)
-				continue;
-			log_debug("connected to %s", node->addr_string);
-
-			rv = booth_transport[TCP].send(node, &msg, sizeof(msg));
-			if (rv != sizeof(msg))
-				goto close;
-
-			log_debug("sent catchup command to %s", node->addr_string);
-
-			rv = booth_transport[TCP].recv(node, &msg, sizeof(&msg));
-			if (rv != sizeof(msg))
-				goto close;
-
-			/* TODO: check header? in tcp recv? */
-
-			log_debug("got catchup result from %s", node->addr_string);
-			ticket_parse(tk, &msg);
-close:
-			booth_transport[TCP].close(node);
+			rv = booth_udp_send(site, &msg, sizeof(msg));
 		}
 	}
 
-
-	if (now >= tps->expires) {
-		tps->owner = NULL;
-		tps->expires = 0;
-	}
-
-	if (local->type != ARBITRATOR) {
-		pcmk_handler.store_ticket(tk->name,
-				tps->owner->site_id,
-				tps->ballot,
-				tps->expires);
-		if (tps->owner == local)
-			pcmk_handler.grant_ticket(tk->name);
-		else
-			pcmk_handler.revoke_ticket(tk->name);
-	}
 
 	return rv;
 }
@@ -388,14 +372,23 @@ void ticket_status_recovery(pl_handle_t handle)
 
 int message_recv(struct boothc_ticket_msg *msg, int msglen)
 {
+	int cmd;
+
 	if (check_boothc_header(&msg->header, sizeof(*msg)) < 0 ||
 			msglen != sizeof(*msg)) {
 		log_error("message receive error");
 		return -1;
 	}
-	/* TODO */
+
+	cmd = ntohl(msg->header.cmd);
+	switch (cmd) {
+	case CMR_CATCHUP:
+		return ticket_process_catchup(msg);
+
+	default:
+		log_error("unprocessed message, cmd %x", cmd);
+	}
 	return 0;
-//	return paxos_recvmsg(msg);
 }
 
 
@@ -605,4 +598,23 @@ reply:
 	return send_ticket_msg(fd, msg);
 }
 
+
+int ticket_process_catchup(struct boothc_ticket_msg *msg)
+{
+	struct ticket_config *tk;
+	int rv;
+
+
+	if (!check_ticket(msg->ticket.id, &tk)) {
+		rv = RLT_INVALID_ARG;
+		goto ex;
+	}
+
+	ticket_parse(tk, msg);
+	rv = 0;
+
+ex:
+	log_debug("got catchup result from %x: result %d", ntohl(msg->header.from), rv);
+	return rv;
+}
 

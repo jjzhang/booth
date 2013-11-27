@@ -53,6 +53,7 @@ int find_myself(struct booth_site **me, int fuzzy_allowed);
 int check_boothc_header(struct boothc_header *data, int len_incl_data);
 
 int setup_udp_server(int try_only);
+int booth_udp_send(struct booth_site *to, void *buf, int len);
 
 int booth_tcp_open(struct booth_site *to);
 int booth_tcp_send(struct booth_site *to, void *buf, int len);
