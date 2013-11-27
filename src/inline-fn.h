@@ -19,6 +19,7 @@
 #ifndef _INLINE_FN_H
 #define _INLINE_FN_H
 
+#include <time.h>
 #include "config.h"
 #include "transport.h"
 
@@ -67,6 +68,19 @@ inline static uint32_t get_local_id(void)
 inline static uint32_t get_node_id(struct booth_site *node)
 {
 	return node ? node->site_id : NO_OWNER;
+}
+
+
+/** Returns number of seconds left, if any. */
+inline static int owner_and_valid(const struct ticket_config *tk)
+{
+	int left;
+
+	if (tk->current_state.owner != local)
+		return 0;
+
+	left = time(NULL) < tk->current_state.expires;
+	return (left < 0) ? 0 : left;
 }
 
 
