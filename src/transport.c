@@ -540,6 +540,8 @@ int setup_udp_server(int try_only)
 	return udp.s;
 }
 
+
+/* Receive/process callback for UDP */
 static void process_recv(int ci)
 {
 	struct msghdr msg_recv;

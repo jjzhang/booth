@@ -244,6 +244,7 @@ int client_add(int fd, const struct booth_transport *tpt,
 }
 
 
+/* Only used for client requests, TCP ???*/
 void process_connection(int ci)
 {
 	struct boothc_ticket_msg msg;
