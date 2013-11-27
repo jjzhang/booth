@@ -59,12 +59,19 @@
 
 int daemonize = 0;
 
-static int client_maxi;
-static int client_size = 0;
+
+/** Structure for "clients".
+ * Filehandles with incoming data get registered here (and in pollfds),
+ * along with their callbacks.
+ * Because these can be reallocated with every new fd, addressing
+ * happens _only_ by their numeric index. */
 struct client *clients = NULL;
 struct pollfd *pollfds = NULL;
+static int client_maxi;
+static int client_size = 0;
 
-typedef enum 
+
+typedef enum
 {
 	BOOTHD_STARTED=0,
 	BOOTHD_STARTING
