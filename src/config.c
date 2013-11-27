@@ -139,6 +139,39 @@ out:
 }
 
 
+inline static const char *skip_while_in(const char *cp, int (*fn)(int), const char *allowed)
+{
+	/* strchr() returns a pointer to the terminator if *cp == 0. */
+	while (*cp &&
+			(fn(*cp) ||
+			 strchr(allowed, *cp)))
+		cp++;
+	return cp;
+}
+
+
+inline static char *skip_while(char *cp, int (*fn)(int))
+{
+	while (fn(*cp))
+		cp++;
+	return cp;
+}
+
+inline static char *skip_until(char *cp, char expected)
+{
+	while (*cp && *cp != expected)
+		cp++;
+	return cp;
+}
+
+
+static inline int is_end_of_line(char *cp)
+{
+	char c = *cp;
+	return c == '\n' || c == 0 || c == '#';
+}
+
+
 static int add_ticket(const char *name, struct ticket_config **tkp,
 		int expiry, int weights[MAX_NODES])
 {
@@ -169,28 +202,6 @@ static int add_ticket(const char *name, struct ticket_config **tkp,
 	if (tkp)
 		*tkp = tk;
 	return 0;
-}
-
-
-inline static char *skip_while(char *cp, int (*fn)(int))
-{
-	while (fn(*cp))
-		cp++;
-	return cp;
-}
-
-inline static char *skip_until(char *cp, char expected)
-{
-	while (*cp && *cp != expected)
-		cp++;
-	return cp;
-}
-
-
-static inline int is_end_of_line(char *cp)
-{
-	char c = *cp;
-	return c == '\n' || c == 0 || c == '#';
 }
 
 
