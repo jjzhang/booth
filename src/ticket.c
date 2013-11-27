@@ -386,7 +386,7 @@ void ticket_status_recovery(pl_handle_t handle)
 }
 
 
-int ticket_recv(struct boothc_ticket_msg *msg, int msglen)
+int message_recv(struct boothc_ticket_msg *msg, int msglen)
 {
 	if (check_boothc_header(&msg->header, sizeof(*msg)) < 0 ||
 			msglen != sizeof(*msg)) {

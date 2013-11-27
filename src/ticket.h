@@ -29,7 +29,7 @@ int do_grant_ticket(struct ticket_config *ticket);
 int revoke_ticket(struct ticket_config *ticket);
 int list_ticket(char **pdata, unsigned int *len);
 
-int ticket_recv(struct boothc_ticket_msg *msg, int msglen);
+int message_recv(struct boothc_ticket_msg *msg, int msglen);
 int setup_ticket(void);
 int check_max_len_valid(const char *s, int max);
 

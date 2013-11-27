@@ -374,7 +374,7 @@ static int setup_transport(void)
 {
 	int rv;
 
-	rv = transport()->init(ticket_recv);
+	rv = transport()->init(message_recv);
 	if (rv < 0) {
 		log_error("failed to init booth_transport %s", transport()->name);
 		goto out;
