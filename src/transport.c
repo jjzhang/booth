@@ -670,6 +670,7 @@ const struct booth_transport booth_transport[TRANSPORT_ENTRIES] = {
 		.init = booth_udp_init,
 		.open = return_0_booth_site,
 		.send = booth_udp_send,
+		.close = return_0_booth_site,
 		.broadcast = booth_udp_broadcast,
 		.exit = booth_udp_exit
 	},
