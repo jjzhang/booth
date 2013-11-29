@@ -29,8 +29,8 @@ extern int poll_timeout;
 static LIST_HEAD(timer_head);
 
 struct timerlist * add_timer(unsigned long expires,
-			     unsigned long data, 
-			     void (*function) (unsigned long data))
+			     void *data,
+			     void (*function) (void *))
 {
 	struct timerlist *timer;
 

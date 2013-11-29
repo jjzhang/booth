@@ -24,14 +24,14 @@
 struct timerlist {
 	struct list_head entry;
 	unsigned long long expires;
-	void (*function) (unsigned long);
-	unsigned long data;
+	void (*function) (void *);
+	void *data;
 };
 
 int timerlist_init(void);
 struct timerlist * add_timer(unsigned long expires,
-			     unsigned long data, 
-			     void (*function) (unsigned long data));
+			     void *data,
+			     void (*function) (void*));
 int del_timer(struct timerlist **timer);
 void timerlist_exit(void);
 void process_timerlist(void);
