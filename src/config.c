@@ -90,7 +90,7 @@ int add_site(char *addr_string, int type)
 			sizeof(node->addr_string));
 	/* Make sure we will never collide with NO_OWNER,
 	 * or be negative (to get "get_local_id() < 0" working). */
-	mask = 1 << (sizeof(node->site_id)*4 -1);
+	mask = 1 << (sizeof(node->site_id)*8 -1);
 	assert(NO_OWNER & mask);
 	node->site_id &= ~mask;
 
