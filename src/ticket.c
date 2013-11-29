@@ -470,7 +470,7 @@ int list_ticket(char **pdata, unsigned int *len)
 		tps = &tk->current_state;
 
 		if (tps->expires != 0)
-			strftime(timeout_str, sizeof(timeout_str), "%G",
+			strftime(timeout_str, sizeof(timeout_str), "%F %T",
 					localtime(&tps->expires));
 		else
 			strcpy(timeout_str, "INF");
