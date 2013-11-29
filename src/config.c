@@ -178,6 +178,7 @@ static int add_ticket(const char *name, struct ticket_config **tkp,
 	int rv;
 	struct ticket_config *tk;
 
+
 	if (booth_conf->ticket_count == booth_conf->ticket_allocated) {
 		rv = ticket_realloc();
 		if (rv < 0)
@@ -191,6 +192,16 @@ static int add_ticket(const char *name, struct ticket_config **tkp,
 
 	if (!check_max_len_valid(name, sizeof(tk->name))) {
 		log_error("ticket name \"%s\" too long.", name);
+		return -EINVAL;
+	}
+
+	if (find_ticket_by_name(name, NULL)) {
+		log_error("ticket name \"%s\" used again.", name);
+		return -EINVAL;
+	}
+
+	if (* skip_while_in(name, isalnum, "-/")) {
+		log_error("ticket name \"%s\" invalid; only alphanumeric names.", name);
 		return -EINVAL;
 	}
 
