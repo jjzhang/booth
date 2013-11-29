@@ -515,7 +515,9 @@ static int query_get_string_answer(cmd_request_t cmd)
 	data = NULL;
 	init_header(&cl.msg.header, cmd, 0, sizeof(cl.msg));
 
-	if (!find_site_by_name(cl.site, &site)) {
+	if (!*cl.site)
+		site = local;
+	else if (!find_site_by_name(cl.site, &site)) {
 		log_error("cannot find site \"%s\"", cl.site);
 		goto out;
 	}
@@ -554,6 +556,7 @@ out:
 	return rv;
 }
 
+
 static int do_command(cmd_request_t cmd)
 {
 	struct booth_site *site, *to;
@@ -565,7 +568,9 @@ static int do_command(cmd_request_t cmd)
 	site = NULL;
 	to = NULL;
 
-	if (!find_site_by_name(cl.site, &site)) {
+	if (!*cl.site)
+		site = local;
+	else if (!find_site_by_name(cl.site, &site)) {
 		log_error("Site \"%s\" not configured.", cl.site);
 		goto out_close;
 	}
