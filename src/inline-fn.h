@@ -63,16 +63,21 @@ inline static uint32_t get_node_id(struct booth_site *node)
 }
 
 
-/** Returns number of seconds left, if any. */
-inline static int owner_and_valid(const struct ticket_config *tk)
+inline static int ticket_valid_for(const struct ticket_config *tk)
 {
 	int left;
 
+	left = tk->current_state.expires - time(NULL);
+	return (left < 0) ? 0 : left;
+}
+
+/** Returns number of seconds left, if any. */
+inline static int owner_and_valid(const struct ticket_config *tk)
+{
 	if (tk->current_state.owner != local)
 		return 0;
 
-	left = time(NULL) < tk->current_state.expires;
-	return (left < 0) ? 0 : left;
+	return ticket_valid_for(tk);
 }
 
 
