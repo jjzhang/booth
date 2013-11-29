@@ -52,8 +52,6 @@ struct tcp_conn {
 	struct list_head list;
 };
 
-static LIST_HEAD(tcp);
-
 
 static int (*deliver_fn) (void *msg, int msglen);
 
@@ -278,22 +276,6 @@ int check_boothc_header(struct boothc_header *h, int len_incl_data)
 	return len_incl_data;
 }
 
-static void process_dead(int ci)
-{
-	struct tcp_conn *conn, *safe;
-
-	list_for_each_entry_safe(conn, safe, &tcp, list) {
-		if (conn->s == clients[ci].fd) {
-			list_del(&conn->list);
-			free(conn);
-			break;
-		}
-	}
-	close(clients[ci].fd);
-	clients[ci].workfn = NULL;
-	clients[ci].fd = -1;
-	pollfds[ci].fd = -1;
-}
 
 static void process_tcp_listener(int ci)
 {
@@ -318,10 +300,9 @@ static void process_tcp_listener(int ci)
 	memset(conn, 0, sizeof(struct tcp_conn));
 	conn->s = fd;
 	memcpy(&conn->to, &addr, sizeof(struct sockaddr));
-	list_add_tail(&conn->list, &tcp);
 
 	i = client_add(fd, clients[ci].transport,
-			process_connection, process_dead);
+			process_connection, NULL);
 
 	log_debug("client connection %d fd %d", i, fd);
 }
