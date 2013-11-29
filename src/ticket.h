@@ -39,8 +39,16 @@ int do_revoke_ticket(struct ticket_config *tk);
 int find_ticket_by_name(const char *ticket, struct ticket_config **found);
 int find_ticket_by_handle(pl_handle_t handle, struct ticket_config **found);
 
-int ticket_answer_list(int fd, struct boothc_ticket_msg *msg);
+
+/** @{
+ * These functions do sanity checks, and prepare an answer
+ * in the given msg place.
+ * Sending is done by upper layers. 
+ */
 int ticket_answer_catchup(struct boothc_ticket_msg *msg);
+/** @} */
+
+int ticket_answer_list(int fd, struct boothc_ticket_msg *msg);
 int ticket_answer_grant(int fd, struct boothc_ticket_msg *msg);
 int ticket_answer_revoke(int fd, struct boothc_ticket_msg *msg);
 
