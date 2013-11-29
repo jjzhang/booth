@@ -596,6 +596,10 @@ int ticket_answer_catchup(struct boothc_ticket_msg *msg)
 		goto reply;
 	}
 
+	log_debug("got catchup request for \"%s\" from %08x",
+			msg->ticket.id, ntohl(msg->header.from));
+
+
 	tps = &tk->current_state;
 
 	mine = owner_and_valid(tk);
@@ -626,6 +630,9 @@ int ticket_process_catchup(struct boothc_ticket_msg *msg)
 		rv = RLT_INVALID_ARG;
 		goto ex;
 	}
+
+	log_debug("got catchup answer for \"%s\" from %08x",
+			msg->ticket.id, ntohl(msg->header.from));
 
 	ticket_parse(tk, msg);
 	rv = 0;
