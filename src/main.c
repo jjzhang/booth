@@ -536,20 +536,31 @@ fail:
 
 static int query_get_string_answer(cmd_request_t cmd)
 {
-	struct booth_site *node;
-	struct boothc_header h, reply;
+	struct booth_site *site;
+	struct boothc_header reply;
 	char *data;
 	int data_len;
 	int rv;
+	struct booth_transport const *tpt;
 
 	data = NULL;
-	init_header(&h, cmd, 0, 0);
+	init_header(&cl.msg.header, cmd, 0, sizeof(cl.msg));
 
-	rv = do_local_connect_and_write(&h, sizeof(h), &node);
-	if (rv < 0)
+	if (!find_site_by_name(cl.site, &site)) {
+		log_error("cannot find site \"%s\"", cl.site);
 		goto out;
+	}
 
-	rv = local_transport->recv(node, &reply, sizeof(reply));
+	tpt = booth_transport + TCP;
+	rv = tpt->open(site);
+	if (rv < 0)
+		goto out_free;
+
+	rv = tpt->send(site, &cl.msg, sizeof(cl.msg));
+	if (rv < 0)
+		goto out_free;
+
+	rv = tpt->recv(site, &reply, sizeof(reply));
 	if (rv < 0)
 		goto out_free;
 
@@ -560,7 +571,7 @@ static int query_get_string_answer(cmd_request_t cmd)
 		rv = -ENOMEM;
 		goto out_free;
 	}
-	rv = local_transport->recv(node, data, data_len);
+	rv = tpt->recv(site, data, data_len);
 	if (rv < 0)
 		goto out_free;
 
@@ -569,7 +580,7 @@ static int query_get_string_answer(cmd_request_t cmd)
 
 out_free:
 	free(data);
-	local_transport->close(node);
+	tpt->close(site);
 out:
 	return rv;
 }
@@ -921,7 +932,7 @@ static int read_arguments(int argc, char **argv)
 			break;
 
 		case 's':
-			if (cl.op == OP_GRANT || cl.op == OP_REVOKE) {
+			if (cl.op == OP_GRANT || cl.op == OP_REVOKE || cl.op == OP_LIST) {
 				int re = host_convert(optarg, site_arg, INET_ADDRSTRLEN);
 				if (re == 0) {
 					safe_copy(cl.site, site_arg, sizeof(cl.site), "site name");
