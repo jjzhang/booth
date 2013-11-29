@@ -320,7 +320,8 @@ static int ticket_catchup(struct ticket_config *tk)
 
 		/* No check, node could have been deconfigured. */
 		find_site_by_id(owner, &tps->owner);
-		if (now >= tps->expires) {
+		if (now >= tps->expires ||
+				!tps->owner) {
 			tps->owner = NULL;
 			tps->expires = 0;
 		}
