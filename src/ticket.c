@@ -261,14 +261,11 @@ static void ticket_parse(struct ticket_config *tk,
 	}
 
 	if (local->type != ARBITRATOR) {
-		pcmk_handler.store_ticket(tk->name,
-				get_node_id(tps->owner),
-				tps->ballot,
-				tps->expires);
+		pcmk_handler.store_ticket(tk);
 		if (tps->owner == local)
-			pcmk_handler.grant_ticket(tk->name);
+			pcmk_handler.grant_ticket(tk);
 		else
-			pcmk_handler.revoke_ticket(tk->name);
+			pcmk_handler.revoke_ticket(tk);
 	}
 }
 
@@ -279,31 +276,14 @@ static void ticket_parse(struct ticket_config *tk,
  * An ARBITRATOR can only ask others. */
 static int ticket_catchup(struct ticket_config *tk)
 {
-	struct ticket_paxos_state *tps;
 	int i, rv = 0;
-	uint32_t owner;
 	struct booth_site *site;
 	struct boothc_ticket_msg msg;
-	time_t now;
 
-	time(&now);
-	tps = &tk->current_state;
 
 	if (local->type != ARBITRATOR) {
-		pcmk_handler.load_ticket(tk->name,
-				&owner,
-				&tps->ballot,
-				&tps->expires);
-
-		/* No check, node could have been deconfigured. */
-		find_site_by_id(owner, &tps->owner);
-		if (now >= tps->expires ||
-				!tps->owner) {
-			tps->owner = NULL;
-			tps->expires = 0;
-		}
+		pcmk_handler.load_ticket(tk);
 	}
-
 
 	foreach_node(i, site) {
 		if (!site->local) {
@@ -316,7 +296,6 @@ static int ticket_catchup(struct ticket_config *tk)
 		}
 	}
 
-
 	return rv;
 }
 
@@ -324,17 +303,12 @@ static int ticket_catchup(struct ticket_config *tk)
 int ticket_write(struct ticket_config *tk);
 int ticket_write(struct ticket_config *tk)
 {
-	struct ticket_paxos_state *tps;
+	pcmk_handler.store_ticket(tk);
 
-	tps = &tk->current_state;
-
-	pcmk_handler.store_ticket(tk->name,
-			tps->owner->site_id, tps->ballot, tps->expires);
-
-	if (tps->owner == local) {
-		pcmk_handler.grant_ticket(tk->name);
-	} else if (!tps->owner) {
-		pcmk_handler.revoke_ticket(tk->name);
+	if (tk->current_state.owner == local) {
+		pcmk_handler.grant_ticket(tk);
+	} else if (!tk->current_state.owner) {
+		pcmk_handler.revoke_ticket(tk);
 	}
 
 	return 0;

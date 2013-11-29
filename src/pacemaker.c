@@ -1,5 +1,6 @@
 /* 
  * Copyright (C) 2011 Jiaju Zhang <jjzhang@suse.de>
+ * Copyright (C) 2013 Philipp Marek <philipp.marek@linbit.com>
  * 
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public
@@ -17,153 +18,149 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <inttypes.h>
 #include "log.h"
 #include "pacemaker.h"
+#include "inline-fn.h"
 
 #define COMMAND_MAX	256
 
-static void pcmk_grant_ticket(const char *ticket)
+static void pcmk_grant_ticket(struct ticket_config *tk)
 {
-	FILE *p;
 	char cmd[COMMAND_MAX];
+	int rv;
 
 	snprintf(cmd, COMMAND_MAX, "crm_ticket -t %s -g --force",
-		 (char *)ticket);
+			tk->name);
 	log_info("command: '%s' was executed", cmd);
-	p = popen(cmd, "r");
-	if (p == NULL) {
-		log_error("popen error: %s", cmd);
-		return;
-	}
-	pclose(p);
-
-	return;
+	rv = system(cmd);
+	if (rv != 0)
+		log_error("error: \"%s\" failed, rv %d", cmd, rv);
 }
 
-static void pcmk_revoke_ticket(const char *ticket)
+static void pcmk_revoke_ticket(struct ticket_config *tk)
 {
-	FILE *p;
 	char cmd[COMMAND_MAX];
+	int rv;
 
 	snprintf(cmd, COMMAND_MAX, "crm_ticket -t %s -r --force",
-		 (char *)ticket);
+			tk->name);
 	log_info("command: '%s' was executed", cmd);
-	p = popen(cmd, "r");
-	if (p == NULL) {
-		log_error("popen error: %s", cmd);
-		return;
-	}
-	pclose(p);
-
-	return;
+	rv = system(cmd);
+	if (rv != 0)
+		log_error("error: \"%s\" failed, rv %d", cmd, rv);
 }
 
-static void pcmk_store_ticket(const char* ticket,
-		uint32_t owner, uint32_t ballot,
-		time_t expires)
+
+static int crm_ticket_set(const struct ticket_config *tk, const char *attr, int64_t val)
 {
-	FILE *p;
 	char cmd[COMMAND_MAX];
+	int i, rv;
+
 
 	snprintf(cmd, COMMAND_MAX,
-		 "crm_ticket -t %s -S owner -v %d",
-		 (char *)ticket, owner);
-	log_info("command: '%s' was executed", cmd);
-	p = popen(cmd, "r");
-	if (p == NULL) {
-		log_error("popen error: %s", cmd);
-		return;
-	}
-	pclose(p);
+		 "crm_ticket -t '%s' -S '%s' -v %" PRIi64,
+		 tk->name, attr, val);
+	/* If there are errors, there's not much we can do but retry ... */
+	for (i=0; i<3 &&
+			(rv = system(cmd));
+			i++) ;
 
-	snprintf(cmd, COMMAND_MAX,
-		 "crm_ticket -t %s -S expires -v %llu",
-		 (char *)ticket, (unsigned long long)expires);
-	log_info("command: '%s' was executed", cmd);
-	p = popen(cmd, "r");
-	if (p == NULL) {
-		log_error("popen error: %s", cmd);
-		return;
-	}
-	pclose(p);
+	log_info("'%s' gave result %d", cmd, rv);
 
-	snprintf(cmd, COMMAND_MAX,
-		 "crm_ticket -t %s -S ballot -v %d",
-		 (char *)ticket, ballot);
-	log_info("command: '%s' was executed", cmd);
-	p = popen(cmd, "r");
-	if (p == NULL) {
-		log_error("popen error: %s", cmd);
-		return;
-	}
-	pclose(p);
-
-	return;
+	return rv;
 }
 
-static void pcmk_load_ticket(const char *ticket,
-		uint32_t *owner, uint32_t *ballot,
-		time_t *expires)
+
+static void pcmk_store_ticket(struct ticket_config *tk)
 {
-	FILE *p;
+	crm_ticket_set(tk, "owner", get_node_id(tk->current_state.owner));
+	crm_ticket_set(tk, "expires", tk->current_state.expires);
+	crm_ticket_set(tk, "ballot", tk->current_state.ballot);
+}
+
+
+static int crm_ticket_get(struct ticket_config *tk,
+		const char *attr, int64_t *data)
+{
 	char cmd[COMMAND_MAX];
 	char line[256];
-	int ow, ba;
-	unsigned long long ex;
+	int rv;
+	int64_t v;
+	FILE *p;
 
+
+	*data = -1;
+	v = 0;
 	snprintf(cmd, COMMAND_MAX,
-		 "crm_ticket -t %s -G owner --quiet",
-		 (char *)ticket);
+			"crm_ticket -t '%s' -G '%s' --quiet",
+			tk->name, attr);
+
 	p = popen(cmd, "r");
 	if (p == NULL) {
-		log_error("popen error: %s", cmd);
-		return;
+		rv = errno;
+		log_error("popen error %d (%s) for \"%s\"",
+				rv, strerror(rv), cmd);
+		return rv || -EINVAL;
 	}
 	if (fgets(line, sizeof(line) - 1, p) == NULL) {
-		pclose(p);
-		return;
+		rv = ENODATA;
+		goto out;
 	}
-	if (sscanf(line, "%d", &ow) == 1)
-		*owner = ow;
-	pclose(p);
-	log_info("command: '%s' was executed", cmd);
-	
 
-	snprintf(cmd, COMMAND_MAX,
-		 "crm_ticket -t %s -G expires --quiet",
-		 (char *)ticket);
-	p = popen(cmd, "r");
-	if (p == NULL) {
-		log_error("popen error: %s", cmd);
-		return;
-	}
-	if (fgets(line, sizeof(line) - 1, p) == NULL) {
-		pclose(p);
-		return;
-	}
-	if (sscanf(line, "%llu", &ex) == 1)
-		*expires = ex;
-	pclose(p);
-	log_info("command: '%s' was executed", cmd);
+	rv = EINVAL;
+	if (sscanf(line, "%" PRIi64, &v) == 1)
+		rv = 0;
+
+	*data = v;
+
+out:
+	rv = pclose(p);
+	log_info("command \"%s\" returned rv %d, value %" PRIi64, cmd, rv, v);
+	return rv;
+}
 
 
-	snprintf(cmd, COMMAND_MAX,
-		 "crm_ticket -t %s -G ballot --quiet",
-		 (char *)ticket);
-	p = popen(cmd, "r");
-	if (p == NULL) {
-		log_error("popen error: %s", cmd);
-		return;
-	}
-	if (fgets(line, sizeof(line) - 1, p) == NULL) {
-		pclose(p);
-		return;
-	}
-	if (sscanf(line, "%d", &ba) == 1)
-		*ballot = ba;
-	pclose(p);
-	log_info("command: '%s' was executed", cmd);
+static void pcmk_load_ticket(struct ticket_config *tk)
+{
+	int rv;
+	int64_t v;
+	time_t now;
+	struct ticket_paxos_state *tps;
 
+
+	rv = crm_ticket_get(tk, "expires", &v);
+	if (!rv) {
+		tk->proposed_state.expires = v;
+	}
+
+	rv = crm_ticket_get(tk, "ballot", &v);
+	if (!rv) {
+		tk->proposed_state.ballot =
+			tk->proposed_state.prev_ballot = v;
+	}
+
+	rv = crm_ticket_get(tk, "owner", &v);
+	if (!rv) {
+		/* No check, node could have been deconfigured. */
+		find_site_by_id(v, &tk->proposed_state.owner);
+	}
+
+
+	time(&now);
+	tps = &tk->proposed_state;
+	if (now >= tps->expires ||
+			!tps->owner) {
+		tps->owner = NULL;
+		tps->expires = 0;
+	}
+
+
+	/* We load only when the state is completely unknown,
+	 * so make that current, too. */
+	tk->current_state = tk->proposed_state;
 
 	return;
 }

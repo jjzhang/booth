@@ -20,6 +20,7 @@
 #define _INLINE_FN_H
 
 #include <time.h>
+#include <string.h>
 #include "config.h"
 #include "transport.h"
 
