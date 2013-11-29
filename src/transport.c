@@ -100,19 +100,14 @@ found:
 			continue;
 
 
-//		assert(bytes <= node->addrlen);
-//#include <stdio.h>
-//		printf("node->addr %s, fam %d, prefix %d; %llx vs %llx, bytes %d\n", node->addr, node->family, prefixlen, *((long long*)&node->in6), *((long long*)ipaddr), bytes);
 		/* Check prefix, whole bytes */
 		if (memcmp(ipaddr, n_a, bytes) != 0)
 			continue;
-//printf("bits %d\n", bits_left);
 		if (!bits_left)
 			goto found;
 
 		node_bits = n_a[bytes];
 		ip_bits = ipaddr[bytes];
-//printf("nodebits %x ip %x mask %x\n", node_bits, ip_bits, mask);
 		if (((node_bits ^ ip_bits) & mask) == 0)
 			goto found;
 	}
