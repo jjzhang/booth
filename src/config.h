@@ -80,6 +80,9 @@ struct booth_config {
     transport_layer_t proto;
     uint16_t port;
 
+	/** Stores the OR of the individual host bitmasks. */
+	uint32_t site_bits;
+
     int node_count;
     struct booth_site node[MAX_NODES];
 

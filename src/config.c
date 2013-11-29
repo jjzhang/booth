@@ -94,6 +94,10 @@ int add_site(char *addr_string, int type)
 	assert(NO_OWNER & mask);
 	node->site_id &= ~mask;
 
+	node->bitmask = 1 << booth_conf->node_count;
+	/* Catch node overflow */
+	assert(node->bitmask);
+	booth_conf->site_bits |= node->bitmask;
 
 	node->tcp_fd = -1;
 

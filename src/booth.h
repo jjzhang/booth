@@ -167,6 +167,8 @@ struct booth_site {
 	int tcp_fd;
 	int udp_fd;
 
+	uint64_t bitmask;
+
 	unsigned short family;
 	union {
 		struct sockaddr_in  sa4;
