@@ -38,29 +38,6 @@
 #define PAXOS_MAGIC		0xDB12
 #define TK_LINE			256
 
-#define CATCHED_VALID_TMSG	1
-
-#if 0
-struct booth_msghdr {
-        uint16_t magic;
-        uint16_t checksum;
-        uint32_t len;
-	char data[0];
-} __attribute__((packed));
-
-struct ticket {
-	char id[BOOTH_NAME_LEN+1];
-	pl_handle_t handle;
-	int owner;
-	int expiry;
-	int ballot;
-	unsigned long long expires;
-	struct list_head list;
-};
-
-static LIST_HEAD(ticket_list);
-
-#endif
 
 #define foreach_ticket(i_,t_) for(i=0; (t_=booth_conf->ticket+i, i<booth_conf->ticket_count); i++)
 #define foreach_node(i_,n_) for(i=0; (n_=booth_conf->node+i, i<booth_conf->node_count); i++)
@@ -268,7 +245,7 @@ static void ticket_parse(struct ticket_config *tk,
 	if (tps->ballot < ntohl(tmsg->ticket.ballot))
 		tps->ballot = ntohl(tmsg->ticket.ballot);
 
-	if (CATCHED_VALID_TMSG == ntohl(tmsg->header.result)) {
+	if (ntohl(tmsg->header.result) == RLT_SUCCESS) {
 		tps->expires = now + ntohl(tmsg->ticket.expiry);
 
 		if (!find_site_by_id( ntohl(tmsg->ticket.owner),
