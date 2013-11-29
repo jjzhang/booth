@@ -592,3 +592,26 @@ ex:
 	return rv;
 }
 
+
+
+void tickets_log_info(void)
+{
+	struct ticket_config *tk;
+	struct ticket_paxos_state *c, *p;
+	int i;
+
+	foreach_ticket(i, tk) {
+		c = &tk->current_state;
+		p = &tk->proposed_state;
+		log_info("Ticket %s: state %s/%s "
+				"mask %" PRIx64 "/%" PRIx64 " "
+				"ballot %x/%x "
+				"expires %-24.24s",
+				tk->name,
+				STATE_STRING(c->state),
+				STATE_STRING(p->state),
+				c->acknowledges, p->acknowledges,
+				c->ballot,       p->ballot,
+				ctime(&c->expires));
+	}
+}

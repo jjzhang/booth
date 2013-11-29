@@ -54,5 +54,6 @@ int ticket_answer_grant(int fd, struct boothc_ticket_msg *msg);
 int ticket_answer_revoke(int fd, struct boothc_ticket_msg *msg);
 
 int ticket_process_catchup(struct boothc_ticket_msg *msg);
+void tickets_log_info(void);
 
 #endif /* _TICKET_H */

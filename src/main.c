@@ -1112,6 +1112,7 @@ static int do_server(int type)
 			type_to_string(local->type),
 			local->site_id);
 
+	signal(SIGUSR1, (__sighandler_t)tickets_log_info);
 
 	set_scheduler();
 	set_oom_adj(-16);
