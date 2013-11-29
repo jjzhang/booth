@@ -471,8 +471,6 @@ static int booth_tcp_recv(struct booth_site *from, void *buf, int len)
 	got = do_read(from->tcp_fd, buf, len);
 	if (got < 0)
 		return got;
-	if (got != len)
-		return -EINVAL;
 	return len;
 }
 

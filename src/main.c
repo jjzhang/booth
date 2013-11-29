@@ -276,7 +276,7 @@ bad_len:
 		}
 		exp = len - sizeof(msg.header);
 		rv = do_read(clients[ci].fd, msg.header.data, exp);
-		if (rv != exp) {
+		if (rv < 0) {
 			log_error("connection %d read data error %d, wanted %d",
 					ci, rv, exp);
 			goto kill;
