@@ -22,6 +22,7 @@
 #include "config.h"
 
 #define DEFAULT_TICKET_EXPIRY	600
+#define DEFAULT_TICKET_TIMEOUT	10
 
 int check_ticket(char *ticket, struct ticket_config **tc);
 int check_site(char *site, int *local);

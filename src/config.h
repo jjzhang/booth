@@ -59,6 +59,10 @@ struct ticket_config {
 	/** How many seconds until expiration. */
 	int expiry;
 
+	/** Network related timeouts. */
+	int timeout;
+
+
 //	pl_handle_t handle; not needed?
 
 	int weight[MAX_NODES];

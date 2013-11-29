@@ -173,7 +173,7 @@ static inline int is_end_of_line(char *cp)
 
 
 static int add_ticket(const char *name, struct ticket_config **tkp,
-		int expiry, int weights[MAX_NODES])
+		const struct ticket_config *def)
 {
 	int rv;
 	struct ticket_config *tk;
@@ -206,8 +206,9 @@ static int add_ticket(const char *name, struct ticket_config **tkp,
 	}
 
 	strcpy(tk->name, name);
-	tk->expiry = expiry;
-	memcpy(tk->weight, weights, sizeof(tk->weight));
+	tk->timeout = def->timeout;
+	tk->expiry = def->expiry;
+	memcpy(tk->weight, def->weight, sizeof(tk->weight));
 	tk->current_state.state = OP_INIT;
 
 	if (tkp)
@@ -270,8 +271,7 @@ int read_config(const char *path)
 	int i;
 	int lineno = 0;
 	int got_transport = 0;
-	int def_expire = DEFAULT_TICKET_EXPIRY;
-	int weights[MAX_NODES];
+	struct ticket_config defaults = { { 0 } };
 	struct ticket_config *last_ticket = NULL;
 
 
@@ -291,8 +291,13 @@ int read_config(const char *path)
 			+ TICKET_ALLOC * sizeof(struct ticket_config));
 	ticket_size = TICKET_ALLOC;
 
+
 	booth_conf->proto = UDP;
-	parse_weights("", weights);
+
+	parse_weights("", defaults.weight);
+	defaults.expiry = DEFAULT_TICKET_EXPIRY;
+	defaults.timeout = DEFAULT_TICKET_TIMEOUT;
+
 	error = "";
 
 	log_debug("reading config file %s", path);
@@ -422,8 +427,7 @@ no_value:
 		}
 
 		if (strcmp(key, "ticket") == 0) {
-			if (add_ticket(val, &last_ticket,
-						def_expire, weights))
+			if (add_ticket(val, &last_ticket, &defaults))
 				goto out;
 
 			/* last_ticket is valid until another one is needed -
@@ -432,22 +436,33 @@ no_value:
 		}
 
 		if (strcmp(key, "expire") == 0) {
-			def_expire = strtol(val, &s, 0);
-			if (*s || s == val) {
-				error = "Expected plain integer value for expire";
+			defaults.expiry = strtol(val, &s, 0);
+			if (*s || s == val || defaults.expiry<10) {
+				error = "Expected plain integer value >=10 for expire";
 				goto err;
 			}
 
 			if (last_ticket)
-				last_ticket->expiry = def_expire;
+				last_ticket->expiry = defaults.expiry;
+		}
+
+		if (strcmp(key, "timeout") == 0) {
+			defaults.timeout = strtol(val, &s, 0);
+			if (*s || s == val || defaults.timeout<5) {
+				error = "Expected plain integer value >=5 for timeout";
+				goto err;
+			}
+
+			if (last_ticket)
+				last_ticket->timeout = defaults.timeout;
 		}
 
 		if (strcmp(key, "weights") == 0) {
-			if (parse_weights(val, weights) < 0)
+			if (parse_weights(val, defaults.weight) < 0)
 				goto out;
 
 			if (last_ticket)
-				memcpy(last_ticket->weight, weights,
+				memcpy(last_ticket->weight, defaults.weight,
 						sizeof(last_ticket->weight));
 		}
 	}
