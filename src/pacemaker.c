@@ -114,7 +114,6 @@ static void pcmk_load_ticket(const char *ticket,
 	snprintf(cmd, COMMAND_MAX,
 		 "crm_ticket -t %s -G owner --quiet",
 		 (char *)ticket);
-	log_info("command: '%s' was executed", cmd);
 	p = popen(cmd, "r");
 	if (p == NULL) {
 		log_error("popen error: %s", cmd);
@@ -127,11 +126,12 @@ static void pcmk_load_ticket(const char *ticket,
 	if (sscanf(line, "%d", &ow) == 1)
 		*owner = ow;
 	pclose(p);
+	log_info("command: '%s' was executed", cmd);
 	
+
 	snprintf(cmd, COMMAND_MAX,
 		 "crm_ticket -t %s -G expires --quiet",
 		 (char *)ticket);
-	log_info("command: '%s' was executed", cmd);
 	p = popen(cmd, "r");
 	if (p == NULL) {
 		log_error("popen error: %s", cmd);
@@ -144,11 +144,12 @@ static void pcmk_load_ticket(const char *ticket,
 	if (sscanf(line, "%llu", &ex) == 1)
 		*expires = ex;
 	pclose(p);
+	log_info("command: '%s' was executed", cmd);
+
 
 	snprintf(cmd, COMMAND_MAX,
 		 "crm_ticket -t %s -G ballot --quiet",
 		 (char *)ticket);
-	log_info("command: '%s' was executed", cmd);
 	p = popen(cmd, "r");
 	if (p == NULL) {
 		log_error("popen error: %s", cmd);
@@ -161,6 +162,8 @@ static void pcmk_load_ticket(const char *ticket,
 	if (sscanf(line, "%d", &ba) == 1)
 		*ballot = ba;
 	pclose(p);
+	log_info("command: '%s' was executed", cmd);
+
 
 	return;
 }
