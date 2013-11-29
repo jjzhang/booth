@@ -138,37 +138,6 @@ retry:
 }
 
 
-static int do_local_connect_and_write(void *data, int len, struct booth_site **ret)
-{
-	struct booth_site *node;
-	int rv;
-
-
-	if (ret)
-		*ret = NULL;
-
-	/* Use locally reachable address, ie. in same cluster. */
-	if (!find_myself(&node, 1)) {
-		log_error("Cannot find local cluster.");
-		return ENOENT;
-	}
-
-	if (ret)
-		*ret = node;
-
-
-	/* Always use TCP within cluster. */
-	rv = booth_tcp_open(node);
-	if (rv < 0)
-		goto out;
-
-	rv = booth_tcp_send(node, data, len);
-
-out:
-	return rv;
-}
-
-
 static void client_alloc(void)
 {
 	int i;
