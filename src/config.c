@@ -452,8 +452,8 @@ no_value:
 
 		if (strcmp(key, "timeout") == 0) {
 			defaults.timeout = strtol(val, &s, 0);
-			if (*s || s == val || defaults.timeout<5) {
-				error = "Expected plain integer value >=5 for timeout";
+			if (*s || s == val || defaults.timeout<1) {
+				error = "Expected plain integer value >=1 for timeout";
 				goto err;
 			}
 
