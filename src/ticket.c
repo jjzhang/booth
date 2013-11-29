@@ -566,7 +566,7 @@ int ticket_answer_catchup(struct boothc_ticket_msg *msg)
 {
 	struct ticket_paxos_state *tps;
 	struct ticket_config *tk;
-	int rv, mine;
+	int rv;
 
 
 	if (!check_ticket(msg->ticket.id, &tk)) {
@@ -580,14 +580,12 @@ int ticket_answer_catchup(struct boothc_ticket_msg *msg)
 
 	tps = &tk->current_state;
 
-	mine = owner_and_valid(tk);
-
 	/* We do _always_ answer.
 	 * In case all booth daemons are restarted at the same time, nobody
 	 * would answer any questions, leading to timeouts and delays.
 	 * Just admit we don't know. */
 
-	msg->ticket.expiry = htonl( mine );
+	msg->ticket.expiry = htonl( ticket_valid_for(tk) );
 	msg->ticket.owner  = htonl( get_node_id(tps->owner) );
 	msg->ticket.ballot = htonl(tps->ballot);
 	rv = RLT_SUCCESS;
