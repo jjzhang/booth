@@ -20,36 +20,11 @@
 #define _INLINE_FN_H
 
 #include <time.h>
+#include <assert.h>
 #include <string.h>
 #include "config.h"
 #include "transport.h"
 
-static inline void init_header(struct boothc_header *h, int cmd,
-			int result, int data_len)
-{
-	h->magic   = htonl(BOOTHC_MAGIC);
-	h->version = htonl(BOOTHC_VERSION);
-	h->length  = htonl(data_len);
-	h->cmd     = htonl(cmd);
-	h->from    = htonl(local->site_id);
-	h->result  = htonl(result);
-}
-
-static inline void init_ticket_site_header(struct boothc_ticket_msg *msg, int cmd)
-{
-	init_header(&msg->header, cmd, 0, sizeof(*msg));
-}
-
-static inline void init_ticket_msg(struct boothc_ticket_msg *msg, int cmd)
-{
-	init_header(&msg->header, cmd, 0, sizeof(*msg));
-	memset(&msg->ticket, 0, sizeof(msg->ticket));
-}
-
-
-static inline struct booth_transport const *transport(void) {
-	return booth_transport + booth_conf->proto;
-}
 
 
 inline static uint32_t get_local_id(void)
@@ -72,6 +47,7 @@ inline static int ticket_valid_for(const struct ticket_config *tk)
 	return (left < 0) ? 0 : left;
 }
 
+
 /** Returns number of seconds left, if any. */
 inline static int owner_and_valid(const struct ticket_config *tk)
 {
@@ -81,5 +57,41 @@ inline static int owner_and_valid(const struct ticket_config *tk)
 	return ticket_valid_for(tk);
 }
 
+
+static inline void init_header(struct boothc_header *h, int cmd,
+			int result, int data_len)
+{
+	h->magic   = htonl(BOOTHC_MAGIC);
+	h->version = htonl(BOOTHC_VERSION);
+	h->length  = htonl(data_len);
+	h->cmd     = htonl(cmd);
+	h->from    = htonl(local->site_id);
+	h->result  = htonl(result);
+}
+
+static inline void init_ticket_site_header(struct boothc_ticket_msg *msg, int cmd)
+{
+	init_header(&msg->header, cmd, 0, sizeof(*msg));
+}
+
+static inline void init_ticket_msg(struct boothc_ticket_msg *msg,
+		int cmd, struct ticket_config *tk)
+{
+	assert(sizeof(msg->ticket.id) == sizeof(tk->name));
+
+	init_header(&msg->header, cmd, 0, sizeof(*msg));
+
+	memcpy(msg->ticket.id, tk->name, sizeof(msg->ticket.id));
+
+	msg->ticket.expiry      = htonl(ticket_valid_for(tk));
+	msg->ticket.owner       = htonl(get_node_id(tk->current_state.owner));
+	msg->ticket.ballot      = htonl(tk->current_state.ballot);
+	msg->ticket.prev_ballot = htonl(tk->current_state.prev_ballot);
+}
+
+
+static inline struct booth_transport const *transport(void) {
+	return booth_transport + booth_conf->proto;
+}
 
 #endif
