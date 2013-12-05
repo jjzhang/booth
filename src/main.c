@@ -494,6 +494,7 @@ static int loop(int fd)
 		}
 
 		process_timerlist();
+		process_tickets();
 	}
 
 	return 0;

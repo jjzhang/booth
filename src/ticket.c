@@ -593,6 +593,66 @@ ex:
 }
 
 
+static void ticket_cron(struct ticket_config *tk)
+{
+	switch(tk->current_state.state) {
+	case ST_STABLE:
+		/* Nothing to do. */
+		break;
+
+	case ST_INIT:
+		/* Unknown state, ask others. */
+		ticket_send_catchup(tk);
+		break;
+
+	case CMD_LIST:
+	case CMD_GRANT:
+	case CMD_REVOKE:
+	case CMD_CATCHUP:
+	case CMR_GENERAL:
+	case CMR_LIST:
+	case CMR_GRANT:
+	case CMR_REVOKE:
+	case CMR_CATCHUP:
+		/* Not a state, only in same enumeration. */
+		break;
+
+	case OP_PREPARING:
+	case OP_PROMISING:
+	case OP_PROPOSING:
+	case OP_ACCEPTING:
+	case OP_RECOVERY:
+	case OP_COMMITTED:
+	case OP_REJECTED:
+		break;
+	}
+}
+
+
+void process_tickets(void)
+{
+	struct ticket_config *tk;
+	int i;
+	time_t now;
+
+	time(&now);
+
+	foreach_ticket(i, tk) {
+		if (0)
+		log_debug("ticket %s next cron %" PRIx64 ", now %" PRIx64 ", in %" PRIi64,
+				tk->name, (uint64_t)tk->next_cron, (uint64_t)now,
+				tk->next_cron - now);
+		if (tk->next_cron > now)
+			continue;
+
+		log_debug("ticket %s cron", tk->name);
+		/* Set next value, cron may override. */
+		tk->next_cron = now + tk->timeout;
+		ticket_cron(tk);
+	}
+}
+
+
 
 void tickets_log_info(void)
 {

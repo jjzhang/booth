@@ -71,8 +71,9 @@ struct ticket_config {
 
 	int weight[MAX_NODES];
 
-	/* Only used on the owner */
+	/* Only used on the owner, */
 	struct timerlist *refresh_ticket;
+	time_t next_cron;
 
 	struct ticket_paxos_state current_state;
 	struct ticket_paxos_state proposed_state;
