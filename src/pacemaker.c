@@ -157,6 +157,7 @@ static void pcmk_load_ticket(struct ticket_config *tk)
 		tps->expires = 0;
 	}
 
+	tps->acknowledges = local->bitmask;
 
 	/* We load only when the state is completely unknown,
 	 * so make that current, too. */

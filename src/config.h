@@ -44,12 +44,16 @@ struct ticket_paxos_state {
 	/** Timestamp of expiration. */
 	time_t expires;
 
+	/** State. */
 	cmd_request_t state;
 
 	/** Current ballot number. Might be < prev_ballot if overflown. */
 	uint32_t ballot;
 	/** Previous ballot. */
 	uint32_t prev_ballot;
+
+	/** Bitmap of sites that acknowledge that state. */
+	uint64_t acknowledges;
 };
 
 
