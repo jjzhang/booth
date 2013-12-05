@@ -105,4 +105,7 @@ int find_site_by_id(uint32_t site_id, struct booth_site **node);
 const char *type_to_string(int type);
 
 
+#define STATE_STRING(s_) ({ union { cmd_request_t s; char c[5]; } d; d.s = htonl(s_); d.c[4] = 0; d.c; })
+
+
 #endif /* _CONFIG_H */
