@@ -170,6 +170,8 @@ struct booth_site {
 	int tcp_fd;
 	int udp_fd;
 
+	/* 0-based, used for indexing into per-ticket weights */
+	int index;
 	uint64_t bitmask;
 
 	unsigned short family;

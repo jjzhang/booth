@@ -94,6 +94,7 @@ int add_site(char *addr_string, int type)
 	assert(NO_OWNER & mask);
 	node->site_id &= ~mask;
 
+	node->index = booth_conf->node_count;
 	node->bitmask = 1 << booth_conf->node_count;
 	/* Catch node overflow */
 	assert(node->bitmask);
