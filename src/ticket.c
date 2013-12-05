@@ -41,7 +41,7 @@
 
 
 #define foreach_ticket(i_,t_) for(i=0; (t_=booth_conf->ticket+i, i<booth_conf->ticket_count); i++)
-#define foreach_node(i_,n_) for(i=0; (n_=booth_conf->node+i, i<booth_conf->node_count); i++)
+#define foreach_node(i_,n_) for(i=0; (n_=booth_conf->site+i, i<booth_conf->site_count); i++)
 
 /* Untrusted input, must fit (incl. \0) in a buffer of max chars. */
 int check_max_len_valid(const char *s, int max)
@@ -170,8 +170,8 @@ int ticket_send(unsigned long id, void *value, int len)
 	struct boothc_ticket_msg msg;
 
 	foreach_node(i, to)
-		if (booth_conf->node[i].site_id == id) {
-			to = booth_conf->node+i;
+		if (booth_conf->site[i].site_id == id) {
+			to = booth_conf->site+i;
 			break;
 		}
 	if (!to)
@@ -298,7 +298,7 @@ static void promote_ticket_state(struct ticket_config *tk)
 {
 	/* >= or > ? */
 	if (__builtin_popcount(tk->proposed_state.acknowledges) * 2 >
-			booth_conf->node_count) {
+			booth_conf->site_count) {
 		tk->current_state = tk->proposed_state;
 
 		if (tk->current_state.state == ST_INIT)

@@ -88,8 +88,8 @@ struct booth_config {
 	/** Stores the OR of the individual host bitmasks. */
 	uint32_t site_bits;
 
-    int node_count;
-    struct booth_site node[MAX_NODES];
+    int site_count;
+    struct booth_site site[MAX_NODES];
 
     int ticket_count;
     int ticket_allocated;

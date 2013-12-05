@@ -84,8 +84,8 @@ static int find_address(unsigned char ipaddr[BOOTH_IPADDR_LEN],
 	/* One bit left to check means ignore 7 lowest bits. */
 	mask = ~( (1 << (8 - bits_left)) -1);
 
-	for (i = 0; i < booth_conf->node_count; i++) {
-		node = booth_conf->node + i;
+	for (i = 0; i < booth_conf->site_count; i++) {
+		node = booth_conf->site + i;
 		if (family != node->family)
 			continue;
 		n_a = node_to_addr_pointer(node);
@@ -564,11 +564,11 @@ static int booth_udp_broadcast(void *buf, int len)
 {
 	int i;
 
-	if (!booth_conf || !booth_conf->node_count)
+	if (!booth_conf || !booth_conf->site_count)
 		return -1;
 
-	for (i = 0; i < booth_conf->node_count; i++)
-		booth_udp_send(booth_conf->node+i, buf, len);
+	for (i = 0; i < booth_conf->site_count; i++)
+		booth_udp_send(booth_conf->site+i, buf, len);
 
 	return 0;
 }

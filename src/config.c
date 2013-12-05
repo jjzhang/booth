@@ -66,16 +66,16 @@ int add_site(char *addr_string, int type)
 
 
 	rv = 1;
-	if (booth_conf->node_count == MAX_NODES) {
+	if (booth_conf->site_count == MAX_NODES) {
 		log_error("too many nodes");
 		goto out;
 	}
-	if (strlen(addr_string)+1 >= sizeof(booth_conf->node[0].addr_string)) {
+	if (strlen(addr_string)+1 >= sizeof(booth_conf->site[0].addr_string)) {
 		log_error("site address \"%s\" too long", addr_string);
 		goto out;
 	}
 
-	site = booth_conf->node + booth_conf->node_count;
+	site = booth_conf->site + booth_conf->site_count;
 
 	site->family = BOOTH_PROTO_FAMILY;
 	site->type = type;
@@ -94,8 +94,8 @@ int add_site(char *addr_string, int type)
 	assert(NO_OWNER & mask);
 	site->site_id &= ~mask;
 
-	site->index = booth_conf->node_count;
-	site->bitmask = 1 << booth_conf->node_count;
+	site->index = booth_conf->site_count;
+	site->bitmask = 1 << booth_conf->site_count;
 	/* Catch site overflow */
 	assert(site->bitmask);
 	booth_conf->site_bits |= site->bitmask;
@@ -108,7 +108,7 @@ int add_site(char *addr_string, int type)
 		site->role = ACCEPTOR | LEARNER;
 
 
-	booth_conf->node_count++;
+	booth_conf->site_count++;
 
 	rv = 0;
 	memset(&site->sa6, 0, sizeof(site->sa6));
@@ -519,8 +519,8 @@ int find_site_by_name(unsigned char *site, struct booth_site **node)
 	if (!booth_conf)
 		return 0;
 
-	for (i = 0; i < booth_conf->node_count; i++) {
-		n = booth_conf->node + i;
+	for (i = 0; i < booth_conf->site_count; i++) {
+		n = booth_conf->site + i;
 		if (n->type == SITE &&
 		    strcmp(n->addr_string, site) == 0) {
 			*node = n;
@@ -544,8 +544,8 @@ int find_site_by_id(uint32_t site_id, struct booth_site **node)
 	if (!booth_conf)
 		return 0;
 
-	for (i = 0; i < booth_conf->node_count; i++) {
-		n = booth_conf->node + i;
+	for (i = 0; i < booth_conf->site_count; i++) {
+		n = booth_conf->site + i;
 		if (n->site_id == site_id) {
 			*node = n;
 			return 1;
