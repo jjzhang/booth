@@ -204,9 +204,6 @@ int paxos_answer(struct boothc_ticket_msg *msg, struct ticket_config *tk,
 
 				tk->current_state.expires = time(NULL) + tk->expiry;
 
-				tk->current_state.state =
-					tk->proposed_state.state = ST_STABLE;
-
 				/* TODO */
 				tk->next_cron = time(NULL) +
 					tk->current_state.owner == local ?
@@ -218,6 +215,9 @@ int paxos_answer(struct boothc_ticket_msg *msg, struct ticket_config *tk,
 
 				ticket_write(tk);
 				rv = ticket_broadcast_proposed_state(tk, OP_COMMITTED);
+
+				tk->current_state.state =
+					tk->proposed_state.state = ST_STABLE;
 				return rv;
 			}
 		}
