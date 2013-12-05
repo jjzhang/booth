@@ -595,7 +595,7 @@ int ticket_answer_grant(int fd, struct boothc_ticket_msg *msg)
 	rv = do_grant_ticket(tk);
 
 reply:
-	init_header(&msg->header, CMR_GRANT, rv, sizeof(*msg));
+	init_header(&msg->header, CMR_GRANT, rv ?: RLT_ASYNC, sizeof(*msg));
 	return send_ticket_msg(fd, msg);
 }
 
@@ -620,7 +620,7 @@ int ticket_answer_revoke(int fd, struct boothc_ticket_msg *msg)
 	rv = do_revoke_ticket(tk);
 
 reply:
-	init_header(&msg->header, CMR_REVOKE, rv, sizeof(*msg));
+	init_header(&msg->header, CMR_REVOKE, rv ?: RLT_ASYNC, sizeof(*msg));
 	return send_ticket_msg(fd, msg);
 }
 
