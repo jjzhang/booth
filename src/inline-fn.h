@@ -57,15 +57,18 @@ inline static int owner_and_valid(const struct ticket_config *tk)
 	return ticket_valid_for(tk);
 }
 
+static inline void init_header_bare(struct boothc_header *h) {
+	h->magic   = htonl(BOOTHC_MAGIC);
+	h->version = htonl(BOOTHC_VERSION);
+	h->from    = htonl(local->site_id);
+}
 
 static inline void init_header(struct boothc_header *h, int cmd,
 			int result, int data_len)
 {
-	h->magic   = htonl(BOOTHC_MAGIC);
-	h->version = htonl(BOOTHC_VERSION);
+	init_header_bare(h);
 	h->length  = htonl(data_len);
 	h->cmd     = htonl(cmd);
-	h->from    = htonl(local->site_id);
 	h->result  = htonl(result);
 }
 
