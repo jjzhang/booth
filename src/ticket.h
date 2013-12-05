@@ -43,7 +43,6 @@ int do_grant_ticket(struct ticket_config *tk);
 int do_revoke_ticket(struct ticket_config *tk);
 
 int find_ticket_by_name(const char *ticket, struct ticket_config **found);
-int find_ticket_by_handle(pl_handle_t handle, struct ticket_config **found);
 
 
 /** @{
@@ -51,14 +50,19 @@ int find_ticket_by_handle(pl_handle_t handle, struct ticket_config **found);
  * in the given msg place.
  * Sending is done by upper layers. 
  */
-int ticket_answer_catchup(struct boothc_ticket_msg *msg);
+int ticket_answer_catchup(struct boothc_ticket_msg *msg, struct ticket_config *tk);
 /** @} */
 
 int ticket_answer_list(int fd, struct boothc_ticket_msg *msg);
 int ticket_answer_grant(int fd, struct boothc_ticket_msg *msg);
 int ticket_answer_revoke(int fd, struct boothc_ticket_msg *msg);
 
-int ticket_process_catchup(struct boothc_ticket_msg *msg, struct booth_site *sender);
+int ticket_process_catchup(struct boothc_ticket_msg *msg, struct ticket_config *tk,
+		struct booth_site *sender);
+int ticket_broadcast_proposed_state(struct ticket_config *tk, cmd_request_t state);
+int promote_ticket_state(struct ticket_config *tk);
+
+int ticket_write(struct ticket_config *tk);
 
 void process_tickets(void);
 void tickets_log_info(void);

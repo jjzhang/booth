@@ -249,7 +249,7 @@ static void combine_paxos_states(struct ticket_config *tk,
 
 	is  = &tk->proposed_state;
 
-	log_info("combine %s: state %s/%s "
+	log_info("combine %s: state %s->%s "
 			"mask %" PRIx64 "/%" PRIx64 " "
 			"ballot %x/%x ",
 			tk->name,
@@ -291,7 +291,7 @@ static void combine_paxos_states(struct ticket_config *tk,
 }
 
 
-static void promote_ticket_state(struct ticket_config *tk)
+int promote_ticket_state(struct ticket_config *tk)
 {
 	/* >= or > ? */
 	if (__builtin_popcount(tk->proposed_state.acknowledges) * 2 >
@@ -303,8 +303,11 @@ static void promote_ticket_state(struct ticket_config *tk)
 
 		log_debug("ticket %s changing into state %s",
 				tk->name, STATE_STRING(tk->current_state.state));
+
+		return 1;
 	}
-	/* TODO: send message? */
+
+	return 0;
 }
 
 
@@ -367,7 +370,7 @@ static int ticket_send_catchup(struct ticket_config *tk)
 
 	foreach_node(i, site) {
 		if (!site->local) {
-			init_ticket_msg(&msg, CMD_CATCHUP, tk);
+			init_ticket_msg(&msg, CMD_CATCHUP, RLT_SUCCESS, tk, &tk->current_state);
 
 			log_debug("attempting catchup from %s", site->addr_string);
 
@@ -379,7 +382,6 @@ static int ticket_send_catchup(struct ticket_config *tk)
 }
 
 
-int ticket_write(struct ticket_config *tk);
 int ticket_write(struct ticket_config *tk)
 {
 	pcmk_handler.store_ticket(tk);
@@ -394,18 +396,22 @@ int ticket_write(struct ticket_config *tk)
 }
 
 
+#if 0
 void ticket_status_recovery(pl_handle_t handle);
 void ticket_status_recovery(pl_handle_t handle)
 {
 //	paxos_lease_status_recovery(handle);
 }
+#endif
 
 
+/* UDP message receiver. */
 int message_recv(struct boothc_ticket_msg *msg, int msglen)
 {
 	int cmd, rv;
 	uint32_t from;
 	struct booth_site *dest;
+	struct ticket_config *tk;
 
 
 	if (check_boothc_header(&msg->header, sizeof(*msg)) < 0 ||
@@ -414,68 +420,68 @@ int message_recv(struct boothc_ticket_msg *msg, int msglen)
 		return -1;
 	}
 
-
 	from = ntohl(msg->header.from);
 	if (!find_site_by_id(from, &dest)) {
 		log_error("unknown sender: %08x", from);
 		return -1;
 	}
 
+	if (!check_ticket(msg->ticket.id, &tk)) {
+		log_error("got invalid ticket name \"%s\" from %s",
+				msg->ticket.id, dest->addr_string);
+		return -EINVAL;
+	}
+
+
 
 	cmd = ntohl(msg->header.cmd);
 	switch (cmd) {
 	case CMD_CATCHUP:
-		rv = ticket_answer_catchup(msg);
+		rv = ticket_answer_catchup(msg, tk);
 		if (rv < 0)
 			return rv;
 		return booth_udp_send(dest, msg, sizeof(*msg));
 
 	case CMR_CATCHUP:
-		return ticket_process_catchup(msg, dest);
+		if (tk->current_state.state == ST_INIT)
+			return ticket_process_catchup(msg, tk, dest);
+		break;
 
 	default:
-		log_error("unprocessed message, cmd %x", cmd);
+		return paxos_answer(msg, tk, dest);
 	}
 	return 0;
 }
 
 
+/** Try to get the ticket for the local site.
+ * */
 int do_grant_ticket(struct ticket_config *tk)
 {
-	struct ticket_paxos_state *tps;
+	int rv;
 
-	tps = &tk->current_state;
-	if (tps->owner == local)
+	if (tk->current_state.owner == local)
 		return RLT_SUCCESS;
+	if (tk->current_state.owner)
+		return RLT_OVERGRANT;
 
-	/* TODO */
-#if 0
-	int ret = paxos_lease_acquire(tk->handle, CLEAR_RELEASE,
-			1, end_acquire);
-	if (ret >= 0)
-		tk->ballot = ret;
-	return (ret < 0)? RLT_SYNC_FAIL: RLT_ASYNC;
-#endif
-	return RLT_SUCCESS;
+	rv = paxos_start_round(tk, local);
+	return rv;
 }
 
 
+/** Start a PAXOS round for revoking.
+ * That can be started from any site. */
 int do_revoke_ticket(struct ticket_config *tk)
 {
-	struct ticket_paxos_state *tps;
+	int rv;
 
-	tps = &tk->current_state;
-	if (!tps->owner)
+	if (!tk->current_state.owner)
 		return RLT_SUCCESS;
 
-	/* TODO */
-#if 0
-	int ret = paxos_lease_release(tk->handle, end_release);
-	if (ret >= 0)
-		tk->ballot = ret;
-	return (ret < 0)? RLT_SYNC_FAIL: RLT_ASYNC;
-#endif
-	return RLT_SUCCESS;
+	rv = paxos_start_round(tk, NULL);
+
+	return rv;
 }
 
 
@@ -617,24 +623,24 @@ int ticket_answer_revoke(int fd, struct boothc_ticket_msg *msg)
 	rv = do_revoke_ticket(tk);
 
 reply:
-	init_header(&msg->header, CMR_REVOKE, rv ?: RLT_ASYNC, sizeof(*msg));
+	init_ticket_msg(msg, CMR_REVOKE, rv ?: RLT_ASYNC, tk, &tk->current_state);
 	return send_ticket_msg(fd, msg);
 }
 
 
-int ticket_answer_catchup(struct boothc_ticket_msg *msg)
+int ticket_answer_catchup(struct boothc_ticket_msg *msg, struct ticket_config *tk)
 {
-	struct ticket_config *tk;
 	int rv;
 
 
-	if (!check_ticket(msg->ticket.id, &tk)) {
+	log_debug("got catchup request for \"%s\" from %08x",
+			msg->ticket.id, ntohl(msg->header.from));
+
+
+	if (!msg && !check_ticket(msg->ticket.id, &tk)) {
 		rv = RLT_INVALID_ARG;
 		goto reply;
 	}
-
-	log_debug("got catchup request for \"%s\" from %08x",
-			msg->ticket.id, ntohl(msg->header.from));
 
 
 	/* We do _always_ answer.
@@ -645,66 +651,86 @@ int ticket_answer_catchup(struct boothc_ticket_msg *msg)
 	rv = RLT_SUCCESS;
 
 reply:
-	init_ticket_msg(msg, CMR_CATCHUP, tk);
-	msg->header.result = htonl(rv);
+	init_ticket_msg(msg, CMR_CATCHUP, rv, tk,
+			(tk->current_state.state == ST_INIT ?
+			 &tk->proposed_state :
+			 &tk->current_state));
 	return 1;
 }
 
 
-int ticket_process_catchup(struct boothc_ticket_msg *msg, struct booth_site *sender)
+int ticket_process_catchup(struct boothc_ticket_msg *msg, struct ticket_config *tk,
+		struct booth_site *sender)
 {
-	struct ticket_config *tk;
 	int rv;
 
 
-	if (!check_ticket(msg->ticket.id, &tk)) {
-		rv = RLT_INVALID_ARG;
-		goto ex;
-	}
-
-	log_debug("got catchup answer for \"%s\" from %08x",
-			msg->ticket.id, ntohl(msg->header.from));
+	log_debug("got catchup answer for \"%s\" from %s",
+			msg->ticket.id, sender->addr_string);
 
 	ticket_parse(tk, msg, sender);
 	rv = 0;
 
-ex:
-	log_debug("got catchup result from %x: result %d", ntohl(msg->header.from), rv);
+	log_debug("got catchup result from %s: result %d", sender->addr_string, rv);
 	return rv;
+}
+
+
+/** Send new state request to all sites.
+ * Perhaps this should take a flag for ACCEPTOR etc.?
+ * No need currently, as all nodes are more or less identical. */
+int ticket_broadcast_proposed_state(struct ticket_config *tk, cmd_request_t state)
+{
+	struct boothc_ticket_msg msg;
+
+	tk->proposed_state.acknowledges = local->bitmask;
+	tk->proposed_state.state = state;
+
+	init_ticket_msg(&msg, state, RLT_SUCCESS, tk, &tk->proposed_state);
+
+	log_debug("broadcasting %s for ticket \"%s\"",
+			STATE_STRING(state), tk->name);
+
+	return transport()->broadcast(&msg, sizeof(msg));
 }
 
 
 static void ticket_cron(struct ticket_config *tk)
 {
 	switch(tk->current_state.state) {
-	case ST_STABLE:
-		/* Nothing to do. */
-		break;
-
 	case ST_INIT:
 		/* Unknown state, ask others. */
 		ticket_send_catchup(tk);
-		break;
+		return;
 
-	case CMD_LIST:
-	case CMD_GRANT:
-	case CMD_REVOKE:
-	case CMD_CATCHUP:
-	case CMR_GENERAL:
-	case CMR_LIST:
-	case CMR_GRANT:
-	case CMR_REVOKE:
-	case CMR_CATCHUP:
-		/* Not a state, only in same enumeration. */
+	default:
+		break;
+	}
+
+	switch(tk->proposed_state.state) {
+	case OP_COMMITTED:
+	case ST_STABLE:
+		/* Do we need to refresh? */
+		if (tk->current_state.owner == local &&
+				time(NULL) + tk->expiry/2 > tk->current_state.expires)
+			paxos_start_round(tk, local);
+
+		/* TODO: remember when we started, and restart afresh after some retries */
 		break;
 
 	case OP_PREPARING:
-	case OP_PROMISING:
 	case OP_PROPOSING:
+		/* We ask others for a change; retry to get consensus. */
+		ticket_broadcast_proposed_state(tk, tk->proposed_state.state);
+		break;
+
+	case OP_PROMISING:
 	case OP_ACCEPTING:
 	case OP_RECOVERY:
-	case OP_COMMITTED:
 	case OP_REJECTED:
+		break;
+
+	default:
 		break;
 	}
 }

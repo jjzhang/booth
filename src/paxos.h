@@ -19,15 +19,17 @@
 #ifndef _PAXOS_H
 #define _PAXOS_H
 
-struct paxos_instance;
+#include "config.h"
+#include "ticket.h"
 
-#define PAXOS_NAME_LEN	63
 
 #define PROPOSER	0x4
 #define ACCEPTOR	0x2
 #define LEARNER		0x1
 
 #if 0
+#define PAXOS_NAME_LEN	63
+struct paxos_instance;
 typedef long ps_handle_t;
 typedef long pi_handle_t;
 
@@ -84,5 +86,9 @@ int paxos_instance_exit(pi_handle_t handle);
 int paxos_space_exit(ps_handle_t handle);
 
 #endif
+
+int paxos_answer(struct boothc_ticket_msg *msg, struct ticket_config *tk,
+		struct booth_site *from);
+int paxos_start_round(struct ticket_config *tk, struct booth_site *new_owner);
 
 #endif /* _PAXOS_H */

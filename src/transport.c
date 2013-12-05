@@ -35,6 +35,7 @@
 #include "inline-fn.h"
 #include "log.h"
 #include "config.h"
+#include "ticket.h"
 #include "paxos_lease.h"
 #include "transport.h"
 
@@ -563,12 +564,16 @@ int booth_udp_send(struct booth_site *to, void *buf, int len)
 static int booth_udp_broadcast(void *buf, int len)
 {
 	int i;
+	struct booth_site *site;
+
 
 	if (!booth_conf || !booth_conf->site_count)
 		return -1;
 
-	for (i = 0; i < booth_conf->site_count; i++)
-		booth_udp_send(booth_conf->site+i, buf, len);
+	foreach_node(i, site) {
+		if (site != local)
+			booth_udp_send(site, buf, len);
+	}
 
 	return 0;
 }

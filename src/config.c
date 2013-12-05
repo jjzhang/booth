@@ -26,6 +26,7 @@
 #include <string.h>
 #include "booth.h"
 #include "config.h"
+#include "paxos.h"
 #include "ticket.h"
 #include "log.h"
 

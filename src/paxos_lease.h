@@ -19,6 +19,7 @@
 #ifndef _PAXOS_LEASE_H
 #define _PAXOS_LEASE_H
 
+#if 0
 #include "booth.h"
 #include "paxos.h"
 
@@ -77,4 +78,5 @@ int paxos_lease_exit(pl_handle_t handle);
 int lease_prepare(struct paxos_instance *pi, struct boothc_ticket_msg *msg);
 int lease_is_prepared(struct paxos_instance *pi, struct boothc_ticket_msg *msg);
 
+#endif
 #endif /* _PAXOS_LEASE_H */
