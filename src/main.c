@@ -76,7 +76,7 @@ typedef enum
 	BOOTHD_STARTING
 } BOOTH_DAEMON_STATE;
 
-int poll_timeout = -1;
+int poll_timeout = POLL_TIMEOUT;
 
 typedef enum {
 	OP_LIST = 1,

@@ -44,6 +44,12 @@
 #define BOOTHC_VERSION		0x00010002
 
 
+/** Timeout value for poll().
+ * Determines frequency of periodic jobs, eg. when send-retries are done.
+ * See process_tickets(). */
+#define POLL_TIMEOUT	1000
+
+
 /** @{ */
 /** The on-network data structures and constants. */
 
