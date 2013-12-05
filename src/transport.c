@@ -30,13 +30,11 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <poll.h>
-#include "list.h"
 #include "booth.h"
 #include "inline-fn.h"
 #include "log.h"
 #include "config.h"
 #include "ticket.h"
-#include "paxos_lease.h"
 #include "transport.h"
 
 #define BOOTH_IPADDR_LEN	(sizeof(struct in6_addr))
@@ -46,12 +44,6 @@
 #define FRAME_SIZE_MAX		10000
 
 struct booth_site *local = NULL;
-
-struct tcp_conn {
-	int s;
-	struct sockaddr to;
-	struct list_head list;
-};
 
 
 static int (*deliver_fn) (void *msg, int msglen);
@@ -278,7 +270,6 @@ static void process_tcp_listener(int ci)
 	int fd, i, one = 1;
 	socklen_t addrlen = sizeof(struct sockaddr);
 	struct sockaddr addr;
-	struct tcp_conn *conn;
 
 	fd = accept(clients[ci].fd, &addr, &addrlen);
 	if (fd < 0) {
@@ -288,14 +279,6 @@ static void process_tcp_listener(int ci)
 	}
 	setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&one, sizeof(one));
 
-	conn = malloc(sizeof(struct tcp_conn));
-	if (!conn) {
-		log_error("failed to alloc mem");
-		return;
-	}
-	memset(conn, 0, sizeof(struct tcp_conn));
-	conn->s = fd;
-	memcpy(&conn->to, &addr, sizeof(struct sockaddr));
 
 	i = client_add(fd, clients[ci].transport,
 			process_connection, NULL);
