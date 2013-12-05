@@ -60,7 +60,7 @@ int add_site(char *address, int type);
 int add_site(char *addr_string, int type)
 {
 	int rv;
-	struct booth_site *node;
+	struct booth_site *site;
 	uLong nid;
 	uint32_t mask;
 
@@ -71,71 +71,71 @@ int add_site(char *addr_string, int type)
 		goto out;
 	}
 	if (strlen(addr_string)+1 >= sizeof(booth_conf->node[0].addr_string)) {
-		log_error("node address \"%s\" too long", addr_string);
+		log_error("site address \"%s\" too long", addr_string);
 		goto out;
 	}
 
-	node = booth_conf->node + booth_conf->node_count;
+	site = booth_conf->node + booth_conf->node_count;
 
-	node->family = BOOTH_PROTO_FAMILY;
-	node->type = type;
+	site->family = BOOTH_PROTO_FAMILY;
+	site->type = type;
 	/* Make site_id start at a non-zero point.
 	 * Perhaps use hash over string or address? */
-	strcpy(node->addr_string, addr_string);
+	strcpy(site->addr_string, addr_string);
 
 	nid = crc32(0L, NULL, 0);
 	/* booth_config() uses memset(), so sizeof() is guaranteed to give
 	 * the same result everywhere - no uninitialized bytes. */
-	node->site_id = crc32(nid, node->addr_string,
-			sizeof(node->addr_string));
+	site->site_id = crc32(nid, site->addr_string,
+			sizeof(site->addr_string));
 	/* Make sure we will never collide with NO_OWNER,
 	 * or be negative (to get "get_local_id() < 0" working). */
-	mask = 1 << (sizeof(node->site_id)*8 -1);
+	mask = 1 << (sizeof(site->site_id)*8 -1);
 	assert(NO_OWNER & mask);
-	node->site_id &= ~mask;
+	site->site_id &= ~mask;
 
-	node->index = booth_conf->node_count;
-	node->bitmask = 1 << booth_conf->node_count;
-	/* Catch node overflow */
-	assert(node->bitmask);
-	booth_conf->site_bits |= node->bitmask;
+	site->index = booth_conf->node_count;
+	site->bitmask = 1 << booth_conf->node_count;
+	/* Catch site overflow */
+	assert(site->bitmask);
+	booth_conf->site_bits |= site->bitmask;
 
-	node->tcp_fd = -1;
+	site->tcp_fd = -1;
 
-	if (node->type == SITE)
-		node->role = PROPOSER | ACCEPTOR | LEARNER;
-	else if (node->type == ARBITRATOR)
-		node->role = ACCEPTOR | LEARNER;
+	if (site->type == SITE)
+		site->role = PROPOSER | ACCEPTOR | LEARNER;
+	else if (site->type == ARBITRATOR)
+		site->role = ACCEPTOR | LEARNER;
 
 
 	booth_conf->node_count++;
 
 	rv = 0;
-	memset(&node->sa6, 0, sizeof(node->sa6));
+	memset(&site->sa6, 0, sizeof(site->sa6));
 
 	if (inet_pton(AF_INET,
-				node->addr_string,
-				&node->sa4.sin_addr) > 0) {
+				site->addr_string,
+				&site->sa4.sin_addr) > 0) {
 
-		node->family = AF_INET;
-		node->sa4.sin_family = node->family;
-		node->sa4.sin_port = htons(booth_conf->port);
-		node->saddrlen = sizeof(node->sa4);
-		node->addrlen = sizeof(node->sa4.sin_addr);
+		site->family = AF_INET;
+		site->sa4.sin_family = site->family;
+		site->sa4.sin_port = htons(booth_conf->port);
+		site->saddrlen = sizeof(site->sa4);
+		site->addrlen = sizeof(site->sa4.sin_addr);
 
 	} else if (inet_pton(AF_INET6,
-				node->addr_string,
-				&node->sa6.sin6_addr) > 0) {
+				site->addr_string,
+				&site->sa6.sin6_addr) > 0) {
 
-		node->family = AF_INET6;
-		node->sa6.sin6_family = node->family;
-		node->sa6.sin6_flowinfo = 0;
-		node->sa6.sin6_port = htons(booth_conf->port);
-		node->saddrlen = sizeof(node->sa6);
-		node->addrlen = sizeof(node->sa6.sin6_addr);
+		site->family = AF_INET6;
+		site->sa6.sin6_family = site->family;
+		site->sa6.sin6_flowinfo = 0;
+		site->sa6.sin6_port = htons(booth_conf->port);
+		site->saddrlen = sizeof(site->sa6);
+		site->addrlen = sizeof(site->sa6.sin6_addr);
 
 	} else {
-		log_error("Address string \"%s\" is bad", node->addr_string);
+		log_error("Address string \"%s\" is bad", site->addr_string);
 		rv = EINVAL;
 	}
 
