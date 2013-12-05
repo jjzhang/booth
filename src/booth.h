@@ -132,7 +132,7 @@ typedef enum {
 	OP_PROPOSING = 0x50726f70,
 	OP_ACCEPTING = 0x41636354,
 	OP_RECOVERY  = 0x5265636f,
-	OP_COMMITTED = 0x496e6d6d,
+	OP_COMMITTED = 0x436f6d6d,
 	OP_REJECTED  = 0x52656a65,
 
 	/* These are not used over the wire */
