@@ -260,7 +260,7 @@ static int parse_weights(const char *input, int weights[MAX_NODES])
 
 	/* Fill rest of vector. */
 	for(v=i; v<MAX_NODES; v++) {
-		weights[v] = 1;
+		weights[v] = 0;
 	}
 
 	return i;

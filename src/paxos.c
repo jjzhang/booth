@@ -793,3 +793,16 @@ int paxos_recvmsg(struct boothc_ticket_msg *msg)
 }
 
 #endif
+
+
+static uint32_t next_ballot_number(struct ticket_config *tk)
+{
+	uint32_t b;
+
+	b = tk->current_state.ballot;
+	/* + unique number */
+	b += local->bitmask;
+	/* + weight */
+	b += booth_conf->site_bits * tk->weight[ local->index ];
+	return b;
+}
