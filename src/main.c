@@ -626,7 +626,8 @@ static int do_command(cmd_request_t cmd)
 	}
 
 
-	switch (ntohl(reply.result)) {
+	rv = ntohl(reply.result);
+	switch (rv) {
 	case RLT_ASYNC:
 		if (cmd == CMD_GRANT)
 			log_info("grant command sent, result will be returned "
@@ -642,6 +643,7 @@ static int do_command(cmd_request_t cmd)
 		break;
 
 	case RLT_SYNC_SUCC:
+	case RLT_SUCCESS:
 		if (cmd == CMD_GRANT)
 			log_info("grant succeeded!");
 		else if (cmd == CMD_REVOKE)
@@ -657,8 +659,13 @@ static int do_command(cmd_request_t cmd)
 		rv = -1;
 		break;
 
+	case RLT_INVALID_ARG:
+		log_error("\"Invalid argument\", most probably ticket name \"%s\" wrong.",
+				cl.msg.ticket.id);
+		break;
+
 	default:
-		log_error("internal error!");
+		log_error("got an error code: %x", rv);
 		rv = -1;
 	}
 
