@@ -78,11 +78,12 @@ static inline void init_ticket_site_header(struct boothc_ticket_msg *msg, int cm
 }
 
 static inline void init_ticket_msg(struct boothc_ticket_msg *msg,
-		int cmd, struct ticket_config *tk)
+		int cmd, int rv,
+		struct ticket_config *tk, struct ticket_paxos_state *ps)
 {
 	assert(sizeof(msg->ticket.id) == sizeof(tk->name));
 
-	init_header(&msg->header, cmd, 0, sizeof(*msg));
+	init_header(&msg->header, cmd, rv, sizeof(*msg));
 
 	if (!tk) {
 		memset(&msg->ticket, 0, sizeof(msg->ticket));
@@ -90,9 +91,9 @@ static inline void init_ticket_msg(struct boothc_ticket_msg *msg,
 		memcpy(msg->ticket.id, tk->name, sizeof(msg->ticket.id));
 
 		msg->ticket.expiry      = htonl(ticket_valid_for(tk));
-		msg->ticket.owner       = htonl(get_node_id(tk->current_state.owner));
-		msg->ticket.ballot      = htonl(tk->current_state.ballot);
-		msg->ticket.prev_ballot = htonl(tk->current_state.prev_ballot);
+		msg->ticket.owner       = htonl(get_node_id(ps->owner));
+		msg->ticket.ballot      = htonl(ps->ballot);
+		msg->ticket.prev_ballot = htonl(ps->prev_ballot);
 	}
 }
 
