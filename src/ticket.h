@@ -24,6 +24,11 @@
 #define DEFAULT_TICKET_EXPIRY	600
 #define DEFAULT_TICKET_TIMEOUT	10
 
+
+#define foreach_ticket(i_,t_) for(i=0; (t_=booth_conf->ticket+i, i<booth_conf->ticket_count); i++)
+#define foreach_node(i_,n_) for(i=0; (n_=booth_conf->site+i, i<booth_conf->site_count); i++)
+
+
 int check_ticket(char *ticket, struct ticket_config **tc);
 int check_site(char *site, int *local);
 int do_grant_ticket(struct ticket_config *ticket);

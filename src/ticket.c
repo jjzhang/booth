@@ -40,9 +40,6 @@
 #define TK_LINE			256
 
 
-#define foreach_ticket(i_,t_) for(i=0; (t_=booth_conf->ticket+i, i<booth_conf->ticket_count); i++)
-#define foreach_node(i_,n_) for(i=0; (n_=booth_conf->site+i, i<booth_conf->site_count); i++)
-
 /* Untrusted input, must fit (incl. \0) in a buffer of max chars. */
 int check_max_len_valid(const char *s, int max)
 {
