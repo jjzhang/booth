@@ -76,7 +76,7 @@ static int crm_ticket_set(const struct ticket_config *tk, const char *attr, int6
 
 static void pcmk_store_ticket(struct ticket_config *tk)
 {
-	crm_ticket_set(tk, "owner", get_node_id(tk->current_state.owner));
+	crm_ticket_set(tk, "owner", (int32_t)get_node_id(tk->current_state.owner));
 	crm_ticket_set(tk, "expires", tk->current_state.expires);
 	crm_ticket_set(tk, "ballot", tk->current_state.ballot);
 }
