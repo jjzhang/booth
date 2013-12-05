@@ -556,8 +556,10 @@ static void ticket_cron(struct ticket_config *tk)
 	case ST_STABLE:
 		/* Do we need to refresh? */
 		if (tk->current_state.owner == local &&
-				time(NULL) + tk->expiry/2 > tk->current_state.expires)
+				time(NULL) + tk->expiry/2 > tk->current_state.expires) {
+			log_info("RENEW ticket \"%s\"", tk->name);
 			paxos_start_round(tk, local);
+		}
 
 		/* TODO: remember when we started, and restart afresh after some retries */
 		break;
