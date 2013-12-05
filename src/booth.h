@@ -90,17 +90,6 @@ struct ticket_msg {
 
 	/** Seconds until expiration. */
 	uint32_t expiry;
-
-#if 0
-	/* From lease - not needed? */
-	uint32_t clear; /* NOT_CLEAR_RELEASE ? */
-	uint32_t leased;  /* has_been_leased by another node? */
-
-
-	/* needed?? */
-	/* From lease */
-	uint32_t op; /* OP_START_LEASE, OP_STOP_LEASE? ?*/
-#endif
 } __attribute__((packed));
 
 

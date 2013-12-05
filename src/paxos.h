@@ -1,5 +1,6 @@
 /* 
  * Copyright (C) 2011 Jiaju Zhang <jjzhang@suse.de>
+ * Copyright (C) 2013 Philipp Marek <philipp.marek@linbit.com>
  * 
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public
@@ -27,65 +28,6 @@
 #define ACCEPTOR	0x2
 #define LEARNER		0x1
 
-#if 0
-#define PAXOS_NAME_LEN	63
-struct paxos_instance;
-typedef long ps_handle_t;
-typedef long pi_handle_t;
-
-struct paxos_operations {
-	int (*get_myid) (void);
-	int (*send) (unsigned long id, void *value, int len);
-	int (*broadcast) (void *value, int len);
-	int (*catchup) (pi_handle_t handle);
-	int (*prepare) (pi_handle_t handle, void *extra);
-	int (*promise) (pi_handle_t handle, void *extra);
-	int (*is_prepared) (pi_handle_t handle, void *extra);
-	int (*propose) (pi_handle_t handle, void *extra,
-			int round, void *value);
-	int (*accepted) (pi_handle_t handle, void *extra,
-			 int round, void *value);
-	int (*commit) (pi_handle_t handle, void *extra, int round);
-	int (*learned) (pi_handle_t handle, void *extra, int round);
-};
-
-int paxos_recvmsg(void *msg, int msglen);
-
-ps_handle_t paxos_space_init(const void *name,
-			     unsigned int number,
-			     unsigned int extralen,
-			     unsigned int valuelen,
-			     const unsigned char *role,
-			     const struct paxos_operations *p_op);
-
-pi_handle_t paxos_instance_init(ps_handle_t handle,
-				const void *name,
-				int *prio);
-
-int paxos_round_request(pi_handle_t handle,
-			void *value,
-			int *round,
-			void (*end_request) (pi_handle_t handle,
-					     int round,
-					     int result));
-
-int paxos_round_discard(pi_handle_t handle, int round);
-
-int paxos_leader_get(pi_handle_t handle, int *round);
-
-int paxos_recovery_status_get(pi_handle_t handle);
-
-int paxos_recovery_status_set(pi_handle_t handle, int recovery);
-
-int paxos_catchup(pi_handle_t handle);
-
-int paxos_propose(pi_handle_t handle, void *value, int round);
-
-int paxos_instance_exit(pi_handle_t handle);
-
-int paxos_space_exit(ps_handle_t handle);
-
-#endif
 
 int paxos_answer(struct boothc_ticket_msg *msg, struct ticket_config *tk,
 		struct booth_site *from);

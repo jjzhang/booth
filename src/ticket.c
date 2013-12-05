@@ -28,15 +28,11 @@
 #include "ticket.h"
 #include "config.h"
 #include "pacemaker.h"
-#include "list.h"
 #include "inline-fn.h"
 #include "log.h"
 #include "booth.h"
-#include "timer.h"
-#include "paxos_lease.h"
 #include "paxos.h"
 
-#define PAXOS_MAGIC		0xDB12
 #define TK_LINE			256
 
 
@@ -68,26 +64,6 @@ int find_ticket_by_name(const char *ticket, struct ticket_config **found)
 	return 0;
 }
 
-#if 0
-int find_ticket_by_handle(pl_handle_t handle, struct ticket_config **found)
-{
-	int i;
-
-	if (found)
-		*found = NULL;
-
-	for (i = 0; i < booth_conf->ticket_count; i++) {
-		if (booth_conf->ticket[i].handle == handle) {
-			if (found)
-				*found = booth_conf->ticket + i;
-			return 1;
-		}
-	}
-
-	return 0;
-}
-#endif
-
 
 int check_ticket(char *ticket, struct ticket_config **found)
 {
@@ -115,119 +91,6 @@ int check_site(char *site, int *is_local)
 
 	return 0;
 }
-
-
-#if 0
-void end_acquire(pl_handle_t handle, int error);
-void end_acquire(pl_handle_t handle, int error)
-{
-	struct ticket_config *tk;
-
-	log_debug("enter end_acquire");
-	if (!find_ticket_by_handle(handle, &tk)) {
-		log_error("BUG: ticket handle %ld does not exist", handle);
-		return;
-	}
-
-	if (error)
-		log_info("ticket %s failed granting for site %s, error:%s",
-				tk->name, local->addr_string, strerror(error));
-	else
-		log_info("ticket %s was granted successfully for site %s",
-				tk->name, local->addr_string);
-	log_debug("exit end_acquire");
-}
-
-void end_release(pl_handle_t handle, int error);
-void end_release(pl_handle_t handle, int error)
-{
-	struct ticket_config *tk;
-
-	log_debug("enter end_release");
-	if (!find_ticket_by_handle(handle, &tk)) {
-		log_error("BUG: ticket handle %ld does not exist", handle);
-		return;
-	}
-
-	if (error)
-		log_info("ticket %s failed revoking on site %s, error:%s",
-				tk->name, local->addr_string, strerror(error));
-	else
-		log_info("ticket %s was revoked successfully on site %s",
-				tk->name, local->addr_string);
-
-	log_debug("exit end_release");
-}
-
-int ticket_send(unsigned long id, void *value, int len);
-int ticket_send(unsigned long id, void *value, int len)
-{
-	int i, rv = -1;
-	struct booth_site *to = NULL;
-	struct boothc_ticket_msg msg;
-
-	foreach_node(i, to)
-		if (booth_conf->site[i].site_id == id) {
-			to = booth_conf->site+i;
-			break;
-		}
-	if (!to)
-		return rv;
-
-	memset(&msg, 0, sizeof(msg));
-	hdr->magic = htons(PAXOS_MAGIC);
-	hdr->len = htonl(sizeof(struct booth_msghdr) + len);
-	memcpy((char *)buf + sizeof(struct booth_msghdr), value, len);
-
-	rv = transport()->send(to, buf, sizeof(struct booth_msghdr) + len);
-
-	frdee(buf);
-	*/
-	return rv;
-	assert(0);
-}
-
-static int ticket_broadcast(void *value, int vlen)
-{
-	struct booth_msghdr *hdr;
-	int tlen ;
-	= sizeof(*hdr) + vlen;
-	char buf[tlen];
-
-	hdr = (void*)buf;
-	hdr->magic = htons(PAXOS_MAGIC);
-	hdr->len = htonl(tlen);
-	memcpy(hdr->data, value, vlen);
-
-	return transport()->broadcast(hdr, tlen);
-}
-
-static int ticket_read(const void *name, int *owner, int *ballot, 
-		       unsigned long long *expires)
-{
-	struct ticket *tk;
-	int found = 0;
-	
-	list_for_each_entry(tk, &ticket_list, list) {
-		if (!strcmp(tk->id, name)) {
-			found = 1;
-			break;
-		}
-	}
-	if (!found) {
-		log_error("BUG: ticket_read failed (ticket %s does not exist)",
-			  (char *)name);
-		return -1;
-	}
-
-	pcmk_handler.load_ticket(tk->id, &tk->owner, &tk->ballot, &tk->expires);
-	*owner = tk->owner;
-	*expires = tk->expires;
-	*ballot = tk->ballot;
- 
-	return 0;
-}
-#endif
 
 
 static inline int is_same_or_better_state(cmd_request_t here, cmd_request_t there)
@@ -396,15 +259,6 @@ int ticket_write(struct ticket_config *tk)
 }
 
 
-#if 0
-void ticket_status_recovery(pl_handle_t handle);
-void ticket_status_recovery(pl_handle_t handle)
-{
-//	paxos_lease_status_recovery(handle);
-}
-#endif
-
-
 /* UDP message receiver. */
 int message_recv(struct boothc_ticket_msg *msg, int msglen)
 {
@@ -528,16 +382,6 @@ int list_ticket(char **pdata, unsigned int *len)
 	return 0;
 }
 
-
-#if 0
-
-const struct paxos_lease_operations ticket_operations = {
-	.send		= ticket_send,
-	.broadcast	= ticket_broadcast,
-	.catchup	= ticket_catchup,
-	.notify		= ticket_write,
-};
-#endif
 
 int setup_ticket(void)
 {

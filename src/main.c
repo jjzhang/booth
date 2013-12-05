@@ -48,7 +48,6 @@
 #include "booth.h"
 #include "config.h"
 #include "transport.h"
-#include "timer.h"
 #include "inline-fn.h"
 #include "pacemaker.h"
 #include "ticket.h"
@@ -369,10 +368,6 @@ out:
 	return rv;
 }
 
-static int setup_timer(void)
-{
-	return timerlist_init();
-}
 
 static int write_daemon_state(int fd, int state)
 {
@@ -438,10 +433,6 @@ static int loop(int fd)
 	void (*deadfn) (int ci);
 	int rv, i;
 
-	rv = setup_timer();
-	if (rv < 0)
-		goto fail;
-
 	rv = setup_transport();
 	if (rv < 0)
 		goto fail;
@@ -493,7 +484,6 @@ static int loop(int fd)
 			}
 		}
 
-		process_timerlist();
 		process_tickets();
 	}
 

@@ -22,7 +22,6 @@
 
 #include <stdint.h>
 #include "booth.h"
-#include "paxos_lease.h"
 #include "transport.h"
 
 
