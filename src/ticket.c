@@ -21,6 +21,7 @@
 #include <string.h>
 #include <errno.h>
 #include <arpa/inet.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <assert.h>
 #include <time.h>
@@ -232,26 +233,109 @@ static int ticket_read(const void *name, int *owner, int *ballot,
 #endif
 
 
-static void ticket_parse(struct ticket_config *tk,
-		struct boothc_ticket_msg *tmsg)
+static inline int is_same_or_better_state(cmd_request_t here, cmd_request_t there)
 {
-	struct ticket_paxos_state *tps;
+	if (here == there)
+		return 1;
+
+	if (here == ST_INIT)
+		return 1;
+
+	return 0;
+}
+
+
+static void combine_paxos_states(struct ticket_config *tk,
+	struct ticket_paxos_state *new)
+{
+	struct ticket_paxos_state *is;
+
+	is  = &tk->proposed_state;
+
+	log_info("combine %s: state %s/%s "
+			"mask %" PRIx64 "/%" PRIx64 " "
+			"ballot %x/%x ",
+			tk->name,
+			STATE_STRING(is->state),
+			STATE_STRING(new->state),
+			is->acknowledges, new->acknowledges,
+			is->ballot,       new->ballot);
+
+	if (is->ballot > new->ballot) {
+		log_debug("ticket %s got older ballot %d %d, ignored.",
+				tk->name, is->ballot, new->ballot);
+		return;
+	}
+
+	if (is->ballot < new->ballot) {
+		log_debug("ticket %s got newer ballot %d %d, loaded.",
+				tk->name, is->ballot, new->ballot);
+		/* Eg. for CATCHUP */
+		*is = *new;
+		return;
+	}
+
+	if (is->prev_ballot != new->prev_ballot) {
+		/* Reject? */
+		log_debug("ticket %s got different prev ballots %d %d.",
+				tk->name, is->prev_ballot, new->prev_ballot);
+		return;
+	}
+
+	/* ballot numbers the same. */
+	if (is_same_or_better_state(is->state, new->state) &&
+			is->owner == new->owner) {
+		is->acknowledges |= new->acknowledges;
+		log_debug("ticket %s got ack %" PRIx64 ", now %" PRIx64,
+				tk->name, new->acknowledges, is->acknowledges);
+	}
+	else {
+	}
+}
+
+
+static void promote_ticket_state(struct ticket_config *tk)
+{
+	/* >= or > ? */
+	if (__builtin_popcount(tk->proposed_state.acknowledges) * 2 >
+			booth_conf->node_count) {
+		tk->current_state = tk->proposed_state;
+
+		if (tk->current_state.state == ST_INIT)
+			tk->current_state.state = ST_STABLE;
+
+		log_debug("ticket %s changing into state %s",
+				tk->name, STATE_STRING(tk->current_state.state));
+	}
+	/* TODO: send message? */
+}
+
+
+static void ticket_parse(struct ticket_config *tk,
+		struct boothc_ticket_msg *tmsg,
+		struct booth_site *from)
+{
+	struct ticket_paxos_state tp, *tps;
+	struct booth_site *owner;
 	time_t now;
 
 
-	tps = &tk->current_state;
 	time(&now);
-
-	if (tps->ballot < ntohl(tmsg->ticket.ballot))
-		tps->ballot = ntohl(tmsg->ticket.ballot);
+	tps = &tp;
 
 	if (ntohl(tmsg->header.result) == RLT_SUCCESS) {
-		tps->expires = now + ntohl(tmsg->ticket.expiry);
-
-		if (!find_site_by_id( ntohl(tmsg->ticket.owner),
-					&tps->owner))
+		if (!find_site_by_id( ntohl(tmsg->ticket.owner), &owner)) {
 			log_error("wrong site_id %x as ticket owner, msg from %x",
 					tmsg->ticket.owner, tmsg->header.from);
+			return;
+		}
+
+		tps->expires     = ntohl(tmsg->ticket.expiry) + now;
+		tps->ballot      = ntohl(tmsg->ticket.ballot);
+		tps->prev_ballot = ntohl(tmsg->ticket.prev_ballot);
+		tps->owner       = owner;
+		tps->acknowledges= from->bitmask;
+		tps->state       = ST_STABLE;
 	}
 
 
@@ -259,6 +343,9 @@ static void ticket_parse(struct ticket_config *tk,
 		tps->owner = NULL;
 		tps->expires = 0;
 	}
+
+	combine_paxos_states(tk, tps);
+	promote_ticket_state(tk);
 
 	if (local->type != ARBITRATOR) {
 		pcmk_handler.store_ticket(tk);
@@ -274,21 +361,16 @@ static void ticket_parse(struct ticket_config *tk,
  *
  * If we're a SITE, we can ask (and have to tell) Pacemaker.
  * An ARBITRATOR can only ask others. */
-static int ticket_catchup(struct ticket_config *tk)
+static int ticket_send_catchup(struct ticket_config *tk)
 {
 	int i, rv = 0;
 	struct booth_site *site;
 	struct boothc_ticket_msg msg;
 
 
-	if (local->type != ARBITRATOR) {
-		pcmk_handler.load_ticket(tk);
-	}
-
 	foreach_node(i, site) {
 		if (!site->local) {
-			init_ticket_msg(&msg, CMD_CATCHUP);
-			strncpy(msg.ticket.id, tk->name, sizeof(msg.ticket.id));
+			init_ticket_msg(&msg, CMD_CATCHUP, tk);
 
 			log_debug("attempting catchup from %s", site->addr_string);
 
@@ -352,7 +434,7 @@ int message_recv(struct boothc_ticket_msg *msg, int msglen)
 		return booth_udp_send(dest, msg, sizeof(*msg));
 
 	case CMR_CATCHUP:
-		return ticket_process_catchup(msg);
+		return ticket_process_catchup(msg, dest);
 
 	default:
 		log_error("unprocessed message, cmd %x", cmd);
@@ -461,7 +543,14 @@ int setup_ticket(void)
 
 	 /* TODO */
 	foreach_ticket(i, tk) {
-		ticket_catchup(tk);
+		tk->current_state.owner = NULL;
+		tk->current_state.expires = 0;
+		tk->current_state.state = ST_INIT;
+		tk->proposed_state = tk->current_state;
+
+		if (local->type != ARBITRATOR) {
+			pcmk_handler.load_ticket(tk);
+		}
 	}
 
 
@@ -538,7 +627,6 @@ reply:
 
 int ticket_answer_catchup(struct boothc_ticket_msg *msg)
 {
-	struct ticket_paxos_state *tps;
 	struct ticket_config *tk;
 	int rv;
 
@@ -552,25 +640,21 @@ int ticket_answer_catchup(struct boothc_ticket_msg *msg)
 			msg->ticket.id, ntohl(msg->header.from));
 
 
-	tps = &tk->current_state;
-
 	/* We do _always_ answer.
 	 * In case all booth daemons are restarted at the same time, nobody
 	 * would answer any questions, leading to timeouts and delays.
 	 * Just admit we don't know. */
 
-	msg->ticket.expiry = htonl( ticket_valid_for(tk) );
-	msg->ticket.owner  = htonl( get_node_id(tps->owner) );
-	msg->ticket.ballot = htonl(tps->ballot);
 	rv = RLT_SUCCESS;
 
 reply:
-	init_header(&msg->header, CMR_CATCHUP, rv, sizeof(*msg));
+	init_ticket_msg(msg, CMR_CATCHUP, tk);
+	msg->header.result = htonl(rv);
 	return 1;
 }
 
 
-int ticket_process_catchup(struct boothc_ticket_msg *msg)
+int ticket_process_catchup(struct boothc_ticket_msg *msg, struct booth_site *sender)
 {
 	struct ticket_config *tk;
 	int rv;
@@ -584,7 +668,7 @@ int ticket_process_catchup(struct boothc_ticket_msg *msg)
 	log_debug("got catchup answer for \"%s\" from %08x",
 			msg->ticket.id, ntohl(msg->header.from));
 
-	ticket_parse(tk, msg);
+	ticket_parse(tk, msg, sender);
 	rv = 0;
 
 ex:
