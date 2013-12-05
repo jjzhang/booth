@@ -101,4 +101,9 @@ static inline struct booth_transport const *transport(void) {
 	return booth_transport + booth_conf->proto;
 }
 
+
+static inline const char *ticket_owner_string(struct booth_site *site) {
+	return site ? site->addr_string : "NONE";
+}
+
 #endif
