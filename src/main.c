@@ -575,6 +575,19 @@ static int do_command(cmd_request_t cmd)
 		goto out_close;
 	}
 
+	/* We don't check for existence of ticket, so that asking can be
+	 * done without local configuration, too.
+	 * Although, that means that the UDP port has to be specified, too. */
+	if (!cl.msg.ticket.id[0]) {
+		/* If the loaded configuration has only a single ticket defined, use that. */
+		if (booth_conf->ticket_count == 1) {
+			strcpy(cl.msg.ticket.id, booth_conf->ticket[0].name);
+		} else {
+			log_error("No ticket given.");
+			goto out_close;
+		}
+	}
+
 	init_header(&cl.msg.header, cmd, 0, sizeof(cl.msg));
 
 	/* Always use TCP for client - at least for now. */
