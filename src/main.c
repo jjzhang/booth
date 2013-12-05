@@ -560,14 +560,13 @@ out:
 
 static int do_command(cmd_request_t cmd)
 {
-	struct booth_site *site, *to;
+	struct booth_site *site;
 	struct boothc_header reply;
 	struct booth_transport const *tpt;
 	int rv;
 
 	rv = 0;
 	site = NULL;
-	to = NULL;
 
 	if (!*cl.site)
 		site = local;
@@ -654,8 +653,6 @@ static int do_command(cmd_request_t cmd)
 out_close:
 	if (site)
 		local_transport->close(site);
-	if (to)
-		booth_transport[TCP].close(to);
 	return rv;
 }
 
