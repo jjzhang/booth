@@ -299,6 +299,7 @@ int read_config(const char *path)
 
 
 	booth_conf->proto = UDP;
+	booth_conf->port = BOOTH_DEFAULT_PORT;
 
 	parse_weights("", defaults.weight);
 	defaults.expiry = DEFAULT_TICKET_EXPIRY;

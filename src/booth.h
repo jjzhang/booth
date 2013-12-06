@@ -37,6 +37,8 @@
 #define DAEMON_NAME		"booth"
 #define BOOTH_PATH_LEN		127
 
+#define BOOTH_DEFAULT_PORT		9929
+
 /* TODO: remove */
 #define BOOTH_PROTO_FAMILY	AF_INET
 
