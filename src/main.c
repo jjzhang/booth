@@ -329,7 +329,7 @@ static int setup_config(int type)
 		goto out;
 
 	/* Set "local" pointer, ignoring errors. */
-	find_myself(NULL, 0);
+	find_myself(NULL, type == CLIENT);
 
 
 	rv = check_config(type);
