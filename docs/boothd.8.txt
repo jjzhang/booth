@@ -1,0 +1,268 @@
+BOOTHD(8)
+===========
+:doctype: manpage
+
+
+NAME
+----
+boothd - The Booth Cluster Ticket Manager.
+
+
+SYNOPSIS
+--------
+*boothd* 'daemon' ['-D'] [-c 'config']
+
+*booth* ['client'] {'list'} [-S 'site'] ['-D'] [-c 'config']
+
+*booth* ['client'] {'grant'|'revoke'} [-S 'site'] ['-D'] [-t] 'ticket'  [-c 'config']
+
+*booth* 'status' ['-D'] [-c 'config']
+
+
+DESCRIPTION
+-----------
+Booth manages tickets which authorizes one of the cluster sites located in
+geographically dispersed distances to run certain resources. It is designed to
+be an add-on to Pacemaker, which extends Pacemaker to support geographically
+distributed clustering.
+
+It is based on the PAXOS protocol, see eg. 
+<http://research.microsoft.com/en-us/um/people/lamport/pubs/lamport-paxos.pdf>
+for details.
+
+
+
+SHORT EXAMPLES
+--------------
+
+---------------------
+# boothd daemon
+
+# boothd client list
+
+# boothd client grant -t ticket-nfs
+
+# boothd client revoke -t ticket-nfs
+---------------------
+
+
+
+OPTIONS
+-------
+*-c*::
+	Configuration to use.
++
+Can be a full path to a configuration file, or a short name; in the latter 
+case, the directory '/etc/booth' and suffix '.conf' are added.
+Per default 'booth' is used, which results in the path '/etc/booth/booth.conf'.
++
+The configuration name also determines the name of the PID file - for the defaults,
+'/var/run/booth/booth.pid'.
+
+*-D*::
+	Debug output/don't daemonize.
+	Increases the debug output level; for 'boothd daemon', keeps the process
+	in the foreground.
+
+*-h*, *--help*::
+	Give a short usage output.
+
+*-s*::
+	Site address.
+
+*-t*::
+	Ticket name.
+
+*-v*, *--version*::
+	Report version information.
+
+
+
+COMMANDS
+--------
+
+Whether the binary is called as 'boothd' or 'booth' doesn't matter; the first 
+argument determines the mode of operation.
+
+
+*'daemon'*::
+	Tells 'boothd' to serve a site. The locally configured interfaces are
+	searched for an IP address that got defined in the configuration,
+	so that Booth can operate in /arbitrator/ resp. /site/ mode.
+
+
+*'client'*::
+	Allows to list the ticket information (see also 'crm_ticket -L'),
+	and to revoke or (initially) grant tickets to a site.
++
+In this mode the configuration file is searched for an IP address that is 
+locally reachable, ie. matches a configured subnet.
+This allows to run the client commands on another node in the same cluster, as
+long as the config file and the service IP is locally reachable.
++
+Example: If the booth service IP is 192.168.55.200, and the local node has
+192.168.55.15 configured on an interface, it knows which site it belongs to.
++
+The client can also ask another site; use '-s' to tell where to connect to.
+
+
+*'status'*::
+	'boothd' looks for the (locked) PID file and the UDP socket, prints
+	some output to stdout (for use in shell scripts) and returns a
+	OCF-compatible return code.
+	With '-D', a human-readable message is printed to STDERR as well.
+
+
+
+CONFIGURATION FILE
+------------------
+
+A basic file looks like this:
+
+-----------------------
+site="192.168.201.100"
+site="192.168.202.100"
+arbitrator="192.168.203.100"
+ticket="I-want-a-pony"
+-----------------------
+
+
+You can use comment lines, by starting them with a hash-sign (''#'').
+Whitespace at the start and end of the line, and around the ''='', are ignored.
+
+The following key/value pairs are defined:
+
+*'port'*::
+	The UDP/TCP port to use. Default is '9929'.
+
+*'transport'*::
+	The transport protocol to use for PAXOS exchanges.
+	Currently only UDP is available.
++
+Please note that the client mode always uses TCP to talk to a daemon; Booth 
+will always bind and listen to *both* UDP and TCP ports.
+
+*'site'*, *'arbitrator'*::
+	Defines a PAXOS member with the given IP, which should be a service IP.
++
+You will need at least three members for normal operation; an odd number is 
+preferred.
+
+*'ticket'*::
+	Registers a ticket. Multiple tickets can be handled in a single Booth instance.
+
+The next items modify per-ticket defaults. They are stored as defaults for 
+further tickets, and are used as value for the last defined ticket (if any).
+
+*'expire'*::
+	The lease time for a ticket, in seconds. After that time the ticket gets 
+	revoked, and another site can get it.
++
+Typically 'booth' will try to renew a held ticket after half the lease time.
+
+*'timeout'*::
+	After that time 'booth' will re-send packets if there was an insufficient 
+	number of replies.
++
+The default is '3'.
+
+*'weights'*::
+	A comma-separated list of integers that define the weight of individual 
+	PAXOS members, in the same order as the 'site' and 'arbitrator' lines.
++
+Default is '0' for all; this means that the ordering within the configuration 
+file defines a kind of priority for conflicting requests.
+
+
+A more verbose example might be
+
+-----------------------
+transport = udp
+port = 9930
+
+# D-85774
+site="192.168.201.100"
+# D-90409
+site="::ffff:192.168.202.100"
+# A-1120
+arbitrator="192.168.203.100"
+
+ticket="I-want-a-pony"
+	timeout = 10
+	expire = 600
+-----------------------
+
+	
+
+NOTES
+-----
+
+Please note that Booth tickets are not meant to be real-time - a reasonable 
+'expire' time might be 300 seconds (5 minutes). Due to possible delays on the 
+WAN connections it makes no sense to expect detection of problems and failover 
+within a few seconds.
+
+
+'booth' should work with IPv6 addresses, too.
+
+
+FILES
+-----
+
+*'/etc/booth/booth.conf'*::
+	The default configuration file name. See also the '-c' argument.
+
+*'/var/run/booth/'*::
+	Directory that holds PID/lock files. See also the 'status' command.
+
+
+
+EXIT STATUS
+-----------
+*0*::
+    Success. For the 'status' command: Daemon running.
+
+*1* (PCMK_OCF_UNKNOWN_ERROR)::
+	General error code.
+
+*7* (PCMK_OCF_NOT_RUNNING)::
+	No daemon process for that configuration active.
+	
+
+
+BUGS
+----
+Probably.
+
+Please report them on GitHub: <https://github.com/ClusterLabs/booth/issues>
+
+
+
+AUTHOR
+------
+AsciiDoc was originally written (mostly) by Jiaju Zhang.
+Many people have contributed to it.
+
+In 2013 Philipp Marek took over maintainership.
+
+
+
+RESOURCES
+---------
+GitHub: <https://github.com/ClusterLabs/booth>
+
+Documentation: <http://doc.opensuse.org/products/draft/SLE-HA/SLE-ha-guide_sd_draft/cha.ha.geo.html>
+
+
+
+COPYING
+-------
+
+Copyright (C) 2011 Jiaju Zhang <jjzhang@suse.de>
+
+Copyright (C) 2013 Philipp Marek <philipp.marek@linbit.com>
+
+Free use of this software is
+granted under the terms of the GNU General Public License (GPL).
+
+
