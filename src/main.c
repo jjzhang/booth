@@ -1006,7 +1006,7 @@ static int do_status(int type)
 	rv = setup_config(type);
 	if (rv) {
 		reason = "Error reading configuration.";
-		ret = PCMK_LSB_UNKNOWN_ERROR;
+		ret = PCMK_OCF_UNKNOWN_ERROR;
 		goto quit;
 	}
 
