@@ -829,6 +829,7 @@ static int read_arguments(int argc, char **argv)
 	int optchar;
 	char *arg1 = argv[1];
 	char *op = NULL;
+	char *cp;
 	char site_arg[INET_ADDRSTRLEN] = {0};
 
 	if (argc < 2 || !strcmp(arg1, "help") || !strcmp(arg1, "--help") ||
@@ -894,7 +895,28 @@ static int read_arguments(int argc, char **argv)
 
 		switch (optchar) {
 		case 'c':
-			safe_copy(cl.configfile, optarg, sizeof(cl.configfile), "config file");
+			if (strchr(optarg, '/')) {
+				safe_copy(cl.configfile, optarg,
+						sizeof(cl.configfile), "config file");
+			} else {
+				/* If no "/" in there, use with default directory. */
+				strcpy(cl.configfile, BOOTH_DEFAULT_CONF_DIR);
+				cp = cl.configfile + strlen(BOOTH_DEFAULT_CONF_DIR);
+				assert(cp > cl.configfile);
+				assert(*(cp-1) == '/');
+
+				/* Write after the "/" */
+				safe_copy(cp + 1, optarg,
+						(sizeof(cl.configfile) -
+						 (cp -  cl.configfile) -
+						 strlen(BOOTH_DEFAULT_CONF_EXT)),
+						"config name");
+
+				/* If no extension, append ".conf".
+				 * Space is available, see -strlen() above. */
+				if (!strchr(cp, '.'))
+					strcat(cp, BOOTH_DEFAULT_CONF_EXT);
+			}
 			break;
 		case 'D':
 			daemonize = 1;
