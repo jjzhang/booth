@@ -240,6 +240,8 @@ static int parse_weights(const char *input, int weights[MAX_NODES])
 			return -1;
 		}
 
+		weights[i] = v;
+
 		while (*cp) {
 			/* Separator characters */
 			if (isspace(*cp) ||
