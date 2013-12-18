@@ -1228,5 +1228,5 @@ int main(int argc, char *argv[], char *envp[])
 
 out:
 	/* Normalize values. 0x100 would be seen as "OK" by waitpid(). */
-	return rv >= 0 && rv < 0x70 ? rv : 1;
+	return (rv >= 0 && rv < 0x70) ? rv : 1;
 }
