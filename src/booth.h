@@ -32,7 +32,11 @@
 #define BOOTH_RUN_DIR "/var/run/booth/"
 #define BOOTH_LOG_DIR "/var/log"
 #define BOOTH_LOGFILE_NAME "booth.log"
-#define BOOTH_DEFAULT_CONF "/etc/booth/booth.conf"
+#define BOOTH_DEFAULT_CONF_DIR "/etc/booth/"
+#define BOOTH_DEFAULT_CONF_NAME "booth"
+#define BOOTH_DEFAULT_CONF_EXT ".conf"
+#define BOOTH_DEFAULT_CONF \
+	BOOTH_DEFAULT_CONF_DIR BOOTH_DEFAULT_CONF_NAME BOOTH_DEFAULT_CONF_EXT
 
 #define DAEMON_NAME		"booth"
 #define BOOTH_PATH_LEN		127
