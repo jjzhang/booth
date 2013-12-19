@@ -34,4 +34,10 @@ tools/booth_resource_monitord
 
 # vim temp files
 .*.sw?
+*~
 
+*.pyc
+
+docs/boothd.8*
+
+doxygen
