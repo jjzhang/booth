@@ -819,6 +819,7 @@ static int read_arguments(int argc, char **argv)
 	char *op = NULL;
 	char *cp;
 	char site_arg[INET_ADDRSTRLEN] = {0};
+	int left;
 
 	if (argc < 2 || !strcmp(arg1, "help") || !strcmp(arg1, "--help") ||
 		!strcmp(arg1, "-h")) {
@@ -947,7 +948,11 @@ static int read_arguments(int argc, char **argv)
 			fprintf(stderr, "Please use '-h' for usage.\n");
 			exit(EXIT_FAILURE);
 			break;
-		
+
+		case -1:
+			/* No more parameters on cmdline, only arguments. */
+			goto extra_args;
+
 		default:
 			fprintf(stderr, "unknown option: %s\n", argv[optind]);
 			exit(EXIT_FAILURE);
@@ -956,6 +961,29 @@ static int read_arguments(int argc, char **argv)
 	}
 
 	return 0;
+
+
+
+extra_args:
+	if (cl.type == CLIENT && !cl.msg.ticket.id[0]) {
+		/* Use additional argument as ticket name. */
+		safe_copy(cl.msg.ticket.id,
+				argv[optind],
+				sizeof(cl.msg.ticket.id),
+				"ticket name");
+		optind++;
+	}
+
+	if (optind == argc)
+		return 0;
+
+
+	left = argc - optind;
+	fprintf(stderr, "Superfluous argument%s: %s%s\n",
+			left == 1 ? "" : "s",
+			argv[optind],
+			left == 1 ? "" : "...");
+	exit(EXIT_FAILURE);
 }
 
 static void set_scheduler(void)
