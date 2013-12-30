@@ -215,7 +215,7 @@ static int add_ticket(const char *name, struct ticket_config **tkp,
 	tk->timeout = def->timeout;
 	tk->expiry = def->expiry;
 	memcpy(tk->weight, def->weight, sizeof(tk->weight));
-	tk->current_state.state = ST_INIT;
+	tk->state = ST_INIT;
 
 	if (tkp)
 		*tkp = tk;

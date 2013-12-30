@@ -51,7 +51,7 @@ int paxos_start_round(struct ticket_config *tk, struct booth_site *new_owner)
 
 	// TODO needs to be done from cron
 	tps = &tk->proposed_state;
-	tps->_proposer = local;
+	tps->proposer = local;
 	tps->prev_ballot = tk->current_state.ballot;
 	tps->ballot = next_ballot_number(tk);
 	tps->owner = new_owner;
@@ -100,8 +100,7 @@ inline static int answer_PREP(
 		tk->proposed_state.proposer = from;
 
 		/* We lose (?) */
-		tk->current_state.state = ST_STABLE;
-		tk->proposed_state.state = ST_STABLE;
+		tk->state = ST_STABLE;
 
 		log_info("PROMISING for ticket \"%s\" (by %s) for %d",
 				tk->name, from->addr_string, ballot);
@@ -134,7 +133,7 @@ inline static int answer_REJ(
 	tk->current_state.ballot = ballot;
 	tk->proposed_state.ballot = ballot;
 
-	tk->current_state.state = ST_STABLE;
+	tk->state = ST_STABLE;
 	return 0;
 }
 
@@ -149,7 +148,7 @@ inline static int answer_PROM(
 {
 	/* Ignore delayed promises.
 	 * They'd only cause packet repetitions anyway. */
-	if (tk->proposed_state.state == OP_PREPARING) {
+	if (tk->state == OP_PREPARING) {
 		tk->proposed_state.acknowledges |= from->bitmask;
 
 		log_info("Got PROMISE from %s for \"%s\", now %" PRIx64,
@@ -187,7 +186,7 @@ inline static int answer_PROP(
 			ballot == tk->proposed_state.ballot &&
 			ntohl(msg->ticket.prev_ballot) == tk->current_state.ballot) {
 
-		tk->proposer = from;
+		tk->proposed_state.proposer = from;
 
 		init_ticket_msg(msg, OP_ACCEPTING, RLT_SUCCESS,
 				tk, &tk->proposed_state);
@@ -218,7 +217,7 @@ inline static int answer_ACC(
 {
 	int rv;
 
-	if (tk->proposed_state.state == OP_PROPOSING) {
+	if (tk->state == OP_PROPOSING) {
 		tk->proposed_state.acknowledges |= from->bitmask;
 
 		log_info("Got ACCEPTING from %s for \"%s\", now %" PRIx64,
@@ -251,8 +250,7 @@ inline static int answer_ACC(
 			ticket_write(tk);
 			rv = ticket_broadcast_proposed_state(tk, OP_COMMITTED);
 
-			tk->current_state.state =
-				tk->proposed_state.state = ST_STABLE;
+			tk->state = ST_STABLE;
 			return rv;
 		}
 	}
@@ -284,8 +282,7 @@ inline static int answer_COMM(
 	tk->proposed_state.owner =
 		tk->current_state.owner = new_owner;
 
-	tk->current_state.state =
-		tk->proposed_state.state = ST_STABLE;
+	tk->state = ST_STABLE;
 
 	tk->current_state.expires =
 		tk->proposed_state.expires = time(NULL) + tk->expiry;

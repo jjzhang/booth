@@ -42,8 +42,6 @@ struct ticket_paxos_state {
 	/** Timestamp of expiration. */
 	time_t expires;
 
-	/** State. */
-	cmd_request_t state;
 
 	/** Current ballot number. Might be < prev_ballot if overflown. */
 	uint32_t ballot;
@@ -64,8 +62,8 @@ struct ticket_config {
 	/** Network related timeouts. */
 	int timeout;
 
-
-//	pl_handle_t handle; not needed?
+	/** State. */
+	cmd_request_t state;
 
 	int weight[MAX_NODES];
 

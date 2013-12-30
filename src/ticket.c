@@ -93,18 +93,6 @@ int check_site(char *site, int *is_local)
 }
 
 
-static inline int is_same_or_better_state(cmd_request_t here, cmd_request_t there)
-{
-	if (here == there)
-		return 1;
-
-	if (here == ST_INIT)
-		return 1;
-
-	return 0;
-}
-
-
 static void combine_paxos_states(struct ticket_config *tk,
 	struct ticket_paxos_state *new)
 {
@@ -112,12 +100,11 @@ static void combine_paxos_states(struct ticket_config *tk,
 
 	is  = &tk->proposed_state;
 
-	log_info("combine %s: state %s->%s "
+	log_info("combine %s: state %s "
 			"mask %" PRIx64 "/%" PRIx64 " "
 			"ballot %x/%x ",
 			tk->name,
-			STATE_STRING(is->state),
-			STATE_STRING(new->state),
+			STATE_STRING(tk->state),
 			is->acknowledges, new->acknowledges,
 			is->ballot,       new->ballot);
 
@@ -142,9 +129,9 @@ static void combine_paxos_states(struct ticket_config *tk,
 		return;
 	}
 
+	assert(!"when do we get here? ");
 	/* ballot numbers the same. */
-	if (is_same_or_better_state(is->state, new->state) &&
-			is->owner == new->owner) {
+	if (is->owner == new->owner) {
 		is->acknowledges |= new->acknowledges;
 		log_debug("ticket %s got ack %" PRIx64 ", now %" PRIx64,
 				tk->name, new->acknowledges, is->acknowledges);
@@ -161,11 +148,11 @@ int promote_ticket_state(struct ticket_config *tk)
 			booth_conf->site_count) {
 		tk->current_state = tk->proposed_state;
 
-		if (tk->current_state.state == ST_INIT)
-			tk->current_state.state = ST_STABLE;
+		if (tk->state == ST_INIT)
+			tk->state = ST_STABLE;
 
 		log_debug("ticket %s changing into state %s",
-				tk->name, STATE_STRING(tk->current_state.state));
+				tk->name, STATE_STRING(tk->state));
 
 		return 1;
 	}
@@ -198,7 +185,6 @@ static void ticket_parse(struct ticket_config *tk,
 		tps->prev_ballot = ntohl(tmsg->ticket.prev_ballot);
 		tps->owner       = owner;
 		tps->acknowledges= from->bitmask;
-		tps->state       = ST_STABLE;
 	}
 
 
@@ -298,7 +284,7 @@ int message_recv(struct boothc_ticket_msg *msg, int msglen)
 		return booth_udp_send(dest, msg, sizeof(*msg));
 
 	case CMR_CATCHUP:
-		if (tk->current_state.state == ST_INIT)
+		if (tk->state == ST_INIT)
 			return ticket_process_catchup(msg, tk, dest);
 		break;
 
@@ -396,10 +382,11 @@ int setup_ticket(void)
 	foreach_ticket(i, tk) {
 		tk->current_state.owner = NULL;
 		tk->current_state.expires = 0;
-		tk->current_state.state = ST_INIT;
 		tk->proposed_state = tk->current_state;
 
-		if (local->type != ARBITRATOR) {
+		tk->state = ST_INIT;
+
+		if (local->role & PROPOSER) {
 			pcmk_handler.load_ticket(tk);
 		}
 	}
@@ -500,7 +487,7 @@ int ticket_answer_catchup(struct boothc_ticket_msg *msg, struct ticket_config *t
 
 reply:
 	init_ticket_msg(msg, CMR_CATCHUP, rv, tk,
-			(tk->current_state.state == ST_INIT ?
+			(tk->state == ST_INIT ?
 			 &tk->proposed_state :
 			 &tk->current_state));
 	return 1;
@@ -533,7 +520,7 @@ int ticket_broadcast_proposed_state(struct ticket_config *tk, cmd_request_t stat
 	struct boothc_ticket_msg msg;
 
 	tk->proposed_state.acknowledges = local->bitmask;
-	tk->proposed_state.state = state;
+	tk->state = state;
 
 	init_ticket_msg(&msg, state, RLT_SUCCESS, tk, &tk->proposed_state);
 
@@ -548,19 +535,15 @@ static void ticket_cron(struct ticket_config *tk)
 {
 	time_t now;
 
-	switch(tk->current_state.state) {
+	now = time(NULL);
+
+	switch(tk->state) {
 	case ST_INIT:
 		/* Unknown state, ask others. */
 		ticket_send_catchup(tk);
 		return;
 
-	default:
-		break;
-	}
 
-	now = time(NULL);
-
-	switch(tk->proposed_state.state) {
 	case OP_COMMITTED:
 	case ST_STABLE:
 
@@ -573,9 +556,12 @@ static void ticket_cron(struct ticket_config *tk)
 					ticket_owner_string(tk->current_state.owner));
 
 			/* Couldn't renew in time - ticket lost. */
-			tk->current_state.state = ST_INIT;
 			tk->current_state.owner = NULL;
 			ticket_write(tk);
+
+			/* Ask others (repeatedly) until we know the new owner. */
+			tk->state = ST_INIT;
+			ticket_activate_timeout(tk);
 		}
 
 		/* Do we need to refresh? */
@@ -592,7 +578,7 @@ static void ticket_cron(struct ticket_config *tk)
 	case OP_PREPARING:
 	case OP_PROPOSING:
 		/* We ask others for a change; retry to get consensus. */
-		ticket_broadcast_proposed_state(tk, tk->proposed_state.state);
+		ticket_broadcast_proposed_state(tk, tk->state);
 		break;
 
 	case OP_PROMISING:
@@ -641,13 +627,12 @@ void tickets_log_info(void)
 	foreach_ticket(i, tk) {
 		c = &tk->current_state;
 		p = &tk->proposed_state;
-		log_info("Ticket %s: state %s/%s "
+		log_info("Ticket %s: state %s "
 				"mask %" PRIx64 "/%" PRIx64 " "
 				"ballot %x/%x "
 				"expires %-24.24s",
 				tk->name,
-				STATE_STRING(c->state),
-				STATE_STRING(p->state),
+				STATE_STRING(tk->state),
 				c->acknowledges, p->acknowledges,
 				c->ballot,       p->ballot,
 				ctime(&c->expires));
