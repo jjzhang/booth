@@ -506,6 +506,7 @@ reply:
 }
 
 
+/* TODO: move all that into paxos.c, like all other message handling? */
 int ticket_process_catchup(struct boothc_ticket_msg *msg, struct ticket_config *tk,
 		struct booth_site *sender)
 {

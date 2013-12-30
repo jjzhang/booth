@@ -164,6 +164,7 @@ struct booth_site {
 	int type;
 	int local;
 
+	/** Roles, like ACCEPTOR, PROPOSER, or LEARNER. Not really used ATM. */
 	int role;
 
 	char addr_string[BOOTH_NAME_LEN];
