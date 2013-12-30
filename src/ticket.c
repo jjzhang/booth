@@ -585,6 +585,10 @@ static void ticket_cron(struct ticket_config *tk)
 			/* TODO: remember when we started, and restart afresh after some retries */
 		}
 
+		/* Nothing to be done, until further notice. */
+		if (!tk->current_state.owner)
+			tk->next_cron = INT_MAX;
+
 		break;
 
 	case OP_PREPARING:
