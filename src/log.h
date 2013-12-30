@@ -26,6 +26,7 @@
 
 #define log_debug(fmt, args...)		do { if (ANYDEBUG) cl_log(LOG_DEBUG, fmt, ##args); } while (0)
 #define log_info(fmt, args...)		cl_log(LOG_INFO, fmt, ##args)
+#define log_warn(fmt, args...)		cl_log(LOG_WARNING, fmt, ##args)
 #define log_error(fmt, args...)		cl_log(LOG_ERR, fmt, ##args)
 
 #endif /* _LOG_H */

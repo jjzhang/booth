@@ -476,6 +476,9 @@ no_value:
 		}
 	}
 
+	if ((booth_conf->site_count % 2) == 0) {
+		log_warn("An odd number of nodes is strongly recommended!");
+	}
 
 	/* Default: make config name match config filename. */
 	if (!booth_conf->name[0]) {
