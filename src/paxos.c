@@ -55,7 +55,8 @@ int paxos_start_round(struct ticket_config *tk, struct booth_site *new_owner)
 	tps->prev_ballot = tk->current_state.ballot;
 	tps->ballot = next_ballot_number(tk);
 	tps->owner = new_owner;
-	tk->next_cron = time(NULL) +  tk->timeout;
+
+	ticket_activate_timeout(tk);
 
 	return ticket_broadcast_proposed_state(tk, OP_PREPARING);
 }
@@ -157,6 +158,7 @@ inline static int answer_PROM(
 
 		/* TODO: only check for count? */
 		if (promote_ticket_state(tk)) {
+			ticket_activate_timeout(tk);
 			return ticket_broadcast_proposed_state(tk, OP_PROPOSING);
 		}
 	}

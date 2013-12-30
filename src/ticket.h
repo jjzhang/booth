@@ -20,6 +20,8 @@
 #ifndef _TICKET_H
 #define _TICKET_H
 
+#include <time.h>
+
 #include "config.h"
 
 #define DEFAULT_TICKET_EXPIRY	600
@@ -67,6 +69,17 @@ int ticket_write(struct ticket_config *tk);
 
 void process_tickets(void);
 void tickets_log_info(void);
+
+
+static inline void ticket_next_cron_in(struct ticket_config *tk, int seconds)
+{
+	tk->next_cron = time(NULL) + seconds;
+}
+
+static inline void ticket_activate_timeout(struct ticket_config *tk)
+{
+	ticket_next_cron_in(tk, tk->timeout);
+}
 
 
 #endif /* _TICKET_H */

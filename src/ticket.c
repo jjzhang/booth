@@ -230,7 +230,6 @@ static int ticket_send_catchup(struct ticket_config *tk)
 	struct booth_site *site;
 	struct boothc_ticket_msg msg;
 
-
 	foreach_node(i, site) {
 		if (!site->local) {
 			init_ticket_msg(&msg, CMD_CATCHUP, RLT_SUCCESS, tk, &tk->current_state);
@@ -240,6 +239,8 @@ static int ticket_send_catchup(struct ticket_config *tk)
 			rv = booth_udp_send(site, &msg, sizeof(msg));
 		}
 	}
+
+	ticket_activate_timeout(tk);
 
 	return rv;
 }
@@ -586,10 +587,6 @@ static void ticket_cron(struct ticket_config *tk)
 			/* TODO: remember when we started, and restart afresh after some retries */
 		}
 
-		/* Nothing to be done, until further notice. */
-		if (!tk->current_state.owner)
-			tk->next_cron = INT_MAX;
-
 		break;
 
 	case OP_PREPARING:
@@ -627,8 +624,8 @@ void process_tickets(void)
 			continue;
 
 		log_debug("ticket cron: doing %s", tk->name);
-		/* Set next value, cron may override. */
-		tk->next_cron = now + tk->timeout;
+		/* Set next value, handler may override. */
+		tk->next_cron = INT_MAX;
 		ticket_cron(tk);
 	}
 }
