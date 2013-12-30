@@ -598,7 +598,7 @@ void process_tickets(void)
 		if (tk->next_cron > now)
 			continue;
 
-		log_debug("ticket %s cron", tk->name);
+		log_debug("ticket cron: doing %s", tk->name);
 		/* Set next value, cron may override. */
 		tk->next_cron = now + tk->timeout;
 		ticket_cron(tk);
