@@ -302,7 +302,10 @@ int message_recv(struct boothc_ticket_msg *msg, int msglen)
 		break;
 
 	default:
-		return paxos_answer(msg, tk, dest);
+		rv = paxos_answer(msg, tk, dest);
+		assert((tk->proposed_state.acknowledges & ~booth_conf->site_bits) == 0);
+		assert((tk->current_state.acknowledges & ~booth_conf->site_bits) == 0);
+		return rv;
 	}
 	return 0;
 }
