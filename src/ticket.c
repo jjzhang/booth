@@ -581,9 +581,10 @@ static void ticket_cron(struct ticket_config *tk)
 				now + tk->expiry/2 > tk->current_state.expires) {
 			log_info("RENEW ticket \"%s\"", tk->name);
 			paxos_start_round(tk, local);
+
+			/* TODO: remember when we started, and restart afresh after some retries */
 		}
 
-		/* TODO: remember when we started, and restart afresh after some retries */
 		break;
 
 	case OP_PREPARING:
