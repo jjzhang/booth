@@ -97,6 +97,7 @@ inline static int answer_PREP(
 		 * See above for reasoning.
 		 */
 		tk->proposed_state.ballot = ballot;
+		tk->proposed_state.proposer = from;
 
 		/* We lose (?) */
 		tk->current_state.state = ST_STABLE;
@@ -181,10 +182,12 @@ inline static int answer_PROP(
 
 	/* We have to be careful here.
 	 * Getting multiple copies of the same message must not trigger
-	 * rejections, but only repeated promises. */
+	 * rejections, but only repeated OP_ACCEPTING messages. */
 	if (ballot > tk->current_state.ballot &&
 			ballot == tk->proposed_state.ballot &&
 			ntohl(msg->ticket.prev_ballot) == tk->current_state.ballot) {
+
+		tk->proposer = from;
 
 		init_ticket_msg(msg, OP_ACCEPTING, RLT_SUCCESS,
 				tk, &tk->proposed_state);

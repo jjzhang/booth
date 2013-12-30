@@ -33,11 +33,10 @@
 
 
 struct ticket_paxos_state {
-	/** See booth_site:site_id. */
-	uint32_t proposer;
-	struct booth_site *_proposer;
+	/** Who tries to change the current status. */
+	struct booth_site *proposer;
 
-	/** See booth_site:site_id. */
+	/** Current owner of ticket. */
 	struct booth_site *owner;
 
 	/** Timestamp of expiration. */
@@ -75,6 +74,7 @@ struct ticket_config {
 	struct ticket_paxos_state current_state;
 	struct ticket_paxos_state proposed_state;
 };
+
 
 struct booth_config {
     char name[BOOTH_NAME_LEN];
