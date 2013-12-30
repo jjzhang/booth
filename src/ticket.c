@@ -544,6 +544,8 @@ int ticket_broadcast_proposed_state(struct ticket_config *tk, cmd_request_t stat
 
 static void ticket_cron(struct ticket_config *tk)
 {
+	time_t now;
+
 	switch(tk->current_state.state) {
 	case ST_INIT:
 		/* Unknown state, ask others. */
@@ -554,9 +556,26 @@ static void ticket_cron(struct ticket_config *tk)
 		break;
 	}
 
+	now = time(NULL);
+
 	switch(tk->proposed_state.state) {
 	case OP_COMMITTED:
 	case ST_STABLE:
+
+		/* Has an owner, has an expiry date, and expiry date in the past? */
+		if (tk->current_state.expires &&
+				tk->current_state.owner &&
+				now > tk->current_state.expires) {
+			log_info("LOST ticket: \"%s\" no longer at %s",
+					tk->name,
+					ticket_owner_string(tk->current_state.owner));
+
+			/* Couldn't renew in time - ticket lost. */
+			tk->current_state.state = ST_INIT;
+			tk->current_state.owner = NULL;
+			ticket_write(tk);
+		}
+
 		/* Do we need to refresh? */
 		if (tk->current_state.owner == local &&
 				time(NULL) + tk->expiry/2 > tk->current_state.expires) {
