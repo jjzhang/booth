@@ -578,7 +578,7 @@ static void ticket_cron(struct ticket_config *tk)
 
 		/* Do we need to refresh? */
 		if (tk->current_state.owner == local &&
-				time(NULL) + tk->expiry/2 > tk->current_state.expires) {
+				now + tk->expiry/2 > tk->current_state.expires) {
 			log_info("RENEW ticket \"%s\"", tk->name);
 			paxos_start_round(tk, local);
 		}
