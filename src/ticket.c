@@ -408,6 +408,8 @@ int ticket_broadcast_proposed_state(struct ticket_config *tk, cmd_request_t stat
 
 	init_ticket_msg(&msg, state, RLT_SUCCESS, tk);
 
+	msg.ticket.owner          = htonl(get_node_id(tk->proposed_owner));
+
 	log_debug("broadcasting %s for ticket \"%s\"",
 			STATE_STRING(state), tk->name);
 
