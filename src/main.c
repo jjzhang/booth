@@ -255,31 +255,31 @@ bad_len:
 
 
 	switch (ntohl(msg.header.cmd)) {
-		case CMD_LIST:
-			ticket_answer_list(fd, &msg);
-			goto kill;
+	case CMD_LIST:
+		ticket_answer_list(fd, &msg);
+		goto kill;
 
-		case CMD_GRANT:
-			/* Expect boothc_ticket_site_msg. */
-			if (len != sizeof(msg))
-				goto bad_len;
-			ticket_answer_grant(fd, &msg);
-			goto kill;
+	case CMD_GRANT:
+		/* Expect boothc_ticket_site_msg. */
+		if (len != sizeof(msg))
+			goto bad_len;
+		ticket_answer_grant(fd, &msg);
+		goto kill;
 
-		case CMD_REVOKE:
-			/* Expect boothc_ticket_site_msg. */
-			if (len != sizeof(msg))
-				goto bad_len;
+	case CMD_REVOKE:
+		/* Expect boothc_ticket_site_msg. */
+		if (len != sizeof(msg))
+			goto bad_len;
 
-			ticket_answer_revoke(fd, &msg);
-			goto kill;
+		ticket_answer_revoke(fd, &msg);
+		goto kill;
 
-		default:
-			log_error("connection %d cmd %x unknown",
-					ci, ntohl(msg.header.cmd));
-			init_header(&msg.header,CMR_GENERAL, RLT_INVALID_ARG, sizeof(msg.header));
-			send_header_only(fd, &msg.header);
-			goto kill;
+	default:
+		log_error("connection %d cmd %x unknown",
+				ci, ntohl(msg.header.cmd));
+		init_header(&msg.header,CMR_GENERAL, RLT_INVALID_ARG, sizeof(msg.header));
+		send_header_only(fd, &msg.header);
+		goto kill;
 	}
 
 	assert(0);
