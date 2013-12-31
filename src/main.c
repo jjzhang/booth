@@ -150,8 +150,10 @@ static void client_alloc(void)
 		pollfds = realloc(pollfds, (client_size + CLIENT_NALLOC) *
 					sizeof(struct pollfd));
 	}
-	if (!clients || !pollfds)
+	if (!clients || !pollfds) {
 		log_error("can't alloc for client array");
+		exit(1);
+	}
 
 	for (i = client_size; i < client_size + CLIENT_NALLOC; i++) {
 		clients[i].workfn = NULL;
