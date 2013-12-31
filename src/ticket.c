@@ -371,6 +371,7 @@ static int ticket_process_catchup(
 			rv == RLT_SUCCESS) {
 		/* Peers seems to know better, but as yet we only have _her_
 		 * word for that. */
+accept:
 		tk->expires               = ntohl(msg->ticket.expiry) + time(NULL);
 		tk->new_ballot            = ballot;
 		tk->last_ack_ballot       = ballot;
@@ -379,6 +380,17 @@ static int ticket_process_catchup(
 
 		/* We stay in ST_INIT and wait for confirmation. */
 		goto ex;
+	}
+
+
+	if (ballot >= tk->last_ack_ballot &&
+			rv == RLT_PROBABLY_SUCCESS &&
+			tk->state == ST_INIT &&
+			tk->retry_number > 3) {
+		/* Peer seems to know better than us, and there's no
+		 * convincing other report. Just take it. */
+		tk->state = ST_STABLE;
+		goto accept;
 	}
 
 
