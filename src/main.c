@@ -612,12 +612,6 @@ static int do_command(cmd_request_t cmd)
 		goto out_close;
 	}
 
-	if (reply.result == RLT_REMOTE_OP) {
-		log_info("Cannot do that operation here.");
-		rv = -1;
-		goto out_close;
-	}
-
 
 	rv = ntohl(reply.result);
 	switch (rv) {

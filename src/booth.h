@@ -26,8 +26,6 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
-/* TODO: Remove */
-#define BOOTH_LOG_DUMP_SIZE (1024*1024)
 
 #define BOOTH_RUN_DIR "/var/run/booth/"
 #define BOOTH_LOG_DIR "/var/log"
@@ -149,7 +147,6 @@ typedef enum {
 	RLT_SYNC_SUCC,
 	RLT_SYNC_FAIL,
 	RLT_INVALID_ARG,
-	RLT_REMOTE_OP,
 	RLT_OVERGRANT,
 } cmd_result_t;
 
