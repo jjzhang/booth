@@ -174,7 +174,7 @@ Default is '0' for all; this means that the ordering within the configuration
 file defines a kind of priority for conflicting requests.
 
 
-A more verbose example might be
+A more verbose example of a configuration file might be
 
 -----------------------
 transport = udp
@@ -240,7 +240,7 @@ Please report them on GitHub: <https://github.com/ClusterLabs/booth/issues>
 
 AUTHOR
 ------
-AsciiDoc was originally written (mostly) by Jiaju Zhang.
+'boothd' was originally written (mostly) by Jiaju Zhang.
 Many people have contributed to it.
 
 In 2013 Philipp Marek took over maintainership.
