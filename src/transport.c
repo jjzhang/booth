@@ -495,7 +495,7 @@ int setup_udp_server(int try_only)
 ex:
 	if (fd >= 0)
 		close(fd);
-	return rv;
+	return -1;
 }
 
 
