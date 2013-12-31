@@ -116,6 +116,26 @@ struct boothc_ticket_msg {
  *
  * These numbers are unlikely to conflict with other enums.
  * All have to be swabbed to network order before sending.
+ * 
+ * \dot
+ * digraph states {
+ * 		node [shape=box];
+ * 		ST_INIT [label="ST_INIT"];
+ * 		
+ * 		subgraph messages { // messages
+ * 		rank=same;
+ * 		node [shape=point, rank=same];
+ * 		edge [style=tapered, penwidth=3, arrowtail=none, arrowhead=none, dir=forward];
+ * 		
+ * 		ST_INIT:e -> ST_INITs [label="sends out CMD_CATCHUP"];
+ * 		}
+ * 		
+ * 		ST_INIT -> ST_STABLE [label="recv CMR_CATCHUP"];
+ * 		ST_STABLE;
+ * 		
+ * 		ST_STABLE -> OP_PROPOSING [label="booth call to assign ticket"];
+ * }
+ * \enddot
  *
  * */
 typedef enum {
