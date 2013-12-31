@@ -279,9 +279,10 @@ inline static int answer_PROP(
 accepting:
 		init_ticket_msg(msg, OP_ACCEPTING, RLT_SUCCESS, tk);
 
-		log_info("ACCEPTING for ticket \"%s\" (by %s) for %d - new owner %s",
+		log_info("sending ACCEPT for ticket \"%s\" (by %s) for %d - new owner %s",
 				tk->name, from->addr_string, ballot,
 				ticket_owner_string(new_owner));
+		change_ticket_owner(tk, ballot, new_owner);
 	} else {
 		msg->header.cmd         = htonl(OP_REJECTED);
 		msg->ticket.ballot      = htonl(tk->new_ballot);
