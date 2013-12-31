@@ -274,15 +274,6 @@ bad_len:
 			ticket_answer_revoke(fd, &msg);
 			goto kill;
 
-		case CMD_CATCHUP:
-			/* Expect boothc_ticket_site_msg. */
-			if (len != sizeof(msg))
-				goto bad_len;
-			rv = ticket_answer_catchup(&msg, NULL);
-			if (rv >= 0)
-				rv = send_ticket_msg(fd, &msg);
-			goto kill;
-
 		default:
 			log_error("connection %d cmd %x unknown",
 					ci, ntohl(msg.header.cmd));
