@@ -283,6 +283,10 @@ accepting:
 				tk->name, from->addr_string, ballot,
 				ticket_owner_string(new_owner));
 		change_ticket_owner(tk, ballot, new_owner);
+	} if (ballot == tk->last_ack_ballot &&
+			ballot == tk->new_ballot &&
+			ntohl(msg->ticket.prev_ballot) == tk->last_ack_ballot) {
+		/* Silently ignore delayed messages. */
 	} else {
 		msg->header.cmd         = htonl(OP_REJECTED);
 		msg->ticket.ballot      = htonl(tk->new_ballot);
