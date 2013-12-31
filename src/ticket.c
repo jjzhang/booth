@@ -573,9 +573,6 @@ int message_recv(struct boothc_ticket_msg *msg, int msglen)
 		return -EINVAL;
 	}
 
-	/* only used in catchup, and not even really there ?? */
-	assert(ntohl(msg->header.result) == 0);
-
 
 	switch (cmd) {
 	case CMD_CATCHUP:
@@ -585,6 +582,10 @@ int message_recv(struct boothc_ticket_msg *msg, int msglen)
 		return ticket_process_catchup(tk, dest, msg, ballot, new_owner_p);
 
 	default:
+		/* only used in catchup, and not even really there ?? */
+		assert(ntohl(msg->header.result) == 0);
+
+
 		rv = paxos_answer(tk, dest, msg, ballot, new_owner_p);
 		assert((tk->proposal_acknowledges & ~booth_conf->site_bits) == 0);
 		return rv;
