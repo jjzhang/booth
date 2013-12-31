@@ -81,7 +81,7 @@ struct booth_config {
     uint16_t port;
 
 	/** Stores the OR of the individual host bitmasks. */
-	uint32_t site_bits;
+	uint64_t site_bits;
 
     int site_count;
     struct booth_site site[MAX_NODES];
