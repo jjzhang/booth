@@ -255,6 +255,7 @@ int ticket_answer_grant(int fd, struct boothc_ticket_msg *msg)
 
 
 	if (!check_ticket(msg->ticket.id, &tk)) {
+		log_error("Client asked to grant unknown ticket");
 		rv = RLT_INVALID_ARG;
 		goto reply;
 	}
@@ -280,6 +281,7 @@ int ticket_answer_revoke(int fd, struct boothc_ticket_msg *msg)
 	struct ticket_config *tk;
 
 	if (!check_ticket(msg->ticket.id, &tk)) {
+		log_error("Client asked to grant unknown ticket");
 		rv = RLT_INVALID_ARG;
 		goto reply;
 	}
