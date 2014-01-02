@@ -917,7 +917,8 @@ static int read_arguments(int argc, char **argv)
 			break;
 		case 't':
 			if (cl.op == OP_GRANT || cl.op == OP_REVOKE) {
-				safe_copy(cl.msg.ticket.id, optarg, sizeof(cl.msg.ticket.id), "ticket name");
+				safe_copy(cl.msg.ticket.id, optarg,
+						sizeof(cl.msg.ticket.id), "ticket name");
 			} else {
 				print_usage();
 				exit(EXIT_FAILURE);
@@ -954,9 +955,7 @@ static int read_arguments(int argc, char **argv)
 			goto extra_args;
 
 		default:
-			fprintf(stderr, "unknown option: %s\n", argv[optind]);
-			exit(EXIT_FAILURE);
-			break;
+			goto unknown;
 		};
 	}
 
@@ -984,7 +983,12 @@ extra_args:
 			argv[optind],
 			left == 1 ? "" : "...");
 	exit(EXIT_FAILURE);
+
+unknown:
+	fprintf(stderr, "unknown option: %s\n", argv[optind]);
+	exit(EXIT_FAILURE);
 }
+
 
 static void set_scheduler(void)
 {
