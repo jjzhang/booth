@@ -822,15 +822,15 @@ static int read_arguments(int argc, char **argv)
 	int left;
 
 	if (argc < 2 || !strcmp(arg1, "help") || !strcmp(arg1, "--help") ||
-		!strcmp(arg1, "-h")) {
+			!strcmp(arg1, "-h")) {
 		print_usage();
 		exit(EXIT_SUCCESS);
 	}
 
 	if (!strcmp(arg1, "version") || !strcmp(arg1, "--version") ||
-		!strcmp(arg1, "-V")) {
+			!strcmp(arg1, "-V")) {
 		printf("%s %s (built %s %s)\n",
-			argv[0], RELEASE_VERSION, __DATE__, __TIME__);
+				argv[0], RELEASE_VERSION, __DATE__, __TIME__);
 		exit(EXIT_SUCCESS);
 	}
 
