@@ -98,6 +98,9 @@ struct ticket_msg {
 	/** Previous ballot. */
 	uint32_t prev_ballot;
 
+	/* Would we want to say _whose_ proposal is more important
+	 * when sending OP_REJECTED ? */
+
 	/** Seconds until expiration. */
 	uint32_t expiry;
 } __attribute__((packed));
@@ -109,8 +112,12 @@ struct boothc_ticket_msg {
 } __attribute__((packed));
 
 
-/* Use numbers that are unlikely to conflict with other enums.
- * All these have to be swabbed to network order before sending. */
+/** State and message IDs.
+ *
+ * These numbers are unlikely to conflict with other enums.
+ * All have to be swabbed to network order before sending.
+ *
+ * */
 typedef enum {
 	/* 0x43 = "C"ommands */
 	CMD_LIST    = 0x436d644c,
@@ -140,6 +147,7 @@ typedef enum {
 } cmd_request_t;
 
 
+/* TODO: make readable constants */
 typedef enum {
 	/* for compatibility with other functions */
 	RLT_SUCCESS = 0,
@@ -148,6 +156,8 @@ typedef enum {
 	RLT_SYNC_FAIL,
 	RLT_INVALID_ARG,
 	RLT_OVERGRANT,
+	RLT_PROBABLY_SUCCESS,
+	RLT_BUSY,
 } cmd_result_t;
 
 

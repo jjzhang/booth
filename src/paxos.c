@@ -36,7 +36,7 @@ static uint32_t next_ballot_number(struct ticket_config *tk)
 
 	/* TODO: getenv() for debugging */
 
-	b = tk->current_state.ballot;
+	b = tk->new_ballot;
 	/* + unique number */
 	b += local->bitmask;
 	/* + weight */
@@ -45,31 +45,95 @@ static uint32_t next_ballot_number(struct ticket_config *tk)
 }
 
 
+static inline void set_proposal_in_ticket(struct ticket_config *tk,
+		struct booth_site *from,
+		uint32_t ballot, struct booth_site *new_owner)
+{
+	tk->proposer = from;
+	tk->new_ballot = ballot;
+	tk->proposed_owner = new_owner;
+	tk->proposal_expires = 0; // TODO - needed?
+	tk->proposal_acknowledges = from->bitmask | local->bitmask;
+
+	/* We lose (?) */
+	tk->state = ST_STABLE;
+}
+
+
+static inline void change_ticket_owner(struct ticket_config *tk,
+		uint32_t ballot,
+		struct booth_site *new_owner)
+{
+	int next;
+
+	/* set "previous" value for next round */
+	tk->last_ack_ballot =
+		tk->new_ballot = ballot;
+
+	tk->owner = new_owner;
+	tk->expires = time(NULL) + tk->expiry;
+	tk->proposer = NULL;
+
+	tk->state = ST_STABLE;
+
+	if (new_owner == local) {
+		next = tk->expiry / 2;
+		if (tk->timeout * RETRIES/2 < next)
+			next = tk->timeout;
+		ticket_next_cron_in(tk, next);
+	}
+	else
+		ticket_next_cron_in(tk, tk->expiry + tk->acquire_after);
+
+	log_info("Now actively COMMITTED for \"%s\": new owner %s, ballot %d",
+			tk->name,
+			ticket_owner_string(tk->owner),
+			ballot);
+
+
+	ticket_write(tk);
+}
+
+
+void abort_proposal(struct ticket_config *tk)
+{
+	tk->proposer = NULL;
+	tk->proposed_owner = tk->owner;
+	tk->retry_number = 0;
+	/* Ask others (repeatedly) until we know the new owner. */
+	tk->state = ST_INIT;
+}
+
+
+
+/** \defgroup msghdl Message handling functions.
+ *
+ * Not all use all arguments; but to keep the interface the same,
+ * they're all just passed everything we have.
+ *
+ * See also enum \ref cmd_request_t. 
+ * @{ */
+
+
+/** Start a PAXOS round, by sending out an OP_PREPARING. */
 int paxos_start_round(struct ticket_config *tk, struct booth_site *new_owner)
 {
-	struct ticket_paxos_state *tps;
+	if (tk->state != ST_STABLE)
+		return RLT_BUSY;
 
-	// TODO needs to be done from cron
-	tps = &tk->proposed_state;
-	tps->proposer = local;
-	tps->prev_ballot = tk->current_state.ballot;
-	tps->ballot = next_ballot_number(tk);
-	tps->owner = new_owner;
+	/* This may not be done from cron, because the ballot number would simply
+	 * get counted up without any benefit.
+	 * The message may get retransmitted, though. */
+	tk->proposer = local;
+	tk->new_ballot = next_ballot_number(tk);
+	tk->proposed_owner = new_owner;
 
+	tk->retry_number = 0;
 	ticket_activate_timeout(tk);
 
 	return ticket_broadcast_proposed_state(tk, OP_PREPARING);
 }
 
-
-/** @{ */
-/** Message handling functions.
- *
- * Not all use all arguments; but to keep the interface the same,
- * they're all just passed everything we have.
- *
- * A PAXOS round starts by sending out an OP_PREPARING.
- * */
 
 
 /** Answering OP_PREPARING means sending out OP_PROMISING. */
@@ -77,7 +141,7 @@ inline static int answer_PREP(
 		struct ticket_config *tk,
 		struct booth_site *from,
 		struct boothc_ticket_msg *msg,
-		int cmd, uint32_t ballot,
+		uint32_t ballot,
 		struct booth_site *new_owner)
 {
 	if (!(local->role & ACCEPTOR))
@@ -87,30 +151,30 @@ inline static int answer_PREP(
 	/* We have to be careful here.
 	 * Getting multiple copies of the same message must not trigger
 	 * rejections, but only repeated promises. */
-	if (ballot > tk->current_state.ballot) {
-		msg->ticket.prev_ballot = htonl(tk->current_state.ballot);
-		msg->header.cmd = htonl(OP_PROMISING);
+	if (from == tk->proposer &&
+			ballot == tk->new_ballot)
+		goto promise;
 
-		/* Not allowed:
-		 *   tk->current_state.ballot = ballot;
-		 *
-		 * See above for reasoning.
-		 */
-		tk->proposed_state.ballot = ballot;
-		tk->proposed_state.proposer = from;
 
-		/* We lose (?) */
-		tk->state = ST_STABLE;
+	/* It doesn't matter whether it's the same or another host;
+	 * the only distinction is the ballot number. */
+	if (ballot > tk->new_ballot) {
+promise:
+		msg->header.cmd         = htonl(OP_PROMISING);
+		msg->ticket.prev_ballot = htonl(tk->last_ack_ballot);
+
+		set_proposal_in_ticket(tk, from, ballot, new_owner);
 
 		log_info("PROMISING for ticket \"%s\" (by %s) for %d",
 				tk->name, from->addr_string, ballot);
 	} else {
-		msg->ticket.ballot = htonl(tk->current_state.ballot);
-		msg->header.cmd = htonl(OP_REJECTED);
+		msg->header.cmd         = htonl(OP_REJECTED);
+		msg->ticket.ballot      = htonl(tk->new_ballot);
+		msg->ticket.prev_ballot = htonl(tk->last_ack_ballot);
 
 		log_info("REJECTING (prep) for ticket \"%s\" from %s - have %d, wanted %d",
 				tk->name, from->addr_string,
-				tk->current_state.ballot, ballot);
+				tk->new_ballot, ballot);
 	}
 	init_header_bare(&msg->header);
 	return booth_udp_send(from, msg, sizeof(*msg));
@@ -122,48 +186,63 @@ inline static int answer_REJ(
 		struct ticket_config *tk,
 		struct booth_site *from,
 		struct boothc_ticket_msg *msg,
-		int cmd, uint32_t ballot,
+		uint32_t ballot,
 		struct booth_site *new_owner)
 {
 	log_info("got REJECTED for ticket \"%s\", ballot %d (has %d), from %s",
 			tk->name,
-			tk->proposed_state.ballot, ballot,
+			tk->new_ballot, ballot,
 			from->addr_string);
 
-	tk->current_state.ballot = ballot;
-	tk->proposed_state.ballot = ballot;
+	abort_proposal(tk);
 
+	/* TODO: should we check whether that sequence is increasing? */
+	tk->new_ballot = ballot;
+	tk->last_ack_ballot = ntohl(msg->ticket.prev_ballot);
+
+	/* No need to ask the others. */
 	tk->state = ST_STABLE;
 	return 0;
 }
 
 
 /** After a few OP_PROMISING replies we can send out OP_PROPOSING. */
-inline static int answer_PROM(
+inline static int got_a_PROM(
 		struct ticket_config *tk,
 		struct booth_site *from,
 		struct boothc_ticket_msg *msg,
-		int cmd, uint32_t ballot,
+		uint32_t ballot,
 		struct booth_site *new_owner)
 {
-	/* Ignore delayed promises.
-	 * They'd only cause packet repetitions anyway. */
-	if (tk->state == OP_PREPARING) {
-		tk->proposed_state.acknowledges |= from->bitmask;
+	if (tk->proposer == local ||
+			tk->state == OP_PREPARING) {
+		tk->proposal_acknowledges |= from->bitmask;
 
 		log_info("Got PROMISE from %s for \"%s\", now %" PRIx64,
 				from->addr_string, tk->name,
-				tk->proposed_state.acknowledges);
-
+				tk->proposal_acknowledges);
 
 		/* TODO: only check for count? */
 		if (promote_ticket_state(tk)) {
 			ticket_activate_timeout(tk);
 			return ticket_broadcast_proposed_state(tk, OP_PROPOSING);
 		}
+
+		/* Wait for further data */
+		return 0;
 	}
 
-	/* Wait for further data */
+
+	/* Packet just delayed? Silently ignore. */
+	if (ballot == tk->last_ack_ballot &&
+			(new_owner == tk->owner ||
+			 new_owner == tk->proposed_owner))
+		return 0;
+
+	/* Message sent to wrong host? */
+	log_debug("got unexpected PROMISE from %s for \"%s\"",
+			from->addr_string, tk->name);
+
 	return 0;
 }
 
@@ -173,34 +252,44 @@ inline static int answer_PROP(
 		struct ticket_config *tk,
 		struct booth_site *from,
 		struct boothc_ticket_msg *msg,
-		int cmd, uint32_t ballot,
+		uint32_t ballot,
 		struct booth_site *new_owner)
 {
 	if (!(local->role & ACCEPTOR))
 		return 0;
 
+	if (from == tk->proposer &&
+			ballot == tk->new_ballot)
+		goto accepting;
+
 	/* We have to be careful here.
 	 * Getting multiple copies of the same message must not trigger
 	 * rejections, but only repeated OP_ACCEPTING messages. */
-	if (ballot > tk->current_state.ballot &&
-			ballot == tk->proposed_state.ballot &&
-			ntohl(msg->ticket.prev_ballot) == tk->current_state.ballot) {
+	if (ballot > tk->last_ack_ballot &&
+			ballot == tk->new_ballot &&
+			ntohl(msg->ticket.prev_ballot) == tk->last_ack_ballot) {
+		if (tk->proposer) {
+			/* Send OP_REJECTED to previous proposer? */
+			log_info("new PROPOSAL for ticket \"%s\" overriding older one from %s",
+					tk->name, from->addr_string);
+		}
 
-		tk->proposed_state.proposer = from;
+		tk->proposer = from;
 
-		init_ticket_msg(msg, OP_ACCEPTING, RLT_SUCCESS,
-				tk, &tk->proposed_state);
+accepting:
+		init_ticket_msg(msg, OP_ACCEPTING, RLT_SUCCESS, tk);
 
 		log_info("ACCEPTING for ticket \"%s\" (by %s) for %d - new owner %s",
 				tk->name, from->addr_string, ballot,
 				ticket_owner_string(new_owner));
 	} else {
-		msg->ticket.ballot = htonl(tk->current_state.ballot);
-		msg->header.cmd = htonl(OP_REJECTED);
+		msg->header.cmd         = htonl(OP_REJECTED);
+		msg->ticket.ballot      = htonl(tk->new_ballot);
+		msg->ticket.prev_ballot = htonl(tk->last_ack_ballot);
 
 		log_info("REJECTING (prop) for ticket \"%s\" from %s - have %d, wanted %d",
 				tk->name, from->addr_string,
-				tk->current_state.ballot, ballot);
+				tk->new_ballot, ballot);
 	}
 	init_header_bare(&msg->header);
 	return booth_udp_send(from, msg, sizeof(*msg));
@@ -208,91 +297,52 @@ inline static int answer_PROP(
 
 
 /** After enough OP_ACCEPTING we can do the change, and send an OP_COMMITTED. */
-inline static int answer_ACC(
+inline static int got_an_ACC(
 		struct ticket_config *tk,
 		struct booth_site *from,
 		struct boothc_ticket_msg *msg,
-		int cmd, uint32_t ballot,
+		uint32_t ballot,
 		struct booth_site *new_owner)
 {
 	int rv;
 
-	if (tk->state == OP_PROPOSING) {
-		tk->proposed_state.acknowledges |= from->bitmask;
+	if (tk->proposer == local &&
+			tk->state == OP_PROPOSING) {
+		tk->proposal_acknowledges |= from->bitmask;
 
 		log_info("Got ACCEPTING from %s for \"%s\", now %" PRIx64,
 				from->addr_string, tk->name,
-				tk->proposed_state.acknowledges);
+				tk->proposal_acknowledges);
 
 		/* TODO: only check for count? */
 		if (promote_ticket_state(tk)) {
-			/* Get previous value for next round */
-			tk->proposed_state.prev_ballot =
-				tk->current_state.prev_ballot = tk->current_state.ballot;
+			change_ticket_owner(tk, tk->new_ballot, tk->proposed_owner);
 
-			tk->current_state.ballot =
-				tk->proposed_state.ballot;
-
-			tk->current_state.owner =
-				tk->proposed_state.owner;
-
-			tk->current_state.expires = time(NULL) + tk->expiry;
-
-			/* TODO */
-			tk->next_cron = time(NULL) +
-				tk->current_state.owner == local ?
-				tk->expiry / 2 : tk->expiry;
-
-			log_info("Now actively COMMITTED for \"%s\", new owner %s",
-					tk->name,
-					ticket_owner_string(tk->current_state.owner));
-
-			ticket_write(tk);
 			rv = ticket_broadcast_proposed_state(tk, OP_COMMITTED);
-
-			tk->state = ST_STABLE;
 			return rv;
 		}
 	}
 
-	/* Wait for further data */
 	return 0;
-
-
 }
+
 
 /** An OP_COMMITTED gets no answer; just record the new state. */
 inline static int answer_COMM(
 		struct ticket_config *tk,
 		struct booth_site *from,
 		struct boothc_ticket_msg *msg,
-		int cmd, uint32_t ballot,
+		uint32_t ballot,
 		struct booth_site *new_owner)
 {
-	log_info("COMMITTED for ticket \"%s\", ballot %d, from %s, new owner %s",
-			tk->name, ballot,
-			from->addr_string, ticket_owner_string(new_owner) );
+	/* We cannot check whether the packet is from an expected proposer -
+	 * perhaps this is the _only_ message of the whole handshake? */
 
-	tk->proposed_state.prev_ballot =
-		tk->current_state.prev_ballot = tk->current_state.ballot;
+	if (ballot > tk->new_ballot &&
+			ntohl(msg->ticket.prev_ballot) == tk->last_ack_ballot) {
+		change_ticket_owner(tk, ballot, new_owner);
+	}
 
-	tk->proposed_state.ballot =
-		tk->current_state.ballot = ballot;
-
-	tk->proposed_state.owner =
-		tk->current_state.owner = new_owner;
-
-	tk->state = ST_STABLE;
-
-	tk->current_state.expires =
-		tk->proposed_state.expires = time(NULL) + tk->expiry;
-
-	/* Nothing to do? */
-	tk->next_cron = time(NULL) +
-		tk->current_state.owner == local ?
-		tk->expiry / 2 : tk->expiry;
-
-	ticket_write(tk);
 	/* Send ack? */
 	return 0;
 
@@ -301,23 +351,16 @@ inline static int answer_COMM(
 /** @} */
 
 
-int paxos_answer(struct boothc_ticket_msg *msg, struct ticket_config *tk,
-		struct booth_site *from)
+int paxos_answer(
+		struct ticket_config *tk,
+		struct booth_site *from,
+		struct boothc_ticket_msg *msg,
+		uint32_t ballot,
+		struct booth_site *new_owner_p)
 {
 	int cmd;
-	uint32_t ballot, new_owner;
-	struct booth_site *new_owner_p;
-
 
 	cmd = ntohl(msg->header.cmd);
-	ballot = ntohl(msg->ticket.ballot);
-
-	new_owner = ntohl(msg->ticket.owner);
-	if (!find_site_by_id(new_owner, &new_owner_p)) {
-		log_error("Message with unknown owner %x received", new_owner);
-		return -EINVAL;
-	}
-
 
 	/* These are in roughly chronological order.
 	 * What the first machine sends is an OP_PREPARING
@@ -325,22 +368,22 @@ int paxos_answer(struct boothc_ticket_msg *msg, struct ticket_config *tk,
 	 * (below) from the others ... */
 	switch (cmd) {
 		case OP_PREPARING:
-			return answer_PREP(tk, from, msg, cmd, ballot, new_owner_p);
+			return answer_PREP(tk, from, msg, ballot, new_owner_p);
 
 		case OP_REJECTED:
-			return answer_REJ(tk, from, msg, cmd, ballot, new_owner_p);
+			return answer_REJ(tk, from, msg, ballot, new_owner_p);
 
 		case OP_PROMISING:
-			return answer_PROM(tk, from, msg, cmd, ballot, new_owner_p);
+			return got_a_PROM(tk, from, msg, ballot, new_owner_p);
 
 		case OP_PROPOSING:
-			return answer_PROP(tk, from, msg, cmd, ballot, new_owner_p);
+			return answer_PROP(tk, from, msg, ballot, new_owner_p);
 
 		case OP_ACCEPTING:
-			return answer_ACC(tk, from, msg, cmd, ballot, new_owner_p);
+			return got_an_ACC(tk, from, msg, ballot, new_owner_p);
 
 		case OP_COMMITTED:
-			return answer_COMM(tk, from, msg, cmd, ballot, new_owner_p);
+			return answer_COMM(tk, from, msg, ballot, new_owner_p);
 
 		default:
 			log_error("unprocessed message, cmd %x", cmd);

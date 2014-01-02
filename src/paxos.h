@@ -29,8 +29,14 @@
 #define LEARNER		0x1
 
 
-int paxos_answer(struct boothc_ticket_msg *msg, struct ticket_config *tk,
-		struct booth_site *from);
+int paxos_answer(
+		struct ticket_config *tk,
+		struct booth_site *from,
+		struct boothc_ticket_msg *msg,
+		uint32_t ballot,
+		struct booth_site *new_owner_p);
+
 int paxos_start_round(struct ticket_config *tk, struct booth_site *new_owner);
+void abort_proposal(struct ticket_config *tk);
 
 #endif /* _PAXOS_H */

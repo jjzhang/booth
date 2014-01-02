@@ -43,7 +43,7 @@ inline static int ticket_valid_for(const struct ticket_config *tk)
 {
 	int left;
 
-	left = tk->current_state.expires - time(NULL);
+	left = tk->expires - time(NULL);
 	return (left < 0) ? 0 : left;
 }
 
@@ -51,7 +51,7 @@ inline static int ticket_valid_for(const struct ticket_config *tk)
 /** Returns number of seconds left, if any. */
 inline static int owner_and_valid(const struct ticket_config *tk)
 {
-	if (tk->current_state.owner != local)
+	if (tk->owner != local)
 		return 0;
 
 	return ticket_valid_for(tk);
@@ -79,7 +79,7 @@ static inline void init_ticket_site_header(struct boothc_ticket_msg *msg, int cm
 
 static inline void init_ticket_msg(struct boothc_ticket_msg *msg,
 		int cmd, int rv,
-		struct ticket_config *tk, struct ticket_paxos_state *ps)
+		struct ticket_config *tk)
 {
 	assert(sizeof(msg->ticket.id) == sizeof(tk->name));
 
@@ -91,20 +91,84 @@ static inline void init_ticket_msg(struct boothc_ticket_msg *msg,
 		memcpy(msg->ticket.id, tk->name, sizeof(msg->ticket.id));
 
 		msg->ticket.expiry      = htonl(ticket_valid_for(tk));
-		msg->ticket.owner       = htonl(get_node_id(ps->owner));
-		msg->ticket.ballot      = htonl(ps->ballot);
-		msg->ticket.prev_ballot = htonl(ps->prev_ballot);
+		msg->ticket.owner       = htonl(get_node_id(tk->owner));
+		msg->ticket.ballot      = htonl(tk->new_ballot);
+		msg->ticket.prev_ballot = htonl(tk->last_ack_ballot);
 	}
 }
 
 
-static inline struct booth_transport const *transport(void) {
+static inline struct booth_transport const *transport(void)
+{
 	return booth_transport + booth_conf->proto;
 }
 
 
-static inline const char *ticket_owner_string(struct booth_site *site) {
+static inline const char *ticket_owner_string(struct booth_site *site)
+{
 	return site ? site->addr_string : "NONE";
 }
+
+
+static inline void disown_ticket(struct ticket_config *tk)
+{
+	tk->owner = NULL;
+	tk->proposed_owner = NULL;
+	tk->expires = 0;
+}
+
+static inline void disown_if_expired(struct ticket_config *tk)
+{
+	if (time(NULL) >= tk->expires || !tk->proposed_owner)
+		disown_ticket(tk);
+}
+
+
+static inline int promote_ticket_state(struct ticket_config *tk)
+{
+	/* Use ">" to get majority decision, even for an even number
+	 * of participants. */
+	return __builtin_popcount(tk->proposal_acknowledges) * 2 >
+			booth_conf->site_count;
+}
+
+
+/* We allow half of the uint32_t to be used;
+ * half of that below, half of that above the current known "good" value.
+ *   0                                                     UINT32_MAX
+ *   |--------------------------+----------------+------------|
+ *                              |        |       |
+ *                              |--------+-------| allowed range
+ *                                       |
+ *                                       current ballot
+ *
+ * So, on overflow it looks like that:
+ *                                UINT32_MAX  0
+ *   |--------------------------+-----------||---+------------|
+ *                              |        |       |
+ *                              |--------+-------| allowed range
+ *                                       |
+ *                                       current ballot
+ *
+ * This should be possible by using the same datatype and relying
+ * on the under/overflow semantics. */
+static inline int ballot_is_higher_than(uint32_t b_high, uint32_t b_low)
+{
+	uint32_t diff;
+
+	if (b_high == b_low)
+		return 0;
+
+	diff = b_high - b_low;
+	if (diff < UINT32_MAX/4)
+		return 1;
+
+	diff = b_low - b_high;
+	if (diff < UINT32_MAX/4)
+		return 0;
+
+	assert(!"ballot out of range - invalid");
+}
+
 
 #endif

@@ -48,22 +48,11 @@ int do_revoke_ticket(struct ticket_config *tk);
 int find_ticket_by_name(const char *ticket, struct ticket_config **found);
 
 
-/** @{
- * These functions do sanity checks, and prepare an answer
- * in the given msg place.
- * Sending is done by upper layers. 
- */
-int ticket_answer_catchup(struct boothc_ticket_msg *msg, struct ticket_config *tk);
-/** @} */
-
 int ticket_answer_list(int fd, struct boothc_ticket_msg *msg);
 int ticket_answer_grant(int fd, struct boothc_ticket_msg *msg);
 int ticket_answer_revoke(int fd, struct boothc_ticket_msg *msg);
 
-int ticket_process_catchup(struct boothc_ticket_msg *msg, struct ticket_config *tk,
-		struct booth_site *sender);
 int ticket_broadcast_proposed_state(struct ticket_config *tk, cmd_request_t state);
-int promote_ticket_state(struct ticket_config *tk);
 
 int ticket_write(struct ticket_config *tk);
 
@@ -71,13 +60,20 @@ void process_tickets(void);
 void tickets_log_info(void);
 
 
+static inline void ticket_next_cron_at(struct ticket_config *tk, time_t when)
+{
+	tk->next_cron = when;
+}
+
 static inline void ticket_next_cron_in(struct ticket_config *tk, int seconds)
 {
-	tk->next_cron = time(NULL) + seconds;
+	ticket_next_cron_at(tk, time(NULL) + seconds);
 }
+
 
 static inline void ticket_activate_timeout(struct ticket_config *tk)
 {
+	/* TODO: increase timeout when no answers */
 	ticket_next_cron_in(tk, tk->timeout);
 }
 

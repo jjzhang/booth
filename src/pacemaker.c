@@ -76,9 +76,9 @@ static int crm_ticket_set(const struct ticket_config *tk, const char *attr, int6
 
 static void pcmk_store_ticket(struct ticket_config *tk)
 {
-	crm_ticket_set(tk, "owner", (int32_t)get_node_id(tk->current_state.owner));
-	crm_ticket_set(tk, "expires", tk->current_state.expires);
-	crm_ticket_set(tk, "ballot", tk->current_state.ballot);
+	crm_ticket_set(tk, "owner", (int32_t)get_node_id(tk->owner));
+	crm_ticket_set(tk, "expires", tk->expires);
+	crm_ticket_set(tk, "ballot", tk->last_ack_ballot);
 }
 
 
@@ -127,41 +127,32 @@ static void pcmk_load_ticket(struct ticket_config *tk)
 {
 	int rv;
 	int64_t v;
-	time_t now;
-	struct ticket_paxos_state *tps;
 
 
 	rv = crm_ticket_get(tk, "expires", &v);
 	if (!rv) {
-		tk->proposed_state.expires = v;
+		tk->expires = v;
 	}
 
 	rv = crm_ticket_get(tk, "ballot", &v);
 	if (!rv) {
-		tk->proposed_state.ballot =
-			tk->proposed_state.prev_ballot = v;
+		tk->new_ballot =
+			tk->last_ack_ballot = v;
 	}
 
 	rv = crm_ticket_get(tk, "owner", &v);
 	if (!rv) {
 		/* No check, node could have been deconfigured. */
-		find_site_by_id(v, &tk->proposed_state.owner);
+		find_site_by_id(v, &tk->proposed_owner);
 	}
 
 
-	time(&now);
-	tps = &tk->proposed_state;
-	if (now >= tps->expires ||
-			!tps->owner) {
-		tps->owner = NULL;
-		tps->expires = 0;
-	}
+	disown_if_expired(tk);
 
-	tps->acknowledges = local->bitmask;
+	tk->proposal_acknowledges = local->bitmask;
 
-	/* We load only when the state is completely unknown,
-	 * so make that current, too. */
-	tk->current_state = tk->proposed_state;
+	/* We load only when the state is completely unknown. */
+	tk->state = ST_INIT;
 
 	return;
 }

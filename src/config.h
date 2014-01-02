@@ -32,28 +32,13 @@
 #define TICKET_ALLOC	16
 
 
-struct ticket_paxos_state {
-	/** Who tries to change the current status. */
-	struct booth_site *proposer;
-
-	/** Current owner of ticket. */
-	struct booth_site *owner;
-
-	/** Timestamp of expiration. */
-	time_t expires;
-
-
-	/** Current ballot number. Might be < prev_ballot if overflown. */
-	uint32_t ballot;
-	/** Previous ballot. */
-	uint32_t prev_ballot;
-
-	/** Bitmap of sites that acknowledge that state. */
-	uint64_t acknowledges;
-};
+#define RETRIES  10
 
 
 struct ticket_config {
+	/** \name Configuration items.
+	 * @{ */
+	/** Name of ticket. */
 	boothc_ticket name;
 
 	/** How many seconds until expiration. */
@@ -68,15 +53,54 @@ struct ticket_config {
 	int acquire_after;
 
 
-	/** State. */
+	/** Node weights. */
+	int weight[MAX_NODES];
+	/** @} */
+
+
+	/** \name Runtime values.
+	 * @{ */
+	/** Current state. */
 	cmd_request_t state;
 
-	int weight[MAX_NODES];
-
+	/** When something has to be done */
 	time_t next_cron;
 
-	struct ticket_paxos_state current_state;
-	struct ticket_paxos_state proposed_state;
+	/** Current owner of ticket. */
+	struct booth_site *owner;
+
+	/** Timestamp of expiration. */
+	time_t expires;
+
+	/** Last ballot number that was agreed on. */
+	uint32_t last_ack_ballot;
+	/** @} */
+
+
+	/** \name Needed while proposals are being done.
+	 * @{ */
+	/** Who tries to change the current status. */
+	struct booth_site *proposer;
+
+	/** Current owner of ticket. */
+	struct booth_site *proposed_owner;
+
+	/** New/current ballot number.
+	 * Might be < prev_ballot if overflown.
+	 * This only every goes "up" (logically). */
+	uint32_t new_ballot;
+
+	/** Bitmap of sites that acknowledge that state. */
+	uint64_t proposal_acknowledges;
+
+	/** Timestamp of proposal expiration. */
+	time_t proposal_expires;
+
+	/** Number of send retries left.
+	 * Used on the new owner.
+	 * Starts at 0, counts up. */
+	int retry_number;
+	/** @} */
 };
 
 
