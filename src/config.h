@@ -62,6 +62,12 @@ struct ticket_config {
 	/** Network related timeouts. */
 	int timeout;
 
+	/** If >0, time to wait for a site to get fenced.
+	 * The ticket may be acquired after that timespan by
+	 * another site. */
+	int acquire_after;
+
+
 	/** State. */
 	cmd_request_t state;
 

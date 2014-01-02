@@ -466,6 +466,18 @@ no_value:
 				last_ticket->timeout = defaults.timeout;
 		}
 
+		if (strcmp(key, "acquire-after") == 0) {
+			defaults.acquire_after = strtol(val, &s, 0);
+			if (*s || s == val || defaults.acquire_after<1) {
+				error = "Expected plain integer value >=1 for acquire-after";
+				goto err;
+			}
+
+			if (last_ticket)
+				last_ticket->acquire_after = defaults.acquire_after;
+		}
+
+
 		if (strcmp(key, "weights") == 0) {
 			if (parse_weights(val, defaults.weight) < 0)
 				goto out;
