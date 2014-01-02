@@ -158,8 +158,8 @@ ticket="ticketB"
         lines = l.readlines()
         l.close()
         self.assertEqual(len(lines), 1, "Lock file should contain one line")
-        pid = lines[0].rstrip()
-        print "lockfile contains: %s" % pid
+        pid = re.search('\\bbooth_pid="?(\\d+)"?', lines[0]).group(1)
+        print "lockfile contains: <%s>" % pid
         return pid
 
     def is_pid_running_daemon(self, pid):
