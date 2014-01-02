@@ -42,6 +42,10 @@ if __name__ == '__main__':
         runner_args['failfast'] = True
         pass
 
+    # not root anymore, so safe
+    # needed because old instances might still use the UDP port.
+    os.system("killall boothd")
+
     runner = unittest.TextTestRunner(**runner_args)
     result = runner.run(suite)
 
