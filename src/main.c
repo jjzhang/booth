@@ -855,16 +855,7 @@ static int read_arguments(int argc, char **argv)
 		cl.type = CLIENT;
 		op = argv[1];
 		optind = 2;
-	}
 
-	switch (cl.type) {
-	case ARBITRATOR:
-		break;
-
-	case SITE:
-		break;
-
-	case CLIENT:
 		if (!strcmp(op, "list"))
 			cl.op = OP_LIST;
 		else if (!strcmp(op, "grant"))
@@ -873,10 +864,9 @@ static int read_arguments(int argc, char **argv)
 			cl.op = OP_REVOKE;
 		else {
 			fprintf(stderr, "client operation \"%s\" is unknown\n",
-				op);
+					op);
 			exit(EXIT_FAILURE);
 		}
-		break;
 	}
 
 	while (optind < argc) {
