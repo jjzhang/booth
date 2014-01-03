@@ -855,7 +855,9 @@ static int read_arguments(int argc, char **argv)
 		cl.type = CLIENT;
 		op = argv[1];
 		optind = 2;
+    }
 
+    if (cl.type == CLIENT) {
 		if (!strcmp(op, "list"))
 			cl.op = OP_LIST;
 		else if (!strcmp(op, "grant"))
