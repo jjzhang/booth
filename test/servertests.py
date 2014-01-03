@@ -53,6 +53,8 @@ class ServerTests(ServerTestEnvironment):
                            config_text=self.working_config)
 
     def test_missing_quotes(self):
+	# quotes no longer required
+	return True
         orig_lines = self.working_config.split("\n")
         for i in xrange(len(orig_lines)):
             new_lines = copy.copy(orig_lines)
@@ -128,12 +130,13 @@ class ServerTests(ServerTestEnvironment):
                                 self.working_config, 1)
             (pid, ret, stdout, stderr, runner) = \
                 self.run_booth(config_text=new_config, expected_exitcode=1, expected_daemon=False)
-            self.assertRegexpMatches(
-                self.read_log(),
-                'invalid config file format: unquoted whitespace'
-            )
+            self.assertRegexpMatches(stderr, 'ticket name "' + ticket + '" invalid')
 
     def test_unreachable_peer(self):
+	# what should this test do? daemon not expected, but no exitcode either?
+	# booth would now just run, and try to reach that peer...
+	# TCP reachability is not required during startup anymore.
+	return True
         config = re.sub('#(.+147.+)', lambda m: m.group(1), self.working_config)
         self.run_booth(config_text=config,
                        expected_exitcode=None, expected_daemon=False)

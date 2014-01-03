@@ -25,7 +25,7 @@ class BoothAssertions:
         """Fail the test unless the text matches the regular expression."""
         if isinstance(expected_regexp, basestring):
             expected_regexp = re.compile(expected_regexp)
-        if not expected_regexp.search(text):
+        if not expected_regexp.search(text, MULTILINE):
             msg = msg or "Regexp didn't match"
             msg = '%s: %r not found in %r' % (msg, expected_regexp.pattern, text)
             raise self.failureException(msg)
