@@ -145,14 +145,15 @@ out:
 }
 
 
-inline static const char *skip_while_in(const char *cp, int (*fn)(int), const char *allowed)
+inline static char *skip_while_in(const char *cp, int (*fn)(int), const char *allowed)
 {
 	/* strchr() returns a pointer to the terminator if *cp == 0. */
 	while (*cp &&
 			(fn(*cp) ||
 			 strchr(allowed, *cp)))
 		cp++;
-	return cp;
+	/* discard "const" qualifier */
+	return (char*)cp;
 }
 
 
