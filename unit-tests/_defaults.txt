@@ -34,9 +34,18 @@ ticket:
 # sender is a peer, and it wants something.
 message:
 
-    header.id       "ticket"
-    owner           -1
-    ballot          0
-    prev_ballot     0
-    expiry          0
+    header.id               "ticket"
+    # invalid by default
+    header.cmd              -1
+    # invalid by default
+    header.result           1
+    # invalid by default
+    header.from             -1
+    header.version          htonl(BOOTHC_VERSION)
+    header.magic            htonl(BOOTHC_MAGIC)
+    header.length           sizeof(struct boothc_ticket_msg)
+    ticket.owner            -1
+    ticket.ballot           0
+    ticket.prev_ballot      0
+    ticket.expiry           0
 
