@@ -10,8 +10,8 @@ sbin_PROGRAMS		= boothd
 boothd_SOURCES	 	= config.c main.c paxos.c ticket.c  transport.c \
 			  pacemaker.c
 
-#boothd_LDLIBS		= -lplumbgpl # doesn't work?
-boothd_LDFLAGS		= $(OS_DYFLAGS) -L./ -lplumbgpl -lz
+boothd_LDFLAGS		= $(OS_DYFLAGS) -L./
+boothd_LDADD		= -lplumb -lplumbgpl -lz
 boothd_CPPFLAGS		= $(GLIB_CFLAGS)
 
 noinst_HEADERS		= booth.h pacemaker.h \

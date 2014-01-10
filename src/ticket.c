@@ -515,7 +515,7 @@ void process_tickets(void)
 		if (0)
 		log_debug("ticket %s next cron %" PRIx64 ", now %" PRIx64 ", in %" PRIi64,
 				tk->name, (uint64_t)tk->next_cron, (uint64_t)now,
-				tk->next_cron - now);
+				(int64_t)tk->next_cron - now);
 		if (tk->next_cron > now)
 			continue;
 
