@@ -254,6 +254,7 @@ class UT():
             self.send_cmd("set variable " + name + " = " + numeric_conv + "(" + value + ")")
         else:
             self.send_cmd("set variable " + name + " = " + value)
+        logging.debug("set_val %s done" % name)
 # }}} GDB communication
 
 
@@ -265,17 +266,28 @@ class UT():
 # {{{ High-level functions.
 # Generally, GDB is attached to BOOTHD, and has it stopped.
     def set_state(self, kv):
+        #os.system("strace -f -tt -s 2000 -e write -p" + str(self.gdb.pid) + " &")
         for n, v in kv.iteritems():
             self.set_val( self.translate_shorthand(n, "ticket"), v)
-        self.set_val( self.translate_shorthand(n, "ticket"), v)
         logging.info("set state")
 
-    def wait_for_function(self, fn):
-        print self.sync(timeout=1);
-        while True:
-            self.continue_debuggee(timeout=2)
 
-            stopped_at = self.sync() 
+    def user_debug(self):
+        while True:
+            x = sys.stdin.readline()
+            if not x:
+                break
+            self.send_cmd(x)
+        sys.exit(0)
+ 
+
+    def wait_for_function(self, fn):
+        while True:
+            stopped_at = self.continue_debuggee(timeout=2)
+            if not stopped_at:
+                self.user_debug()
+            if re.match(r"^Program received signal SIGSEGV,", stopped_at):
+                self.user_debug()
             if re.match(r"^Breakpoint \d+, " + fn, stopped_at):
                 break
 
