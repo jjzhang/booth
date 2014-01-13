@@ -21,11 +21,33 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <inttypes.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include "log.h"
 #include "pacemaker.h"
 #include "inline-fn.h"
 
 #define COMMAND_MAX	256
+
+
+static const char * interpret_rv(int rv)
+{
+	static char text[64];
+	int p;
+
+
+	if (rv == 0)
+		return "0";
+
+	p = sprintf(text, "rv %d", WEXITSTATUS(rv));
+
+	if (WIFSIGNALED(rv))
+		sprintf(text + p, "  signal %d", WTERMSIG(rv));
+
+	return text;
+}
+
+
 
 static void pcmk_grant_ticket(struct ticket_config *tk)
 {
@@ -37,7 +59,7 @@ static void pcmk_grant_ticket(struct ticket_config *tk)
 	log_info("command: '%s' was executed", cmd);
 	rv = system(cmd);
 	if (rv != 0)
-		log_error("error: \"%s\" failed, rv %d", cmd, rv);
+		log_error("error: \"%s\" failed, rv %s", cmd, interpret_rv(rv));
 }
 
 static void pcmk_revoke_ticket(struct ticket_config *tk)
@@ -50,7 +72,7 @@ static void pcmk_revoke_ticket(struct ticket_config *tk)
 	log_info("command: '%s' was executed", cmd);
 	rv = system(cmd);
 	if (rv != 0)
-		log_error("error: \"%s\" failed, rv %d", cmd, rv);
+		log_error("error: \"%s\" failed, rv %s", cmd, interpret_rv(rv));
 }
 
 
@@ -68,7 +90,7 @@ static int crm_ticket_set(const struct ticket_config *tk, const char *attr, int6
 			(rv = system(cmd));
 			i++) ;
 
-	log_info("'%s' gave result %d", cmd, rv);
+	log_info("'%s' gave result %s", cmd, interpret_rv(rv));
 
 	return rv;
 }
@@ -118,7 +140,7 @@ static int crm_ticket_get(struct ticket_config *tk,
 
 out:
 	rv = pclose(p);
-	log_info("command \"%s\" returned rv %d, value %" PRIi64, cmd, rv, v);
+	log_info("command \"%s\" returned rv %s, value %" PRIi64, cmd, interpret_rv(rv), v);
 	return rv;
 }
 
