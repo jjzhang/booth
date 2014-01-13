@@ -926,7 +926,7 @@ static int read_arguments(int argc, char **argv)
 					safe_copy(cl.site, optarg, sizeof(cl.site), "site name");
 				}
 			} else {
-				print_usage();
+				log_error("\"-s\" not allowed in daemon mode.");
 				exit(EXIT_FAILURE);
 			}
 			break;
