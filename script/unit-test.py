@@ -25,6 +25,8 @@ class UT():
     booth = None
     prompt = "CUSTOM-GDB-PROMPT-%d-%d" % (os.getpid(), time.time())
 
+    dont_log_expect = 0
+
     @classmethod
     def _filename(cls, desc):
         return "/tmp/booth-unittest.%s" % desc
@@ -79,12 +81,10 @@ class UT():
         global default_log_format
         global default_log_datefmt
 
-        this_test_log = logging.FileHandler( **args )
+        this_test_log = logging.FileHandler( mode = "w", **args )
         this_test_log.setFormatter(
                 logging.Formatter(fmt = default_log_format,
                     datefmt = default_log_datefmt) )
-        # in the specific files we want ALL information
-        this_test_log.setLevel(logging.DEBUG)
         
         this_test_log.emit(
                 logging.makeLogRecord( { 
@@ -92,6 +92,9 @@ class UT():
                     "lineno": 0,
                     "levelname": "None",
                     "level": None,} ) )
+
+        # in the specific files we want ALL information
+        this_test_log.setLevel(logging.DEBUG)
 
         logging.getLogger('').addHandler(this_test_log)
         return this_test_log
@@ -105,6 +108,7 @@ class UT():
             try:
                 log = self.setup_log(filename = UT._filename(f))
 
+                log.setLevel(logging.DEBUG)
                 logging.warn("running test %s" % f)
                 self.start_processes()
 
@@ -136,11 +140,13 @@ class UT():
 
         answer = self.gdb.before
 
+        self.dont_log_expect += 1
         # be careful not to use RE characters like +*.[] etc.
-        r = '---ATH' + str(random.randint(0, 2**20)) + '---'
-        self.gdb.sendline("print '" + r + "'")
+        r = str(random.randint(2**19, 2**20))
+        self.gdb.sendline("print " + r)
         self.gdb.expect(r, timeout)
         self.gdb.expect(self.prompt, timeout)
+        self.dont_log_expect -= 1
         return answer
 
     def stop_processes(self):
@@ -155,6 +161,23 @@ class UT():
         if self.booth:
             self.booth.close( force=self.booth.isalive() )
 
+
+    # needed for use as pexpect.logfile
+    def flush(self, *arg):
+        pass
+    # needed for use as pexpect.logfile
+    def write(self, stg):
+        if self.dont_log_expect == 0:
+            # TODO: split by input/output, give program
+            for line in re.split(r"[\r\n]+", stg):
+                if line == self.prompt:
+                    continue
+                if line == "":
+                    continue
+                #print " >> " + line
+                logging.debug("  >> " + line)
+
+
     def start_processes(self):
         self.booth = pexpect.spawn(self.binary,
                 args = [ "daemon", "-D",
@@ -166,6 +189,7 @@ class UT():
                     [('PATH',
                         self.test_base + "/bin/:" +
                         os.getenv('PATH'))] ),
+                logfile = self,     # works because of write() above
                 timeout = 30,
                 maxread = 32768)
         logging.info("started booth with PID %d, lockfile %s" % (self.booth.pid, self.lockfile))
@@ -177,6 +201,7 @@ class UT():
                     "-p", str(self.booth.pid),
                     "-nx", "-nh",   # don't use .gdbinit
                     ],
+                logfile = self,     # works because of write() above
                 timeout = 30,
                 maxread = 32768)
         logging.info("started GDB with PID %d" % self.gdb.pid)
@@ -191,7 +216,7 @@ class UT():
         self.check_value("local->site_id", self.this_site_id);
         
         # Now we're set up.
-        self.send_cmd("breakpoint booth_udp_send")
+        self.send_cmd("break booth_udp_send")
         self.send_cmd("breakpoint booth_udp_broadcast")
         self.send_cmd("breakpoint process_recv")
 
@@ -253,18 +278,26 @@ if __name__ == '__main__':
         sys.stderr.write("Must be run non-root; aborting.\n")
         sys.exit(1)
 
-    # http://stackoverflow.com/questions/9321741/printing-to-screen-and-writing-to-a-file-at-the-same-time
-    logging.basicConfig(filename = UT._filename('seq'),
+
+    ut = UT(sys.argv[1], sys.argv[2] + "/")
+
+    # "master" log object needs max level
+    logging.basicConfig(level = logging.DEBUG,
             format = default_log_format,
-            datefmt = default_log_datefmt,
-            level = logging.INFO)
+            datefmt = default_log_datefmt)
+
+
+    overview_log = ut.setup_log( filename = UT._filename('seq') )
+    overview_log.setLevel(logging.WARN)
+
+    # http://stackoverflow.com/questions/9321741/printing-to-screen-and-writing-to-a-file-at-the-same-time
     console = logging.StreamHandler()
     console.setLevel(logging.WARN)
     console.setFormatter(logging.Formatter('%(levelname)-8s: %(message)s'))
-
     logging.getLogger('').addHandler(console)
+
+ 
     logging.info("Starting boothd unit tests.")
 
-    ut = UT(sys.argv[1], sys.argv[2] + "/")
     ret = ut.run()
     sys.exit(ret)
