@@ -7,8 +7,33 @@ import re, shutil, pexpect, logging
 import random, copy, glob
 
 
-default_log_format = '%(asctime)s  %(funcName)15s:%(lineno)03d  %(levelname)8s | %(message)s'
+# Don't make that much sense - function/line is write().
+# Would have to use traceback.extract_stack() manually.
+#   %(funcName)10.10s:%(lineno)3d  %(levelname)8s 
+default_log_format = '%(asctime)s: %(message)s'
 default_log_datefmt = '%b %d %H:%M:%S'
+
+
+# needed for use as pexpect.logfile, to relay into existing logfiles
+class expect_logging():
+    prefix = ""
+    test = None
+
+    def __init__(self, pre, inst):
+        self.prefix = pre
+        self.test = inst
+
+    def flush(self, *arg):
+        pass
+    def write(self, stg):
+        if self.test.dont_log_expect == 0:
+            # TODO: split by input/output, give program
+            for line in re.split(r"[\r\n]+", stg):
+                if line == self.test.prompt:
+                    continue
+                if line == "":
+                    continue
+                logging.debug("  " + self.prefix + "  " + line)
 
 
 class UT():
@@ -162,21 +187,6 @@ class UT():
             self.booth.close( force=self.booth.isalive() )
 
 
-    # needed for use as pexpect.logfile
-    def flush(self, *arg):
-        pass
-    # needed for use as pexpect.logfile
-    def write(self, stg):
-        if self.dont_log_expect == 0:
-            # TODO: split by input/output, give program
-            for line in re.split(r"[\r\n]+", stg):
-                if line == self.prompt:
-                    continue
-                if line == "":
-                    continue
-                #print " >> " + line
-                logging.debug("  >> " + line)
-
 
     def start_processes(self):
         self.booth = pexpect.spawn(self.binary,
@@ -189,9 +199,12 @@ class UT():
                     [('PATH',
                         self.test_base + "/bin/:" +
                         os.getenv('PATH'))] ),
-                logfile = self,     # works because of write() above
+                #logfile = expect_logging("?? boothd", self),
                 timeout = 30,
                 maxread = 32768)
+        self.booth.setecho(False)
+        self.booth.logfile_read = expect_logging("<-  boothd", self)
+        self.booth.logfile_send = expect_logging(" -> boothd", self)
         logging.info("started booth with PID %d, lockfile %s" % (self.booth.pid, self.lockfile))
         self.booth.expect(self.this_site, timeout=2)
         #print self.booth.before; exit
@@ -201,12 +214,16 @@ class UT():
                     "-p", str(self.booth.pid),
                     "-nx", "-nh",   # don't use .gdbinit
                     ],
-                logfile = self,     # works because of write() above
                 timeout = 30,
+                #logfile = expect_logging("?? gdb", self),
                 maxread = 32768)
+        self.gdb.setecho(False)
+        self.gdb.logfile_read = expect_logging("<-  gdb", self)
+        self.gdb.logfile_send = expect_logging(" -> gdb", self)
         logging.info("started GDB with PID %d" % self.gdb.pid)
         self.gdb.expect("(gdb)")
         self.gdb.sendline("set pagination off\n")
+        self.gdb.sendline("set verbose off\n") ## sadly to late for the initial "symbol not found" messages
         self.gdb.sendline("set prompt " + self.prompt + "\\n\n");
         self.sync(2000)
 
@@ -217,12 +234,13 @@ class UT():
         
         # Now we're set up.
         self.send_cmd("break booth_udp_send")
-        self.send_cmd("breakpoint booth_udp_broadcast")
-        self.send_cmd("breakpoint process_recv")
+        self.send_cmd("break booth_udp_broadcast")
+        self.send_cmd("break process_recv")
 
 
     # send a command to GDB, returning the GDB answer as string.
     def send_cmd(self, stg, timeout=-1):
+        # avoid logging the echo of our command 
         self.gdb.sendline(stg + "\n")
         return self.sync()
 
@@ -292,9 +310,9 @@ if __name__ == '__main__':
 
     # http://stackoverflow.com/questions/9321741/printing-to-screen-and-writing-to-a-file-at-the-same-time
     console = logging.StreamHandler()
-    console.setLevel(logging.WARN)
     console.setFormatter(logging.Formatter('%(levelname)-8s: %(message)s'))
     logging.getLogger('').addHandler(console)
+    console.setLevel(logging.WARN)
 
  
     logging.info("Starting boothd unit tests.")
