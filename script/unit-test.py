@@ -193,15 +193,16 @@ class UT():
         self.sync(2000)
 
         self.this_site_id = self.query_value("local->site_id")
-        self.this_port = self.query_value("boothd_config->port")
+        self.this_port = self.query_value("booth_conf->port")
 
         # do a self-test
         self.check_value("local->site_id", self.this_site_id);
         
         # Now we're set up.
+        self.send_cmd("break ticket_cron")
         self.send_cmd("break booth_udp_send")
         self.send_cmd("break booth_udp_broadcast")
-        self.send_cmd("break process_recv")
+        self.send_cmd("break recvfrom")
 # }}}
 
 
@@ -223,7 +224,7 @@ class UT():
     def send_cmd(self, stg, timeout=-1):
         # avoid logging the echo of our command 
         self.gdb.sendline(stg + "\n")
-        return self.sync()
+        return self.sync(timeout=timeout)
 
     def _query_value(self, which):
         val = self.send_cmd("print " + which)
@@ -257,22 +258,46 @@ class UT():
 
 
     # there has to be some event waiting, so that boothd stops again.
-    def continue_debuggee(timeout=30):
-        self.gdb.send_cmd("continue", timeout)
+    def continue_debuggee(self, timeout=30):
+        self.send_cmd("continue", timeout)
 
 
-# {{{ High-level functions
+# {{{ High-level functions.
+# Generally, GDB is attached to BOOTHD, and has it stopped.
     def set_state(self, kv):
         for n, v in kv.iteritems():
             self.set_val( self.translate_shorthand(n, "ticket"), v)
+        self.set_val( self.translate_shorthand(n, "ticket"), v)
         logging.info("set state")
 
+    def wait_for_function(self, fn):
+        print self.sync(timeout=1);
+        while True:
+            self.continue_debuggee(timeout=2)
+
+            stopped_at = self.sync() 
+            if re.match(r"^Breakpoint \d+, " + fn, stopped_at):
+                break
+
+    # We break, change the data, and return the correct size.
     def send_message(self, msg):
         udp_sock.sendto('a', (self.this_site, self.this_port))
-        self.continue_debuggee(timeout=2)
-
+        self.wait_for_function("recvfrom")
+        
+        # go to frame with "msg" variable
+        self.send_cmd("up")
+        # go back to correct frame, so that "return" returns to process_recv() 
+        #TODO
+        self.send_cmd("down")
+        # send new value.
+        # self.send_cmd() might not work, as boothd may not stop ???
+        # should stop somewhere?
+        self.send_cmd("return sizeof(struct boothc_ticket_msg)\n")
+ 
     def wait_outgoing(self, msg):
-        pass
+        self.wait_for_function("booth_udp_send")
+        #stopped_at = self.sync() 
+       
 
     def loop(self, data):
         matches = map(lambda k: re.match(r"^(outgoing|message)(\d+)$", k), data.iterkeys())
@@ -281,12 +306,16 @@ class UT():
         loop_max = max(nums)
         for counter in range(0, loop_max+1):    # incl. last message
             logging.info("Part " + str(counter))
-            msg = 'message%d' % counter
-            if data.has_key(msg):
-                self.send_message(data[msg])
-            out = 'outgoing%d' % counter
-            if data.has_key(msg):
-                self.wait_outgoing(data[msg])
+            kmsg = 'message%d' % counter
+            msg  = data.get(kmsg)
+            if msg:
+                logging.info("sending " + kmsg)
+                self.send_message(msg)
+            kout = 'outgoing%d' % counter
+            out  = data.get(kout)
+            if out:
+                logging.info("waiting for " + kout)
+                self.wait_outgoing(out)
 
     def run(self):
         os.chdir(self.test_base)
@@ -303,6 +332,7 @@ class UT():
                 test = self.read_test_input(f, m=copy.deepcopy(self.defaults))
                 self.set_state(test["ticket"])
                 self.loop(test)
+                logging.warn("test %s ends" % f)
             finally:
                 self.stop_processes()
                 if log:

@@ -15,7 +15,8 @@ ticket:
 
     # defaults for all tests
     state           ST_INIT
-    next_cron       time(0)+500
+    next_cron       0
+# time(0)+1
     # local is site[0] per convention
 
     owner           booth_conf->site[1]
