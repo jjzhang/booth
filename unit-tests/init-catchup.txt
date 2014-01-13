@@ -11,5 +11,3 @@ ticket:
 outgoing0:
     header.cmd   CMD_CATCHUP
 	#ticket.id ==
-	
-

@@ -2,7 +2,7 @@
 # vim: fileencoding=utf-8
 # see http://stackoverflow.com/questions/728891/correct-way-to-define-python-source-code-encoding
 
-import os, sys, time, signal, tempfile
+import os, sys, time, signal, tempfile, socket
 import re, shutil, pexpect, logging
 import random, copy, glob
 
@@ -14,6 +14,7 @@ default_log_format = '%(asctime)s: %(message)s'
 default_log_datefmt = '%b %d %H:%M:%S'
 
 
+# {{{ pexpect-logging glue
 # needed for use as pexpect.logfile, to relay into existing logfiles
 class expect_logging():
     prefix = ""
@@ -34,15 +35,18 @@ class expect_logging():
                 if line == "":
                     continue
                 logging.debug("  " + self.prefix + "  " + line)
+# }}}
 
 
 class UT():
+# {{{ Members
     binary = None
     test_base = None
     lockfile = None
 
     defaults = None
 
+    this_port = None
     this_site = "127.0.0.1"
     this_site_id = None
 
@@ -52,6 +56,11 @@ class UT():
 
     dont_log_expect = 0
 
+    udp_sock = None
+# }}}
+
+
+# {{{ setup functions
     @classmethod
     def _filename(cls, desc):
         return "/tmp/booth-unittest.%s" % desc
@@ -63,6 +72,7 @@ class UT():
         self.test_base = os.path.realpath(dir) + "/"
         self.defaults = self.read_test_input(self.test_base + "_defaults.txt", state="ticket")
         self.lockfile = UT._filename("lock")
+        self.udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
 
     def read_test_input(self, file, state=None, m={ "ticket": {}, "message": {} } ):
@@ -94,14 +104,6 @@ class UT():
         return m
 
 
-    def set_state(self, kv):
-        for n, v in kv.iteritems():
-            self.set_val( self.translate_shorthand(n, "ticket"), v)
-
-    def loop(self, data):
-        pass
-
-
     def setup_log(self, **args):
         global default_log_format
         global default_log_datefmt
@@ -125,31 +127,6 @@ class UT():
         return this_test_log
 
 
-    def run(self):
-        os.chdir(self.test_base)
-        # TODO: sorted, random order
-        for f in filter( (lambda f: re.match(r"^\d\d\d_.*\.txt$", f)), glob.glob("*")):
-            log = None
-            try:
-                log = self.setup_log(filename = UT._filename(f))
-
-                log.setLevel(logging.DEBUG)
-                logging.warn("running test %s" % f)
-                self.start_processes()
-
-                test = self.read_test_input(f, m=copy.deepcopy(self.defaults))
-                self.set_state(test["ticket"])
-                self.loop(test)
-            finally:
-                self.stop_processes()
-                if log:
-                    log.close()
-            return
-
-    def run_one_test(file):
-        return
-
-
     # We want shorthand in descriptions, ie. "state"
     # instead of "booth_conf->ticket[0].state".
     def translate_shorthand(self, name, context):
@@ -160,19 +137,7 @@ class UT():
         assert(False)
 
 
-    def sync(self, timeout=-1):
-        self.gdb.expect(self.prompt, timeout)
 
-        answer = self.gdb.before
-
-        self.dont_log_expect += 1
-        # be careful not to use RE characters like +*.[] etc.
-        r = str(random.randint(2**19, 2**20))
-        self.gdb.sendline("print " + r)
-        self.gdb.expect(r, timeout)
-        self.gdb.expect(self.prompt, timeout)
-        self.dont_log_expect -= 1
-        return answer
 
     def stop_processes(self):
         if os.access(self.lockfile, os.F_OK):
@@ -228,6 +193,7 @@ class UT():
         self.sync(2000)
 
         self.this_site_id = self.query_value("local->site_id")
+        self.this_port = self.query_value("boothd_config->port")
 
         # do a self-test
         self.check_value("local->site_id", self.this_site_id);
@@ -236,14 +202,28 @@ class UT():
         self.send_cmd("break booth_udp_send")
         self.send_cmd("break booth_udp_broadcast")
         self.send_cmd("break process_recv")
+# }}}
 
 
-    # send a command to GDB, returning the GDB answer as string.
+# {{{ GDB communication
+    def sync(self, timeout=-1):
+        self.gdb.expect(self.prompt, timeout)
+
+        answer = self.gdb.before
+
+        self.dont_log_expect += 1
+        # be careful not to use RE characters like +*.[] etc.
+        r = str(random.randint(2**19, 2**20))
+        self.gdb.sendline("print " + r)
+        self.gdb.expect(r, timeout)
+        self.gdb.expect(self.prompt, timeout)
+        self.dont_log_expect -= 1
+        return answer    # send a command to GDB, returning the GDB answer as string.
+
     def send_cmd(self, stg, timeout=-1):
         # avoid logging the echo of our command 
         self.gdb.sendline(stg + "\n")
         return self.sync()
-
 
     def _query_value(self, which):
         val = self.send_cmd("print " + which)
@@ -273,24 +253,82 @@ class UT():
             self.send_cmd("set variable " + name + " = " + numeric_conv + "(" + value + ")")
         else:
             self.send_cmd("set variable " + name + " = " + value)
+# }}} GDB communication
 
 
-class Message(UT):
-    def set_break():
-        "message_recv"
-
-    # set data, with automatic htonl() for network messages.
-    def send_vals(self, data):
-        for n, v in data.iteritems():
-            self.set_val("msg->" + n, v, "htonl")
-
-class Ticket(UT):
-    # set ticket data - 
-    def send_vals(self, data):
-        for (n, v) in data:
-            self.set_val(n, v)
+    # there has to be some event waiting, so that boothd stops again.
+    def continue_debuggee(timeout=30):
+        self.gdb.send_cmd("continue", timeout)
 
 
+# {{{ High-level functions
+    def set_state(self, kv):
+        for n, v in kv.iteritems():
+            self.set_val( self.translate_shorthand(n, "ticket"), v)
+        logging.info("set state")
+
+    def send_message(self, msg):
+        udp_sock.sendto('a', (self.this_site, self.this_port))
+        self.continue_debuggee(timeout=2)
+
+    def wait_outgoing(self, msg):
+        pass
+
+    def loop(self, data):
+        matches = map(lambda k: re.match(r"^(outgoing|message)(\d+)$", k), data.iterkeys())
+        valid_matches = filter(None, matches)
+        nums = map(lambda m: int(m.group(2)), valid_matches)
+        loop_max = max(nums)
+        for counter in range(0, loop_max+1):    # incl. last message
+            logging.info("Part " + str(counter))
+            msg = 'message%d' % counter
+            if data.has_key(msg):
+                self.send_message(data[msg])
+            out = 'outgoing%d' % counter
+            if data.has_key(msg):
+                self.wait_outgoing(data[msg])
+
+    def run(self):
+        os.chdir(self.test_base)
+        # TODO: sorted, random order
+        for f in filter( (lambda f: re.match(r"^\d\d\d_.*\.txt$", f)), glob.glob("*")):
+            log = None
+            try:
+                log = self.setup_log(filename = UT._filename(f))
+
+                log.setLevel(logging.DEBUG)
+                logging.warn("running test %s" % f)
+                self.start_processes()
+
+                test = self.read_test_input(f, m=copy.deepcopy(self.defaults))
+                self.set_state(test["ticket"])
+                self.loop(test)
+            finally:
+                self.stop_processes()
+                if log:
+                    log.close()
+            return
+# }}}
+
+
+##
+##class Message(UT):
+##    def set_break():
+##        "message_recv"
+##
+##    # set data, with automatic htonl() for network messages.
+##    def send_vals(self, data):
+##        for n, v in data.iteritems():
+##            self.set_val("msg->" + n, v, "htonl")
+##
+##class Ticket(UT):
+##    # set ticket data - 
+##    def send_vals(self, data):
+##        for (n, v) in data:
+##            self.set_val(n, v)
+
+
+# {{{ main 
 if __name__ == '__main__':
     if os.geteuid() == 0:
         sys.stderr.write("Must be run non-root; aborting.\n")
@@ -319,3 +357,4 @@ if __name__ == '__main__':
 
     ret = ut.run()
     sys.exit(ret)
+# }}}
