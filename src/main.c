@@ -321,8 +321,16 @@ static int setup_config(int type)
 	if (rv < 0)
 		goto out;
 
+
 	/* Set "local" pointer, ignoring errors. */
-	find_myself(NULL, type == CLIENT);
+	if (cl.type == DAEMON && cl.site[0]) {
+		if (!find_site_by_name(cl.site, &local)) {
+			log_error("Cannot find \"%s\" in the configuration.",
+					cl.site);
+			return -EINVAL;
+		}
+	} else
+		find_myself(NULL, type == CLIENT);
 
 
 	rv = check_config(type);
@@ -918,7 +926,13 @@ static int read_arguments(int argc, char **argv)
 			break;
 
 		case 's':
-			if (cl.op == OP_GRANT || cl.op == OP_REVOKE || cl.op == OP_LIST) {
+			/* For testing and debugging: allow "-s site" also for
+			 * daemon start, so that the address that should be used
+			 * can be set manually.
+			 * This makes it easier to start multiple processes
+			 * on one machine. */
+			if (cl.type == CLIENT ||
+					(cl.type == DAEMON && debug_level)) {
 				int re = host_convert(optarg, site_arg, INET_ADDRSTRLEN);
 				if (re == 0) {
 					safe_copy(cl.site, site_arg, sizeof(cl.site), "site name");
