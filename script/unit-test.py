@@ -225,7 +225,14 @@ class UT():
         return answer    # send a command to GDB, returning the GDB answer as string.
 
     def send_cmd(self, stg, timeout=-1):
-        # avoid logging the echo of our command 
+        # give booth a chance to get its messages out
+        try:
+            self.booth.read_nonblocking(64*1024, 0)
+        except pexpect.TIMEOUT:
+            pass
+        finally:
+            pass
+
         self.gdb.sendline(stg)
         return self.sync(timeout=timeout)
 
