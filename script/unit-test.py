@@ -193,7 +193,7 @@ class UT():
         self.gdb.sendline("set verbose off\n") ## sadly to late for the initial "symbol not found" messages
         self.gdb.sendline("set prompt " + self.prompt + "\\n\n");
         self.sync(2000)
-        os.system("strace -o /tmp/sfdgs -f -tt -s 2000 -p %d &" % self.gdb.pid)
+        #os.system("strace -o /tmp/sfdgs -f -tt -s 2000 -p %d &" % self.gdb.pid)
 
         self.this_site_id = self.query_value("local->site_id")
         self.this_port = self.query_value("booth_conf->port")
@@ -409,6 +409,8 @@ if __name__ == '__main__':
 
     # "master" log object needs max level
     logging.basicConfig(level = logging.DEBUG,
+            filename = "/dev/null",
+            filemode = "a",
             format = default_log_format,
             datefmt = default_log_datefmt)
 
@@ -418,9 +420,9 @@ if __name__ == '__main__':
 
     # http://stackoverflow.com/questions/9321741/printing-to-screen-and-writing-to-a-file-at-the-same-time
     console = logging.StreamHandler()
-    console.setFormatter(logging.Formatter('%(levelname)-8s: %(message)s'))
-    logging.getLogger('').addHandler(console)
+    console.setFormatter(logging.Formatter(' #  %(message)s'))
     console.setLevel(logging.WARN)
+    logging.getLogger('').addHandler(console)
 
  
     logging.info("Starting boothd unit tests.")
