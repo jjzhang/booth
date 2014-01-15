@@ -292,7 +292,7 @@ class UT():
     def user_debug(self, txt):
         print self.gdb.buffer
         print "\n\nProblem detected (%s), entering interactive mode.\n\n" % txt
-        self.send_cmd("set prompt \"GDB>\"")
+        # can't use send_cmd, doesn't reply with expected prompt anymore.
         self.gdb.interact()
         #while True:
         #    sys.stdout.write("GDB> ")
@@ -301,6 +301,8 @@ class UT():
         #    if not x:
         #        break
         #    self.send_cmd(x)
+        self.gdb.sendline("set prompt GDB> \n")
+        self.gdb.setecho(True)
         self.stop_processes()
         sys.exit(0)
  
