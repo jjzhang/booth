@@ -19,8 +19,8 @@ ticket:
 # time(0)+1
     # local is site[0] per convention
 
-    owner           booth_conf->site[1]
-    expires         time(0)+600
+    owner           booth_conf->site+1
+    expires         time(0)+1
     last_ack_ballot 242
 
     proposer        0

@@ -152,45 +152,48 @@ class UT():
             self.booth.close( force=self.booth.isalive() )
 
 
+    def start_a_process(self, bin, **args):
+        name = re.sub(r".*/", "", bin)
+        # How to get stderr, too?
+        expct = pexpect.spawn(bin,
+                env = dict( os.environ.items() +
+                    [('PATH',
+                        self.test_base + "/bin/:" +
+                        os.getenv('PATH')),
+                    ('LC_ALL', 'C'),
+                    ('LANG', 'C')] ),
+                timeout = 30,
+                maxread = 32768,
+                **args)
+        expct.setecho(False)
+        expct.logfile_read = expect_logging("<-  %s" % name, self)
+        expct.logfile_send = expect_logging(" -> %s" % name, self)
+        return expct
+
 
     def start_processes(self):
-        self.booth = pexpect.spawn(self.binary,
+        self.booth = self.start_a_process(self.binary,
                 args = [ "daemon", "-D",
                     "-c", self.test_base + "/booth.conf",
                     "-s", "127.0.0.1",
                     "-l", self.lockfile,
-                    ],
-                env = dict( os.environ.items() +
-                    [('PATH',
-                        self.test_base + "/bin/:" +
-                        os.getenv('PATH'))] ),
-                #logfile = expect_logging("?? boothd", self),
-                timeout = 30,
-                maxread = 32768)
-        self.booth.setecho(False)
-        self.booth.logfile_read = expect_logging("<-  boothd", self)
-        self.booth.logfile_send = expect_logging(" -> boothd", self)
+                ])
         logging.info("started booth with PID %d, lockfile %s" % (self.booth.pid, self.lockfile))
-        self.booth.expect(self.this_site, timeout=2)
+        self.booth.expect("BOOTH site daemon is starting", timeout=2)
         #print self.booth.before; exit
 
-        self.gdb = pexpect.spawn("gdb",
+        self.gdb = self.start_a_process("gdb",
                 args=["-quiet",
                     "-p", str(self.booth.pid),
                     "-nx", "-nh",   # don't use .gdbinit
-                    ],
-                timeout = 30,
-                #logfile = expect_logging("?? gdb", self),
-                maxread = 32768)
-        self.gdb.setecho(False)
-        self.gdb.logfile_read = expect_logging("<-  gdb", self)
-        self.gdb.logfile_send = expect_logging(" -> gdb", self)
+                    ])
         logging.info("started GDB with PID %d" % self.gdb.pid)
         self.gdb.expect("(gdb)")
         self.gdb.sendline("set pagination off\n")
         self.gdb.sendline("set verbose off\n") ## sadly to late for the initial "symbol not found" messages
         self.gdb.sendline("set prompt " + self.prompt + "\\n\n");
         self.sync(2000)
+        os.system("strace -o /tmp/sfdgs -f -tt -s 2000 -p %d &" % self.gdb.pid)
 
         self.this_site_id = self.query_value("local->site_id")
         self.this_port = self.query_value("booth_conf->port")
@@ -223,13 +226,14 @@ class UT():
 
     def send_cmd(self, stg, timeout=-1):
         # avoid logging the echo of our command 
-        self.gdb.sendline(stg + "\n")
+        self.gdb.sendline(stg)
         return self.sync(timeout=timeout)
 
     def _query_value(self, which):
         val = self.send_cmd("print " + which)
         cleaned = re.search(r"^\$\d+ = (.*\S)\s*$", val, re.MULTILINE)
-        assert cleaned,val
+        if not cleaned:
+            self.user_debug("query failed")
         return cleaned.group(1)
 
     def query_value(self, which):
@@ -240,7 +244,12 @@ class UT():
     def check_value(self, which, value):
         val = self._query_value("(" + which + ") == (" + value + ")")
         logging.debug("check_value: «%s» is «%s»: %s" % (which, value, val))
-        assert val == "1", val # TODO: return?
+        if val == "1":
+            return True
+        # for easier (test) debugging we'll show the _real_ value, too.
+        has = self._query_value(which)
+        logging.error("«%s»: expected «%s», got «%s»." % (which, value, has))
+        sys.exit(1)
 
     # Send data to GDB, to inject them into the binary.
     # Handles different data types
@@ -260,7 +269,7 @@ class UT():
 
     # there has to be some event waiting, so that boothd stops again.
     def continue_debuggee(self, timeout=30):
-        self.send_cmd("continue", timeout)
+        return self.send_cmd("continue", timeout)
 
 
 # {{{ High-level functions.
@@ -272,24 +281,32 @@ class UT():
         logging.info("set state")
 
 
-    def user_debug(self):
-        while True:
-            x = sys.stdin.readline()
-            if not x:
-                break
-            self.send_cmd(x)
+    def user_debug(self, txt):
+        print self.gdb.buffer
+        print "\n\nProblem detected (%s), entering interactive mode.\n\n" % txt
+        self.send_cmd("set prompt \"GDB>\"")
+        self.gdb.interact()
+        #while True:
+        #    sys.stdout.write("GDB> ")
+        #    sys.stdout.flush()
+        #    x = sys.stdin.readline()
+        #    if not x:
+        #        break
+        #    self.send_cmd(x)
+        self.stop_processes()
         sys.exit(0)
  
 
     def wait_for_function(self, fn):
         while True:
-            stopped_at = self.continue_debuggee(timeout=2)
+            stopped_at = self.continue_debuggee(timeout=3)
             if not stopped_at:
-                self.user_debug()
-            if re.match(r"^Program received signal SIGSEGV,", stopped_at):
-                self.user_debug()
-            if re.match(r"^Breakpoint \d+, " + fn, stopped_at):
+                self.user_debug("Not stopped at any breakpoint?")
+            if re.search(r"^Program received signal SIGSEGV,", stopped_at):
+                self.user_debug("Segfault", stopped_at)
+            if re.search(r"^Breakpoint \d+, %s " % fn, stopped_at, re.MULTILINE):
                 break
+        logging.info("Now in %s" % fn)
 
     # We break, change the data, and return the correct size.
     def send_message(self, msg):
@@ -308,6 +325,10 @@ class UT():
  
     def wait_outgoing(self, msg):
         self.wait_for_function("booth_udp_send")
+        self.query_value("buf")
+        for (n, v) in msg.iteritems():
+            self.check_value( "ntohl(((struct boothc_ticket_msg *)buf)->" + n + ")", v)
+        logging.info("out gone")
         #stopped_at = self.sync() 
        
 
@@ -328,6 +349,7 @@ class UT():
             if out:
                 logging.info("waiting for " + kout)
                 self.wait_outgoing(out)
+        logging.info("loop ends")
 
     def run(self):
         os.chdir(self.test_base)
@@ -369,6 +391,12 @@ class UT():
 ##        for (n, v) in data:
 ##            self.set_val(n, v)
 
+#def traceit(frame, event, arg):
+#     if event == "line":
+#         lineno = frame.f_lineno
+#         print frame.f_code.co_filename, ":", "line", lineno
+#     return traceit
+
 
 # {{{ main 
 if __name__ == '__main__':
@@ -396,6 +424,9 @@ if __name__ == '__main__':
 
  
     logging.info("Starting boothd unit tests.")
+
+    #sys.settrace(traceit)
+
 
     ret = ut.run()
     sys.exit(ret)
