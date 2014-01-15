@@ -318,7 +318,7 @@ class UT():
 
     # We break, change the data, and return the correct size.
     def send_message(self, msg):
-        udp_sock.sendto('a', (self.this_site, self.this_port))
+        self.udp_sock.sendto('a', (socket.gethostbyname(self.this_site), self.this_port))
         self.wait_for_function("recvfrom")
         
         # go to frame with "msg" variable
