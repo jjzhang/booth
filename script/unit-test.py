@@ -190,13 +190,14 @@ class UT():
         logging.info("started GDB with PID %d" % self.gdb.pid)
         self.gdb.expect("(gdb)")
         self.gdb.sendline("set pagination off\n")
+        self.gdb.sendline("set interactive-mode off\n")
         self.gdb.sendline("set verbose off\n") ## sadly to late for the initial "symbol not found" messages
         self.gdb.sendline("set prompt " + self.prompt + "\\n\n");
         self.sync(2000)
         #os.system("strace -o /tmp/sfdgs -f -tt -s 2000 -p %d &" % self.gdb.pid)
 
         self.this_site_id = self.query_value("local->site_id")
-        self.this_port = self.query_value("booth_conf->port")
+        self.this_port = int(self.query_value("booth_conf->port"))
 
         # do a self-test
         self.check_value("local->site_id", self.this_site_id);
