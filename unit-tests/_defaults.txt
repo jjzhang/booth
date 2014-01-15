@@ -1,0 +1,52 @@
+# vim: ft=sh et :
+
+
+# ticket defaults, mostly set via config file.
+ticket:
+
+    name           "ticket"
+
+    ## these would matter if testing via GDB had high latencies
+    #expiry         60
+    #timeout        10
+    #acquire_after  30
+
+
+
+    # defaults for all tests
+    state           ST_INIT
+    next_cron       0
+# time(0)+1
+    # local is site[0] per convention
+
+    owner           booth_conf->site+1
+    expires         time(0)+1
+    last_ack_ballot 242
+
+    proposer        0
+    proposed_owner  0
+    new_ballot      0
+    proposal_acknowledges   0
+    retry_number    0
+
+
+
+# defaults for input message.
+# sender is a peer, and it wants something.
+message:
+
+    ticket.id               "ticket"
+    # invalid by default
+    header.cmd              -1
+    # invalid by default
+    header.result           1
+    # invalid by default
+    header.from             -1
+    header.version          BOOTHC_VERSION
+    header.magic            BOOTHC_MAGIC
+    header.length           sizeof(struct boothc_ticket_msg)
+    ticket.owner            -1
+    ticket.ballot           0
+    ticket.prev_ballot      0
+    ticket.expiry           0
+

@@ -505,10 +505,13 @@ static void process_recv(int ci)
 	struct sockaddr_storage sa;
 	int rv;
 	socklen_t sa_len;
-	char buffer[2048];
+	char buffer[256];
+	/* Used for unit tests */
+	struct boothc_ticket_msg *msg;
 
 
 	sa_len = sizeof(sa);
+	msg = (void*)buffer;
 	rv = recvfrom(clients[ci].fd,
 			buffer, sizeof(buffer),
 			MSG_NOSIGNAL | MSG_DONTWAIT,
@@ -516,7 +519,7 @@ static void process_recv(int ci)
 	if (rv == -1)
 		return;
 
-	deliver_fn(buffer, rv);
+	deliver_fn(msg, rv);
 }
 
 static int booth_udp_init(void *f)

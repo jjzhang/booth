@@ -347,11 +347,15 @@ static int ticket_process_catchup(
 			ticket_owner_string(new_owner), ballot);
 
 	rv = ntohl(msg->header.result);
+	if (rv != RLT_SUCCESS &&
+			rv != RLT_PROBABLY_SUCCESS) {
+		log_error("dropped because of wrong rv: 0x%x", rv);
+		return -EINVAL;
+	}
+
 	if (ballot == tk->new_ballot &&
 			ballot == tk->last_ack_ballot &&
-			new_owner == tk->owner &&
-			(rv == RLT_SUCCESS ||
-			 rv == RLT_PROBABLY_SUCCESS))  {
+			new_owner == tk->owner)  {
 		/* Peer says the same thing we're believing. */
 		tk->proposal_acknowledges |= from->bitmask;
 		tk->expires                = ntohl(msg->ticket.expiry) + time(NULL);
@@ -566,7 +570,7 @@ int message_recv(struct boothc_ticket_msg *msg, int msglen)
 	}
 
 	from = ntohl(msg->header.from);
-	if (!find_site_by_id(from, &dest)) {
+	if (!find_site_by_id(from, &dest) || !dest) {
 		log_error("unknown sender: %08x", from);
 		return -1;
 	}

@@ -1,0 +1,48 @@
+# vim: ft=sh et :
+
+
+ticket:
+    state               ST_INIT
+    last_ack_ballot     1
+    new_ballot          2012
+
+# No message0
+# expecting catchup query
+
+# outgoing packet: expect this data
+outgoing0:
+    header.cmd          CMD_CATCHUP
+    header.result       RLT_SUCCESS
+
+
+# ignore "bad" catchup data
+message1:
+    header.from         booth_conf->site[2].site_id
+    header.cmd          CMR_CATCHUP
+    header.result       243521741
+
+outgoing1:
+    header.cmd          CMD_CATCHUP
+    header.result       RLT_SUCCESS
+
+
+# accept good CMR_CATCHUP
+message2:
+    header.cmd          CMR_CATCHUP
+    header.result       RLT_SUCCESS
+    header.from         booth_conf->site[2].site_id
+    ticket.ballot       2062
+    ticket.prev_ballot  2052
+    ticket.owner        -1
+
+# nothing goes out
+
+
+# after a delay, check final state
+finally:
+# should be overwritten
+    last_ack_ballot     2052
+# should not be - a OP_PREPARING would fetch the new value
+    new_ballot          2012
+# too low-level
+#    proposal_acknowledges 5
