@@ -505,7 +505,7 @@ static void process_recv(int ci)
 	struct sockaddr_storage sa;
 	int rv;
 	socklen_t sa_len;
-	char buffer[2048];
+	char buffer[256];
 	/* Used for unit tests */
 	struct boothc_ticket_msg *msg;
 
