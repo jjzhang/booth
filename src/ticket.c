@@ -570,7 +570,7 @@ int message_recv(struct boothc_ticket_msg *msg, int msglen)
 	}
 
 	from = ntohl(msg->header.from);
-	if (!find_site_by_id(from, &dest)) {
+	if (!find_site_by_id(from, &dest) || !dest) {
 		log_error("unknown sender: %08x", from);
 		return -1;
 	}
