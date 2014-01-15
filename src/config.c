@@ -320,7 +320,7 @@ int read_config(const char *path)
 
 
 		/* Key */
-		end_of_key = skip_while(key, isalnum);
+		end_of_key = skip_while_in(key, isalnum, "-_");
 		if (end_of_key == key) {
 			error = "No key";
 			goto err;
