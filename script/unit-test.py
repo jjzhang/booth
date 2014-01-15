@@ -319,25 +319,31 @@ class UT():
     # We break, change the data, and return the correct size.
     def send_message(self, msg):
         self.udp_sock.sendto('a', (socket.gethostbyname(self.this_site), self.this_port))
+
         self.wait_for_function("recvfrom")
+        # drain input, but stop afterwards for changing data
+        self.send_cmd("finish")
+        # step over length assignment
+        self.send_cmd("next")
         
-        # go to frame with "msg" variable
-        self.send_cmd("up")
-        # go back to correct frame, so that "return" returns to process_recv() 
-        #TODO
-        self.send_cmd("down")
-        # send new value.
-        # self.send_cmd() might not work, as boothd may not stop ???
-        # should stop somewhere?
-        self.send_cmd("return sizeof(struct boothc_ticket_msg)\n")
+        # push message.
+        for (n, v) in msg.iteritems():
+            self.set_val( "msg->" + n, v, "htonl")
+
+        # set "received" length
+        self.set_val("rv", "msg->header.length", "ntohl")
+
+        # the next thing should run continue via wait_for_function
  
     def wait_outgoing(self, msg):
         self.wait_for_function("booth_udp_send")
-        self.query_value("buf")
         for (n, v) in msg.iteritems():
             self.check_value( "ntohl(((struct boothc_ticket_msg *)buf)->" + n + ")", v)
         logging.info("out gone")
         #stopped_at = self.sync() 
+
+    def merge_dicts(self, base, overlay):
+        return dict(base.items() + overlay.items())
        
 
     def loop(self, data):
@@ -351,7 +357,7 @@ class UT():
             msg  = data.get(kmsg)
             if msg:
                 logging.info("sending " + kmsg)
-                self.send_message(msg)
+                self.send_message(self.merge_dicts(data["message"], msg))
             kout = 'outgoing%d' % counter
             out  = data.get(kout)
             if out:
