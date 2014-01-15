@@ -35,7 +35,7 @@ ticket:
 # sender is a peer, and it wants something.
 message:
 
-    header.id               "ticket"
+    ticket.id               "ticket"
     # invalid by default
     header.cmd              -1
     # invalid by default
