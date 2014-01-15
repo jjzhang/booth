@@ -42,8 +42,8 @@ message:
     header.result           1
     # invalid by default
     header.from             -1
-    header.version          htonl(BOOTHC_VERSION)
-    header.magic            htonl(BOOTHC_MAGIC)
+    header.version          BOOTHC_VERSION
+    header.magic            BOOTHC_MAGIC
     header.length           sizeof(struct boothc_ticket_msg)
     ticket.owner            -1
     ticket.ballot           0
