@@ -359,6 +359,21 @@ class UT():
                 self.wait_outgoing(out)
         logging.info("loop ends")
 
+    def do_finally(self, data):
+        if not data:
+            return
+
+        # Allow debuggee to reach a stable state
+        time.sleep(1)
+        # stop it
+        posix.kill(self.booth.pid, signal.SIGINT)
+        # sync with GDB
+        self.query_value("42")
+
+        for (n, v) in data.iteritems():
+            self.check_value( "booth_conf->ticket[0]." + n, v)
+        
+
     def run(self):
         os.chdir(self.test_base)
         # TODO: sorted, random order
@@ -374,6 +389,7 @@ class UT():
                 test = self.read_test_input(f, m=copy.deepcopy(self.defaults))
                 self.set_state(test["ticket"])
                 self.loop(test)
+                self.do_finally(test.get("finally"))
                 logging.warn("test %s ends" % f)
             except:
                 logging.error("Broke in %s: %s" % (f, sys.exc_info))
