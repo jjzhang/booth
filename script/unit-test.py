@@ -369,7 +369,8 @@ class UT():
                 logging.warn("test %s ends" % f)
             except:
                 logging.error("Broke in %s: %s" % (f, sys.exc_info))
-                logging.error("  %s" % traceback.format_stack(sys.exc_traceback))
+                for frame in traceback.format_tb(sys.exc_traceback):
+                    logging.info("  -  %s " % frame.rstrip())
             finally:
                 self.stop_processes()
                 if log:
