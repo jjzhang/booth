@@ -1,0 +1,22 @@
+
+=== Simple tests (commandline, config file)
+
+
+Run
+
+    # make check-TESTS
+
+to run the tests written in python.
+
+
+
+
+=== Unit tests
+
+These use gdb and pexpect to set boothd state to some configured value,
+injecting some input and looking at the output.
+
+    # python script/unit-test.py src/boothd unit-tests/
+
+
+
