@@ -310,9 +310,9 @@ class UT():
             stopped_at = self.continue_debuggee(timeout=3)
             if not stopped_at:
                 self.user_debug("Not stopped at any breakpoint?")
-            if re.search(r"^Program received signal SIGSEGV,", stopped_at):
-                self.user_debug("Segfault", stopped_at)
-            if re.search(r"^Breakpoint \d+, %s " % fn, stopped_at, re.MULTILINE):
+            if re.search(r"^Program received signal SIGSEGV,", stopped_at, re.MULTILINE):
+                self.user_debug("Segfault")
+            if re.search(r"^Breakpoint \d+, (0x\w+ in )?%s " % fn, stopped_at, re.MULTILINE):
                 break
         logging.info("Now in %s" % fn)
 
