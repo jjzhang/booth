@@ -329,6 +329,7 @@ static int setup_config(int type)
 					cl.site);
 			return -EINVAL;
 		}
+		local->local = 1;
 	} else
 		find_myself(NULL, type == CLIENT);
 
