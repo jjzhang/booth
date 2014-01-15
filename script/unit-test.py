@@ -400,7 +400,7 @@ class UT():
                 self.do_finally(test.get("finally"))
                 logging.warn("test %s ends" % f)
             except:
-                logging.error("Broke in %s: %s" % (f, sys.exc_info))
+                logging.error("Broke in %s: %s" % (f, sys.exc_info()))
                 for frame in traceback.format_tb(sys.exc_traceback):
                     logging.info("  -  %s " % frame.rstrip())
             finally:
