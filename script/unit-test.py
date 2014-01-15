@@ -2,7 +2,7 @@
 # vim: fileencoding=utf-8
 # see http://stackoverflow.com/questions/728891/correct-way-to-define-python-source-code-encoding
 
-import os, sys, time, signal, tempfile, socket
+import os, sys, time, signal, tempfile, socket, posix, time
 import re, shutil, pexpect, logging
 import random, copy, glob, traceback
 
