@@ -4,7 +4,7 @@
 
 import os, sys, time, signal, tempfile, socket
 import re, shutil, pexpect, logging
-import random, copy, glob
+import random, copy, glob, traceback
 
 
 # Don't make that much sense - function/line is write().
@@ -367,6 +367,9 @@ class UT():
                 self.set_state(test["ticket"])
                 self.loop(test)
                 logging.warn("test %s ends" % f)
+            except:
+                logging.error("Broke in %s: %s" % (f, sys.exc_info))
+                logging.error("  %s" % traceback.format_stack(sys.exc_traceback))
             finally:
                 self.stop_processes()
                 if log:
