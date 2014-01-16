@@ -27,8 +27,42 @@ outgoing0:
 
 message1:               "bad sender"
     header.from         71
-    header.result       0
 
 outgoing1:
     state               ST_INIT
+
+
+
+message2:               "bad version"
+    header.version      512
+
+outgoing2:
+    state               ST_INIT
+
+
+message3:               "bad magic"
+    header.version      31
+
+outgoing3:
+    state               ST_INIT
+
+message4:               "bad length"
+    header.length       16
+
+outgoing4:
+    state               ST_INIT
+
+
+message5:               "bad ticket ID"
+    ticket.id           "gibtsnich"
+
+outgoing5:
+    state               ST_INIT
+
+
+message100:               "should work"
+
+outgoing100:
+    state               ST_STABLE
+    ticket.ballot       99
 
