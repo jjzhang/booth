@@ -431,22 +431,6 @@ class UT():
 # }}}
 
 
-##
-##class Message(UT):
-##    def set_break():
-##        "message_recv"
-##
-##    # set data, with automatic htonl() for network messages.
-##    def send_vals(self, data):
-##        for n, v in data.iteritems():
-##            self.set_val("msg->" + n, v, "htonl")
-##
-##class Ticket(UT):
-##    # set ticket data - 
-##    def send_vals(self, data):
-##        for (n, v) in data:
-##            self.set_val(n, v)
-
 #def traceit(frame, event, arg):
 #     if event == "line":
 #         lineno = frame.f_lineno
