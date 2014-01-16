@@ -403,7 +403,9 @@ class UT():
     def run(self):
         os.chdir(self.test_base)
         # TODO: sorted, random order
-        for f in filter( (lambda f: re.match(r"^\d\d\d_.*\.txt$", f)), glob.glob("*")):
+        tests = filter( (lambda f: re.match(r"^\d\d\d_.*\.txt$", f)), glob.glob("*"))
+        tests.sort()
+        for f in tests:
             log = None
             try:
                 log = self.setup_log(filename = UT._filename(f))
