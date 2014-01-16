@@ -138,46 +138,48 @@ struct boothc_ticket_msg {
  * \enddot
  *
  * */
+#define CHAR2CONST(a,b,c,d) ((a << 24) | (b << 24) | (c << 8) | d)
+#define STG2CONST(X) ({ const char _ggg[4] = X; return (uint32_t*)_ggg; })
 typedef enum {
 	/* 0x43 = "C"ommands */
-	CMD_LIST    = 0x436d644c,
-	CMD_GRANT   = 0x436d6447,
-	CMD_REVOKE  = 0x436d6452,
-	CMD_CATCHUP = 0x436d6443,
+	CMD_LIST    = CHAR2CONST('C', 'L', 's', 't'),
+	CMD_GRANT   = CHAR2CONST('C', 'G', 'n', 't'),
+	CMD_REVOKE  = CHAR2CONST('C', 'R', 'v', 'k'),
+	CMD_CATCHUP = CHAR2CONST('C', 'C', 't', 'p'),
 
 	/* Replies */
-	CMR_GENERAL = 0x52706c67,
-	CMR_LIST    = 0x52706c4c,
-	CMR_GRANT   = 0x52706c47,
-	CMR_REVOKE  = 0x52706c52,
-	CMR_CATCHUP = 0x52706c43,
+	CMR_GENERAL = CHAR2CONST('G', 'n', 'l', 'R'), // Increase distance to CMR_GRANT
+	CMR_LIST    = CHAR2CONST('R', 'L', 's', 't'),
+	CMR_GRANT   = CHAR2CONST('R', 'G', 'n', 't'),
+	CMR_REVOKE  = CHAR2CONST('R', 'R', 'v', 'k'),
+	CMR_CATCHUP = CHAR2CONST('R', 'C', 't', 'p'),
 
 	/* Paxos */
-	OP_PREPARING = 0x50726570,
-	OP_PROMISING = 0x50726f6d,
-	OP_PROPOSING = 0x50726f70,
-	OP_ACCEPTING = 0x41636354,
-	OP_RECOVERY  = 0x5265636f,
-	OP_COMMITTED = 0x436f6d6d,
-	OP_REJECTED  = 0x52656a65,
+	OP_PREPARING = CHAR2CONST('P', 'r', 'e', 'p'),
+	OP_PROMISING = CHAR2CONST('P', 'r', 'o', 'm'),
+	OP_PROPOSING = CHAR2CONST('P', 'r', 'o', 'p'),
+	OP_ACCEPTING = CHAR2CONST('A', 'c', 'p', 't'),
+	OP_RECOVERY  = CHAR2CONST('R', 'c', 'v', 'y'),
+	OP_COMMITTED = CHAR2CONST('C', 'm', 'm', 't'),
+	OP_REJECTED  = CHAR2CONST('R', 'J', 'C', '!'),
 
 	/* These are not used over the wire */
-	ST_INIT      = 0x496e6974,
-	ST_STABLE    = 0x53746162,
+	ST_INIT      = CHAR2CONST('I', 'n', 'i', 't'),
+	ST_STABLE    = CHAR2CONST('S', 't', 'b', 'l'),
 } cmd_request_t;
 
 
 /* TODO: make readable constants */
 typedef enum {
 	/* for compatibility with other functions */
-	RLT_SUCCESS = 0,
-	RLT_ASYNC = 0x526c5401,
-	RLT_SYNC_SUCC,
-	RLT_SYNC_FAIL,
-	RLT_INVALID_ARG,
-	RLT_OVERGRANT,
-	RLT_PROBABLY_SUCCESS,
-	RLT_BUSY,
+	RLT_SUCCESS             = 0,
+	RLT_ASYNC               = CHAR2CONST('A', 's', 'y', 'n'),
+	RLT_SYNC_SUCC           = CHAR2CONST('S', 'c', 'c', 's'),
+	RLT_SYNC_FAIL           = CHAR2CONST('F', 'a', 'i', 'l'),
+	RLT_INVALID_ARG         = CHAR2CONST('I', 'A', 'r', 'g'),
+	RLT_OVERGRANT           = CHAR2CONST('O', 'v', 'e', 'r'),
+	RLT_PROBABLY_SUCCESS    = CHAR2CONST('S', 'u', 'c', '?'),
+	RLT_BUSY                = CHAR2CONST('B', 'u', 's', 'y'),
 } cmd_result_t;
 
 
