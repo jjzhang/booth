@@ -380,7 +380,8 @@ class UT():
             kout = 'outgoing%d' % counter
             out  = data.get(kout)
             if out:
-                logging.info("waiting for " + kout)
+                comment = out.aux.get("comment") or ""
+                logging.info("waiting for " + kout + "  " + comment)
                 self.wait_outgoing(out)
         logging.info("loop ends")
 
