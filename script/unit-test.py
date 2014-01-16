@@ -145,9 +145,9 @@ class UT():
             return "booth_conf->ticket[0]." + name
         if context == 'message':
             return "msg->" + name
+        if context == 'inject':
+            return "ntohl(((struct boothc_ticket_msg *)buf)->" + name + ")"
         assert(False)
-
-
 
 
     def stop_processes(self):
@@ -341,7 +341,7 @@ class UT():
         
         # push message.
         for (n, v) in msg.iteritems():
-            self.set_val( "msg->" + n, v, "htonl")
+            self.set_val( self.translate_shorthand(n, "message"), v, "htonl")
 
         # set "received" length
         self.set_val("rv", "msg->header.length", "ntohl")
@@ -351,7 +351,11 @@ class UT():
     def wait_outgoing(self, msg):
         self.wait_for_function("booth_udp_send")
         for (n, v) in msg.iteritems():
-            self.check_value( "ntohl(((struct boothc_ticket_msg *)buf)->" + n + ")", v)
+            if re.search(r"\.", n):
+                self.check_value( self.translate_shorthand(n, "inject"), v)
+            else:
+                self.check_value( self.translate_shorthand(n, "ticket"), v)
+
         logging.info("out gone")
         #stopped_at = self.sync() 
 
@@ -392,7 +396,7 @@ class UT():
         self.query_value("42")
 
         for (n, v) in data.iteritems():
-            self.check_value( "booth_conf->ticket[0]." + n, v)
+            self.check_value( self.translate_shorthand(n, "ticket"), v)
         
 
     def run(self):
