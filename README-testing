@@ -1,4 +1,5 @@
 
+
 === Simple tests (commandline, config file)
 
 
@@ -18,5 +19,55 @@ injecting some input and looking at the output.
 
     # python script/unit-test.py src/boothd unit-tests/
 
+This must (currently?) be run as a non-root user.
 
 
+Basically, boothd is started with the config file `unit-tests/booth.conf`, and
+gdb gets attached to it.
+
+Then, some ticket state is set, incoming messages are delivered, and outgoing
+messages and the state is compared to expected values.
+
+`unit-tests/_defaults.txt` has default values for the initial state and
+message data.
+
+
+Each test file consists of headers and key/value pairs:
+
+--------------------
+ticket:
+	state 		ST_STABLE
+
+message0: 		# optional comment for the log file
+        header.cmd      OP_ACCEPTING
+        ticket.id       "asdga"
+
+outgoing0:
+	header.cmd 	OP_PREPARING
+	last_ack_ballot 42
+
+finally:
+	new_ballot 	1234
+--------------------
+
+
+A few details to the the above example:
+
+* Ticket states in RAM (`ticket`, `finally`) are written in host-endianness.
+
+* Message data (`messageN`, `outgoingN`) are automatically converted via `htonl` resp. `ntohl`. They are delivered/checked in the order defined by the integer `N` component.
+
+* Strings are done via `strcpy()`
+
+* `ticket` and `messageN` are assignment chunks
+
+* `finally` and `outgoingN` are compare chunks
+
+* In `outgoingN` you can check _both_ message data (keys with a `.` in them) and ticket state
+
+* Symbolic names are useable, GDB translates them for us
+
+* The test scripts in `unit-tests/` need to be named with 3 digits, an underscore, some text, and `.txt`
+
+
+# vim: set ft=asciidoc :
