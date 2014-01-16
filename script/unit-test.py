@@ -236,14 +236,17 @@ class UT():
         self.dont_log_expect -= 1
         return answer    # send a command to GDB, returning the GDB answer as string.
 
-    def send_cmd(self, stg, timeout=-1):
-        # give booth a chance to get its messages out
+    def drain_booth_log(self):
         try:
             self.booth.read_nonblocking(64*1024, 0)
         except pexpect.TIMEOUT:
             pass
         finally:
             pass
+
+    def send_cmd(self, stg, timeout=-1):
+        # give booth a chance to get its messages out
+        self.drain_booth_log()
 
         self.gdb.sendline(stg)
         return self.sync(timeout=timeout)
@@ -288,7 +291,9 @@ class UT():
 
     # there has to be some event waiting, so that boothd stops again.
     def continue_debuggee(self, timeout=30):
-        return self.send_cmd("continue", timeout)
+        res = self.send_cmd("continue", timeout)
+        self.drain_booth_log()
+        return res
 
 
 # {{{ High-level functions.
@@ -385,16 +390,23 @@ class UT():
                 self.wait_outgoing(out)
         logging.info("loop ends")
 
+
+    def let_booth_go_a_bit(self):
+        self.drain_booth_log()
+
+        self.gdb.sendline("continue")
+        time.sleep(1)
+        # stop it
+        posix.kill(self.booth.pid, signal.SIGINT)
+        self.drain_booth_log()
+
+
     def do_finally(self, data):
         if not data:
             return
 
         # Allow debuggee to reach a stable state
-        time.sleep(1)
-        # stop it
-        posix.kill(self.booth.pid, signal.SIGINT)
-        # sync with GDB
-        self.query_value("42")
+        self.let_booth_go_a_bit()
 
         for (n, v) in data.iteritems():
             self.check_value( self.translate_shorthand(n, "ticket"), v)
