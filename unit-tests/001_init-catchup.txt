@@ -26,8 +26,8 @@ outgoing1:
     header.result       RLT_SUCCESS
 
 
-# accept good CMR_CATCHUP
-message2:
+# should be accepted
+message2:               # valid CMR_CATCHUP
     header.cmd          CMR_CATCHUP
     header.result       RLT_SUCCESS
     header.from         booth_conf->site[2].site_id

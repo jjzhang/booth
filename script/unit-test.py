@@ -38,6 +38,16 @@ class expect_logging():
 # }}}
 
 
+# {{{ dictionary plus second hash
+class dict_plus(dict):
+    def __init__(self):
+        self.aux = dict()
+
+#    def aux(self):
+#        return self.aux
+# }}}
+
+
 class UT():
 # {{{ Members
     binary = None
@@ -75,8 +85,9 @@ class UT():
         self.udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
 
-    def read_test_input(self, file, state=None, m={ "ticket": {}, "message": {} } ):
+    def read_test_input(self, file, state=None, m = dict()):
         fo = open(file, "r")
+        state = None
         for line in fo.readlines():
             # comment?
             if re.match(r"^\s*#", line):
@@ -86,20 +97,20 @@ class UT():
                 continue
 
             # message resp. ticket
-            res = re.match(r"^\s*(\w+)\s*:\s*$", line)
+            # We allow a comment to have something to write out to screen
+            res = re.match(r"^\s*(\w+)\s*:(?:\s*(#.*?\S))?\s*$", line)
             if res:
                 state = res.group(1)
                 if not m.has_key(state):
-                    m[state] = {}
+                    m[state] = dict_plus()
+                if res.group(2):
+                    m[state].aux["comment"] = res.group(2)
                 continue
 
             assert(state)
 
             res = re.match(r"^\s*(\S+)\s*(.*)\s*$", line)
             if res:
-                assert(state)
-                if not m[state]:
-                    m[state] = {}
                 m[state][ res.group(1) ] = res.group(2)
         return m
 
@@ -355,10 +366,12 @@ class UT():
         loop_max = max(nums)
         for counter in range(0, loop_max+1):    # incl. last message
             logging.info("Part " + str(counter))
+
             kmsg = 'message%d' % counter
             msg  = data.get(kmsg)
             if msg:
-                logging.info("sending " + kmsg)
+                comment = msg.aux.get("comment") or ""
+                logging.info("sending " + kmsg + "  " + comment)
                 self.send_message(self.merge_dicts(data["message"], msg))
             kout = 'outgoing%d' % counter
             out  = data.get(kout)
