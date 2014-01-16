@@ -15,17 +15,6 @@ outgoing0:
     header.result       RLT_SUCCESS
 
 
-# ignore "bad" catchup data
-message1:
-    header.from         booth_conf->site[2].site_id
-    header.cmd          CMR_CATCHUP
-    header.result       243521741
-
-outgoing1:
-    header.cmd          CMD_CATCHUP
-    header.result       RLT_SUCCESS
-
-
 # should be accepted
 message2:               # valid CMR_CATCHUP
     header.cmd          CMR_CATCHUP

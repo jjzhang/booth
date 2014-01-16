@@ -1,0 +1,34 @@
+# vim: ft=sh et :
+#
+# This test is mostly concerned with ignoring invalid packets.
+# We're expecting catchup queries.
+
+
+ticket:
+    state               ST_INIT
+    last_ack_ballot     1
+    new_ballot          2012
+
+
+# defaults
+message:
+    header.cmd          CMR_CATCHUP
+    ticket.ballot       99
+    ticket.prev_ballot  98
+
+
+message0:               "bad result code"
+    header.from         booth_conf->site[2].site_id
+    header.result       243521741
+
+outgoing0:
+    state               ST_INIT
+
+
+message1:               "bad sender"
+    header.from         71
+    header.result       0
+
+outgoing1:
+    state               ST_INIT
+
