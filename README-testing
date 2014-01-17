@@ -69,5 +69,7 @@ A few details to the the above example:
 
 * The test scripts in `unit-tests/` need to be named with 3 digits, an underscore, some text, and `.txt`
 
+* The "fake" `crm_ticket` script gets the current test via `UNIT_TEST`; test scripts can pass additional information via `UNIT_TEST_AUX`.
+
 
 # vim: set ft=asciidoc :

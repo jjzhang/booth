@@ -1,3 +1,49 @@
 #!/bin/bash
+#
+# "fake" crm_ticket for unit tests.
+#  * Ignores set,grant,revoke actions
+#  * returns values it gets asked for from UNIT_TEST_AUX
 
-true
+
+
+function word_after()
+{
+  perl -e '
+	  $search=shift();
+	  $stg=shift();
+	  print $1 if $stg =~ /$search/;' "$1" "$2"
+}
+
+
+function Get()
+{
+	which=$(word_after " -G '(\\w+)'" "$1")
+	if [[ -z "$which" ]] ; then
+		exit 1
+	fi
+
+	word_after "\\b$which\\b (\\S+)" "$UNIT_TEST_AUX"
+	exit 0
+}
+
+
+
+# include resp. supersede with per-test functions
+inc="${UNIT_TEST_FILE%.txt}.sh"
+if [[ -e "$inc" ]] ; then
+	. "$inc"
+fi
+
+
+if [[ "$*" == *" -G "* ]] ; then
+	Get "$*"
+elif [[ "$*" == *" -g "* ]] ; then
+	: # grant
+elif [[ "$*" == *" -r "* ]] ; then
+	: # revoke
+elif [[ "$*" == *" -S "* ]] ; then
+	: # set
+else
+	echo "not understood" >&2 
+	exit 1
+fi

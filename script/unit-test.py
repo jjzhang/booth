@@ -163,7 +163,7 @@ class UT():
             self.booth.close( force=self.booth.isalive() )
 
 
-    def start_a_process(self, bin, **args):
+    def start_a_process(self, bin, env_add=[], **args):
         name = re.sub(r".*/", "", bin)
         # How to get stderr, too?
         expct = pexpect.spawn(bin,
@@ -171,8 +171,10 @@ class UT():
                     [('PATH',
                         self.test_base + "/bin/:" +
                         os.getenv('PATH')),
+                    ('UNIT_TEST_PATH', self.test_base),
                     ('LC_ALL', 'C'),
-                    ('LANG', 'C')] ),
+                    ('LANG', 'C')] +
+                    env_add ),
                 timeout = 30,
                 maxread = 32768,
                 **args)
@@ -182,13 +184,19 @@ class UT():
         return expct
 
 
-    def start_processes(self):
+    def start_processes(self, test):
         self.booth = self.start_a_process(self.binary,
                 args = [ "daemon", "-D",
                     "-c", self.test_base + "/booth.conf",
                     "-s", "127.0.0.1",
-                    "-l", self.lockfile,
-                ])
+                    "-l", self.lockfile, 
+                    ],
+                env_add=[ ('UNIT_TEST', test),
+                    ('UNIT_TEST_FILE', os.path.realpath(test)),
+                    # provide some space, so that strcpy(getenv()) works
+                    ('UNIT_TEST_AUX', "".zfill(1024)),
+                    ]);
+
         logging.info("started booth with PID %d, lockfile %s" % (self.booth.pid, self.lockfile))
         self.booth.expect("BOOTH site daemon is starting", timeout=2)
         #print self.booth.before; exit
@@ -424,7 +432,7 @@ class UT():
 
                 log.setLevel(logging.DEBUG)
                 logging.warn("running test %s" % f)
-                self.start_processes()
+                self.start_processes(f)
 
                 test = self.read_test_input(f, m=copy.deepcopy(self.defaults))
                 self.set_state(test["ticket"])

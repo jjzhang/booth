@@ -1,0 +1,24 @@
+# vim: ft=sh et :
+#
+# This test is mostly concerned with ignoring invalid packets.
+# We're expecting catchup queries.
+
+
+ticket:
+    state               ST_STABLE
+    last_ack_ballot     40
+    new_ballot          50
+
+
+message0:               "set state"
+    header.cmd          OP_COMMITTED
+    header.from         booth_conf->site[2].site_id
+    header.result       0
+    ticket.ballot       99
+    ticket.prev_ballot  98
+    ticket.owner        booth_conf->site[2].site_id
+    getenv("UNIT_TEST_AUX")  "ballot 99 owner +" 
+
+
+outgoing0:
+    last_ack_ballot     99
