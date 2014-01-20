@@ -138,7 +138,7 @@ struct boothc_ticket_msg {
  * \enddot
  *
  * */
-#define CHAR2CONST(a,b,c,d) ((a << 24) | (b << 24) | (c << 8) | d)
+#define CHAR2CONST(a,b,c,d) ((a << 24) | (b << 16) | (c << 8) | d)
 #define STG2CONST(X) ({ const char _ggg[4] = X; return (uint32_t*)_ggg; })
 typedef enum {
 	/* 0x43 = "C"ommands */
