@@ -370,6 +370,14 @@ static int ticket_process_catchup(
 	}
 
 
+	if (ticket_valid_for(tk) == 0 && !tk->owner) {
+		/* We see the ticket as expired, and therefore don't know an owner.
+		 * So believe some other host. */
+		tk->state = ST_STABLE;
+		goto accept;
+	}
+
+
 	if (ballot >= tk->new_ballot &&
 			ballot >= tk->last_ack_ballot &&
 			rv == RLT_SUCCESS) {
