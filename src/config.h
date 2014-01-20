@@ -110,8 +110,8 @@ struct booth_config {
     transport_layer_t proto;
     uint16_t port;
 
-	/** Stores the OR of the individual host bitmasks. */
-	uint64_t site_bits;
+    /** Stores the OR of the individual host bitmasks. */
+    uint64_t site_bits;
 
     int site_count;
     struct booth_site site[MAX_NODES];
