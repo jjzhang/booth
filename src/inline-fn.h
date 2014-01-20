@@ -133,6 +133,8 @@ static inline int promote_ticket_state(struct ticket_config *tk)
 }
 
 
+
+
 /* We allow half of the uint32_t to be used;
  * half of that below, half of that above the current known "good" value.
  *   0                                                     UINT32_MAX
@@ -168,6 +170,17 @@ static inline int ballot_is_higher_than(uint32_t b_high, uint32_t b_low)
 		return 0;
 
 	assert(!"ballot out of range - invalid");
+}
+
+
+static inline uint32_t ballot_max2(uint32_t a, uint32_t b)
+{
+	return ballot_is_higher_than(a, b) ? a : b;
+}
+
+static inline uint32_t ballot_max3(uint32_t a, uint32_t b, uint32_t c)
+{
+	return ballot_max2( ballot_max2(a, b), c);
 }
 
 

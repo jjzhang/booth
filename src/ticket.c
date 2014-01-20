@@ -392,8 +392,8 @@ static int ticket_process_catchup(
 
 accept:
 		tk->expires               = ntohl(msg->ticket.expiry) + time(NULL);
-		tk->new_ballot            = ballot;
-		tk->last_ack_ballot       = ballot;
+		tk->new_ballot            = ballot_max2(ballot, tk->new_ballot);
+		tk->last_ack_ballot       = ballot_max2(ballot, tk->last_ack_ballot);
 		tk->owner                 = new_owner;
 		tk->proposal_acknowledges = from->bitmask;
 
