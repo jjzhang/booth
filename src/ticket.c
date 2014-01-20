@@ -428,7 +428,7 @@ int ticket_broadcast_proposed_state(struct ticket_config *tk, cmd_request_t stat
 
 	msg.ticket.owner          = htonl(get_node_id(tk->proposed_owner));
 
-	log_debug("broadcasting %s for ticket \"%s\"",
+	log_debug("broadcasting '%s' for ticket \"%s\"",
 			STATE_STRING(state), tk->name);
 
 	return transport()->broadcast(&msg, sizeof(msg));
@@ -538,7 +538,7 @@ void tickets_log_info(void)
 	int i;
 
 	foreach_ticket(i, tk) {
-		log_info("Ticket %s: state %s "
+		log_info("Ticket %s: state '%s' "
 				"mask %" PRIx64 "/%" PRIx64 " "
 				"ballot %d (current %d) "
 				"expires %-24.24s",
