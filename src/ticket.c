@@ -366,6 +366,9 @@ static int ticket_process_catchup(
 		}
 
 		disown_if_expired(tk);
+		log_debug("catchup: peer ack 0x%" PRIx64 ", now state '%s'",
+			tk->proposal_acknowledges,
+			STATE_STRING(tk->state));
 		goto ex;
 	}
 
@@ -374,6 +377,7 @@ static int ticket_process_catchup(
 		/* We see the ticket as expired, and therefore don't know an owner.
 		 * So believe some other host. */
 		tk->state = ST_STABLE;
+		log_debug("catchup: no owner locally, believe peer.");
 		goto accept;
 	}
 
@@ -383,6 +387,9 @@ static int ticket_process_catchup(
 			rv == RLT_SUCCESS) {
 		/* Peers seems to know better, but as yet we only have _her_
 		 * word for that. */
+		log_debug("catchup: peer has higher ballot: %d >= %d/%d",
+				ballot, tk->new_ballot, tk->last_ack_ballot);
+
 accept:
 		tk->expires               = ntohl(msg->ticket.expiry) + time(NULL);
 		tk->new_ballot            = ballot;
@@ -402,6 +409,7 @@ accept:
 		/* Peer seems to know better than us, and there's no
 		 * convincing other report. Just take it. */
 		tk->state = ST_STABLE;
+		log_debug("catchup: exceeded retries, peer has higher ballot.");
 		goto accept;
 	}
 
@@ -409,11 +417,14 @@ accept:
 	if (ballot < tk->new_ballot ||
 			ballot < tk->last_ack_ballot) {
 		/* Peer seems outdated ... tell it to reload? */
+		log_debug("catchup: peer outdated?");
 #if 0
 		init_ticket_msg(&msg, CMD_DO_CATCHUP, RLT_SUCCESS, tk, &tk->current_state);
 #endif
+		goto ex;
 	}
 
+	log_debug("catchup: unhandled situation!");
 
 ex:
 	ticket_write(tk);
