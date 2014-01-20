@@ -531,7 +531,7 @@ int check_config(int type)
 }
 
 
-int find_site_by_name(unsigned char *site, struct booth_site **node)
+int find_site_by_name(unsigned char *site, struct booth_site **node, int any_type)
 {
 	struct booth_site *n;
 	int i;
@@ -541,7 +541,7 @@ int find_site_by_name(unsigned char *site, struct booth_site **node)
 
 	for (i = 0; i < booth_conf->site_count; i++) {
 		n = booth_conf->site + i;
-		if (n->type == SITE &&
+		if ((n->type == SITE || any_type) &&
 		    strcmp(n->addr_string, site) == 0) {
 			*node = n;
 			return 1;

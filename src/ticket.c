@@ -84,7 +84,7 @@ int check_site(char *site, int *is_local)
 	if (!check_max_len_valid(site, sizeof(node->addr_string)))
 		return 0;
 
-	if (find_site_by_name(site, &node)) {
+	if (find_site_by_name(site, &node, 0)) {
 		*is_local = node->local;
 		return 1;
 	}

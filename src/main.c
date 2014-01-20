@@ -324,7 +324,7 @@ static int setup_config(int type)
 
 	/* Set "local" pointer, ignoring errors. */
 	if (cl.type == DAEMON && cl.site[0]) {
-		if (!find_site_by_name(cl.site, &local)) {
+		if (!find_site_by_name(cl.site, &local, 1)) {
 			log_error("Cannot find \"%s\" in the configuration.",
 					cl.site);
 			return -EINVAL;
@@ -510,7 +510,7 @@ static int query_get_string_answer(cmd_request_t cmd)
 
 	if (!*cl.site)
 		site = local;
-	else if (!find_site_by_name(cl.site, &site)) {
+	else if (!find_site_by_name(cl.site, &site, 1)) {
 		log_error("cannot find site \"%s\"", cl.site);
 		rv = ENOENT;
 		goto out;
@@ -563,9 +563,18 @@ static int do_command(cmd_request_t cmd)
 
 	if (!*cl.site)
 		site = local;
-	else if (!find_site_by_name(cl.site, &site)) {
-		log_error("Site \"%s\" not configured.", cl.site);
-		goto out_close;
+	else {
+		if (!find_site_by_name(cl.site, &site, 1)) {
+			log_error("Site \"%s\" not configured.", cl.site);
+			goto out_close;
+		}
+
+		if (site->type == ARBITRATOR) {
+			log_error("Site \"%s\" is an arbitrator, cannot grant ticket there.", cl.site);
+			goto out_close;
+		}
+
+		assert(site->type == SITE);
 	}
 
 	/* We don't check for existence of ticket, so that asking can be

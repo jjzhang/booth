@@ -129,7 +129,7 @@ int read_config(const char *path);
 
 int check_config(int type);
 
-int find_site_by_name(unsigned char *site, struct booth_site **node);
+int find_site_by_name(unsigned char *site, struct booth_site **node, int any_type);
 int find_site_by_id(uint32_t site_id, struct booth_site **node);
 
 const char *type_to_string(int type);
