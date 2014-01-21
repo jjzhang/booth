@@ -20,6 +20,7 @@
 #define _INLINE_FN_H
 
 #include <time.h>
+#include <sys/time.h>
 #include <assert.h>
 #include <string.h>
 #include "config.h"
@@ -197,6 +198,19 @@ static inline int timeval_msec(struct timeval tv)
 	if (m >= 1000)
 		m = 999;
 	return m;
+}
+
+
+static inline int timeval_in_past(struct timeval which)
+{
+	struct timeval tv;
+
+	gettimeofday(&tv, NULL);
+	if (which.tv_sec < tv.tv_sec)
+		return 1;
+	if (which.tv_sec > tv.tv_sec)
+		return 0;
+	return which.tv_usec < tv.tv_usec;
 }
 
 
