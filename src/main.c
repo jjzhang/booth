@@ -607,13 +607,13 @@ static int do_command(cmd_request_t cmd)
 	if (rv < 0)
 		goto out_close;
 
-	if (reply.result == RLT_INVALID_ARG) {
+	if (reply.result == htonl(RLT_INVALID_ARG)) {
 		log_info("invalid argument!");
 		rv = -1;
 		goto out_close;
 	}
 
-	if (reply.result == RLT_OVERGRANT) {
+	if (reply.result == htonl(RLT_OVERGRANT)) {
 		log_info("You're granting a granted ticket "
 			 "If you wanted to migrate a ticket,"
 			 "use revoke first, then use grant");
