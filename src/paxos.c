@@ -218,7 +218,7 @@ inline static int got_a_PROM(
 			tk->state == OP_PREPARING) {
 		tk->proposal_acknowledges |= from->bitmask;
 
-		log_info("Got PROMISE from %s for \"%s\", now %" PRIx64,
+		log_info("Got PROMISE from %s for \"%s\", acks now 0x%" PRIx64,
 				from->addr_string, tk->name,
 				tk->proposal_acknowledges);
 
@@ -315,7 +315,7 @@ inline static int got_an_ACC(
 			tk->state == OP_PROPOSING) {
 		tk->proposal_acknowledges |= from->bitmask;
 
-		log_info("Got ACCEPTING from %s for \"%s\", now %" PRIx64,
+		log_info("Got ACCEPTING from %s for \"%s\", acks now 0x%" PRIx64,
 				from->addr_string, tk->name,
 				tk->proposal_acknowledges);
 
