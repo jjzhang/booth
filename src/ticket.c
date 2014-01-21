@@ -195,10 +195,11 @@ int list_ticket(char **pdata, unsigned int *len)
 
 
 		cp += sprintf(cp,
-				"ticket: %s, owner: %s, expires: %s\n",
+				"ticket: %s, owner: %s, expires: %s, ballot: %d\n",
 				tk->name,
 				tk->owner ? tk->owner->addr_string : "None",
-				timeout_str);
+				timeout_str,
+				tk->last_ack_ballot);
 
 		*len = cp - data;
 		assert(*len < alloc);
