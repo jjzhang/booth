@@ -904,8 +904,8 @@ static int read_arguments(int argc, char **argv)
 				assert(cp > cl.configfile);
 				assert(*(cp-1) == '/');
 
-				/* Write after the "/" */
-				safe_copy(cp + 1, optarg,
+				/* Write at the \0, ie. after the "/" */
+				safe_copy(cp, optarg,
 						(sizeof(cl.configfile) -
 						 (cp -  cl.configfile) -
 						 strlen(BOOTH_DEFAULT_CONF_EXT)),
