@@ -182,7 +182,7 @@ promise:
 
 
 /** Getting OP_REJECTED means abandoning the current operation. */
-inline static int answer_REJ(
+inline static int handle_REJ(
 		struct ticket_config *tk,
 		struct booth_site *from,
 		struct boothc_ticket_msg *msg,
@@ -376,7 +376,7 @@ int paxos_answer(
 			return answer_PREP(tk, from, msg, ballot, new_owner_p);
 
 		case OP_REJECTED:
-			return answer_REJ(tk, from, msg, ballot, new_owner_p);
+			return handle_REJ(tk, from, msg, ballot, new_owner_p);
 
 		case OP_PROMISING:
 			return got_a_PROM(tk, from, msg, ballot, new_owner_p);
