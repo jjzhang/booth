@@ -11,7 +11,7 @@ boothd_SOURCES	 	= config.c main.c paxos.c ticket.c  transport.c \
 			  pacemaker.c
 
 boothd_LDFLAGS		= $(OS_DYFLAGS) -L./
-boothd_LDADD		= -lplumb -lplumbgpl -lz
+boothd_LDADD		= -lplumb -lplumbgpl -lz -lm
 boothd_CPPFLAGS		= $(GLIB_CFLAGS)
 
 noinst_HEADERS		= booth.h pacemaker.h \

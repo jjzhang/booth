@@ -531,21 +531,26 @@ void process_tickets(void)
 {
 	struct ticket_config *tk;
 	int i;
-	time_t now;
+	struct timeval now;
+	float sec_until;
 
-	time(&now);
+	gettimeofday(&now, NULL);
 
 	foreach_ticket(i, tk) {
+		sec_until = timeval_to_float(tk->next_cron) - timeval_to_float(now);
 		if (0)
-		log_debug("ticket %s next cron %" PRIx64 ", now %" PRIx64 ", in %" PRIi64,
-				tk->name, (uint64_t)tk->next_cron, (uint64_t)now,
-				(int64_t)tk->next_cron - now);
-		if (tk->next_cron > now)
+			log_debug("ticket %s next cron %" PRIx64 ".%03d, "
+					"now %" PRIx64 "%03d, in %f",
+					tk->name,
+					(uint64_t)tk->next_cron.tv_sec, timeval_msec(tk->next_cron),
+					(uint64_t)now.tv_sec, timeval_msec(now),
+					sec_until);
+		if (sec_until > 0.0)
 			continue;
 
 		log_debug("ticket cron: doing %s", tk->name);
 		/* Set next value, handler may override. */
-		tk->next_cron = INT_MAX;
+		tk->next_cron.tv_sec = INT_MAX;
 		ticket_cron(tk);
 	}
 }

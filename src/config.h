@@ -64,7 +64,7 @@ struct ticket_config {
 	cmd_request_t state;
 
 	/** When something has to be done */
-	time_t next_cron;
+	struct timeval next_cron;
 
 	/** Current owner of ticket. */
 	struct booth_site *owner;

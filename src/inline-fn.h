@@ -184,4 +184,20 @@ static inline uint32_t ballot_max3(uint32_t a, uint32_t b, uint32_t c)
 }
 
 
+static inline double timeval_to_float(struct timeval tv)
+{
+	return tv.tv_sec + tv.tv_usec*1e-6;
+}
+
+static inline int timeval_msec(struct timeval tv)
+{
+	int m;
+
+	m = tv.tv_usec / 1000;
+	if (m >= 1000)
+		m = 999;
+	return m;
+}
+
+
 #endif

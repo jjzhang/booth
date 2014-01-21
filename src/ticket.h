@@ -21,6 +21,8 @@
 #define _TICKET_H
 
 #include <time.h>
+#include <sys/time.h>
+#include <math.h>
 
 #include "config.h"
 
@@ -60,14 +62,20 @@ void process_tickets(void);
 void tickets_log_info(void);
 
 
-static inline void ticket_next_cron_at(struct ticket_config *tk, time_t when)
+static inline void ticket_next_cron_at(struct ticket_config *tk, struct timeval when)
 {
 	tk->next_cron = when;
 }
 
-static inline void ticket_next_cron_in(struct ticket_config *tk, int seconds)
+static inline void ticket_next_cron_in(struct ticket_config *tk, float seconds)
 {
-	ticket_next_cron_at(tk, time(NULL) + seconds);
+	struct timeval tv;
+
+	gettimeofday(&tv, NULL);
+	tv.tv_sec += trunc(seconds);
+	tv.tv_usec += (seconds - trunc(seconds)) * 1e6;
+
+	ticket_next_cron_at(tk, tv);
 }
 
 
