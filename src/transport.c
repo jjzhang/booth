@@ -43,6 +43,8 @@
 #define SOCKET_BUFFER_SIZE	160000
 #define FRAME_SIZE_MAX		10000
 
+
+
 struct booth_site *local = NULL;
 
 
@@ -63,19 +65,22 @@ static void parse_rtattr(struct rtattr *tb[],
 static int find_address(unsigned char ipaddr[BOOTH_IPADDR_LEN],
 		int family, int prefixlen,
 		int fuzzy_allowed,
-		struct booth_site **me)
+		struct booth_site **me,
+		int *address_bits_matched)
 {
 	int i;
 	struct booth_site *node;
 	int bytes, bits_left, mask;
 	unsigned char node_bits, ip_bits;
 	uint8_t *n_a;
+	int matched, did_match;
 
 
 	bytes = prefixlen / 8;
 	bits_left = prefixlen % 8;
 	/* One bit left to check means ignore 7 lowest bits. */
 	mask = ~( (1 << (8 - bits_left)) -1);
+	did_match = 0;
 
 	for (i = 0; i < booth_conf->site_count; i++) {
 		node = booth_conf->site + i;
@@ -83,10 +88,18 @@ static int find_address(unsigned char ipaddr[BOOTH_IPADDR_LEN],
 			continue;
 		n_a = node_to_addr_pointer(node);
 
-		if (memcmp(ipaddr, n_a, node->addrlen) == 0) {
+		for(matched = 0; matched < node->addrlen; matched++)
+			if (ipaddr[matched] != n_a[matched])
+				break;
+
+
+		if (matched == node->addrlen) {
+			/* Full match. */
+			*address_bits_matched = matched * 8;
 found:
 			*me = node;
-			return 1;
+			did_match = 1;
+			continue;
 		}
 
 		if (!fuzzy_allowed)
@@ -94,18 +107,23 @@ found:
 
 
 		/* Check prefix, whole bytes */
-		if (memcmp(ipaddr, n_a, bytes) != 0)
+		if (matched < bytes)
+			continue;
+		if (matched * 8 < *address_bits_matched)
 			continue;
 		if (!bits_left)
 			goto found;
 
 		node_bits = n_a[bytes];
 		ip_bits = ipaddr[bytes];
-		if (((node_bits ^ ip_bits) & mask) == 0)
+		if (((node_bits ^ ip_bits) & mask) == 0) {
+			/* _At_least_ prefixlen bits matched. */
+			*address_bits_matched = prefixlen;
 			goto found;
+		}
 	}
 
-	return 0;
+	return did_match;
 }
 
 
@@ -121,6 +139,7 @@ int _find_myself(int family, struct booth_site **mep, int fuzzy_allowed)
 		struct nlmsghdr nlh;
 		struct rtgenmsg g;
 	} req;
+	int address_bits_matched;
 
 
 	if (local)
@@ -128,6 +147,7 @@ int _find_myself(int family, struct booth_site **mep, int fuzzy_allowed)
 
 
 	me = NULL;
+	address_bits_matched = 0;
 	if (mep)
 		*mep = NULL;
 	fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
@@ -197,16 +217,16 @@ int _find_myself(int family, struct booth_site **mep, int fuzzy_allowed)
 				memcpy(ipaddr, RTA_DATA(tb[IFA_ADDRESS]),
 						BOOTH_IPADDR_LEN);
 
-				if (find_address(ipaddr,
+				/* First try with exact addresses, then optionally with subnet matching. */
+				if (ifa->ifa_prefixlen > address_bits_matched)
+					find_address(ipaddr,
 							ifa->ifa_family, ifa->ifa_prefixlen,
-							fuzzy_allowed, &me))
-					goto out;
+							fuzzy_allowed, &me, &address_bits_matched);
 			}
 			h = NLMSG_NEXT(h, status);
 		}
 	}
 
-out:
 	close(fd);
 
 	if (!me)
