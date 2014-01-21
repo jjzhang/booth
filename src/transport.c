@@ -421,9 +421,9 @@ int booth_tcp_open(struct booth_site *to)
 	rv = connect_nonb(s, (struct sockaddr *)&to->sa6, to->saddrlen, 10);
 	if (rv == -1) {
 		if( errno == ETIMEDOUT)
-			log_error("connection to %s timeout", to->addr_string);
+			log_error("connect to \"%s\" got a timeout", to->addr_string);
 		else 
-			log_error("connection to %s error %s", to->addr_string,
+			log_error("connect to \"%s\" got an error: %s", to->addr_string,
 					strerror(errno));
 		goto error;
 	}
