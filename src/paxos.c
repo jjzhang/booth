@@ -218,6 +218,10 @@ inline static int answer_PREP(
 	if (!(local->role & ACCEPTOR))
 		return 0;
 
+	/* Ignore if packet is too late, and state is already active. */
+	if (tk->owner == new_owner &&
+			ballot == tk->last_ack_ballot)
+		return 0;
 
 	/* We have to be careful here.
 	 * Getting multiple copies of the same message must not trigger
@@ -260,6 +264,14 @@ inline static int handle_REJ(
 		uint32_t ballot,
 		struct booth_site *new_owner)
 {
+	if (tk->last_ack_ballot == ballot) {
+		log_debug("got a late REJECTED; ignored, as "
+				"ballot %d is already active.",
+				tk->last_ack_ballot);
+		return 0;
+	}
+
+
 	log_info("got REJECTED for ticket \"%s\", ballot %d (has %d), from %s",
 			tk->name,
 			tk->new_ballot, ballot,
