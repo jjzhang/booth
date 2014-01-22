@@ -115,7 +115,7 @@ static inline void disown_ticket(struct ticket_config *tk)
 {
 	tk->owner = NULL;
 	tk->proposed_owner = NULL;
-	tk->expires = 0;
+	time(&tk->expires);
 }
 
 static inline void disown_if_expired(struct ticket_config *tk)
@@ -206,16 +206,26 @@ static inline int timeval_msec(struct timeval tv)
 }
 
 
+static inline int timeval_compare(struct timeval tv1, struct timeval tv2)
+{
+	if (tv1.tv_sec < tv2.tv_sec)
+		return -1;
+	if (tv1.tv_sec > tv2.tv_sec)
+		return +1;
+	if (tv1.tv_usec < tv2.tv_usec)
+		return -1;
+	if (tv1.tv_usec > tv2.tv_usec)
+		return +1;
+	return 0;
+}
+
+
 static inline int timeval_in_past(struct timeval which)
 {
 	struct timeval tv;
 
 	gettimeofday(&tv, NULL);
-	if (which.tv_sec < tv.tv_sec)
-		return 1;
-	if (which.tv_sec > tv.tv_sec)
-		return 0;
-	return which.tv_usec < tv.tv_usec;
+	return timeval_compare(tv, which) > 0;
 }
 
 
