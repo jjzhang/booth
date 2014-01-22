@@ -358,7 +358,7 @@ static int ticket_process_catchup(
 			ballot == tk->last_ack_ballot &&
 			new_owner == tk->owner)  {
 		/* Peer says the same thing we're believing. */
-		tk->proposal_acknowledges |= from->bitmask;
+		tk->proposal_acknowledges |= from->bitmask | local->bitmask;
 		tk->expires                = ntohl(msg->ticket.expiry) + time(NULL);
 
 		if (should_switch_state_p(tk)) {
