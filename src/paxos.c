@@ -344,9 +344,18 @@ inline static int answer_PROP(
 	if (!(local->role & ACCEPTOR))
 		return 0;
 
-	if (from == tk->proposer &&
+
+	/* Repeated packet. */
+	if (new_owner == tk->owner &&
 			ballot == tk->new_ballot)
 		goto accepting;
+
+	/* If packet is late, ie. we already have that state,
+	 * just repeat the ack - perhaps it got lost. */
+	if (new_owner == tk->owner &&
+			ballot == tk->last_ack_ballot)
+		goto accepting;
+
 
 	/* We have to be careful here.
 	 * Getting multiple copies of the same message must not trigger
