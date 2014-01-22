@@ -147,10 +147,14 @@ void abort_proposal(struct ticket_config *tk)
 
 int PROPOSE_to_COMMIT(struct ticket_config *tk)
 {
+	int rv;
+
 	if (should_switch_state_p(tk)) {
 		change_ticket_owner(tk, tk->new_ballot, tk->proposed_owner);
 
-		return ticket_broadcast_proposed_state(tk, OP_COMMITTED);
+		rv = ticket_broadcast_proposed_state(tk, OP_COMMITTED);
+		tk->state = ST_STABLE;
+		return rv;
 	}
 
 	return retries_exceeded(tk);
