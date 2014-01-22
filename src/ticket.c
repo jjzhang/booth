@@ -430,6 +430,12 @@ accept:
 ex:
 	ticket_write(tk);
 
+	if (tk->state == ST_STABLE) {
+		/* If we believe to have enough information, we can try to
+		 * acquire the ticket (again). */
+		time(&tk->expires);
+	}
+
 	return 0;
 }
 
@@ -490,16 +496,44 @@ static void ticket_cron(struct ticket_config *tk)
 
 			/* Couldn't renew in time - ticket lost. */
 			tk->owner = NULL;
+			disown_ticket(tk);
+			/* This gets us into ST_INIT again; we couldn't
+			 * talk to a majority of sites, so we don't know
+			 * whether somebody else has the ticket now.
+			 * Keep asking until we know. */
 			abort_proposal(tk);
+
 			ticket_write(tk);
 
-			if (tk->acquire_after)
-				ticket_next_cron_in(tk, tk->acquire_after);
+			/* May not try to re-acquire now, need to find out
+			 * what others think. */
+			break;
 		}
 
-		/* Do we need to refresh? */
-		if (tk->owner == local &&
-				ticket_valid_for(tk) < tk->expiry/2) {
+		/* No matter whether the ticket just got lost by someone,
+		 * or whether is wasn't active anywhere - if automatic
+		 * acquiration is configured, try to get it active.
+		 * Condition:
+		 *  - no owner,
+		 *  - no active proposal,
+		 *  - acquire_after has passed,
+		 *  - could activate locally.
+		 * Now the sites can try to trump each other.  */
+		if (!tk->owner &&
+				!tk->proposed_owner &&
+				!tk->proposer &&
+				tk->expires &&
+				tk->expires + tk->acquire_after >= now &&
+				local->type == SITE) {
+			log_info("ACQUIRE ticket \"%s\" after timeout", tk->name);
+			paxos_start_round(tk, local);
+			break;
+		}
+
+
+		/* Are we the current owner, and do we need to refresh?
+		 * This is not the same as above. */
+		if (should_start_renewal(tk)) {
 			log_info("RENEW ticket \"%s\"", tk->name);
 			paxos_start_round(tk, local);
 
