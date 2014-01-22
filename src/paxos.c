@@ -193,9 +193,12 @@ int paxos_start_round(struct ticket_config *tk, struct booth_site *new_owner)
 	if (tk->state != ST_STABLE)
 		return RLT_BUSY;
 
-	/* This may not be done from cron, because the ballot number would simply
+	/* This may not be called repeatedly from cron,
+	 * because the ballot number would simply
 	 * get counted up without any benefit.
-	 * The message may get retransmitted, though. */
+	 * The message may get retransmitted, though.
+	 * Normal retry behaviour gets achieved during
+	 * state OP_PREPARING anyway. */
 	tk->proposer = local;
 	tk->new_ballot = next_ballot_number(tk);
 	tk->proposed_owner = new_owner;
@@ -203,6 +206,9 @@ int paxos_start_round(struct ticket_config *tk, struct booth_site *new_owner)
 	tk->retry_number = 0;
 	ticket_activate_timeout(tk);
 
+	/* TODO: shorten renew exchange by just sending
+	 * a new proposal? Ballot numbers should still be the
+	 * same everywhere, owner doesn't change. */
 	return ticket_broadcast_proposed_state(tk, OP_PREPARING);
 }
 
