@@ -550,8 +550,14 @@ void process_tickets(void)
 			continue;
 
 		log_debug("ticket cron: doing %s", tk->name);
-		/* Set next value, handler may override. */
-		tk->next_cron.tv_sec = INT_MAX;
+
+
+		/* Set next value, handler may override.
+		 * This should already be handled via the state logic;
+		 * but to be on the safe side the renew repetition is
+		 * duplicated here, too.  */
+		set_ticket_wakeup(tk);
+
 		ticket_cron(tk);
 	}
 }
@@ -635,4 +641,19 @@ int message_recv(struct boothc_ticket_msg *msg, int msglen)
 		return rv;
 	}
 	return 0;
+}
+
+
+void set_ticket_wakeup(struct ticket_config *tk)
+{
+	int next;
+
+	if (tk->owner == local) {
+		next = tk->expiry / 2;
+		if (tk->timeout * RETRIES/2 < next)
+			next = tk->timeout;
+		ticket_next_cron_in(tk, next);
+	}
+	else
+		ticket_next_cron_in(tk, tk->expiry + tk->acquire_after);
 }

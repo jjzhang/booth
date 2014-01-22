@@ -113,8 +113,6 @@ static inline void change_ticket_owner(struct ticket_config *tk,
 		uint32_t ballot,
 		struct booth_site *new_owner)
 {
-	int next;
-
 	/* set "previous" value for next round */
 	tk->last_ack_ballot =
 		tk->new_ballot = ballot;
@@ -125,15 +123,7 @@ static inline void change_ticket_owner(struct ticket_config *tk,
 
 	tk->state = ST_STABLE;
 
-	if (new_owner == local) {
-		next = tk->expiry / 2;
-		if (tk->timeout * RETRIES/2 < next)
-			next = tk->timeout;
-		ticket_next_cron_in(tk, next);
-	}
-	else
-		ticket_next_cron_in(tk, tk->expiry + tk->acquire_after);
-
+	set_ticket_wakeup(tk);
 	log_info("Now actively COMMITTED for \"%s\": new owner %s, ballot %d",
 			tk->name,
 			ticket_owner_string(tk->owner),
