@@ -146,6 +146,7 @@ static inline void change_ticket_owner(struct ticket_config *tk,
 
 void abort_proposal(struct ticket_config *tk)
 {
+	log_info("ABORTing proposal.");
 	tk->proposer = NULL;
 	tk->proposed_owner = tk->owner;
 	tk->retry_number = 0;
@@ -302,8 +303,9 @@ inline static int got_a_PROM(
 			tk->state == OP_PREPARING) {
 		tk->proposal_acknowledges |= from->bitmask;
 
-		log_info("Got PROMISE from %s for \"%s\", acks now 0x%" PRIx64,
+		log_info("Got PROMISE from %s for \"%s\", for %d, acks now 0x%" PRIx64,
 				from->addr_string, tk->name,
+				tk->new_ballot,
 				tk->proposal_acknowledges);
 
 		return PREPARE_to_PROPOSE(tk);
