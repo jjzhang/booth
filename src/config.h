@@ -93,6 +93,11 @@ struct ticket_config {
 	/** Bitmap of sites that acknowledge that state. */
 	uint64_t proposal_acknowledges;
 
+	/** When an incompletely acknowledged proposal gets done.
+	 * If all peers agree, that happens sooner.
+	 * See switch_state_to(). */
+	struct timeval proposal_switch;
+
 	/** Timestamp of proposal expiration. */
 	time_t proposal_expires;
 

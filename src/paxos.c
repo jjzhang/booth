@@ -60,6 +60,55 @@ static inline void set_proposal_in_ticket(struct ticket_config *tk,
 }
 
 
+int should_switch_state_p(struct ticket_config *tk)
+{
+	if (all_agree(tk)) {
+		log_debug("all agree");
+		return 1;
+	}
+
+	if (majority_agree(tk)) {
+		/* Time passed, and more than half agree. */
+		if (timeval_in_past(tk->proposal_switch)) {
+			log_debug("majority, and enough time passed");
+			return 2;
+		}
+
+		if (!tk->proposal_switch.tv_sec) {
+			log_debug("majority, wait half a second");
+			/* Wait half a second before doing the state change. */
+			ticket_next_cron_in(tk, 0.5);
+			tk->proposal_switch = tk->next_cron;
+		}
+	}
+
+	return 0;
+}
+
+
+static int retries_exceeded(struct ticket_config *tk)
+{
+	tk->retry_number ++;
+	if (tk->retry_number > RETRIES) {
+		log_info("ABORT %s for ticket \"%s\" - "
+				"not enough answers after %d retries",
+				tk->state == OP_PREPARING ? "prepare" : "propose",
+				tk->name, tk->retry_number);
+		abort_proposal(tk);
+	} else {
+		/* We ask others for a change; retry to get
+		 * consensus.
+		 * But don't ask again immediately after a
+		 * query, give the peers time to answer. */
+		if (timeval_in_past(tk->proposal_switch)) {
+			ticket_broadcast_proposed_state(tk, tk->state);
+			ticket_activate_timeout(tk);
+		}
+	}
+	return 0;
+}
+
+
 static inline void change_ticket_owner(struct ticket_config *tk,
 		uint32_t ballot,
 		struct booth_site *new_owner)
@@ -102,6 +151,28 @@ void abort_proposal(struct ticket_config *tk)
 	tk->retry_number = 0;
 	/* Ask others (repeatedly) until we know the new owner. */
 	tk->state = ST_INIT;
+}
+
+
+int PROPOSE_to_COMMIT(struct ticket_config *tk)
+{
+	if (should_switch_state_p(tk)) {
+		change_ticket_owner(tk, tk->new_ballot, tk->proposed_owner);
+
+		return ticket_broadcast_proposed_state(tk, OP_COMMITTED);
+	}
+
+	return retries_exceeded(tk);
+}
+
+
+int PREPARE_to_PROPOSE(struct ticket_config *tk)
+{
+	if (should_switch_state_p(tk)) {
+		return ticket_broadcast_proposed_state(tk, OP_PROPOSING);
+	}
+
+	return retries_exceeded(tk);
 }
 
 
@@ -222,14 +293,7 @@ inline static int got_a_PROM(
 				from->addr_string, tk->name,
 				tk->proposal_acknowledges);
 
-		/* TODO: only check for count? */
-		if (promote_ticket_state(tk)) {
-			ticket_activate_timeout(tk);
-			return ticket_broadcast_proposed_state(tk, OP_PROPOSING);
-		}
-
-		/* Wait for further data */
-		return 0;
+		return PREPARE_to_PROPOSE(tk);
 	}
 
 
@@ -309,8 +373,6 @@ inline static int got_an_ACC(
 		uint32_t ballot,
 		struct booth_site *new_owner)
 {
-	int rv;
-
 	if (tk->proposer == local &&
 			tk->state == OP_PROPOSING) {
 		tk->proposal_acknowledges |= from->bitmask;
@@ -319,15 +381,8 @@ inline static int got_an_ACC(
 				from->addr_string, tk->name,
 				tk->proposal_acknowledges);
 
-		/* TODO: only check for count? */
-		if (promote_ticket_state(tk)) {
-			change_ticket_owner(tk, tk->new_ballot, tk->proposed_owner);
-
-			rv = ticket_broadcast_proposed_state(tk, OP_COMMITTED);
-			return rv;
-		}
+		return PROPOSE_to_COMMIT(tk);
 	}
-
 	return 0;
 }
 

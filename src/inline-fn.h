@@ -125,7 +125,12 @@ static inline void disown_if_expired(struct ticket_config *tk)
 }
 
 
-static inline int promote_ticket_state(struct ticket_config *tk)
+static inline int all_agree(struct ticket_config *tk)
+{
+	return tk->proposal_acknowledges == booth_conf->site_bits;
+}
+
+static inline int majority_agree(struct ticket_config *tk)
 {
 	/* Use ">" to get majority decision, even for an even number
 	 * of participants. */

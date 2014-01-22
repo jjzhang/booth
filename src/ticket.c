@@ -361,7 +361,7 @@ static int ticket_process_catchup(
 		tk->proposal_acknowledges |= from->bitmask;
 		tk->expires                = ntohl(msg->ticket.expiry) + time(NULL);
 
-		if (promote_ticket_state(tk)) {
+		if (should_switch_state_p(tk)) {
 			if (tk->state == ST_INIT)
 				tk->state = ST_STABLE;
 		}
@@ -509,19 +509,11 @@ static void ticket_cron(struct ticket_config *tk)
 		break;
 
 	case OP_PREPARING:
+		PREPARE_to_PROPOSE(tk);
+		break;
+
 	case OP_PROPOSING:
-		tk->retry_number ++;
-		if (tk->retry_number > RETRIES) {
-			log_info("ABORT %s for ticket \"%s\" - "
-					"not enough answers after %d retries",
-					tk->state == OP_PREPARING ? "prepare" : "propose",
-					tk->name, tk->retry_number);
-			abort_proposal(tk);
-		} else {
-			/* We ask others for a change; retry to get consensus. */
-			ticket_broadcast_proposed_state(tk, tk->state);
-			ticket_activate_timeout(tk);
-		}
+		PROPOSE_to_COMMIT(tk);
 		break;
 
 	case OP_PROMISING:
