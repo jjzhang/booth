@@ -182,7 +182,7 @@ int PREPARE_to_PROPOSE(struct ticket_config *tk)
  * Not all use all arguments; but to keep the interface the same,
  * they're all just passed everything we have.
  *
- * See also enum \ref cmd_request_t. 
+ * See also enum \ref cmd_request_t.
  * @{ */
 
 
