@@ -646,14 +646,25 @@ int message_recv(struct boothc_ticket_msg *msg, int msglen)
 
 void set_ticket_wakeup(struct ticket_config *tk)
 {
-	int next;
+	struct timeval tv, now;
 
 	if (tk->owner == local) {
-		next = tk->expiry / 2;
-		if (tk->timeout * RETRIES/2 < next)
-			next = tk->timeout;
-		ticket_next_cron_in(tk, next);
+		gettimeofday(&now, NULL);
+
+		tv = now;
+		tv.tv_sec = next_renewal_starts_at(tk);
+
+		/* If timestamp is in the past, look again in one second. */
+		if (timeval_compare(tv, now) <= 0)
+			tv.tv_sec = now.tv_sec + 1;
+
+		ticket_next_cron_at(tk, tv);
+	} else {
+		/* If there's some owner, check on her later on.
+		 * If no owner - don't care. */
+		if (tk->owner)
+			ticket_next_cron_in(tk, tk->expiry + tk->acquire_after);
+		else
+			ticket_next_cron_in(tk, 3600);
 	}
-	else
-		ticket_next_cron_in(tk, tk->expiry + tk->acquire_after);
 }
