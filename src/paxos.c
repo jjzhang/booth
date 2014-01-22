@@ -280,8 +280,9 @@ inline static int handle_REJ(
 	abort_proposal(tk);
 
 	/* TODO: should we check whether that sequence is increasing? */
-	tk->new_ballot = ballot;
-	tk->last_ack_ballot = ntohl(msg->ticket.prev_ballot);
+	tk->new_ballot = ballot_max2(tk->new_ballot, ballot);
+	tk->last_ack_ballot = ballot_max2(tk->last_ack_ballot,
+			ntohl(msg->ticket.prev_ballot));
 
 	/* No need to ask the others. */
 	tk->state = ST_STABLE;
