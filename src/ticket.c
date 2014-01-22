@@ -441,15 +441,24 @@ int ticket_broadcast_proposed_state(struct ticket_config *tk, cmd_request_t stat
 {
 	struct boothc_ticket_msg msg;
 
-	tk->proposal_acknowledges = local->bitmask;
+	if (state != tk->state) {
+		tk->proposal_acknowledges = local->bitmask;
+		tk->retry_number          = 0;
+	}
+
 	tk->state                 = state;
-
 	init_ticket_msg(&msg, state, RLT_SUCCESS, tk);
-
 	msg.ticket.owner          = htonl(get_node_id(tk->proposed_owner));
 
 	log_debug("broadcasting '%s' for ticket \"%s\"",
 			STATE_STRING(state), tk->name);
+#include <unistd.h>
+//sleep(1);
+
+	/* Switch state after one second, if the majority says ok. */
+	gettimeofday(&tk->proposal_switch, NULL);
+	tk->proposal_switch.tv_sec++;
+
 
 	return transport()->broadcast(&msg, sizeof(msg));
 }
