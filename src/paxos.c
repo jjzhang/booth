@@ -299,14 +299,21 @@ inline static int got_a_PROM(
 		uint32_t ballot,
 		struct booth_site *new_owner)
 {
-	if (tk->proposer == local ||
-			tk->state == OP_PREPARING) {
+	int had_that;
+
+	if (tk->proposer == local &&
+			tk->state == OP_PREPARING &&
+			tk->new_ballot == ballot) {
+		had_that = tk->proposal_acknowledges & from->bitmask;
+
 		tk->proposal_acknowledges |= from->bitmask;
 
 		log_info("Got PROMISE from %s for \"%s\", for %d, acks now 0x%" PRIx64,
 				from->addr_string, tk->name,
 				tk->new_ballot,
 				tk->proposal_acknowledges);
+		if (had_that)
+			return 0;
 
 		return PREPARE_to_PROPOSE(tk);
 	}
