@@ -378,7 +378,7 @@ accepting:
 				tk->name, from->addr_string, ballot,
 				ticket_owner_string(new_owner));
 		change_ticket_owner(tk, ballot, new_owner);
-	} if (ballot == tk->last_ack_ballot &&
+	} else if (ballot == tk->last_ack_ballot &&
 			ballot == tk->new_ballot &&
 			ntohl(msg->ticket.prev_ballot) == tk->last_ack_ballot) {
 		/* Silently ignore delayed messages. */
