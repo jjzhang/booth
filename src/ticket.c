@@ -195,10 +195,11 @@ int list_ticket(char **pdata, unsigned int *len)
 
 
 		cp += sprintf(cp,
-				"ticket: %s, owner: %s, expires: %s\n",
+				"ticket: %s, owner: %s, expires: %s, ballot: %d\n",
 				tk->name,
 				tk->owner ? tk->owner->addr_string : "None",
-				timeout_str);
+				timeout_str,
+				tk->last_ack_ballot);
 
 		*len = cp - data;
 		assert(*len < alloc);
@@ -261,7 +262,7 @@ int ticket_answer_grant(int fd, struct boothc_ticket_msg *msg)
 	}
 
 	if (tk->owner) {
-		log_error("client wants to get an granted ticket %s",
+		log_error("client wants to get an (already granted!) ticket \"%s\"",
 				msg->ticket.id);
 		rv = RLT_OVERGRANT;
 		goto reply;
@@ -357,10 +358,10 @@ static int ticket_process_catchup(
 			ballot == tk->last_ack_ballot &&
 			new_owner == tk->owner)  {
 		/* Peer says the same thing we're believing. */
-		tk->proposal_acknowledges |= from->bitmask;
+		tk->proposal_acknowledges |= from->bitmask | local->bitmask;
 		tk->expires                = ntohl(msg->ticket.expiry) + time(NULL);
 
-		if (promote_ticket_state(tk)) {
+		if (should_switch_state_p(tk)) {
 			if (tk->state == ST_INIT)
 				tk->state = ST_STABLE;
 		}
@@ -429,6 +430,12 @@ accept:
 ex:
 	ticket_write(tk);
 
+	if (tk->state == ST_STABLE) {
+		/* If we believe to have enough information, we can try to
+		 * acquire the ticket (again). */
+		time(&tk->expires);
+	}
+
 	return 0;
 }
 
@@ -440,15 +447,24 @@ int ticket_broadcast_proposed_state(struct ticket_config *tk, cmd_request_t stat
 {
 	struct boothc_ticket_msg msg;
 
-	tk->proposal_acknowledges = local->bitmask;
+	if (state != tk->state) {
+		tk->proposal_acknowledges = local->bitmask;
+		tk->retry_number          = 0;
+	}
+
 	tk->state                 = state;
-
 	init_ticket_msg(&msg, state, RLT_SUCCESS, tk);
-
 	msg.ticket.owner          = htonl(get_node_id(tk->proposed_owner));
 
 	log_debug("broadcasting '%s' for ticket \"%s\"",
 			STATE_STRING(state), tk->name);
+#include <unistd.h>
+//sleep(1);
+
+	/* Switch state after one second, if the majority says ok. */
+	gettimeofday(&tk->proposal_switch, NULL);
+	tk->proposal_switch.tv_sec++;
+
 
 	return transport()->broadcast(&msg, sizeof(msg));
 }
@@ -480,16 +496,44 @@ static void ticket_cron(struct ticket_config *tk)
 
 			/* Couldn't renew in time - ticket lost. */
 			tk->owner = NULL;
+			disown_ticket(tk);
+			/* This gets us into ST_INIT again; we couldn't
+			 * talk to a majority of sites, so we don't know
+			 * whether somebody else has the ticket now.
+			 * Keep asking until we know. */
 			abort_proposal(tk);
+
 			ticket_write(tk);
 
-			if (tk->acquire_after)
-				ticket_next_cron_in(tk, tk->acquire_after);
+			/* May not try to re-acquire now, need to find out
+			 * what others think. */
+			break;
 		}
 
-		/* Do we need to refresh? */
-		if (tk->owner == local &&
-				ticket_valid_for(tk) < tk->expiry/2) {
+		/* No matter whether the ticket just got lost by someone,
+		 * or whether is wasn't active anywhere - if automatic
+		 * acquiration is configured, try to get it active.
+		 * Condition:
+		 *  - no owner,
+		 *  - no active proposal,
+		 *  - acquire_after has passed,
+		 *  - could activate locally.
+		 * Now the sites can try to trump each other.  */
+		if (!tk->owner &&
+				!tk->proposed_owner &&
+				!tk->proposer &&
+				tk->expires &&
+				tk->expires + tk->acquire_after >= now &&
+				local->type == SITE) {
+			log_info("ACQUIRE ticket \"%s\" after timeout", tk->name);
+			paxos_start_round(tk, local);
+			break;
+		}
+
+
+		/* Are we the current owner, and do we need to refresh?
+		 * This is not the same as above. */
+		if (should_start_renewal(tk)) {
 			log_info("RENEW ticket \"%s\"", tk->name);
 			paxos_start_round(tk, local);
 
@@ -499,19 +543,11 @@ static void ticket_cron(struct ticket_config *tk)
 		break;
 
 	case OP_PREPARING:
+		PREPARE_to_PROPOSE(tk);
+		break;
+
 	case OP_PROPOSING:
-		tk->retry_number ++;
-		if (tk->retry_number > RETRIES) {
-			log_info("ABORT %s for ticket \"%s\" - "
-					"not enough answers after %d retries",
-					tk->state == OP_PREPARING ? "prepare" : "propose",
-					tk->name, tk->retry_number);
-			abort_proposal(tk);
-		} else {
-			/* We ask others for a change; retry to get consensus. */
-			ticket_broadcast_proposed_state(tk, tk->state);
-			ticket_activate_timeout(tk);
-		}
+		PROPOSE_to_COMMIT(tk);
 		break;
 
 	case OP_PROMISING:
@@ -530,21 +566,32 @@ void process_tickets(void)
 {
 	struct ticket_config *tk;
 	int i;
-	time_t now;
+	struct timeval now;
+	float sec_until;
 
-	time(&now);
+	gettimeofday(&now, NULL);
 
 	foreach_ticket(i, tk) {
+		sec_until = timeval_to_float(tk->next_cron) - timeval_to_float(now);
 		if (0)
-		log_debug("ticket %s next cron %" PRIx64 ", now %" PRIx64 ", in %" PRIi64,
-				tk->name, (uint64_t)tk->next_cron, (uint64_t)now,
-				(int64_t)tk->next_cron - now);
-		if (tk->next_cron > now)
+			log_debug("ticket %s next cron %" PRIx64 ".%03d, "
+					"now %" PRIx64 "%03d, in %f",
+					tk->name,
+					(uint64_t)tk->next_cron.tv_sec, timeval_msec(tk->next_cron),
+					(uint64_t)now.tv_sec, timeval_msec(now),
+					sec_until);
+		if (sec_until > 0.0)
 			continue;
 
 		log_debug("ticket cron: doing %s", tk->name);
-		/* Set next value, handler may override. */
-		tk->next_cron = INT_MAX;
+
+
+		/* Set next value, handler may override.
+		 * This should already be handled via the state logic;
+		 * but to be on the safe side the renew repetition is
+		 * duplicated here, too.  */
+		set_ticket_wakeup(tk);
+
 		ticket_cron(tk);
 	}
 }
@@ -628,4 +675,30 @@ int message_recv(struct boothc_ticket_msg *msg, int msglen)
 		return rv;
 	}
 	return 0;
+}
+
+
+void set_ticket_wakeup(struct ticket_config *tk)
+{
+	struct timeval tv, now;
+
+	if (tk->owner == local) {
+		gettimeofday(&now, NULL);
+
+		tv = now;
+		tv.tv_sec = next_renewal_starts_at(tk);
+
+		/* If timestamp is in the past, look again in one second. */
+		if (timeval_compare(tv, now) <= 0)
+			tv.tv_sec = now.tv_sec + 1;
+
+		ticket_next_cron_at(tk, tv);
+	} else {
+		/* If there's some owner, check on her later on.
+		 * If no owner - don't care. */
+		if (tk->owner)
+			ticket_next_cron_in(tk, tk->expiry + tk->acquire_after);
+		else
+			ticket_next_cron_in(tk, 3600);
+	}
 }

@@ -607,16 +607,16 @@ static int do_command(cmd_request_t cmd)
 	if (rv < 0)
 		goto out_close;
 
-	if (reply.result == RLT_INVALID_ARG) {
+	if (reply.result == htonl(RLT_INVALID_ARG)) {
 		log_info("invalid argument!");
 		rv = -1;
 		goto out_close;
 	}
 
-	if (reply.result == RLT_OVERGRANT) {
-		log_info("You're granting a granted ticket "
-			 "If you wanted to migrate a ticket,"
-			 "use revoke first, then use grant");
+	if (reply.result == htonl(RLT_OVERGRANT)) {
+		log_info("You're granting a granted ticket. "
+			 "If you wanted to migrate a ticket, "
+			 "use revoke first, then use grant.");
 		rv = -1;
 		goto out_close;
 	}
@@ -904,8 +904,8 @@ static int read_arguments(int argc, char **argv)
 				assert(cp > cl.configfile);
 				assert(*(cp-1) == '/');
 
-				/* Write after the "/" */
-				safe_copy(cp + 1, optarg,
+				/* Write at the \0, ie. after the "/" */
+				safe_copy(cp, optarg,
 						(sizeof(cl.configfile) -
 						 (cp -  cl.configfile) -
 						 strlen(BOOTH_DEFAULT_CONF_EXT)),

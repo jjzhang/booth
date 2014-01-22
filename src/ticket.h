@@ -21,6 +21,8 @@
 #define _TICKET_H
 
 #include <time.h>
+#include <sys/time.h>
+#include <math.h>
 
 #include "config.h"
 
@@ -47,6 +49,8 @@ int do_revoke_ticket(struct ticket_config *tk);
 
 int find_ticket_by_name(const char *ticket, struct ticket_config **found);
 
+void set_ticket_wakeup(struct ticket_config *tk);
+
 
 int ticket_answer_list(int fd, struct boothc_ticket_msg *msg);
 int ticket_answer_grant(int fd, struct boothc_ticket_msg *msg);
@@ -60,14 +64,20 @@ void process_tickets(void);
 void tickets_log_info(void);
 
 
-static inline void ticket_next_cron_at(struct ticket_config *tk, time_t when)
+static inline void ticket_next_cron_at(struct ticket_config *tk, struct timeval when)
 {
 	tk->next_cron = when;
 }
 
-static inline void ticket_next_cron_in(struct ticket_config *tk, int seconds)
+static inline void ticket_next_cron_in(struct ticket_config *tk, float seconds)
 {
-	ticket_next_cron_at(tk, time(NULL) + seconds);
+	struct timeval tv;
+
+	gettimeofday(&tv, NULL);
+	tv.tv_sec += trunc(seconds);
+	tv.tv_usec += (seconds - trunc(seconds)) * 1e6;
+
+	ticket_next_cron_at(tk, tv);
 }
 
 

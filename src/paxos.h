@@ -39,4 +39,8 @@ int paxos_answer(
 int paxos_start_round(struct ticket_config *tk, struct booth_site *new_owner);
 void abort_proposal(struct ticket_config *tk);
 
+int PREPARE_to_PROPOSE(struct ticket_config *tk);
+int PROPOSE_to_COMMIT(struct ticket_config *tk);
+int should_switch_state_p(struct ticket_config *tk);
+
 #endif /* _PAXOS_H */

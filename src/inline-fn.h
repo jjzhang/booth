@@ -20,6 +20,7 @@
 #define _INLINE_FN_H
 
 #include <time.h>
+#include <sys/time.h>
 #include <assert.h>
 #include <string.h>
 #include "config.h"
@@ -114,7 +115,7 @@ static inline void disown_ticket(struct ticket_config *tk)
 {
 	tk->owner = NULL;
 	tk->proposed_owner = NULL;
-	tk->expires = 0;
+	time(&tk->expires);
 }
 
 static inline void disown_if_expired(struct ticket_config *tk)
@@ -124,7 +125,12 @@ static inline void disown_if_expired(struct ticket_config *tk)
 }
 
 
-static inline int promote_ticket_state(struct ticket_config *tk)
+static inline int all_agree(struct ticket_config *tk)
+{
+	return tk->proposal_acknowledges == booth_conf->site_bits;
+}
+
+static inline int majority_agree(struct ticket_config *tk)
 {
 	/* Use ">" to get majority decision, even for an even number
 	 * of participants. */
@@ -181,6 +187,80 @@ static inline uint32_t ballot_max2(uint32_t a, uint32_t b)
 static inline uint32_t ballot_max3(uint32_t a, uint32_t b, uint32_t c)
 {
 	return ballot_max2( ballot_max2(a, b), c);
+}
+
+
+static inline double timeval_to_float(struct timeval tv)
+{
+	return tv.tv_sec + tv.tv_usec*(double)1.0e-6;
+}
+
+static inline int timeval_msec(struct timeval tv)
+{
+	int m;
+
+	m = tv.tv_usec / 1000;
+	if (m >= 1000)
+		m = 999;
+	return m;
+}
+
+
+static inline int timeval_compare(struct timeval tv1, struct timeval tv2)
+{
+	if (tv1.tv_sec < tv2.tv_sec)
+		return -1;
+	if (tv1.tv_sec > tv2.tv_sec)
+		return +1;
+	if (tv1.tv_usec < tv2.tv_usec)
+		return -1;
+	if (tv1.tv_usec > tv2.tv_usec)
+		return +1;
+	return 0;
+}
+
+
+static inline int timeval_in_past(struct timeval which)
+{
+	struct timeval tv;
+
+	gettimeofday(&tv, NULL);
+	return timeval_compare(tv, which) > 0;
+}
+
+
+static inline time_t next_renewal_starts_at(struct ticket_config *tk)
+{
+	time_t half_exp, retries_needed;
+
+	/* If not owner, don't renew. */
+	if (tk->owner != local)
+		return 0;
+
+	/* Try to renew at half of expiry time. */
+	half_exp = tk->expires - tk->expiry/2;
+	/* Also start renewal if we couldn't get
+	 * a few message retransmission in the alloted
+	 * expiry time. */
+	retries_needed = tk->expires - tk->timeout * RETRIES/2;
+
+	/* Return earlier timestamp. */
+	return half_exp < retries_needed
+		? half_exp
+		: retries_needed;
+}
+
+
+static inline int should_start_renewal(struct ticket_config *tk)
+{
+	time_t now, when;
+
+	when = next_renewal_starts_at(tk);
+	if (!when)
+		return 0;
+
+	time(&now);
+	return when >= now;
 }
 
 

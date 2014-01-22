@@ -60,12 +60,59 @@ static inline void set_proposal_in_ticket(struct ticket_config *tk,
 }
 
 
+int should_switch_state_p(struct ticket_config *tk)
+{
+	if (all_agree(tk)) {
+		log_debug("all agree");
+		return 1;
+	}
+
+	if (majority_agree(tk)) {
+		/* Time passed, and more than half agree. */
+		if (timeval_in_past(tk->proposal_switch)) {
+			log_debug("majority, and enough time passed");
+			return 2;
+		}
+
+		if (!tk->proposal_switch.tv_sec) {
+			log_debug("majority, wait half a second");
+			/* Wait half a second before doing the state change. */
+			ticket_next_cron_in(tk, 0.5);
+			tk->proposal_switch = tk->next_cron;
+		}
+	}
+
+	return 0;
+}
+
+
+static int retries_exceeded(struct ticket_config *tk)
+{
+	tk->retry_number ++;
+	if (tk->retry_number > RETRIES) {
+		log_info("ABORT %s for ticket \"%s\" - "
+				"not enough answers after %d retries",
+				tk->state == OP_PREPARING ? "prepare" : "propose",
+				tk->name, tk->retry_number);
+		abort_proposal(tk);
+	} else {
+		/* We ask others for a change; retry to get
+		 * consensus.
+		 * But don't ask again immediately after a
+		 * query, give the peers time to answer. */
+		if (timeval_in_past(tk->proposal_switch)) {
+			ticket_broadcast_proposed_state(tk, tk->state);
+			ticket_activate_timeout(tk);
+		}
+	}
+	return 0;
+}
+
+
 static inline void change_ticket_owner(struct ticket_config *tk,
 		uint32_t ballot,
 		struct booth_site *new_owner)
 {
-	int next;
-
 	/* set "previous" value for next round */
 	tk->last_ack_ballot =
 		tk->new_ballot = ballot;
@@ -76,15 +123,7 @@ static inline void change_ticket_owner(struct ticket_config *tk,
 
 	tk->state = ST_STABLE;
 
-	if (new_owner == local) {
-		next = tk->expiry / 2;
-		if (tk->timeout * RETRIES/2 < next)
-			next = tk->timeout;
-		ticket_next_cron_in(tk, next);
-	}
-	else
-		ticket_next_cron_in(tk, tk->expiry + tk->acquire_after);
-
+	set_ticket_wakeup(tk);
 	log_info("Now actively COMMITTED for \"%s\": new owner %s, ballot %d",
 			tk->name,
 			ticket_owner_string(tk->owner),
@@ -97,11 +136,38 @@ static inline void change_ticket_owner(struct ticket_config *tk,
 
 void abort_proposal(struct ticket_config *tk)
 {
+	log_info("ABORTing proposal.");
 	tk->proposer = NULL;
 	tk->proposed_owner = tk->owner;
 	tk->retry_number = 0;
 	/* Ask others (repeatedly) until we know the new owner. */
 	tk->state = ST_INIT;
+}
+
+
+int PROPOSE_to_COMMIT(struct ticket_config *tk)
+{
+	int rv;
+
+	if (should_switch_state_p(tk)) {
+		change_ticket_owner(tk, tk->new_ballot, tk->proposed_owner);
+
+		rv = ticket_broadcast_proposed_state(tk, OP_COMMITTED);
+		tk->state = ST_STABLE;
+		return rv;
+	}
+
+	return retries_exceeded(tk);
+}
+
+
+int PREPARE_to_PROPOSE(struct ticket_config *tk)
+{
+	if (should_switch_state_p(tk)) {
+		return ticket_broadcast_proposed_state(tk, OP_PROPOSING);
+	}
+
+	return retries_exceeded(tk);
 }
 
 
@@ -111,7 +177,7 @@ void abort_proposal(struct ticket_config *tk)
  * Not all use all arguments; but to keep the interface the same,
  * they're all just passed everything we have.
  *
- * See also enum \ref cmd_request_t. 
+ * See also enum \ref cmd_request_t.
  * @{ */
 
 
@@ -121,9 +187,12 @@ int paxos_start_round(struct ticket_config *tk, struct booth_site *new_owner)
 	if (tk->state != ST_STABLE)
 		return RLT_BUSY;
 
-	/* This may not be done from cron, because the ballot number would simply
+	/* This may not be called repeatedly from cron,
+	 * because the ballot number would simply
 	 * get counted up without any benefit.
-	 * The message may get retransmitted, though. */
+	 * The message may get retransmitted, though.
+	 * Normal retry behaviour gets achieved during
+	 * state OP_PREPARING anyway. */
 	tk->proposer = local;
 	tk->new_ballot = next_ballot_number(tk);
 	tk->proposed_owner = new_owner;
@@ -131,6 +200,9 @@ int paxos_start_round(struct ticket_config *tk, struct booth_site *new_owner)
 	tk->retry_number = 0;
 	ticket_activate_timeout(tk);
 
+	/* TODO: shorten renew exchange by just sending
+	 * a new proposal? Ballot numbers should still be the
+	 * same everywhere, owner doesn't change. */
 	return ticket_broadcast_proposed_state(tk, OP_PREPARING);
 }
 
@@ -147,6 +219,10 @@ inline static int answer_PREP(
 	if (!(local->role & ACCEPTOR))
 		return 0;
 
+	/* Ignore if packet is too late, and state is already active. */
+	if (tk->owner == new_owner &&
+			ballot == tk->last_ack_ballot)
+		return 0;
 
 	/* We have to be careful here.
 	 * Getting multiple copies of the same message must not trigger
@@ -182,13 +258,21 @@ promise:
 
 
 /** Getting OP_REJECTED means abandoning the current operation. */
-inline static int answer_REJ(
+inline static int handle_REJ(
 		struct ticket_config *tk,
 		struct booth_site *from,
 		struct boothc_ticket_msg *msg,
 		uint32_t ballot,
 		struct booth_site *new_owner)
 {
+	if (tk->last_ack_ballot == ballot) {
+		log_debug("got a late REJECTED; ignored, as "
+				"ballot %d is already active.",
+				tk->last_ack_ballot);
+		return 0;
+	}
+
+
 	log_info("got REJECTED for ticket \"%s\", ballot %d (has %d), from %s",
 			tk->name,
 			tk->new_ballot, ballot,
@@ -197,8 +281,9 @@ inline static int answer_REJ(
 	abort_proposal(tk);
 
 	/* TODO: should we check whether that sequence is increasing? */
-	tk->new_ballot = ballot;
-	tk->last_ack_ballot = ntohl(msg->ticket.prev_ballot);
+	tk->new_ballot = ballot_max2(tk->new_ballot, ballot);
+	tk->last_ack_ballot = ballot_max2(tk->last_ack_ballot,
+			ntohl(msg->ticket.prev_ballot));
 
 	/* No need to ask the others. */
 	tk->state = ST_STABLE;
@@ -214,22 +299,23 @@ inline static int got_a_PROM(
 		uint32_t ballot,
 		struct booth_site *new_owner)
 {
-	if (tk->proposer == local ||
-			tk->state == OP_PREPARING) {
+	int had_that;
+
+	if (tk->proposer == local &&
+			tk->state == OP_PREPARING &&
+			tk->new_ballot == ballot) {
+		had_that = tk->proposal_acknowledges & from->bitmask;
+
 		tk->proposal_acknowledges |= from->bitmask;
 
-		log_info("Got PROMISE from %s for \"%s\", now %" PRIx64,
+		log_info("Got PROMISE from %s for \"%s\", for %d, acks now 0x%" PRIx64,
 				from->addr_string, tk->name,
+				tk->new_ballot,
 				tk->proposal_acknowledges);
+		if (had_that)
+			return 0;
 
-		/* TODO: only check for count? */
-		if (promote_ticket_state(tk)) {
-			ticket_activate_timeout(tk);
-			return ticket_broadcast_proposed_state(tk, OP_PROPOSING);
-		}
-
-		/* Wait for further data */
-		return 0;
+		return PREPARE_to_PROPOSE(tk);
 	}
 
 
@@ -258,9 +344,18 @@ inline static int answer_PROP(
 	if (!(local->role & ACCEPTOR))
 		return 0;
 
-	if (from == tk->proposer &&
+
+	/* Repeated packet. */
+	if (new_owner == tk->owner &&
 			ballot == tk->new_ballot)
 		goto accepting;
+
+	/* If packet is late, ie. we already have that state,
+	 * just repeat the ack - perhaps it got lost. */
+	if (new_owner == tk->owner &&
+			ballot == tk->last_ack_ballot)
+		goto accepting;
+
 
 	/* We have to be careful here.
 	 * Getting multiple copies of the same message must not trigger
@@ -283,7 +378,7 @@ accepting:
 				tk->name, from->addr_string, ballot,
 				ticket_owner_string(new_owner));
 		change_ticket_owner(tk, ballot, new_owner);
-	} if (ballot == tk->last_ack_ballot &&
+	} else if (ballot == tk->last_ack_ballot &&
 			ballot == tk->new_ballot &&
 			ntohl(msg->ticket.prev_ballot) == tk->last_ack_ballot) {
 		/* Silently ignore delayed messages. */
@@ -309,25 +404,16 @@ inline static int got_an_ACC(
 		uint32_t ballot,
 		struct booth_site *new_owner)
 {
-	int rv;
-
 	if (tk->proposer == local &&
 			tk->state == OP_PROPOSING) {
 		tk->proposal_acknowledges |= from->bitmask;
 
-		log_info("Got ACCEPTING from %s for \"%s\", now %" PRIx64,
+		log_info("Got ACCEPTING from %s for \"%s\", acks now 0x%" PRIx64,
 				from->addr_string, tk->name,
 				tk->proposal_acknowledges);
 
-		/* TODO: only check for count? */
-		if (promote_ticket_state(tk)) {
-			change_ticket_owner(tk, tk->new_ballot, tk->proposed_owner);
-
-			rv = ticket_broadcast_proposed_state(tk, OP_COMMITTED);
-			return rv;
-		}
+		return PROPOSE_to_COMMIT(tk);
 	}
-
 	return 0;
 }
 
@@ -376,7 +462,7 @@ int paxos_answer(
 			return answer_PREP(tk, from, msg, ballot, new_owner_p);
 
 		case OP_REJECTED:
-			return answer_REJ(tk, from, msg, ballot, new_owner_p);
+			return handle_REJ(tk, from, msg, ballot, new_owner_p);
 
 		case OP_PROMISING:
 			return got_a_PROM(tk, from, msg, ballot, new_owner_p);
