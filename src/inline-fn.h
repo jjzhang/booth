@@ -229,4 +229,39 @@ static inline int timeval_in_past(struct timeval which)
 }
 
 
+static inline time_t next_renewal_starts_at(struct ticket_config *tk)
+{
+	time_t half_exp, retries_needed;
+
+	/* If not owner, don't renew. */
+	if (tk->owner != local)
+		return 0;
+
+	/* Try to renew at half of expiry time. */
+	half_exp = tk->expires - tk->expiry/2;
+	/* Also start renewal if we couldn't get
+	 * a few message retransmission in the alloted
+	 * expiry time. */
+	retries_needed = tk->expires - tk->timeout * RETRIES/2;
+
+	/* Return earlier timestamp. */
+	return half_exp < retries_needed
+		? half_exp
+		: retries_needed;
+}
+
+
+static inline int should_start_renewal(struct ticket_config *tk)
+{
+	time_t now, when;
+
+	when = next_renewal_starts_at(tk);
+	if (!when)
+		return 0;
+
+	time(&now);
+	return when >= now;
+}
+
+
 #endif
