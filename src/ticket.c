@@ -262,7 +262,7 @@ int ticket_answer_grant(int fd, struct boothc_ticket_msg *msg)
 	}
 
 	if (tk->owner) {
-		log_error("client wants to get an granted ticket %s",
+		log_error("client wants to get an (already granted!) ticket \"%s\"",
 				msg->ticket.id);
 		rv = RLT_OVERGRANT;
 		goto reply;
