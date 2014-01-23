@@ -727,7 +727,8 @@ static int _lockfile(int mode, int *fdp, pid_t *locked_by)
 }
 
 
-static int lockfile(void) {
+static int create_lockfile(void)
+{
 	int rv, fd;
 
 	fd = -1;
@@ -1160,7 +1161,7 @@ static int do_server(int type)
 
 	/* The lockfile must be written to _after_ the call to daemon(), so
 	 * that the lockfile contains the pid of the daemon, not the parent. */
-	lock_fd = lockfile();
+	lock_fd = create_lockfile();
 	if (lock_fd < 0)
 		return lock_fd;
 
