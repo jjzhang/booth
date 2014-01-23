@@ -767,32 +767,29 @@ static void unlink_lockfile(int fd)
 
 static void print_usage(void)
 {
-	printf("Usage:\n");
-	printf("booth <type> <operation> [options]\n");
+	printf("Usages:\n");
+	printf("  booth daemon [-c config] [-D]\n");
+	printf("  booth [client] {list|grant|revoke} [options]\n");
+	printf("  booth status [-c config] [-D]\n");
 	printf("\n");
-	printf("Types:\n");
-	printf("  arbitrator:   daemon running on arbitrator\n");
-	printf("  site:	        daemon running on cluster site\n");
-	printf("  client:       command running from client\n");
-	printf("\n");
-	printf("Operations:\n");
-	printf("Please note that operations are valid iff type is client!\n");
+	printf("Client operations:\n");
 	printf("  list:	        List all the tickets\n");
-	printf("  grant:        Grant ticket T(-t T) to site S(-s S)\n");
-	printf("  revoke:       Revoke ticket T(-t T) from site S(-s S)\n");
+	printf("  grant:        Grant ticket to site\n");
+	printf("  revoke:       Revoke ticket from site\n");
 	printf("\n");
 	printf("Options:\n");
 	printf("  -c FILE       Specify config file [default " BOOTH_DEFAULT_CONF "]\n");
-	printf("  -l LOCKFILE   Specify lock file path\n");
+	printf("                Can be a path or a name without \".conf\" suffix\n");
 	printf("  -D            Enable debugging to stderr and don't fork\n");
 	printf("  -t            ticket name\n");
-	printf("  -S            report local daemon status (for site and arbitrator)\n");
-	printf("                RA script compliant return codes.\n");
 	printf("  -s            site name\n");
+	printf("  -l LOCKFILE   Specify lock file path (daemon only)\n");
 	printf("  -h            Print this help, then exit\n");
+	printf("\n");
+	printf("Please see the man page for details.\n");
 }
 
-#define OPTION_STRING		"c:Dl:t:s:hS"
+#define OPTION_STRING		"c:Dl:t:s:h"
 
 
 void safe_copy(char *dest, char *value, size_t buflen, const char *description) {
