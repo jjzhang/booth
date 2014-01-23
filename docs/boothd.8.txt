@@ -173,6 +173,28 @@ The default is '3'.
 Default is '0' for all; this means that the ordering within the configuration 
 file defines a kind of priority for conflicting requests.
 
+*'acquire-after'*::
+	Setting this to a positive value will make 'booth' try to acquire a ticket 
+	that got lost.
++
+Ie. if the site that _had_ the ticket is not reachable any more,
+then 'acquire-after' seconds after ticket expiration other sites will try
+to activate the ticket. (Only one will succeed, though.)
++
+A typical delay might be 60 seconds.
+
+*'retries'*::
+	Defines how often broadcast packets are sent out before the current 
+	action (grant, revoke) is aborted.
++
+Default is 10; values lower than 3 are forbidden, and high values won't 
+make much sense, too.
++
+Please note that this counts only for a single packet; if ticket *renewal*
+runs into this limit (because the network was temporarily down), but the
+ticket is still valid afterwards, a new renewal run will be started 
+automatically.
+
 
 A more verbose example of a configuration file might be
 
@@ -188,8 +210,10 @@ site="::ffff:192.168.202.100"
 arbitrator="192.168.203.100"
 
 ticket="I-want-a-pony"
-	timeout = 10
-	expire = 600
+    expire        = 600
+    acquire-after = 60
+    timeout       = 10
+    retries       = 5
 -----------------------
 
 	
@@ -203,7 +227,18 @@ WAN connections it makes no sense to expect detection of problems and failover
 within a few seconds.
 
 
-'booth' should work with IPv6 addresses, too.
+'booth' works with IPv6 addresses, too.
+
+
+'booth' will start to renew a ticket before it expires, to account
+for transmission delays.
+
+This will happen so that (the bigger one of) half the 'expire' time, or 
+'timeout'*'retries'/2 seconds, will be left for the renewal.
+
+Of course, that means that with bad configuration values (eg. 'expire' 60 
+seconds, 'timeout' 3 seconds, and 'retries' > 40) the ticket renewal 
+process will be started just after the ticket got acquired.
 
 
 FILES
@@ -260,7 +295,7 @@ COPYING
 
 Copyright (C) 2011 Jiaju Zhang <jjzhang@suse.de>
 
-Copyright (C) 2013 Philipp Marek <philipp.marek@linbit.com>
+Copyright (C) 2013-2014 Philipp Marek <philipp.marek@linbit.com>
 
 Free use of this software is
 granted under the terms of the GNU General Public License (GPL).
