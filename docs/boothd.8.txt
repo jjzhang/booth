@@ -196,6 +196,15 @@ ticket is still valid afterwards, a new renewal run will be started
 automatically.
 
 
+*'site-user'*, *'site-group'*, *'arbitrator-user'*, *'arbitrator-group'*::
+	These define the credentials 'boothd' will be running with.
++
+On a (Pacemaker) site the booth process will have to call 'crm_ticket', so the 
+default is to use 'hacluster':'haclient'; for an arbitrator this user and group 
+might not exists, so that will default to 'nobody':'nobody'.
+
+
+
 A more verbose example of a configuration file might be
 
 -----------------------
@@ -216,7 +225,6 @@ ticket="I-want-a-pony"
     retries       = 5
 -----------------------
 
-	
 
 NOTES
 -----
