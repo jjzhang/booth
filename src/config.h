@@ -32,8 +32,6 @@
 #define TICKET_ALLOC	16
 
 
-#define RETRIES  10
-
 
 struct ticket_config {
 	/** \name Configuration items.
@@ -46,6 +44,9 @@ struct ticket_config {
 
 	/** Network related timeouts. */
 	int timeout;
+
+	/** Retries before giving up. */
+	int retries;
 
 	/** If >0, time to wait for a site to get fenced.
 	 * The ticket may be acquired after that timespan by

@@ -307,6 +307,7 @@ int read_config(const char *path)
 	parse_weights("", defaults.weight);
 	defaults.expiry = DEFAULT_TICKET_EXPIRY;
 	defaults.timeout = DEFAULT_TICKET_TIMEOUT;
+	defaults.retries = DEFAULT_RETRIES;
 
 	error = "";
 
@@ -465,6 +466,17 @@ no_value:
 
 			if (last_ticket)
 				last_ticket->timeout = defaults.timeout;
+		}
+
+		if (strcmp(key, "retries") == 0) {
+			defaults.retries = strtol(val, &s, 0);
+			if (*s || s == val || defaults.retries<3 || defaults.retries > 100) {
+				error = "Expected plain integer value in the range [3, 100] for retries";
+				goto err;
+			}
+
+			if (last_ticket)
+				last_ticket->retries = defaults.retries;
 		}
 
 		if (strcmp(key, "acquire-after") == 0) {

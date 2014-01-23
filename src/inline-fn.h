@@ -242,7 +242,7 @@ static inline time_t next_renewal_starts_at(struct ticket_config *tk)
 	/* Also start renewal if we couldn't get
 	 * a few message retransmission in the alloted
 	 * expiry time. */
-	retries_needed = tk->expires - tk->timeout * RETRIES/2;
+	retries_needed = tk->expires - tk->timeout * tk->retries/2;
 
 	/* Return earlier timestamp. */
 	return half_exp < retries_needed

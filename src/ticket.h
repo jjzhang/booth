@@ -28,6 +28,7 @@
 
 #define DEFAULT_TICKET_EXPIRY	600
 #define DEFAULT_TICKET_TIMEOUT	10
+#define DEFAULT_RETRIES			10
 
 
 #define foreach_ticket(i_,t_) for(i=0; (t_=booth_conf->ticket+i, i<booth_conf->ticket_count); i++)

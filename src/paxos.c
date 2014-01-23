@@ -89,7 +89,7 @@ int should_switch_state_p(struct ticket_config *tk)
 static int retries_exceeded(struct ticket_config *tk)
 {
 	tk->retry_number ++;
-	if (tk->retry_number > RETRIES) {
+	if (tk->retry_number > tk->retries) {
 		log_info("ABORT %s for ticket \"%s\" - "
 				"not enough answers after %d retries",
 				tk->state == OP_PREPARING ? "prepare" : "propose",
