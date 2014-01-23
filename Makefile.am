@@ -43,6 +43,8 @@ MAINTAINERCLEANFILES	= Makefile.in aclocal.m4 configure depcomp \
 
 dist_doc_DATA		= README COPYING
 
+notrans_dist_man8_MANS = docs/boothd.8
+
 boothconfdir		= ${BOOTHSYSCONFDIR}
 
 boothconf_DATA		= conf/booth.conf.example
