@@ -727,6 +727,13 @@ static int _lockfile(int mode, int *fdp, pid_t *locked_by)
 }
 
 
+static inline int is_root(void)
+{
+	/* TODO: getuid()? Better way to check? */
+	return geteuid() == 0;
+}
+
+
 static int create_lockfile(void)
 {
 	int rv, fd;
@@ -738,7 +745,7 @@ static int create_lockfile(void)
 		log_error("lockfile %s open error %d: %s",
 				cl.lockfile, rv, strerror(rv));
 		return -1;
-	}       
+	}
 
 	if (rv < 0) {
 		log_error("lockfile %s setlk error %d: %s",
@@ -751,6 +758,12 @@ static int create_lockfile(void)
 		log_error("write daemon state %d to lockfile error %s: %s",
 				BOOTHD_STARTING, cl.lockfile, strerror(errno));
 		goto fail;
+	}
+
+	if (is_root()) {
+		if (fchown(fd, booth_conf->uid, booth_conf->gid) < 0)
+			log_error("fchown() on lockfile said %d: %s",
+					errno, strerror(errno));
 	}
 
 	return fd;
@@ -1136,6 +1149,30 @@ quit:
 }
 
 
+static int limit_this_process(void)
+{
+	int rv;
+	if (!is_root())
+		return 0;
+
+	if (setregid(booth_conf->gid, booth_conf->gid) < 0) {
+		rv = errno;
+		log_error("setregid() didn't work: %s", strerror(rv));
+		return rv;
+	}
+
+	if (setreuid(booth_conf->uid, booth_conf->uid) < 0) {
+		rv = errno;
+		log_error("setreuid() didn't work: %s", strerror(rv));
+		return rv;
+	}
+
+	/* TODO: ulimits? But that would restrict crm_ticket and handler 
+	 * scripts, too! */
+	return 0;
+}
+
+
 static int do_server(int type)
 {
 	int lock_fd = -1;
@@ -1171,6 +1208,10 @@ static int do_server(int type)
 	cl_log_set_facility(HA_LOG_FACILITY);
 	cl_inherit_logging_environment(0);
 
+	rv = limit_this_process();
+	if (rv)
+		return rv;
+
 
 	log_info("BOOTH %s daemon is starting, node id is %08X.",
 			type_to_string(local->type),
@@ -1189,8 +1230,12 @@ static int do_server(int type)
 	rv = loop(lock_fd);
 
 out:
-	if (lock_fd >= 0)
+	if (lock_fd >= 0) {
+		/* We might not be able to delete it, but at least
+		 * make it empty. */
+		ftruncate(lock_fd, 0);
 		unlink_lockfile(lock_fd);
+	}
 
 	return rv;
 }

@@ -119,6 +119,13 @@ struct booth_config {
     /** Stores the OR of the individual host bitmasks. */
     uint64_t site_bits;
 
+    char site_user[BOOTH_NAME_LEN];
+    char site_group[BOOTH_NAME_LEN];
+    char arb_user[BOOTH_NAME_LEN];
+    char arb_group[BOOTH_NAME_LEN];
+    uid_t uid;
+    gid_t gid;
+
     int site_count;
     struct booth_site site[MAX_NODES];
 

@@ -22,6 +22,9 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <zlib.h>
+#include <sys/types.h>
+#include <pwd.h>
+#include <grp.h>
 #include <errno.h>
 #include <string.h>
 #include "booth.h"
@@ -304,6 +307,15 @@ int read_config(const char *path)
 	booth_conf->proto = UDP;
 	booth_conf->port = BOOTH_DEFAULT_PORT;
 
+
+	/* Provide safe defaults. -1 is reserved, though. */
+	booth_conf->uid = -2;
+	booth_conf->gid = -2;
+	strcpy(booth_conf->site_user,  "hacluster");
+	strcpy(booth_conf->site_group, "haclient");
+	strcpy(booth_conf->arb_user,   "nobody");
+	strcpy(booth_conf->arb_group,  "nobody");
+
 	parse_weights("", defaults.weight);
 	defaults.expiry = DEFAULT_TICKET_EXPIRY;
 	defaults.timeout = DEFAULT_TICKET_TIMEOUT;
@@ -457,6 +469,20 @@ no_value:
 				last_ticket->expiry = defaults.expiry;
 		}
 
+		if (strcmp(key, "site-user") == 0)
+			safe_copy(booth_conf->site_user, optarg, BOOTH_NAME_LEN,
+					"site-user");
+		if (strcmp(key, "site-group") == 0)
+			safe_copy(booth_conf->site_group, optarg, BOOTH_NAME_LEN,
+					"site-group");
+		if (strcmp(key, "arbitrator-user") == 0)
+			safe_copy(booth_conf->arb_user, optarg, BOOTH_NAME_LEN,
+					"arbitrator-user");
+		if (strcmp(key, "arbitrator-group") == 0)
+			safe_copy(booth_conf->arb_group, optarg, BOOTH_NAME_LEN,
+					"arbitrator-group");
+
+
 		if (strcmp(key, "timeout") == 0) {
 			defaults.timeout = strtol(val, &s, 0);
 			if (*s || s == val || defaults.timeout<1) {
@@ -534,10 +560,61 @@ out:
 	return -1;
 }
 
+
 int check_config(int type)
 {
+	struct passwd *pw;
+	struct group *gr;
+	char *cp, *input;
+
 	if (!booth_conf)
 		return -1;
+
+
+	input = (type == ARBITRATOR)
+		? booth_conf->arb_user
+		: booth_conf->site_user;
+	if (!*input)
+		goto u_inval;
+	if (isdigit(input[0])) {
+		booth_conf->uid = strtol(input, &cp, 0);
+		if (*cp != 0) {
+u_inval:
+			log_error("User \"%s\" cannot be resolved into a UID.", input);
+			return ENOENT;
+		}
+	}
+	else {
+		pw = getpwnam(input);
+		if (!pw)
+			goto u_inval;
+		booth_conf->uid = pw->pw_uid;
+	}
+
+
+	input = (type == ARBITRATOR)
+		? booth_conf->arb_group
+		: booth_conf->site_group;
+	if (!*input)
+		goto g_inval;
+	if (isdigit(input[0])) {
+		booth_conf->gid = strtol(input, &cp, 0);
+		if (*cp != 0) {
+g_inval:
+			log_error("Group \"%s\" cannot be resolved into a UID.", input);
+			return ENOENT;
+		}
+	}
+	else {
+		gr = getgrnam(input);
+		if (!gr)
+			goto g_inval;
+		booth_conf->gid = gr->gr_gid;
+	}
+
+
+	/* TODO: check whether uid or gid is 0 again?
+	 * The admin may shoot himself in the foot, though. */
 
 	return 0;
 }
