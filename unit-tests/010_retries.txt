@@ -1,0 +1,45 @@
+# vim: ft=sh et :
+#
+# Testing whether retries are sent, and if they're stopped again.
+
+
+ticket:
+    state               ST_STABLE
+    last_ack_ballot     40
+    new_ballot          50
+    owner               local
+    retries             6
+    timeout             1
+    # may keep ticket all the time
+    expiry              3000
+
+
+outgoing0:
+    cmd                 OP_PREPARING
+outgoing1:
+    cmd                 OP_PREPARING
+outgoing2:
+    cmd                 OP_PREPARING
+outgoing3:
+    cmd                 OP_PREPARING
+
+message4:
+    cmd                 OP_PROMISING
+
+outgoing5:
+    cmd                 OP_PROPOSING
+outgoing6:
+    cmd                 OP_PROPOSING
+outgoing7:
+    cmd                 OP_PROPOSING
+outgoing8:
+    cmd                 OP_PROPOSING
+outgoing9:
+    cmd                 OP_PROPOSING
+outgoing10:
+    cmd                 OP_PROPOSING
+    
+
+# Now retry counter should trigger, and restart paxos
+outgoing11:
+    cmd                 OP_PREPARING
