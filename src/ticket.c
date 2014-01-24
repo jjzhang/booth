@@ -458,8 +458,6 @@ int ticket_broadcast_proposed_state(struct ticket_config *tk, cmd_request_t stat
 
 	log_debug("broadcasting '%s' for ticket \"%s\"",
 			STATE_STRING(state), tk->name);
-#include <unistd.h>
-//sleep(1);
 
 	/* Switch state after one second, if the majority says ok. */
 	gettimeofday(&tk->proposal_switch, NULL);
