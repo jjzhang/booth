@@ -66,6 +66,12 @@ typedef unsigned char boothc_ticket[BOOTH_NAME_LEN];
 
 
 struct boothc_header {
+	/** Authentication data; not used now. */
+	uint32_t iv;
+	uint32_t auth1;
+	uint32_t auth2;
+
+
 	/** BOOTHC_MAGIC */
 	uint32_t magic;
 	/** BOOTHC_VERSION */

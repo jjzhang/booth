@@ -17,36 +17,40 @@ do
 		else
 			local hdr = tree:add(booth_proto, buffer(0, 24), "Booth header")
 
-			local cmd = buffer(16, 4)
+			local cmd = buffer(28, 4)
 			local tcmd = T32(hdr, cmd, 0,    "Cmd     %08x, \"" .. cmd:string() .. "\"");
 
-			local from = buffer(8, 4)
+			local from = buffer(20, 4)
 			local tfrom = T32(hdr, from, 0,  "From    %08x");
 			if bit.band(from:uint(), 0x80000000) > 0 then
 				tfrom:add_expert_info(PI_PROTOCOL,  PI_WARN, "Highest bit set")
 			end
 
-			local len = buffer(12, 4)
+			local len = buffer(24, 4)
 			local tlen = T32(hdr, len, 0,    "Length  %8d");
 			if len:uint() > 1000 then
 				tlen:add_expert_info(PI_PROTOCOL,  PI_WARN, "Length too big?")
 			end
 
-			T32(hdr, buffer, 20,             "Result  %08x");
-			T32(hdr, buffer,  0,             "Magic   %08x");
-			T32(hdr, buffer,  4,             "Version %08x");
+			T32(hdr, buffer, 32,             "Result  %08x");
+			T32(hdr, buffer, 12,             "Magic   %08x");
+			T32(hdr, buffer, 16,             "Version %08x");
+
+			T32(hdr, buffer,  0,             "IV      %08x");
+			T32(hdr, buffer,  4,             "Auth1   %08x");
+			T32(hdr, buffer,  8,             "Auth2   %08x");
 
 
 
-			if (endbuf > 24) then
-				local tick = tree:add(booth_proto, buffer(24, endbuf-24), "Booth data")
-				local name = buffer(24, 64)
+			if (endbuf > 36) then
+				local tick = tree:add(booth_proto, buffer(36, endbuf-36), "Booth data")
+				local name = buffer(36, 64)
 				tick:add(name,                "Ticket name: ", name:string())
 
-				T32(tick, buffer, 24+64 +  0, "Owner:        %08x")
-				T32(tick, buffer, 24+64 +  4, "Ballot:       %08x")
-				T32(tick, buffer, 24+64 +  8, "Prev. Ballot: %08x")
-				T32(tick, buffer, 24+64 + 12, "Expiry:       %8d")
+				T32(tick, buffer, 36+64 +  0, "Owner:        %08x")
+				T32(tick, buffer, 36+64 +  4, "Ballot:       %08x")
+				T32(tick, buffer, 36+64 +  8, "Prev. Ballot: %08x")
+				T32(tick, buffer, 36+64 + 12, "Expiry:       %8d")
 			end
 
 			pinfo.cols.info = "Booth, cmd " .. cmd:string()

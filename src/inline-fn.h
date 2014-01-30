@@ -62,6 +62,9 @@ static inline void init_header_bare(struct boothc_header *h) {
 	h->magic   = htonl(BOOTHC_MAGIC);
 	h->version = htonl(BOOTHC_VERSION);
 	h->from    = htonl(local->site_id);
+	h->iv      = htonl(0);
+	h->auth1   = htonl(0);
+	h->auth2   = htonl(0);
 }
 
 static inline void init_header(struct boothc_header *h, int cmd,
