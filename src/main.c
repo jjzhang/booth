@@ -1208,10 +1208,6 @@ static int do_server(int type)
 	cl_log_set_facility(HA_LOG_FACILITY);
 	cl_inherit_logging_environment(0);
 
-	rv = limit_this_process();
-	if (rv)
-		return rv;
-
 
 	log_info("BOOTH %s daemon is starting, node id is %08X.",
 			type_to_string(local->type),
@@ -1226,6 +1222,11 @@ static int do_server(int type)
 			type_to_string(local->type),
 			local->addr_string,
 			booth_conf->port);
+
+	rv = limit_this_process();
+	if (rv)
+		return rv;
+
 
 	rv = loop(lock_fd);
 
