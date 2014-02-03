@@ -341,11 +341,13 @@ static int ticket_process_catchup(
 		struct booth_site *new_owner)
 {
 	int rv;
+	uint32_t prev_ballot;
 
 
 	log_info("got CATCHUP answer for \"%s\" from %s; says owner %s with ballot %d",
 			tk->name, from->addr_string,
 			ticket_owner_string(new_owner), ballot);
+	prev_ballot = ntohl(msg->ticket.prev_ballot);
 
 	rv = ntohl(msg->header.result);
 	if (rv != RLT_SUCCESS &&
@@ -394,7 +396,7 @@ static int ticket_process_catchup(
 accept:
 		tk->expires               = ntohl(msg->ticket.expiry) + time(NULL);
 		tk->new_ballot            = ballot_max2(ballot, tk->new_ballot);
-		tk->last_ack_ballot       = ballot_max2(ballot, tk->last_ack_ballot);
+		tk->last_ack_ballot       = ballot_max2(prev_ballot, tk->last_ack_ballot);
 		tk->owner                 = new_owner;
 		tk->proposal_acknowledges = from->bitmask;
 
