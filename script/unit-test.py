@@ -420,12 +420,14 @@ class UT():
             self.check_value( self.translate_shorthand(n, "ticket"), v)
         
 
-    def run(self):
+    def run(self, start_from="000"):
         os.chdir(self.test_base)
         # TODO: sorted, random order
         tests = filter( (lambda f: re.match(r"^\d\d\d_.*\.txt$", f)), glob.glob("*"))
         tests.sort()
         for f in tests:
+            if f < start_from:
+                continue
             log = None
             try:
                 log = self.setup_log(filename = UT._filename(f))
@@ -489,6 +491,9 @@ if __name__ == '__main__':
 
     #sys.settrace(traceit)
 
-    ret = ut.run()
+    starting = "0"
+    if len(sys.argv) > 3:
+        starting = sys.argv[3]
+    ret = ut.run(starting)
     sys.exit(ret)
 # }}}
