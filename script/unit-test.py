@@ -449,7 +449,7 @@ class UT():
                 self.stop_processes()
                 if log:
                     log.close()
-            return
+        return
 # }}}
 
 
