@@ -59,6 +59,7 @@ class UT():
     this_port = None
     this_site = "127.0.0.1"
     this_site_id = None
+    running = False
 
     gdb = None
     booth = None
@@ -226,6 +227,8 @@ class UT():
         self.send_cmd("break booth_udp_send")
         self.send_cmd("break booth_udp_broadcast")
         self.send_cmd("break recvfrom")
+
+        self.running = False
 # }}}
 
 
@@ -299,7 +302,9 @@ class UT():
 
     # there has to be some event waiting, so that boothd stops again.
     def continue_debuggee(self, timeout=30):
-        res = self.send_cmd("continue", timeout)
+        res = None
+        if not self.running:
+            res = self.send_cmd("continue", timeout)
         self.drain_booth_log()
         return res
 
@@ -401,12 +406,17 @@ class UT():
 
     def let_booth_go_a_bit(self):
         self.drain_booth_log()
+        logging.debug("running: %d" % self.running)
 
-        self.gdb.sendline("continue")
+        if not self.running:
+            self.gdb.sendline("continue")
         time.sleep(1)
+        self.drain_booth_log()
         # stop it
         posix.kill(self.booth.pid, signal.SIGINT)
-        self.drain_booth_log()
+        posix.kill(self.gdb.pid, signal.SIGINT)
+        self.running = False
+        self.sync(2000)
 
 
     def do_finally(self, data):
