@@ -17,7 +17,7 @@ message:
     ticket.prev_ballot  98
 
 
-message0:               "bad result code"
+message0:               # bad result code
     header.from         booth_conf->site[2].site_id
     header.result       243521741
 
@@ -25,7 +25,7 @@ outgoing0:
     state               ST_INIT
 
 
-message1:               "bad sender"
+message1:               # bad sender
     header.from         71
 
 outgoing1:
@@ -33,34 +33,34 @@ outgoing1:
 
 
 
-message2:               "bad version"
+message2:               # bad version
     header.version      512
 
 outgoing2:
     state               ST_INIT
 
 
-message3:               "bad magic"
+message3:               # bad magic
     header.version      31
 
 outgoing3:
     state               ST_INIT
 
-message4:               "bad length"
+message4:               # bad length
     header.length       16
 
 outgoing4:
     state               ST_INIT
 
 
-message5:               "bad ticket ID"
+message5:               # bad ticket ID
     ticket.id           "gibtsnich"
 
 outgoing5:
     state               ST_INIT
 
 
-message100:               "should work"
+message100:               # should work
 
 outgoing100:
     state               ST_STABLE
