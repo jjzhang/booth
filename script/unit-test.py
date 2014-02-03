@@ -3,7 +3,7 @@
 # see http://stackoverflow.com/questions/728891/correct-way-to-define-python-source-code-encoding
 
 import os, sys, time, signal, tempfile, socket, posix, time
-import re, shutil, pexpect, logging
+import re, shutil, pexpect, logging, pprint
 import random, copy, glob, traceback
 
 
@@ -447,6 +447,7 @@ class UT():
                 self.start_processes(f)
 
                 test = self.read_test_input(f, m=copy.deepcopy(self.defaults))
+                logging.debug("data: %s" % pprint.pformat(test, width = 200))
                 self.set_state(test["ticket"])
                 self.loop(test)
                 self.do_finally(test.get("finally"))
