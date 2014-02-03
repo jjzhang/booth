@@ -459,6 +459,7 @@ class UT():
                 self.stop_processes()
                 if log:
                     log.close()
+                    logging.getLogger("").removeHandler(log)
         return
 # }}}
 
