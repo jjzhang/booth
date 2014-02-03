@@ -1,7 +1,6 @@
 # vim: ft=sh et :
 #
-# This test is mostly concerned with ignoring invalid packets.
-# We're expecting catchup queries.
+# Checks whether Pacemaker gets correct command lines.
 
 
 ticket:
