@@ -315,7 +315,10 @@ class UT():
             res = self.send_cmd("set variable " + name + " = " + numeric_conv + "(" + value + ")")
         else:
             res = self.send_cmd("set variable " + name + " = " + value)
-        assert(not re.search(r"There is no member named", res, re.MULTILINE))
+        for r in [r"There is no member named",
+                r"Structure has no component named",
+                r"No symbol .* in current context", ]:
+            assert(not re.search(r, res, re.MULTILINE))
         logging.debug("set_val %s done" % name)
 # }}} GDB communication
 
