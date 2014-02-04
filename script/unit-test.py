@@ -301,14 +301,16 @@ class UT():
     # Handles different data types
     def set_val(self, name, value, numeric_conv=None):
         logging.debug("setting value «%s» to «%s» (num_conv %s)" %(name, value, numeric_conv))
+        res = None
         # string value?
         if re.match(r'^"', value):
-            self.send_cmd("print strcpy(" + name + ", " + value + ")")
+            res = self.send_cmd("print strcpy(" + name + ", " + value + ")")
         # numeric
         elif numeric_conv:
-            self.send_cmd("set variable " + name + " = " + numeric_conv + "(" + value + ")")
+            res = self.send_cmd("set variable " + name + " = " + numeric_conv + "(" + value + ")")
         else:
-            self.send_cmd("set variable " + name + " = " + value)
+            res = self.send_cmd("set variable " + name + " = " + value)
+        assert(not re.search(r"There is no member named", res, re.MULTILINE))
         logging.debug("set_val %s done" % name)
 # }}} GDB communication
 
