@@ -68,6 +68,9 @@ class UT():
     dont_log_expect = 0
 
     udp_sock = None
+
+    # http://stackoverflow.com/questions/384076/how-can-i-color-python-logging-output
+    BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE = range(8)
 # }}}
 
 
@@ -137,6 +140,16 @@ class UT():
 
         logging.getLogger('').addHandler(this_test_log)
         return this_test_log
+
+
+    def running_on_console(self):
+        return sys.stdout.isatty()
+
+
+    def colored_string(self, stg, color):
+        if self.running_on_console():
+            return  "\033[%dm%s\033[0m" % (30+color, stg)
+        return stg
 
 
     # We want shorthand in descriptions, ie. "state"
@@ -439,11 +452,13 @@ class UT():
             if f < start_from:
                 continue
             log = None
+            if self.running_on_console():
+                sys.stdout.write("\n")
             try:
                 log = self.setup_log(filename = UT._filename(f))
 
                 log.setLevel(logging.DEBUG)
-                logging.warn("running test %s" % f)
+                logging.error(self.colored_string("Starting test '%s'" % f, self.BLUE))
                 self.start_processes(f)
 
                 test = self.read_test_input(f, m=copy.deepcopy(self.defaults))
@@ -451,9 +466,9 @@ class UT():
                 self.set_state(test["ticket"])
                 self.loop(test)
                 self.do_finally(test.get("finally"))
-                logging.warn("test %s ends" % f)
+                logging.warn(self.colored_string("Finished test '%s' - OK" % f, self.GREEN))
             except:
-                logging.error("Broke in %s: %s" % (f, sys.exc_info()))
+                logging.error(self.colored_string("Broke in %s: %s" % (f, sys.exc_info()), self.RED))
                 for frame in traceback.format_tb(sys.exc_traceback):
                     logging.info("  -  %s " % frame.rstrip())
             finally:
@@ -461,6 +476,8 @@ class UT():
                 if log:
                     log.close()
                     logging.getLogger("").removeHandler(log)
+        if self.running_on_console():
+            sys.stdout.write("\n")
         return
 # }}}
 
