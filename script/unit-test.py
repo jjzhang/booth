@@ -403,16 +403,21 @@ class UT():
         nums = map(lambda m: int(m.group(2)), valid_matches)
         loop_max = max(nums)
         for counter in range(0, loop_max+1):    # incl. last message
-            logging.info("Part " + str(counter))
 
             kmsg = 'message%d' % counter
             msg  = data.get(kmsg)
+
+            kout = 'outgoing%d' % counter
+            out  = data.get(kout)
+
+            if not msg and not out:
+                continue
+
+            logging.info("Part " + str(counter))
             if msg:
                 comment = msg.aux.get("comment") or ""
                 logging.info("sending " + kmsg + "  " + comment)
                 self.send_message(self.merge_dicts(data["message"], msg))
-            kout = 'outgoing%d' % counter
-            out  = data.get(kout)
             if out:
                 comment = out.aux.get("comment") or ""
                 logging.info("waiting for " + kout + "  " + comment)
