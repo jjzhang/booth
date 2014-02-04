@@ -31,7 +31,4 @@ message2:               # valid CMR_CATCHUP
 finally:
 # should be overwritten
     last_ack_ballot     2052
-# should not be - a OP_PREPARING would fetch the new value
-    new_ballot          2012
-# too low-level
-#    proposal_acknowledges 5
+    new_ballot          2062
