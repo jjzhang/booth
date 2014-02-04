@@ -233,7 +233,7 @@ class UT():
         self.this_port = int(self.query_value("booth_conf->port"))
 
         # do a self-test
-        self.check_value("local->site_id", self.this_site_id);
+        assert(self.check_value("local->site_id", self.this_site_id))
         
         # Now we're set up.
         self.send_cmd("break ticket_cron")
@@ -295,7 +295,7 @@ class UT():
         # for easier (test) debugging we'll show the _real_ value, too.
         has = self._query_value(which)
         logging.error("«%s»: expected «%s», got «%s»." % (which, value, has))
-        sys.exit(1)
+        return False
 
     # Send data to GDB, to inject them into the binary.
     # Handles different data types
@@ -381,12 +381,15 @@ class UT():
  
     def wait_outgoing(self, msg):
         self.wait_for_function("booth_udp_send")
+        ok = True
         for (n, v) in msg.iteritems():
             if re.search(r"\.", n):
-                self.check_value( self.translate_shorthand(n, "inject"), v)
+                ok = self.check_value( self.translate_shorthand(n, "inject"), v) and ok
             else:
-                self.check_value( self.translate_shorthand(n, "ticket"), v)
+                ok = self.check_value( self.translate_shorthand(n, "ticket"), v) and ok
 
+        if not ok:
+            sys.exit(1)
         logging.info("out gone")
         #stopped_at = self.sync() 
 
@@ -439,8 +442,11 @@ class UT():
         # Allow debuggee to reach a stable state
         self.let_booth_go_a_bit()
 
+        ok = True
         for (n, v) in data.iteritems():
-            self.check_value( self.translate_shorthand(n, "ticket"), v)
+            ok = self.check_value( self.translate_shorthand(n, "ticket"), v) and ok
+        if not ok:
+            sys.exit(1)
         
 
     def run(self, start_from="000"):
