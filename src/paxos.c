@@ -89,12 +89,20 @@ int should_switch_state_p(struct ticket_config *tk)
 static int retries_exceeded(struct ticket_config *tk)
 {
 	tk->retry_number ++;
-	if (tk->retry_number > tk->retries) {
+	if (tk->retry_number >= tk->retries) {
 		log_info("ABORT %s for ticket \"%s\" - "
-				"not enough answers after %d retries",
+				"not enough answers after %d retries (of %d)",
 				tk->state == OP_PREPARING ? "prepare" : "propose",
-				tk->name, tk->retry_number);
+				tk->name, tk->retry_number, tk->retries);
 		abort_proposal(tk);
+
+
+		/* Keep on trying to refresh. */
+		if (owner_and_valid(tk))
+			tk->state = ST_STABLE;
+
+		ticket_activate_timeout(tk);
+		return EBUSY;
 	} else {
 		/* We ask others for a change; retry to get
 		 * consensus.
