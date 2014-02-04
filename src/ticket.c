@@ -523,6 +523,7 @@ static void ticket_cron(struct ticket_config *tk)
 				!tk->proposed_owner &&
 				!tk->proposer &&
 				tk->expires &&
+				tk->acquire_after &&
 				tk->expires + tk->acquire_after >= now &&
 				local->type == SITE) {
 			log_info("ACQUIRE ticket \"%s\" after timeout", tk->name);
