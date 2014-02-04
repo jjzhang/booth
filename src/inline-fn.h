@@ -162,7 +162,14 @@ static inline int majority_agree(struct ticket_config *tk)
  *                                       current ballot
  *
  * This should be possible by using the same datatype and relying
- * on the under/overflow semantics. */
+ * on the under/overflow semantics.
+ *
+ *
+ * Having 30 bits available, and assuming an expire time of
+ * one minute and a (high) ballot step of 64 == 2^6 (because
+ * of weights), we get 2^24 minutes of range - which is ~750
+ * years. "Should be enough for everybody."
+ */
 static inline int ballot_is_higher_than(uint32_t b_high, uint32_t b_low)
 {
 	uint32_t diff;
