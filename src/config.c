@@ -508,7 +508,7 @@ no_value:
 
 		if (strcmp(key, "acquire-after") == 0) {
 			defaults.acquire_after = strtol(val, &s, 0);
-			if (*s || s == val || defaults.acquire_after<1) {
+			if (*s || s == val || defaults.acquire_after<0) {
 				error = "Expected plain integer value >=1 for acquire-after";
 				goto err;
 			}
