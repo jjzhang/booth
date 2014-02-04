@@ -66,6 +66,7 @@ class UT():
     prompt = "CUSTOM-GDB-PROMPT-%d-%d" % (os.getpid(), time.time())
 
     dont_log_expect = 0
+    current_nr = None
 
     udp_sock = None
 
@@ -92,7 +93,10 @@ class UT():
     def read_test_input(self, file, state=None, m = dict()):
         fo = open(file, "r")
         state = None
+        line_nr = 0
         for line in fo.readlines():
+            line_nr += 1
+
             # comment?
             if re.match(r"^\s*#", line):
                 continue
@@ -109,6 +113,7 @@ class UT():
                     m[state] = dict_plus()
                 if res.group(2):
                     m[state].aux["comment"] = res.group(2)
+                m[state].aux["line"] = line_nr
                 continue
 
             assert(state)
@@ -327,6 +332,10 @@ class UT():
 # {{{ High-level functions.
 # Generally, GDB is attached to BOOTHD, and has it stopped.
     def set_state(self, kv):
+        if not kv:
+            return
+
+        self.current_nr = kv.aux.get("line")
         #os.system("strace -f -tt -s 2000 -e write -p" + str(self.gdb.pid) + " &")
         for n, v in kv.iteritems():
             self.set_val( self.translate_shorthand(n, "ticket"), v)
@@ -399,7 +408,7 @@ class UT():
         return dict(base.items() + overlay.items())
        
 
-    def loop(self, data):
+    def loop(self, fn, data):
         matches = map(lambda k: re.match(r"^(outgoing|message)(\d+)$", k), data.iterkeys())
         valid_matches = filter(None, matches)
         nums = map(lambda m: int(m.group(2)), valid_matches)
@@ -415,14 +424,16 @@ class UT():
             if not msg and not out:
                 continue
 
-            logging.info("Part " + str(counter))
+            logging.info("Part %d" % counter)
             if msg:
-                comment = msg.aux.get("comment") or ""
-                logging.info("sending " + kmsg + "  " + comment)
+                self.current_nr = msg.aux.get("line")
+                comment = msg.aux.get("comment", "")
+                logging.info("sending %s  (%s:%d)  %s" % (kmsg, fn, self.current_nr, comment))
                 self.send_message(self.merge_dicts(data["message"], msg))
             if out:
-                comment = out.aux.get("comment") or ""
-                logging.info("waiting for " + kout + "  " + comment)
+                self.current_nr = out.aux.get("line")
+                comment = out.aux.get("comment", "")
+                logging.info("waiting for %s  (%s:%d)  %s" % (kout, fn, self.current_nr, comment))
                 self.wait_outgoing(out)
         logging.info("loop ends")
 
@@ -446,6 +457,7 @@ class UT():
         if not data:
             return
 
+        self.current_nr = data.aux.get("line")
         # Allow debuggee to reach a stable state
         self.let_booth_go_a_bit()
 
@@ -476,12 +488,15 @@ class UT():
 
                 test = self.read_test_input(f, m=copy.deepcopy(self.defaults))
                 logging.debug("data: %s" % pprint.pformat(test, width = 200))
-                self.set_state(test["ticket"])
-                self.loop(test)
+
+                self.set_state(test.get("ticket"))
+                self.loop(f, test)
                 self.do_finally(test.get("finally"))
+
+                self.current_nr = None
                 logging.warn(self.colored_string("Finished test '%s' - OK" % f, self.GREEN))
             except:
-                logging.error(self.colored_string("Broke in %s: %s" % (f, sys.exc_info()), self.RED))
+                logging.error(self.colored_string("Broke in %s:%d %s" % (f, self.current_nr, sys.exc_info()), self.RED))
                 for frame in traceback.format_tb(sys.exc_traceback):
                     logging.info("  -  %s " % frame.rstrip())
             finally:
