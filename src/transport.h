@@ -27,6 +27,7 @@ struct booth_node {
 	int local;
 	unsigned short family;
 	char addr[BOOTH_NAME_LEN];
+	int connect_state;
 } __attribute__((packed));
 
 typedef enum {
