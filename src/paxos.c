@@ -440,6 +440,8 @@ inline static int answer_COMM(
 	if (ballot > tk->new_ballot &&
 			ntohl(msg->ticket.prev_ballot) == tk->last_ack_ballot) {
 		change_ticket_owner(tk, ballot, new_owner);
+	} else {
+		log_info("commit message from \"%s\" discarded.", from->addr_string);
 	}
 
 	/* Send ack? */
