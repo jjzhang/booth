@@ -25,23 +25,30 @@
 #define ACCEPTOR	0x2
 #define LEARNER		0x1
 
+#define INSTANCE_NUMBER_EMPTY	-1
+
 typedef long ps_handle_t;
 typedef long pi_handle_t;
+
 
 struct paxos_operations {
 	int (*get_myid) (void);
 	int (*send) (unsigned long id, void *value, int len);
 	int (*broadcast) (void *value, int len);
 	int (*catchup) (pi_handle_t handle);
+	int (*equal_value) (const void *value1, const void *value2);
+	void (*debug_value) (const void *value);
 	int (*prepare) (pi_handle_t handle, void *extra);
-	int (*promise) (pi_handle_t handle, void *extra);
+	int (*promise) (pi_handle_t handle, void *extra,
+			int proposer_id, int round);
 	int (*is_prepared) (pi_handle_t handle, void *extra);
 	int (*propose) (pi_handle_t handle, void *extra,
 			int round, void *value);
 	int (*accepted) (pi_handle_t handle, void *extra,
 			 int round, void *value);
 	int (*commit) (pi_handle_t handle, void *extra, int round);
-	int (*learned) (pi_handle_t handle, void *extra, int round);
+	int (*learned) (pi_handle_t handle, void *extra,
+			int round, void *value);
 };
 
 int paxos_recvmsg(void *msg, int msglen);
@@ -75,6 +82,13 @@ int paxos_recovery_status_set(pi_handle_t handle, int recovery);
 int paxos_catchup(pi_handle_t handle);
 
 int paxos_propose(pi_handle_t handle, void *value, int round);
+
+int paxos_boost_round(pi_handle_t handle,
+		void *value,
+		int round,
+		void (*end_request) (pi_handle_t handle,
+	     int round,
+	     int result));
 
 int paxos_instance_exit(pi_handle_t handle);
 
