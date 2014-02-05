@@ -466,26 +466,26 @@ int paxos_answer(
 	 * (see paxos_start_round()), which gets received
 	 * (below) from the others ... */
 	switch (cmd) {
-		case OP_PREPARING:
-			return answer_PREP(tk, from, msg, ballot, new_owner_p);
+	case OP_PREPARING:
+		return answer_PREP(tk, from, msg, ballot, new_owner_p);
 
-		case OP_REJECTED:
-			return handle_REJ(tk, from, msg, ballot, new_owner_p);
+	case OP_REJECTED:
+		return handle_REJ(tk, from, msg, ballot, new_owner_p);
 
-		case OP_PROMISING:
-			return got_a_PROM(tk, from, msg, ballot, new_owner_p);
+	case OP_PROMISING:
+		return got_a_PROM(tk, from, msg, ballot, new_owner_p);
 
-		case OP_PROPOSING:
-			return answer_PROP(tk, from, msg, ballot, new_owner_p);
+	case OP_PROPOSING:
+		return answer_PROP(tk, from, msg, ballot, new_owner_p);
 
-		case OP_ACCEPTING:
-			return got_an_ACC(tk, from, msg, ballot, new_owner_p);
+	case OP_ACCEPTING:
+		return got_an_ACC(tk, from, msg, ballot, new_owner_p);
 
-		case OP_COMMITTED:
-			return answer_COMM(tk, from, msg, ballot, new_owner_p);
+	case OP_COMMITTED:
+		return answer_COMM(tk, from, msg, ballot, new_owner_p);
 
-		default:
-			log_error("unprocessed message, cmd %x", cmd);
-			return -EINVAL;
+	default:
+		log_error("unprocessed message, cmd %x", cmd);
+		return -EINVAL;
 	}
 }
