@@ -9,7 +9,7 @@ ticket:
     ## these would matter if testing via GDB had high latencies
     #expiry         60
     #timeout        10
-    #acquire_after  30
+    acquire_after  0
 
 
 

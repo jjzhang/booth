@@ -7,7 +7,7 @@
 ticket:
     state               ST_INIT
     last_ack_ballot     1
-    new_ballot          2012
+    new_ballot          12
 
 
 # defaults
@@ -15,10 +15,11 @@ message:
     header.cmd          CMR_CATCHUP
     ticket.ballot       99
     ticket.prev_ballot  98
+    header.from         booth_conf->site[2].site_id
+    header.result       0
 
 
 message0:               # bad result code
-    header.from         booth_conf->site[2].site_id
     header.result       243521741
 
 outgoing0:
@@ -60,9 +61,20 @@ outgoing5:
     state               ST_INIT
 
 
-message100:               # should work
+message6:               # bad ballot number
+    ticket.ballot       -15
 
-outgoing100:
+outgoing6:
+    state               ST_INIT
+
+
+message100:             # should work
+    ticket.ballot       199
+    ticket.prev_ballot  198
+
+# no outgoing message
+finally:                
     state               ST_STABLE
-    ticket.ballot       99
+    new_ballot          199
+    last_ack_ballot     198
 

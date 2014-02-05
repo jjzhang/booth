@@ -9,15 +9,16 @@ ticket:
     new_ballot          50
 
 
-message0:               "set state"
+message0:              
     header.cmd          OP_COMMITTED
     header.from         booth_conf->site[2].site_id
     header.result       0
     ticket.ballot       99
-    ticket.prev_ballot  98
+# must match last_ack_ballot above
+    ticket.prev_ballot  40
     ticket.owner        booth_conf->site[2].site_id
-    getenv("UNIT_TEST_AUX")  "ballot 99 owner +" 
+    #getenv("UNIT_TEST_AUX")  "ballot 99 owner +" 
 
 
-outgoing0:
+finally:
     last_ack_ballot     99

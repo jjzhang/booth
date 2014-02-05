@@ -12,34 +12,45 @@ ticket:
     timeout             1
     # may keep ticket all the time
     expiry              3000
+    expires             time(0) + 2000
+
 
 
 outgoing0:
-    cmd                 OP_PREPARING
+    header.cmd          OP_PREPARING
 outgoing1:
-    cmd                 OP_PREPARING
+    header.cmd          OP_PREPARING
 outgoing2:
-    cmd                 OP_PREPARING
+    header.cmd          OP_PREPARING
 outgoing3:
-    cmd                 OP_PREPARING
+    header.cmd          OP_PREPARING
 
 message4:
-    cmd                 OP_PROMISING
+    header.cmd          OP_PROMISING
+    header.from         booth_conf->site[2].site_id
+    header.result       0
+    ticket.prev_ballot  45
+    ticket.ballot       booth_conf->ticket[0].new_ballot
 
 outgoing5:
-    cmd                 OP_PROPOSING
+    header.cmd          OP_PROPOSING
 outgoing6:
-    cmd                 OP_PROPOSING
+    header.cmd          OP_PROPOSING
 outgoing7:
-    cmd                 OP_PROPOSING
+    header.cmd          OP_PROPOSING
 outgoing8:
-    cmd                 OP_PROPOSING
+    header.cmd          OP_PROPOSING
 outgoing9:
-    cmd                 OP_PROPOSING
+    header.cmd          OP_PROPOSING
 outgoing10:
-    cmd                 OP_PROPOSING
+    header.cmd          OP_PROPOSING
     
 
 # Now retry counter should trigger, and restart paxos
 outgoing11:
-    cmd                 OP_PREPARING
+    header.cmd          OP_PROPOSING
+outgoing12:
+    header.cmd          OP_PROPOSING
+
+outgoing13:
+    header.cmd          OP_PREPARING
