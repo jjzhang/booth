@@ -421,13 +421,21 @@ class UT():
             kmsg = 'message%d' % counter
             msg  = data.get(kmsg)
 
+            ktkt = 'ticket%d' % counter
+            tkt  = data.get(ktkt)
+
             kout = 'outgoing%d' % counter
             out  = data.get(kout)
 
-            if not msg and not out:
+            if not any([msg, out, tkt]):
                 continue
 
             logging.info("Part %d" % counter)
+            if tkt:
+                self.current_nr = tkt.aux.get("line")
+                comment = tkt.aux.get("comment", "")
+                logging.info("ticket change %s  (%s:%d)  %s" % (ktkt, fn, self.current_nr, comment))
+                self.set_state(tkt)
             if msg:
                 self.current_nr = msg.aux.get("line")
                 comment = msg.aux.get("comment", "")
