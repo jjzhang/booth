@@ -59,7 +59,7 @@ static void pcmk_grant_ticket(struct ticket_config *tk)
 	log_info("command: '%s' was executed", cmd);
 	rv = system(cmd);
 	if (rv != 0)
-		log_error("error: \"%s\" failed, rv %s", cmd, interpret_rv(rv));
+		log_error("error: \"%s\" failed, %s", cmd, interpret_rv(rv));
 }
 
 static void pcmk_revoke_ticket(struct ticket_config *tk)
@@ -72,7 +72,7 @@ static void pcmk_revoke_ticket(struct ticket_config *tk)
 	log_info("command: '%s' was executed", cmd);
 	rv = system(cmd);
 	if (rv != 0)
-		log_error("error: \"%s\" failed, rv %s", cmd, interpret_rv(rv));
+		log_error("error: \"%s\" failed, %s", cmd, interpret_rv(rv));
 }
 
 
@@ -140,7 +140,7 @@ static int crm_ticket_get(struct ticket_config *tk,
 
 out:
 	rv = pclose(p);
-	log_info("command \"%s\" returned rv %s, value %" PRIi64, cmd, interpret_rv(rv), v);
+	log_info("command \"%s\" returned %s, value %" PRIi64, cmd, interpret_rv(rv), v);
 	return rv;
 }
 
