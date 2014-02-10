@@ -100,6 +100,8 @@ static int retries_exceeded(struct ticket_config *tk)
 		/* Keep on trying to refresh. */
 		if (owner_and_valid(tk))
 			tk->state = ST_STABLE;
+		else
+			disown_if_expired(tk);
 
 		ticket_activate_timeout(tk);
 		return EBUSY;
