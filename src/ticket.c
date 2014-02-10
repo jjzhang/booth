@@ -497,6 +497,8 @@ static void ticket_cron(struct ticket_config *tk)
 
 		ticket_write(tk);
 
+		ticket_activate_timeout(tk);
+
 		/* May not try to re-acquire now, need to find out
 		 * what others think. */
 		return;
