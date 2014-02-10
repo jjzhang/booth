@@ -242,8 +242,7 @@ class UT():
         
         # Now we're set up.
         self.send_cmd("break ticket_cron")
-        self.send_cmd("break booth_udp_send")
-        self.send_cmd("break booth_udp_broadcast")
+        self.send_cmd("break booth_udp_send if to == &(booth_conf->site[1])")
         self.send_cmd("break recvfrom")
 
         self.running = False
