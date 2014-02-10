@@ -476,6 +476,33 @@ static void ticket_cron(struct ticket_config *tk)
 
 	now = time(NULL);
 
+
+	/* Has an owner, has an expiry date, and expiry date in the past?
+	 * Losing the ticket must happen in _every_ state. */
+	if (tk->expires &&
+			tk->owner &&
+			now > tk->expires) {
+		log_info("LOST ticket: \"%s\" no longer at %s",
+				tk->name,
+				ticket_owner_string(tk->owner));
+
+		/* Couldn't renew in time - ticket lost. */
+		tk->owner = NULL;
+		disown_ticket(tk);
+		/* This gets us into ST_INIT again; we couldn't
+		 * talk to a majority of sites, so we don't know
+		 * whether somebody else has the ticket now.
+		 * Keep asking until we know. */
+		abort_proposal(tk);
+
+		ticket_write(tk);
+
+		/* May not try to re-acquire now, need to find out
+		 * what others think. */
+		return;
+	}
+
+
 	switch(tk->state) {
 	case ST_INIT:
 		/* Unknown state, ask others. */
@@ -485,30 +512,6 @@ static void ticket_cron(struct ticket_config *tk)
 
 	case OP_COMMITTED:
 	case ST_STABLE:
-
-		/* Has an owner, has an expiry date, and expiry date in the past? */
-		if (tk->expires &&
-				tk->owner &&
-				now > tk->expires) {
-			log_info("LOST ticket: \"%s\" no longer at %s",
-					tk->name,
-					ticket_owner_string(tk->owner));
-
-			/* Couldn't renew in time - ticket lost. */
-			tk->owner = NULL;
-			disown_ticket(tk);
-			/* This gets us into ST_INIT again; we couldn't
-			 * talk to a majority of sites, so we don't know
-			 * whether somebody else has the ticket now.
-			 * Keep asking until we know. */
-			abort_proposal(tk);
-
-			ticket_write(tk);
-
-			/* May not try to re-acquire now, need to find out
-			 * what others think. */
-			break;
-		}
 
 		/* No matter whether the ticket just got lost by someone,
 		 * or whether is wasn't active anywhere - if automatic
