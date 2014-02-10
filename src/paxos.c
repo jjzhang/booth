@@ -88,7 +88,8 @@ int should_switch_state_p(struct ticket_config *tk)
 
 static int retries_exceeded(struct ticket_config *tk)
 {
-	tk->retry_number ++;
+	int ret;
+
 	if (tk->retry_number >= tk->retries) {
 		log_info("ABORT %s for ticket \"%s\" - "
 				"not enough answers after %d retries (of %d)",
@@ -100,11 +101,8 @@ static int retries_exceeded(struct ticket_config *tk)
 		/* Keep on trying to refresh. */
 		if (owner_and_valid(tk))
 			tk->state = ST_STABLE;
-		else
-			disown_if_expired(tk);
 
-		ticket_activate_timeout(tk);
-		return EBUSY;
+		ret = EBUSY;
 	} else {
 		/* We ask others for a change; retry to get
 		 * consensus.
@@ -112,10 +110,15 @@ static int retries_exceeded(struct ticket_config *tk)
 		 * query, give the peers time to answer. */
 		if (timeval_in_past(tk->proposal_switch)) {
 			ticket_broadcast_proposed_state(tk, tk->state);
-			ticket_activate_timeout(tk);
 		}
+		ret = 0;
 	}
-	return 0;
+
+
+	disown_if_expired(tk);
+	ticket_activate_timeout(tk);
+
+	return ret;
 }
 
 
