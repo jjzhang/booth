@@ -1,0 +1,33 @@
+# vim: ft=sh et :
+#
+# Testing whether retries are aborted at some time.
+
+
+ticket:
+    state               ST_STABLE
+    last_ack_ballot     40
+    new_ballot          50
+    retries             6
+    timeout             1
+    owner               local
+    expiry              3000
+    # but renewing is necessary
+    expires             time(0) + 100
+    next_cron           time(0) + 1
+
+
+outgoing0:
+    header.cmd          OP_PREPARING
+outgoing1:
+    header.cmd          OP_PREPARING
+outgoing2:
+    header.cmd          OP_PREPARING
+outgoing3:
+    header.cmd          OP_PREPARING
+
+# Now give cause to abort.
+ticket4:
+    expires             time(0) + 1
+    timeout             2
+outgoing4:
+    header.cmd          CMD_CATCHUP
