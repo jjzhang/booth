@@ -363,7 +363,8 @@ class UT():
         sys.exit(0)
  
 
-    def wait_for_function(self, fn):
+    def wait_for_function(self, fn, timeout=20):
+        until = time.time() + timeout
         while True:
             stopped_at = self.continue_debuggee(timeout=3)
             if not stopped_at:
@@ -372,6 +373,8 @@ class UT():
                 self.user_debug("Segfault")
             if re.search(r"^Breakpoint \d+, (0x\w+ in )?%s " % fn, stopped_at, re.MULTILINE):
                 break
+            if time.time() > until:
+                self.user_debug("Didn't stop in function %s" % fn)
         logging.info("Now in %s" % fn)
 
     # We break, change the data, and return the correct size.
