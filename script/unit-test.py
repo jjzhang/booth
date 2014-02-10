@@ -346,21 +346,25 @@ class UT():
 
 
     def user_debug(self, txt):
-        print self.gdb.buffer
-        print "\n\nProblem detected (%s), entering interactive mode.\n\n" % txt
-        # can't use send_cmd, doesn't reply with expected prompt anymore.
-        self.gdb.interact()
-        #while True:
-        #    sys.stdout.write("GDB> ")
-        #    sys.stdout.flush()
-        #    x = sys.stdin.readline()
-        #    if not x:
-        #        break
-        #    self.send_cmd(x)
-        self.gdb.sendline("set prompt GDB> \n")
-        self.gdb.setecho(True)
+        logging.error("Problem detected: %s", txt)
+        logging.info(self.gdb.buffer)
+        if not sys.stdin.isatty():
+            logging.error("Not a terminal, stopping.")
+        else:
+            print "\n\nEntering interactive mode.\n\n"
+            self.gdb.sendline("set prompt GDB> \n")
+            self.gdb.setecho(True)
+            # can't use send_cmd, doesn't reply with expected prompt anymore.
+            self.gdb.interact()
+            #while True:
+            #    sys.stdout.write("GDB> ")
+            #    sys.stdout.flush()
+            #    x = sys.stdin.readline()
+            #    if not x:
+            #        break
+            #    self.send_cmd(x)
         self.stop_processes()
-        sys.exit(0)
+        sys.exit(1)
  
 
     def wait_for_function(self, fn, timeout=20):
