@@ -270,7 +270,7 @@ static inline int should_start_renewal(struct ticket_config *tk)
 		return 0;
 
 	time(&now);
-	return when >= now;
+	return when <= now;
 }
 
 
