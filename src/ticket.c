@@ -449,6 +449,9 @@ ex:
 		time(&tk->expires);
 	}
 
+	/* Allow further actions. */
+	ticket_activate_timeout(tk);
+
 	return 0;
 }
 
