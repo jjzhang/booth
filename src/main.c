@@ -254,6 +254,9 @@ bad_len:
 	}
 
 
+	/* For CMD_GRANT and CMD_REVOKE:
+	 * Don't close connection immediately, but send
+	 * result a second later? */
 	switch (ntohl(msg.header.cmd)) {
 	case CMD_LIST:
 		ticket_answer_list(fd, &msg);
