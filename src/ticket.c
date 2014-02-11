@@ -329,6 +329,14 @@ static int ticket_answer_catchup(
 		RLT_PROBABLY_SUCCESS : RLT_SUCCESS;
 
 	init_ticket_msg(msg, CMR_CATCHUP, rv, tk);
+
+	/* On catchup, don't tell about ongoing proposals;
+	 * if we did, the other site might believe that the
+	 * ballot numbers have already been used.
+	 * Send the known ballot number, so that a PREPARE
+	 * gets accepted. */
+	msg->ticket.ballot = msg->ticket.prev_ballot;
+
 	return booth_udp_send(from, msg, sizeof(*msg));
 }
 
