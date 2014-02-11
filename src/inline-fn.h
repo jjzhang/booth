@@ -116,8 +116,11 @@ static inline const char *ticket_owner_string(struct booth_site *site)
 
 static inline void disown_ticket(struct ticket_config *tk)
 {
+	/* ONLY the "current state" is changed;
+	 * current paxos rounds should not be affected.
+	 *   tk->proposed_owner = NULL;
+	 */
 	tk->owner = NULL;
-	tk->proposed_owner = NULL;
 	time(&tk->expires);
 }
 
