@@ -553,6 +553,9 @@ if __name__ == '__main__':
             datefmt = default_log_datefmt)
 
 
+    # make sure no old processes are active anymore
+    os.system("killall boothd > /dev/null 2> /dev/null")
+
     overview_log = ut.setup_log( filename = UT._filename('seq') )
     overview_log.setLevel(logging.WARN)
 
