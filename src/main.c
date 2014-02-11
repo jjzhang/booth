@@ -1212,9 +1212,9 @@ static int do_server(int type)
 	cl_inherit_logging_environment(0);
 
 
-	log_info("BOOTH %s daemon is starting, node id is %08X.",
+	log_info("BOOTH %s daemon is starting, node id is 0x%08X (%d).",
 			type_to_string(local->type),
-			local->site_id);
+			local->site_id, local->site_id);
 
 	signal(SIGUSR1, (__sighandler_t)tickets_log_info);
 
