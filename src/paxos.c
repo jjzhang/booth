@@ -442,8 +442,17 @@ inline static int answer_COMM(
 	/* We cannot check whether the packet is from an expected proposer -
 	 * perhaps this is the _only_ message of the whole handshake? */
 
-	if (ballot > tk->new_ballot &&
+	if (ballot == tk->last_ack_ballot &&
+			new_owner == tk->owner) {
+		/* Ignored - just acknowledging the commit. */
+		log_info("COMMIT message from \"%s\" received.", from->addr_string);
+	} else if (ballot > tk->new_ballot &&
 			ntohl(msg->ticket.prev_ballot) == tk->last_ack_ballot) {
+		/* Received a COMMIT, but no prior packets;
+		 * might happen because the network just got
+		 * connected again. */
+		log_info("COMMIT message from \"%s\" for new ballot %d received.",
+				from->addr_string, ballot);
 		change_ticket_owner(tk, ballot, new_owner);
 	} else {
 		log_info("commit message from \"%s\" discarded.", from->addr_string);
