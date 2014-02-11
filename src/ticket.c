@@ -290,14 +290,17 @@ int ticket_answer_revoke(int fd, struct boothc_ticket_msg *msg)
 	if (!tk->owner) {
 		log_info("client wants to revoke a free ticket \"%s\"",
 				msg->ticket.id);
+		/* Return a different result code? */
 		rv = RLT_SUCCESS;
 		goto reply;
 	}
 
 	rv = do_revoke_ticket(tk);
+	if (rv == 0)
+		rv = RLT_ASYNC;
 
 reply:
-	init_ticket_msg(msg, CMR_REVOKE, rv ?: RLT_ASYNC, tk);
+	init_ticket_msg(msg, CMR_REVOKE, rv, tk);
 	return send_ticket_msg(fd, msg);
 }
 
