@@ -10,7 +10,9 @@ import random, copy, glob, traceback
 # Don't make that much sense - function/line is write().
 # Would have to use traceback.extract_stack() manually.
 #   %(funcName)10.10s:%(lineno)3d  %(levelname)8s 
-default_log_format = '%(asctime)s: %(message)s'
+# The second ":" is to get correct syntax highlightning,
+# eg. messages with ERROR etc. are red in vim.
+default_log_format = '%(asctime)s: : %(message)s'
 default_log_datefmt = '%b %d %H:%M:%S'
 
 
@@ -298,7 +300,7 @@ class UT():
             return True
         # for easier (test) debugging we'll show the _real_ value, too.
         has = self._query_value(which)
-        logging.error("«%s»: expected «%s», got «%s»." % (which, value, has))
+        logging.error("«%s»: expected «%s», got «%s». ERROR." % (which, value, has))
         return False
 
     # Send data to GDB, to inject them into the binary.
