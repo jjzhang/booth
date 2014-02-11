@@ -1,0 +1,37 @@
+# vim: ft=sh et :
+# We've got the ticket; on catchup, peer agrees with us re. owner, but has a
+# higher ballot number.
+# We must not lose the ticket.
+
+ticket:
+    state               ST_INIT
+    last_ack_ballot     100
+    new_ballot          100
+    owner               local
+    expires             time(0) + 35
+
+gdb0:
+        watch booth_conf->ticket[0].owner § commands § bt § c § end
+
+# No message0
+
+outgoing0:
+    header.cmd          CMD_CATCHUP
+    header.result       RLT_SUCCESS
+    ticket.ballot       100
+    ticket.prev_ballot  100
+    ticket.owner        local->site_id
+
+
+message1:               # catchup, same owner
+    header.cmd          CMR_CATCHUP
+    header.result       RLT_SUCCESS
+    header.from         booth_conf->site[2].site_id
+    ticket.expiry       5
+    ticket.ballot       120
+    ticket.prev_ballot  120
+    ticket.owner        local->site_id
+
+finally:
+    owner               local
+
