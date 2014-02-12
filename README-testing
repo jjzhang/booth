@@ -1,11 +1,14 @@
+There's a booth-test RPM available that contains two types of tests.
+
+It installs the necessary files into `/usr/share/booth/tests`.
 
 
 === Simple tests (commandline, config file)
 
 
-Run
+Run (as non-root)
 
-    # make check-TESTS
+    # python test/runtests.py
 
 to run the tests written in python.
 
