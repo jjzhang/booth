@@ -436,6 +436,10 @@ class UT():
             kout = 'outgoing%d' % counter
             out  = data.get(kout)
 
+            kgdb = 'gdb%d' % counter
+            gdb  = data.get(kgdb)
+
+
             if not any([msg, out, tkt]):
                 continue
 
@@ -450,6 +454,11 @@ class UT():
                 comment = msg.aux.get("comment", "")
                 logging.info("sending %s  (%s:%d)  %s" % (kmsg, fn, self.current_nr, comment))
                 self.send_message(self.merge_dicts(data["message"], msg))
+            if gdb:
+                for (k, v) in gdb.iteritems():
+                    self.send_cmd(k + " " + v.replace("§", "\n"))
+            if data.has_key(kgdb) and len(gdb) == 0:
+                self.user_debug("manual override")
             if out:
                 self.current_nr = out.aux.get("line")
                 comment = out.aux.get("comment", "")

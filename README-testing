@@ -73,4 +73,25 @@ A few details to the the above example:
 * The "fake" `crm_ticket` script gets the current test via `UNIT_TEST`; test scripts can pass additional information via `UNIT_TEST_AUX`.
 
 
+
+==== Tips and Hints
+
+There's another special header: `gdb__N__`. These lines are sent to GDB after
+injecting a message, but before waiting for an outgoing line. Values that
+contain `§` are sent as multiple lines to GDB.
+
+This means that a stanza like
+
+--------------------
+gdb0:
+        watch booth_conf->ticket[0].owner § commands § bt § c § end
+--------------------
+
+will cause a watchpoint to be set, and when it is triggered a backtrace (`bt`)
+is written to the log file.
+
+This makes it easy to ask for additional data or check for a call-chain when
+hitting bugs that can be reproduced via such a unit-test.
+
+
 # vim: set ft=asciidoc :
