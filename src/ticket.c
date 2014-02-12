@@ -438,6 +438,16 @@ accept:
 		goto ex;
 	}
 
+
+	if (ballot >= tk->last_ack_ballot &&
+			local->type == SITE &&
+			new_owner == tk->owner) {
+		/* We've got some information (local Pacemaker?), and a peer
+		 * says same owner, with same or higher ballot number. */
+		log_debug("catchup: peer agrees about owner.");
+		goto ex;
+	}
+
 	log_debug("catchup: unhandled situation!");
 
 ex:
