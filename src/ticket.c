@@ -353,6 +353,7 @@ static int ticket_process_catchup(
 {
 	int rv;
 	uint32_t prev_ballot;
+	time_t peer_expiry;
 
 
 	log_info("got CATCHUP answer for \"%s\" from %s; says owner %s with ballot %d",
@@ -405,7 +406,9 @@ static int ticket_process_catchup(
 				ballot, tk->new_ballot, tk->last_ack_ballot);
 
 accept:
-		tk->expires               = ntohl(msg->ticket.expiry) + time(NULL);
+		peer_expiry               = ntohl(msg->ticket.expiry) + time(NULL);
+		tk->expires               = (tk->expires > peer_expiry) ?
+			tk->expires : peer_expiry;
 		tk->new_ballot            = ballot_max2(ballot, tk->new_ballot);
 		tk->last_ack_ballot       = ballot_max2(prev_ballot, tk->last_ack_ballot);
 		tk->owner                 = new_owner;
