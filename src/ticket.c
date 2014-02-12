@@ -714,9 +714,10 @@ void set_ticket_wakeup(struct ticket_config *tk)
 
 		ticket_next_cron_at(tk, tv);
 	} else {
-		/* If there's some owner, check on her later on.
-		 * If no owner - don't care. */
-		if (tk->owner)
+		/* If there is (or should be) some owner, check on her later on.
+		 * If no one is interested - don't care. */
+		if ((tk->owner || tk->acquire_after) &&
+				(local->type == SITE))
 			ticket_next_cron_in(tk, tk->expiry + tk->acquire_after);
 		else
 			ticket_next_cron_in(tk, 3600);
