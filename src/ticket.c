@@ -383,7 +383,7 @@ static int ticket_process_catchup(
 		disown_if_expired(tk);
 		log_debug("catchup: peer ack 0x%" PRIx64 ", now state '%s'",
 			tk->proposal_acknowledges,
-			STATE_STRING(tk->state));
+			state_to_string(tk->state));
 		goto ex;
 	}
 
@@ -486,7 +486,7 @@ int ticket_broadcast_proposed_state(struct ticket_config *tk, cmd_request_t stat
 	msg.ticket.owner          = htonl(get_node_id(tk->proposed_owner));
 
 	log_debug("broadcasting '%s' for ticket \"%s\"",
-			STATE_STRING(state), tk->name);
+			state_to_string(state), tk->name);
 
 	/* Switch state after one second, if the majority says ok. */
 	gettimeofday(&tk->proposal_switch, NULL);
@@ -642,7 +642,7 @@ void tickets_log_info(void)
 				"ballot %d (current %d) "
 				"expires %-24.24s",
 				tk->name,
-				STATE_STRING(tk->state),
+				state_to_string(tk->state),
 				tk->proposal_acknowledges,
 				booth_conf->site_bits,
 				tk->last_ack_ballot, tk->new_ballot,
@@ -735,4 +735,27 @@ void set_ticket_wakeup(struct ticket_config *tk)
 		else
 			ticket_next_cron_in(tk, 3600);
 	}
+}
+
+
+
+/* Given a state (in host byte order), return a human-readable (char*).
+ * An array is used so that multiple states can be printed in a single printf(). */
+char *state_to_string(uint32_t state_ho)
+{
+	union mu { cmd_request_t s; char c[5]; };
+	static union mu cache[6] = { { 0 } }, *cur;
+	static int current = 0;
+
+	current ++;
+	if (current >= sizeof(cache)/sizeof(cache[0]))
+		current = 0;
+
+	cur = cache + current;
+
+	cur->s = htonl(state_ho);
+	/* Shouldn't be necessary, union array is initialized with zeroes, and
+	 * these bytes never get written. */
+	cur->c[4] = 0;
+	return cur->c;
 }

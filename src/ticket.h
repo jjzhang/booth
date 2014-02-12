@@ -63,6 +63,7 @@ int ticket_write(struct ticket_config *tk);
 
 void process_tickets(void);
 void tickets_log_info(void);
+char *state_to_string(uint32_t state_ho);
 
 
 static inline void ticket_next_cron_at(struct ticket_config *tk, struct timeval when)
