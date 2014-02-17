@@ -115,7 +115,7 @@ static const char * interpret_rv(int rv)
 }
 
 
-static void pcmk_write_ticket_atomic(struct ticket_config *tk, int grant)
+static int pcmk_write_ticket_atomic(struct ticket_config *tk, int grant)
 {
 	char cmd[COMMAND_MAX];
 	int rv;
@@ -139,21 +139,27 @@ static void pcmk_write_ticket_atomic(struct ticket_config *tk, int grant)
 	log_info("command: '%s' was executed", cmd);
 	if (rv != 0)
 		log_error("error: \"%s\" failed, %s", cmd, interpret_rv(rv));
+
+	return rv;
 }
 
 
-static void pcmk_grant_ticket(struct ticket_config *tk)
+static int pcmk_store_ticket_nonatomic(struct ticket_config *tk);
+
+static int pcmk_grant_ticket(struct ticket_config *tk)
 {
 	char cmd[COMMAND_MAX];
 	int rv;
 
 
 	test_atomicity();
-	if (atomicity == YES) {
-		pcmk_write_ticket_atomic(tk, +1);
-		return;
-	}
+	if (atomicity == YES)
+		return pcmk_write_ticket_atomic(tk, +1);
 
+
+	rv = pcmk_store_ticket_nonatomic(tk);
+	if (rv)
+		return rv;
 
 	snprintf(cmd, COMMAND_MAX, "crm_ticket -t %s -g --force",
 			tk->name);
@@ -161,21 +167,24 @@ static void pcmk_grant_ticket(struct ticket_config *tk)
 	rv = system(cmd);
 	if (rv != 0)
 		log_error("error: \"%s\" failed, %s", cmd, interpret_rv(rv));
+	return rv;
 }
 
 
-static void pcmk_revoke_ticket(struct ticket_config *tk)
+static int pcmk_revoke_ticket(struct ticket_config *tk)
 {
 	char cmd[COMMAND_MAX];
 	int rv;
 
 
 	test_atomicity();
-	if (atomicity == YES) {
-		pcmk_write_ticket_atomic(tk, -1);
-		return;
-	}
+	if (atomicity == YES)
+		return pcmk_write_ticket_atomic(tk, -1);
 
+
+	rv = pcmk_store_ticket_nonatomic(tk);
+	if (rv)
+		return rv;
 
 	snprintf(cmd, COMMAND_MAX, "crm_ticket -t %s -r --force",
 			tk->name);
@@ -183,6 +192,7 @@ static void pcmk_revoke_ticket(struct ticket_config *tk)
 	rv = system(cmd);
 	if (rv != 0)
 		log_error("error: \"%s\" failed, %s", cmd, interpret_rv(rv));
+	return rv;
 }
 
 
@@ -200,25 +210,29 @@ static int crm_ticket_set(const struct ticket_config *tk, const char *attr, int6
 			(rv = system(cmd));
 			i++) ;
 
-	log_info("'%s' gave result %s", cmd, interpret_rv(rv));
+	log_debug("'%s' gave result %s", cmd, interpret_rv(rv));
 
 	return rv;
 }
 
 
-static void pcmk_store_ticket(struct ticket_config *tk)
+static int pcmk_store_ticket_nonatomic(struct ticket_config *tk)
 {
-	test_atomicity();
+	int rv;
 
-	if (atomicity == YES) {
-		/* Nothing needed, done via grant/revoke. */
-		return;
-		pcmk_write_ticket_atomic(tk, 0);
-	}
+	/* Always try to store *each* attribute, even if there's an error
+	 * for one of them. */
+	rv = crm_ticket_set(tk, "owner", (int32_t)get_node_id(tk->owner));
+	rv = crm_ticket_set(tk, "expires", tk->expires)         || rv;
+	rv = crm_ticket_set(tk, "ballot", tk->last_ack_ballot)  || rv;
 
-	crm_ticket_set(tk, "owner", (int32_t)get_node_id(tk->owner));
-	crm_ticket_set(tk, "expires", tk->expires);
-	crm_ticket_set(tk, "ballot", tk->last_ack_ballot);
+	if (rv)
+		log_error("setting crm_ticket attributes failed; %s",
+				interpret_rv(rv));
+	else
+		log_info("setting crm_ticket attributes successful");
+
+	return rv;
 }
 
 
@@ -263,7 +277,7 @@ out:
 }
 
 
-static void pcmk_load_ticket(struct ticket_config *tk)
+static int pcmk_load_ticket(struct ticket_config *tk)
 {
 	int rv;
 	int64_t v;
@@ -272,6 +286,7 @@ static void pcmk_load_ticket(struct ticket_config *tk)
 	/* This here gets run during startup; testing that here means that
 	 * normal operation won't be interrupted with that test. */
 	test_atomicity();
+
 
 	rv = crm_ticket_get(tk, "expires", &v);
 	if (!rv) {
@@ -298,12 +313,12 @@ static void pcmk_load_ticket(struct ticket_config *tk)
 	/* We load only when the state is completely unknown. */
 	tk->state = ST_INIT;
 
-	return;
+	return rv;
 }
+
 
 struct ticket_handler pcmk_handler = {
 	.grant_ticket   = pcmk_grant_ticket,
 	.revoke_ticket  = pcmk_revoke_ticket,
-	.store_ticket   = pcmk_store_ticket,
 	.load_ticket    = pcmk_load_ticket,
 };

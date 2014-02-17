@@ -1,6 +1,6 @@
 /* 
  * Copyright (C) 2011 Jiaju Zhang <jjzhang@suse.de>
- * Copyright (C) 2013 Philipp Marek <philipp.marek@linbit.com>
+ * Copyright (C) 2013-2014 Philipp Marek <philipp.marek@linbit.com>
  * 
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public
@@ -24,10 +24,9 @@
 #include "config.h"
 
 struct ticket_handler {
-	void (*grant_ticket) (struct ticket_config *tk);
-	void (*revoke_ticket) (struct ticket_config *tk);
-	void (*store_ticket) (struct ticket_config *tk);
-	void (*load_ticket) (struct ticket_config *tk);
+	int (*grant_ticket) (struct ticket_config *tk);
+	int (*revoke_ticket) (struct ticket_config *tk);
+	int (*load_ticket) (struct ticket_config *tk);
 };
 
 struct ticket_handler pcmk_handler;

@@ -126,8 +126,6 @@ int ticket_write(struct ticket_config *tk)
 
 	disown_if_expired(tk);
 
-	pcmk_handler.store_ticket(tk);
-
 	if (tk->owner == local) {
 		pcmk_handler.grant_ticket(tk);
 	} else {
