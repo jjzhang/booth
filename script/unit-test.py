@@ -300,8 +300,8 @@ class UT():
             return True
         # for easier (test) debugging we'll show the _real_ value, too.
         has = self._query_value(which)
-        _is = self._query_value(value)
-        logging.error("«%s»: got «%s», expected «%s». ERROR." % (which, _is, has))
+        want = self._query_value(value)
+        logging.error("«%s»: got «%s», expected «%s». ERROR." % (which, has, want))
         return False
 
     # Send data to GDB, to inject them into the binary.
