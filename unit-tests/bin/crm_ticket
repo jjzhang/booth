@@ -8,21 +8,24 @@
 
 function word_after()
 {
+# Per default $1 is printed
   perl -e '
 	  $search=shift();
 	  $stg=shift();
-	  print $1 if $stg =~ /$search/;' "$1" "$2"
+	  print $'${3:-1}' if $stg =~ /$search/;' "$1" "$2"
 }
 
 
 function Get()
 {
-	which=$(word_after " -G '(\\w+)'" "$1")
+	which=$(word_after " -G ('?)(\\w+)\\1" "$1" 2)
 	if [[ -z "$which" ]] ; then
 		exit 1
 	fi
 
 	word_after "\\b$which\\b (\\S+)" "$UNIT_TEST_AUX"
+        # provide a newline
+        echo ""
 	exit 0
 }
 
