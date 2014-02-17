@@ -506,13 +506,14 @@ class UT():
             if f < start_from:
                 continue
             log = None
+            logfn = UT._filename(f)
             if self.running_on_console():
                 sys.stdout.write("\n")
             try:
-                log = self.setup_log(filename = UT._filename(f))
+                log = self.setup_log(filename = logfn)
 
                 log.setLevel(logging.DEBUG)
-                logging.error(self.colored_string("Starting test '%s'" % f, self.BLUE))
+                logging.error(self.colored_string("Starting test '%s'" % f, self.BLUE) + ", logfile " + logfn)
                 self.start_processes(f)
 
                 test = self.read_test_input(f, m=copy.deepcopy(self.defaults))
