@@ -27,7 +27,74 @@
 #include "pacemaker.h"
 #include "inline-fn.h"
 
-#define COMMAND_MAX	256
+
+enum atomic_ticket_supported {
+	YES=0,
+	NO,
+	FILENOTFOUND,  /* Ie. UNKNOWN */
+	UNKNOWN = FILENOTFOUND,
+};
+/* http://thedailywtf.com/Articles/What_Is_Truth_0x3f_.aspx */
+
+
+enum atomic_ticket_supported atomicity = UNKNOWN;
+
+
+
+#define COMMAND_MAX	1024
+
+
+/** Determines whether the installed crm_ticket can do atomic ticket grants,
+ * _including_ multiple attribute changes.
+ *
+ * See
+ *   https://bugzilla.novell.com/show_bug.cgi?id=855099
+ *
+ * Run "crm_ticket" without "--force";
+ *   - the old version asks for "Y/N" via STDIN, and returns 0
+ *     when reading "no";
+ *   - the new version just reports an error without asking.
+ */
+static void test_atomicity(void)
+{
+	int rv;
+
+	if (atomicity != UNKNOWN)
+		return;
+
+	rv = system("echo n | crm_ticket -g -t any-ticket-name > /dev/null 2> /dev/null");
+	if (rv == -1) {
+		log_error("Cannot run \"crm_ticket\"!");
+		/* BIG problem. Abort. */
+		exit(1);
+	}
+
+	if (WIFSIGNALED(rv)) {
+		log_error("\"crm_ticket\" terminated by a signal!");
+		/* Problem. Abort. */
+		exit(1);
+	}
+
+	switch (WEXITSTATUS(rv)) {
+	case 0:
+		atomicity = NO;
+		log_info("Old \"crm_ticket\" found, using non-atomic ticket updates.");
+		break;
+
+	case 1:
+		atomicity = YES;
+		log_info("New \"crm_ticket\" found, using atomic ticket updates.");
+		break;
+
+	default:
+		log_error("Unexpected return value from \"crm_ticket\" (%d), "
+				"falling back to non-atomic ticket updates.",
+				rv);
+		atomicity = NO;
+	}
+
+	assert(atomicity == YES || atomicity == NO);
+}
 
 
 static const char * interpret_rv(int rv)
@@ -48,11 +115,45 @@ static const char * interpret_rv(int rv)
 }
 
 
+static void pcmk_write_ticket_atomic(struct ticket_config *tk, int grant)
+{
+	char cmd[COMMAND_MAX];
+	int rv;
+
+
+	snprintf(cmd, COMMAND_MAX,
+			"crm_ticket -t '%s' "
+			"%s --force "
+			"-S owner -v %" PRIi32
+			"-S expires -v %" PRIi64
+			"-S ballot -v %" PRIi64,
+			tk->name,
+			(grant > 0 ? "-g" :
+			 grant < 0 ? "-v" :
+			 ""),
+			(int32_t)get_node_id(tk->owner),
+			(int64_t)tk->expires,
+			(int64_t)tk->last_ack_ballot);
+
+	rv = system(cmd);
+	log_info("command: '%s' was executed", cmd);
+	if (rv != 0)
+		log_error("error: \"%s\" failed, %s", cmd, interpret_rv(rv));
+}
+
 
 static void pcmk_grant_ticket(struct ticket_config *tk)
 {
 	char cmd[COMMAND_MAX];
 	int rv;
+
+
+	test_atomicity();
+	if (atomicity == YES) {
+		pcmk_write_ticket_atomic(tk, +1);
+		return;
+	}
+
 
 	snprintf(cmd, COMMAND_MAX, "crm_ticket -t %s -g --force",
 			tk->name);
@@ -62,10 +163,19 @@ static void pcmk_grant_ticket(struct ticket_config *tk)
 		log_error("error: \"%s\" failed, %s", cmd, interpret_rv(rv));
 }
 
+
 static void pcmk_revoke_ticket(struct ticket_config *tk)
 {
 	char cmd[COMMAND_MAX];
 	int rv;
+
+
+	test_atomicity();
+	if (atomicity == YES) {
+		pcmk_write_ticket_atomic(tk, -1);
+		return;
+	}
+
 
 	snprintf(cmd, COMMAND_MAX, "crm_ticket -t %s -r --force",
 			tk->name);
@@ -98,6 +208,14 @@ static int crm_ticket_set(const struct ticket_config *tk, const char *attr, int6
 
 static void pcmk_store_ticket(struct ticket_config *tk)
 {
+	test_atomicity();
+
+	if (atomicity == YES) {
+		/* Nothing needed, done via grant/revoke. */
+		return;
+		pcmk_write_ticket_atomic(tk, 0);
+	}
+
 	crm_ticket_set(tk, "owner", (int32_t)get_node_id(tk->owner));
 	crm_ticket_set(tk, "expires", tk->expires);
 	crm_ticket_set(tk, "ballot", tk->last_ack_ballot);
@@ -150,6 +268,10 @@ static void pcmk_load_ticket(struct ticket_config *tk)
 	int rv;
 	int64_t v;
 
+
+	/* This here gets run during startup; testing that here means that
+	 * normal operation won't be interrupted with that test. */
+	test_atomicity();
 
 	rv = crm_ticket_get(tk, "expires", &v);
 	if (!rv) {
