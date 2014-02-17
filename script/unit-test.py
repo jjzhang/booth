@@ -512,6 +512,7 @@ class UT():
             logfn = UT._filename(f)
             if self.running_on_console():
                 sys.stdout.write("\n")
+            self.current_nr = "setup"
             try:
                 log = self.setup_log(filename = logfn)
 
@@ -526,10 +527,10 @@ class UT():
                 self.loop(f, test)
                 self.do_finally(test.get("finally"))
 
-                self.current_nr = None
+                self.current_nr = "teardown"
                 logging.warn(self.colored_string("Finished test '%s' - OK" % f, self.GREEN))
             except:
-                logging.error(self.colored_string("Broke in %s:%d %s" % (f, self.current_nr, sys.exc_info()), self.RED))
+                logging.error(self.colored_string("Broke in %s:%s %s" % (f, self.current_nr, sys.exc_info()), self.RED))
                 for frame in traceback.format_tb(sys.exc_traceback):
                     logging.info("  -  %s " % frame.rstrip())
             finally:
