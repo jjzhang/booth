@@ -12,7 +12,8 @@ ticket:
     timeout             1
     # may keep ticket all the time
     expiry              3000
-    expires             time(0) + 2000
+    # but shall start renewal now
+    expires             time(0) + 1000
 
 
 
@@ -48,9 +49,4 @@ outgoing10:
 
 # Now retry counter should trigger, and restart paxos
 outgoing11:
-    header.cmd          OP_PROPOSING
-outgoing12:
-    header.cmd          OP_PROPOSING
-
-outgoing13:
     header.cmd          OP_PREPARING
