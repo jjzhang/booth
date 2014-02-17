@@ -27,7 +27,14 @@ outgoing3:
 
 # Now give cause to abort.
 ticket4:
-    expires             time(0) + 1
+    expires             time(0) - 2
+    retry_number        10
     timeout             2
 outgoing4:
     header.cmd          CMD_CATCHUP
+
+
+# ticket must be lost
+finally:
+    owner               0
+    state               ST_INIT
