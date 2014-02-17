@@ -22,6 +22,10 @@ injecting some input and looking at the output.
 
     # python script/unit-test.py src/boothd unit-tests/
 
+Or, if using the 'booth-test' RPM,
+
+    # python unit-test.py src/boothd unit-tests/
+
 This must (currently?) be run as a non-root user; another optional argument is
 the test to start from, eg. '003'.
 
