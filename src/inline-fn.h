@@ -126,7 +126,8 @@ static inline void disown_ticket(struct ticket_config *tk)
 
 static inline void disown_if_expired(struct ticket_config *tk)
 {
-	if (time(NULL) >= tk->expires || !tk->proposed_owner)
+	if (time(NULL) >= tk->expires ||
+			(!tk->proposed_owner && !tk->owner))
 		disown_ticket(tk);
 }
 
