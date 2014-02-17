@@ -299,8 +299,11 @@ class UT():
         if val == "1":
             return True
         # for easier (test) debugging we'll show the _real_ value, too.
-        has = self._query_value(which)
         want = self._query_value(value)
+        # Order is important, so that next query works!!
+        has = self._query_value(which)
+        # for informational purposes
+        self._query_value('state_to_string($$)')
         logging.error("«%s»: got «%s», expected «%s». ERROR." % (which, has, want))
         return False
 
