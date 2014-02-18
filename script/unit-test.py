@@ -180,6 +180,7 @@ class UT():
         # if not, we terminate it ourselves.
         if self.gdb:
             self.gdb.close( force=True );
+        self.drain_booth_log()
         if self.booth:
             self.booth.close( force=self.booth.isalive() )
 
