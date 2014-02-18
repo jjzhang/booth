@@ -510,13 +510,15 @@ class UT():
             sys.exit(1)
         
 
-    def run(self, start_from="000"):
+    def run(self, start_from="000", end_with="999"):
         os.chdir(self.test_base)
         # TODO: sorted, random order
         tests = filter( (lambda f: re.match(r"^\d\d\d_.*\.txt$", f)), glob.glob("*"))
         tests.sort()
         for f in tests:
-            if f < start_from:
+            if f[0:3] < start_from:
+                continue
+            if f[0:3] > end_with:
                 continue
             log = None
             logfn = UT._filename(f)
@@ -598,6 +600,9 @@ if __name__ == '__main__':
     starting = "0"
     if len(sys.argv) > 3:
         starting = sys.argv[3]
-    ret = ut.run(starting)
+    ending = "999"
+    if len(sys.argv) > 4:
+        ending = sys.argv[4]
+    ret = ut.run(starting, ending)
     sys.exit(ret)
 # }}}
