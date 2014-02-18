@@ -276,6 +276,8 @@ class UT():
     def drain_booth_log(self):
         try:
             self.booth.read_nonblocking(64*1024, 0)
+        except pexpect.EOF:
+            pass
         except pexpect.TIMEOUT:
             pass
         finally:
