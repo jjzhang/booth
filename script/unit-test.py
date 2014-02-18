@@ -225,7 +225,14 @@ class UT():
         self.gdb = self.start_a_process("gdb",
                 args=["-quiet",
                     "-p", str(self.booth.pid),
-                    "-nx", "-nh",   # don't use .gdbinit
+                    # Don't use .gdbinit
+                    "-nx", "-nh",
+                    # Run until the defined point.
+                    # This is necessary so that ticket state setting doesn't
+                    # happen _before_ the call to pcmk_load_ticket()
+                    # (which would overwrite our data)
+                    "-ex", "break ticket_cron",
+                    "-ex", "continue",
                     ])
         logging.info("started GDB with PID %d" % self.gdb.pid)
         self.gdb.expect("(gdb)")
@@ -234,18 +241,18 @@ class UT():
         self.gdb.sendline("set verbose off\n") ## sadly to late for the initial "symbol not found" messages
         self.gdb.sendline("set prompt " + self.prompt + "\\n\n");
         self.sync(2000)
-        #os.system("strace -o /tmp/sfdgs -f -tt -s 2000 -p %d &" % self.gdb.pid)
 
+        # Only stop for this recipient, so that broadcasts are not seen multiple times
+        self.send_cmd("break booth_udp_send if to == &(booth_conf->site[1])")
+        self.send_cmd("break recvfrom")
+        # ticket_cron is still a breakpoint
+
+        # Now we're set up.
         self.this_site_id = self.query_value("local->site_id")
         self.this_port = int(self.query_value("booth_conf->port"))
 
         # do a self-test
         assert(self.check_value("local->site_id", self.this_site_id))
-        
-        # Now we're set up.
-        self.send_cmd("break ticket_cron")
-        self.send_cmd("break booth_udp_send if to == &(booth_conf->site[1])")
-        self.send_cmd("break recvfrom")
 
         self.running = False
 # }}}
@@ -480,7 +487,10 @@ class UT():
         self.drain_booth_log()
         # stop it
         posix.kill(self.booth.pid, signal.SIGINT)
-        posix.kill(self.gdb.pid, signal.SIGINT)
+        # This additional signal seems to be unnecessary.
+        #posix.kill(self.gdb.pid, signal.SIGINT)
+        # In case it's really needed we should drain booth's signals queue,
+        # eg. by sending "print getpid()" twice, before the sync() call.
         self.running = False
         self.sync(2000)
 
