@@ -272,7 +272,7 @@ static int crm_ticket_get(struct ticket_config *tk,
 
 out:
 	rv = pclose(p);
-	log_info("command \"%s\" returned %s, value %" PRIi64, cmd, interpret_rv(rv), v);
+	log_debug("command \"%s\" returned %s, value %" PRIi64, cmd, interpret_rv(rv), v);
 	return rv;
 }
 
