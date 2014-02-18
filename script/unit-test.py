@@ -515,6 +515,7 @@ class UT():
         # TODO: sorted, random order
         tests = filter( (lambda f: re.match(r"^\d\d\d_.*\.txt$", f)), glob.glob("*"))
         tests.sort()
+        failed = 0
         for f in tests:
             if f[0:3] < start_from:
                 continue
@@ -542,6 +543,7 @@ class UT():
                 self.current_nr = "teardown"
                 logging.warn(self.colored_string("Finished test '%s' - OK" % f, self.GREEN))
             except:
+                failed += 1
                 logging.error(self.colored_string("Broke in %s:%s %s" % (f, self.current_nr, sys.exc_info()), self.RED))
                 for frame in traceback.format_tb(sys.exc_traceback):
                     logging.info("  -  %s " % frame.rstrip())
@@ -552,7 +554,7 @@ class UT():
                     logging.getLogger("").removeHandler(log)
         if self.running_on_console():
             sys.stdout.write("\n")
-        return
+        return failed
 # }}}
 
 
