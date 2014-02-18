@@ -488,7 +488,7 @@ class UT():
         time.sleep(1)
         self.drain_booth_log()
         # stop it
-        posix.kill(self.booth.pid, signal.SIGINT)
+        self.booth.sendintr()
         # This additional signal seems to be unnecessary.
         #posix.kill(self.gdb.pid, signal.SIGINT)
         # In case it's really needed we should drain booth's signals queue,
