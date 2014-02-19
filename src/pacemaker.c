@@ -121,12 +121,24 @@ static int pcmk_write_ticket_atomic(struct ticket_config *tk, int grant)
 	int rv;
 
 
+	/* The values are appended to "-v", so that NO_OWNER
+	 * (which is -1) isn't seen as another option. */
+	/* The first attribute name/value pair needs to be given in a certain
+	 * order, to workaround a bug in 1.1.10+git20140124.96cd194-1.1. 
+	 *   $ crm_ticket -t 'ticket-nfs' -v --force -S owner -v-1
+	 *      -S expires -v1392797997 -S ballot -v3817
+	 *   You need to supply an attribute name with the -S command for -v 3817
+	 *   Error performing operation: Invalid argument
+         * but
+	 *   $ crm_ticket -t 'ticket-nfs' -v --force -v-1 -S owner
+	 *      -S expires -v1392797997 -S ballot -v3817
+	 */
 	snprintf(cmd, COMMAND_MAX,
 			"crm_ticket -t '%s' "
 			"%s --force "
-			"-S owner -v %" PRIi32
-			"-S expires -v %" PRIi64
-			"-S ballot -v %" PRIi64,
+			"-S owner -v%" PRIi32 " "
+			"-S expires -v%" PRIi64 " "
+			"-S ballot -v%" PRIi64,
 			tk->name,
 			(grant > 0 ? "-g" :
 			 grant < 0 ? "-v" :
