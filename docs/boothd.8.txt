@@ -76,6 +76,9 @@ The configuration name also determines the name of the PID file - for the defaul
 *-v*, *--version*::
 	Report version information.
 
+*-S*::
+	'systemd' mode: don't fork. This is like '-D' but without the debug output.
+
 
 
 COMMANDS

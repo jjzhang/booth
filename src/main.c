@@ -798,6 +798,7 @@ static void print_usage(void)
 	printf("  -c FILE       Specify config file [default " BOOTH_DEFAULT_CONF "]\n");
 	printf("                Can be a path or a name without \".conf\" suffix\n");
 	printf("  -D            Enable debugging to stderr and don't fork\n");
+	printf("  -S            Systemd mode (no forking)\n");
 	printf("  -t            ticket name\n");
 	printf("  -s            site name\n");
 	printf("  -l LOCKFILE   Specify lock file path (daemon only)\n");
@@ -806,7 +807,7 @@ static void print_usage(void)
 	printf("Please see the man page for details.\n");
 }
 
-#define OPTION_STRING		"c:Dl:t:s:h"
+#define OPTION_STRING		"c:Dl:t:s:hS"
 
 
 void safe_copy(char *dest, char *value, size_t buflen, const char *description) {
@@ -932,8 +933,10 @@ static int read_arguments(int argc, char **argv)
 			}
 			break;
 		case 'D':
-			daemonize = 1;
 			debug_level++;
+			/* Fall through */
+		case 'S':
+			daemonize = 1;
 			break;
 
 		case 'l':
