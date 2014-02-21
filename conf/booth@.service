@@ -4,6 +4,7 @@
 Description=Booth - Ticket Manager for Pacemaker Clusters
 Documentation=man:boothd(8)
 After=network-online.target
+ConditionFileExists=/etc/booth/%i.conf
 
 [Install]
 Alias=boothd
