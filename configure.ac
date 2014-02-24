@@ -347,7 +347,26 @@ else
 	WERROR_CFLAGS=""
 fi
 
+RESMON_CFLAGS=""
 if test "x${enable_resource_monitor}" = xyes; then
+	RESMON_CFLAGS="-I$oldincludedir/pacemaker/"
+	CPPFLAGS="$ENV_CPPFLAGS $ANSI_CPPFLAGS $OS_CPPFLAGS $GLIB_CFLAGS $RESMON_CFLAGS"
+	AC_CHECK_HEADERS(libxml/tree.h)
+	AC_CHECK_HEADERS(crm/cib.h)
+	AC_CHECK_HEADERS([crm/cib/util.h], [], [],
+			[
+#include <libxml/tree.h>
+#include <crm/cib.h>
+			])
+	AC_CHECK_HEADERS([crm/common/xml.h], [], [],
+			[
+#include <libxml/tree.h>
+#include <crm/cib.h>
+			])
+	AC_CHECK_LIB([crmcommon -lcrmcluster -lpe_status -lcib -lglib-2.0 -lqb -lxml2], [xml_log_patchset])
+	AC_CHECK_LIB([crmcommon -lcrmcluster -lpe_status -lcib -lglib-2.0 -lqb -lxml2], [log_cib_diff])
+	AC_CHECK_FUNCS(log_cib_diff)
+	AC_CHECK_FUNCS(xml_log_patchset)
 	PACKAGE_FEATURES="$PACKAGE_FEATURES resource-monitor"
 	WITH_LIST="$WITH_LIST --with resource-monitor"
 	SUPPORT_RESOURCE_MONITOR=1
@@ -367,7 +386,7 @@ fi
 # final build of *FLAGS
 CFLAGS="$ENV_CFLAGS $OPT_CFLAGS $GDB_FLAGS $OS_CFLAGS \
 	$COVERAGE_CFLAGS $EXTRA_WARNINGS $WERROR_CFLAGS $NSS_CFLAGS"
-CPPFLAGS="$ENV_CPPFLAGS $ANSI_CPPFLAGS $OS_CPPFLAGS"
+CPPFLAGS="$ENV_CPPFLAGS $ANSI_CPPFLAGS $OS_CPPFLAGS $GLIB_CFLAGS $RESMON_CFLAGS"
 LDFLAGS="$ENV_LDFLAGS $COVERAGE_LDFLAGS $OS_LDFLAGS"
 
 # substitute what we need:
@@ -392,6 +411,8 @@ AC_DEFINE_UNQUOTED([SOCKETDIR], "$(eval echo ${SOCKETDIR})", [Socket directory])
 AC_DEFINE_UNQUOTED([LOCALSTATEDIR], "$(eval echo ${localstatedir})", [localstate directory])
 
 BOOTHSYSCONFDIR=${sysconfdir}/booth
+AC_SUBST([HAVE_LOG_CIB_DIFF])
+AC_SUBST([HAVE_XML_LOG_PATCHSET])
 AC_SUBST([BOOTHSYSCONFDIR])
 AC_DEFINE_UNQUOTED([BOOTHSYSCONFDIR], "$(eval echo ${BOOTHSYSCONFDIR})", [booth config directory])
 

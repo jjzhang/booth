@@ -4,6 +4,7 @@
  *   When abnormality occurs in a resource, move a ticket to other sites using booth.
  *
  * Copyright (c) 2012 NIPPON TELEGRAPH AND TELEPHONE CORPORATION
+ * Copyright (c) 2014 Philipp Marek <philipp.marek@linbit.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public
@@ -122,3 +123,20 @@ int crmd_ipc_msg_callback(const char *buffer, ssize_t length,
 			  gpointer user_data);
 void crmd_ipc_connection_destroy(gpointer user_data);
 int crmd_connect(void);
+
+
+#ifdef HAVE_LOG_CIB_DIFF
+/* OK */
+#else
+#ifdef HAVE_XML_LOG_PATCHSET
+/* See https://github.com/ClusterLabs/pacemaker, commit
+ * 6953aa52e00c4ddf481254a828f6d7c7826a23b9 */
+	static inline void
+log_cib_diff(int log_level, xmlNode * diff, const char *function)
+{
+	xml_log_patchset(log_level, function, diff);
+}
+#else
+#error "Neither log_cib_diff() nor xml_log_patchset() available."
+#endif
+#endif

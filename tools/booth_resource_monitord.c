@@ -4,6 +4,7 @@
  *   When abnormality occurs in a resource, move a ticket to other sites using booth.
  *
  * Copyright (c) 2012 NIPPON TELEGRAPH AND TELEPHONE CORPORATION
+ * Copyright (c) 2013-2014 Philipp Marek <philipp.marek@linbit.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public
@@ -52,7 +53,6 @@
 #include <crm_config.h>
 #include <crm/crm.h>
 #include <crm/cib.h>
-#include <crm/cib/compatibility.h>
 #include <crm/error.h>
 #include <crm/msg_xml.h>
 #include <crm/common/ipc.h>
