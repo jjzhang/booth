@@ -262,6 +262,19 @@ FILES
 	Directory that holds PID/lock files. See also the 'status' command.
 
 
+SYSTEMD INTEGRATION
+-------------------
+
+The Booth sources (and, very likely, packages too) include a 'systemd' unit
+file for 'boothd'.
+
+So don't forget to install 'boothd' into 'systemd' after configuration!
+
+-----------
+# systemctl enable booth@{configurationname}.service
+# systemctl start  booth@{configurationname}.service
+-----------
+
 
 EXIT STATUS
 -----------
