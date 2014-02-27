@@ -1,0 +1,23 @@
+#!/bin/bash
+# This script is part of Booth.
+# It checks whether the given resource (service) still has a chance
+# to run on the local cluster, so that booth knows whether to
+# acquire the ticket here.
+
+set -e
+
+service="${1:?Need a resource name as first argument.}"
+
+all_INF=1
+for eligible_node in `crm_node -p` ; do
+	stat=`crm_failcount -G -r "$service" -N "$eligible_node"`
+	if [[ "$stat" == "scope=status "*"name="*" value="* &&
+		"$stat" != *" value=INFINITY" ]] ; then
+		all_INF=0
+	fi
+done
+
+
+# if INFINITY on all nodes, the service can't run anywhere.
+# so tell booth to _not_ get the ticket.
+exit $all_INF
