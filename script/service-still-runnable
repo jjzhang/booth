@@ -8,6 +8,13 @@ set -e
 
 service="${1:?Need a resource name as first argument.}"
 
+# might say "resource g_http is NOT running", but still returns 0.
+if ! crm_resource -W --resource "$service" &> /dev/null ; then
+	echo "Error: Resource name '$service' is now known."
+	exit 1
+fi
+
+
 all_INF=1
 for eligible_node in `crm_node -p` ; do
 	stat=`crm_failcount -G -r "$service" -N "$eligible_node"`
