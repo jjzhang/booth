@@ -207,6 +207,22 @@ default is to use 'hacluster':'haclient'; for an arbitrator this user and group
 might not exists, so that will default to 'nobody':'nobody'.
 
 
+*'before-acquire-handler'::
+	If set, this script/program will be called before 'boothd' tries to
+	acquire or renew a ticket. Only a clean exit will allow 'boothd' to
+	proceed; any other return value will cancel the operation.
++
+This makes it possible to check whether it makes sense to try
+to acquire the ticket; eg. if a service in the
+dependency-chain has a failcount of 'INFINITY' on all
+available nodes, the service will be unable to run - and so
+another cluster (and not this one!) should try to start it.
++
+Please assume that 'boothd' will wait synchronously for the result of that
+call, so having that program return quickly would be an advantage.
++
+Please see below for details about available environment variables.
+
 
 A more verbose example of a configuration file might be
 
@@ -250,6 +266,30 @@ This will happen so that (the bigger one of) half the 'expire' time, or
 Of course, that means that with bad configuration values (eg. 'expire' 60 
 seconds, 'timeout' 3 seconds, and 'retries' > 40) the ticket renewal 
 process will be started just after the ticket got acquired.
+
+
+HANDLERS
+--------
+
+Currently, there's only one external handler defined (see the 'before-acquire-handler'
+configuration item above).
+
+It gets the following data via the environment:
+
+*'BOOTH_TICKET'::
+	The ticket name, as given in the configuration file. (See 'ticket' item above.)
+
+*'BOOTH_LOCAL'::
+	The local site specification, as defined in 'site'.
+
+*'BOOTH_CONF_PATH'::
+	The path to the active configuration file.
+
+*'BOOTH_CONF_NAME'::
+	The configuration name, as used by the '-c' commandline argument.
+
+*'BOOTH_TICKET_EXPIRES'::
+	Timestamp for the ticket expiration (seconds since 1.1.1970), or '0'.
 
 
 FILES

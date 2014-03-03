@@ -8,14 +8,14 @@ AM_CPPFLAGS		= -I$(top_builddir)/include
 sbin_PROGRAMS		= boothd
 
 boothd_SOURCES	 	= config.c main.c paxos.c ticket.c  transport.c \
-			  pacemaker.c
+			  pacemaker.c handler.c
 
 boothd_LDFLAGS		= $(OS_DYFLAGS) -L./
 boothd_LDADD		= -lplumb -lplumbgpl -lz -lm
 boothd_CPPFLAGS		= $(GLIB_CFLAGS)
 
 noinst_HEADERS		= booth.h pacemaker.h \
-			  config.h log.h paxos.h ticket.h transport.h
+			  config.h log.h paxos.h ticket.h transport.h handler.h
 
 if HAVE_HELP2MAN
 man_MANS		= booth.8 boothd.8

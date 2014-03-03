@@ -53,6 +53,9 @@ struct ticket_config {
 	 * another site. */
 	int acquire_after;
 
+	/* Program to ask whether it makes sense to
+	 * acquire the ticket */
+	char *ext_verifier;
 
 	/** Node weights. */
 	int weight[MAX_NODES];

@@ -32,6 +32,7 @@
 #include "log.h"
 #include "booth.h"
 #include "paxos.h"
+#include "handler.h"
 
 #define TK_LINE			256
 
@@ -136,6 +137,33 @@ int ticket_write(struct ticket_config *tk)
 }
 
 
+/* Ask an external program whether getting the ticket
+ * makes sense.
+* Eg. if the services have a failcount of INFINITY,
+* we can't serve here anyway. */
+int get_ticket_locally_if_allowed(struct ticket_config *tk)
+{
+	int rv;
+
+	if (!tk->ext_verifier)
+		goto get_it;
+
+	rv = run_handler(tk, tk->ext_verifier, 1);
+	if (rv) {
+		log_error("May not acquire ticket.");
+
+		/* Give it to somebody else. */
+		if (owner_and_valid(tk))
+			paxos_start_round(tk, NULL);
+	} else {
+		log_info("May keep ticket.");
+	}
+
+get_it:
+	return paxos_start_round(tk, local);
+}
+
+
 /** Try to get the ticket for the local site.
  * */
 int do_grant_ticket(struct ticket_config *tk)
@@ -147,7 +175,7 @@ int do_grant_ticket(struct ticket_config *tk)
 	if (tk->owner)
 		return RLT_OVERGRANT;
 
-	rv = paxos_start_round(tk, local);
+	rv = get_ticket_locally_if_allowed(tk);
 	return rv;
 }
 
@@ -556,8 +584,8 @@ static void ticket_cron(struct ticket_config *tk)
 				tk->acquire_after &&
 				tk->expires + tk->acquire_after >= now &&
 				local->type == SITE) {
-			log_info("ACQUIRE ticket \"%s\" after timeout", tk->name);
-			paxos_start_round(tk, local);
+			if (!get_ticket_locally_if_allowed(tk))
+				log_info("ACQUIRE ticket \"%s\" after timeout; ac=%d", tk->name, tk->acquire_after);
 			break;
 		}
 
@@ -565,8 +593,8 @@ static void ticket_cron(struct ticket_config *tk)
 		/* Are we the current owner, and do we need to refresh?
 		 * This is not the same as above. */
 		if (should_start_renewal(tk)) {
-			log_info("RENEW ticket \"%s\"", tk->name);
-			paxos_start_round(tk, local);
+			if (!get_ticket_locally_if_allowed(tk))
+				log_info("RENEW ticket \"%s\"", tk->name);
 
 			/* TODO: remember when we started, and restart afresh after some retries */
 		}

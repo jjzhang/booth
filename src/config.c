@@ -318,6 +318,7 @@ int read_config(const char *path)
 	strcpy(booth_conf->arb_group,  "nobody");
 
 	parse_weights("", defaults.weight);
+	defaults.ext_verifier  = NULL;
 	defaults.expiry        = DEFAULT_TICKET_EXPIRY;
 	defaults.timeout       = DEFAULT_TICKET_TIMEOUT;
 	defaults.retries       = DEFAULT_RETRIES;
@@ -515,6 +516,17 @@ no_value:
 
 			if (last_ticket)
 				last_ticket->acquire_after = defaults.acquire_after;
+		}
+
+		if (strcmp(key, "before-acquire-handler") == 0) {
+			defaults.ext_verifier = strdup(val);
+			if (*s || s == val || defaults.timeout<1) {
+				error = "Expected plain integer value >=1 for timeout";
+				goto err;
+			}
+
+			if (last_ticket)
+				last_ticket->ext_verifier = defaults.ext_verifier;
 		}
 
 
