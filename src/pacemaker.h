@@ -30,6 +30,7 @@ struct ticket_handler {
 };
 
 struct ticket_handler pcmk_handler;
+const char * interpret_rv(int rv);
 
 
 #endif /* _PACEMAKER_H */

@@ -97,7 +97,7 @@ static void test_atomicity(void)
 }
 
 
-static const char * interpret_rv(int rv)
+const char * interpret_rv(int rv)
 {
 	static char text[64];
 	int p;
