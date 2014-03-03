@@ -435,10 +435,9 @@ no_value:
 			booth_conf->port = atoi(val);
 
 		if (strcmp(key, "name") == 0) {
-			if(strlen(val)+1 >= BOOTH_NAME_LEN) {
-				error = "Config name too long.";
-				goto err;
-			}
+			safe_copy(booth_conf->name, 
+					val, BOOTH_NAME_LEN,
+					"name");
 		}
 
 		if (strcmp(key, "site") == 0) {
