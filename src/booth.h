@@ -247,4 +247,14 @@ void process_connection(int ci);
 void safe_copy(char *dest, char *value, size_t buflen, const char *description);
 
 
+struct command_line {
+	int type;		/* ACT_ */
+	int op;			/* OP_ */
+	char configfile[BOOTH_PATH_LEN];
+	char lockfile[BOOTH_PATH_LEN];
+
+	char site[BOOTH_NAME_LEN];
+	struct boothc_ticket_msg msg;
+};
+extern struct command_line cl;
 #endif /* _BOOTH_H */

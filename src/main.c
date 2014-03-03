@@ -84,18 +84,10 @@ typedef enum {
 	OP_REVOKE,
 } operation_t;
 
-struct command_line {
-	int type;		/* ACT_ */
-	int op;			/* OP_ */
-	char configfile[BOOTH_PATH_LEN];
-	char lockfile[BOOTH_PATH_LEN];
 
-	char site[BOOTH_NAME_LEN];
-	struct boothc_ticket_msg msg;
-};
 
 struct booth_config *booth_conf;
-static struct command_line cl;
+struct command_line cl;
 
 int do_read(int fd, void *buf, size_t count)
 {
