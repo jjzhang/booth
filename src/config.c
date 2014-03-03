@@ -318,9 +318,9 @@ int read_config(const char *path)
 	strcpy(booth_conf->arb_group,  "nobody");
 
 	parse_weights("", defaults.weight);
-	defaults.expiry = DEFAULT_TICKET_EXPIRY;
-	defaults.timeout = DEFAULT_TICKET_TIMEOUT;
-	defaults.retries = DEFAULT_RETRIES;
+	defaults.expiry        = DEFAULT_TICKET_EXPIRY;
+	defaults.timeout       = DEFAULT_TICKET_TIMEOUT;
+	defaults.retries       = DEFAULT_RETRIES;
 	defaults.acquire_after = 0;
 
 	error = "";
