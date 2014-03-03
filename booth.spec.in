@@ -1,4 +1,3 @@
-%bcond_with resource_monitor
 
 %global alphatag @alphatag@
 %global numcomm @numcomm@
@@ -36,9 +35,6 @@ distributed clustering.
 ./autogen.sh
 
 %configure \
-%if %{with resource_monitor}
-	--enable-resource-monitor \
-%endif
 	--with-initddir=%{_initrddir}
 
 make all
@@ -66,10 +62,6 @@ rm -rf %{buildroot}
 %dir /usr/lib/ocf/resource.d/pacemaker/
 /usr/lib/ocf/resource.d/pacemaker/booth-site
 %{_initrddir}/booth-arbitrator
-%if %{with resource_monitor}
-%{_sbindir}/booth_resource_monitord
-%endif
-
 
 
 %changelog

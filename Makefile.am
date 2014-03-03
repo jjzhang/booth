@@ -59,7 +59,7 @@ bootharbitrator_SCRIPTS	= script/lsb/booth-arbitrator
 
 TESTS			= test/runtests.py
 
-SUBDIRS			= src tools
+SUBDIRS			= src
 
 coverity:
 	cov-build --dir=cov make

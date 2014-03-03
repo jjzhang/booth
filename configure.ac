@@ -117,8 +117,7 @@ AC_CHECK_FUNCS([alarm alphasort atexit bzero dup2 endgrent endpwent fcntl \
 		sched_get_priority_max sched_setscheduler])
 
 AC_CONFIG_FILES([Makefile
-		 src/Makefile
-		 tools/Makefile])
+		 src/Makefile])
 
 # ===============================================
 # Helpers
@@ -346,35 +345,6 @@ if test "x${enable_fatal_warnings}" = xyes && \
 else
 	WERROR_CFLAGS=""
 fi
-
-RESMON_CFLAGS=""
-if test "x${enable_resource_monitor}" = xyes; then
-	RESMON_CFLAGS="-I$oldincludedir/pacemaker/"
-	CPPFLAGS="$ENV_CPPFLAGS $ANSI_CPPFLAGS $OS_CPPFLAGS $GLIB_CFLAGS $RESMON_CFLAGS"
-	AC_CHECK_HEADERS(libxml/tree.h)
-	AC_CHECK_HEADERS(crm/cib.h)
-	AC_CHECK_HEADERS([crm/cib/util.h], [], [],
-			[
-#include <libxml/tree.h>
-#include <crm/cib.h>
-			])
-	AC_CHECK_HEADERS([crm/common/xml.h], [], [],
-			[
-#include <libxml/tree.h>
-#include <crm/cib.h>
-			])
-	AC_CHECK_LIB([crmcommon -lcrmcluster -lpe_status -lcib -lglib-2.0 -lqb -lxml2], [xml_log_patchset])
-	AC_CHECK_LIB([crmcommon -lcrmcluster -lpe_status -lcib -lglib-2.0 -lqb -lxml2], [log_cib_diff])
-	AC_CHECK_FUNCS(log_cib_diff)
-	AC_CHECK_FUNCS(xml_log_patchset)
-	PACKAGE_FEATURES="$PACKAGE_FEATURES resource-monitor"
-	WITH_LIST="$WITH_LIST --with resource-monitor"
-	SUPPORT_RESOURCE_MONITOR=1
-else
-	SUPPORT_RESOURCE_MONITOR=0
-fi
-
-AM_CONDITIONAL(RESOURCE_MONITOR, test $SUPPORT_RESOURCE_MONITOR = 1)
 
 # don't add addtional cflags
 if test "x${enable_user_flags}" = xyes; then
