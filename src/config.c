@@ -430,25 +430,31 @@ no_value:
 				goto err;
 			}
 			got_transport = 1;
+			continue;
 		}
 
-		if (strcmp(key, "port") == 0)
+		if (strcmp(key, "port") == 0) {
 			booth_conf->port = atoi(val);
+			continue;
+		}
 
 		if (strcmp(key, "name") == 0) {
 			safe_copy(booth_conf->name, 
 					val, BOOTH_NAME_LEN,
 					"name");
+			continue;
 		}
 
 		if (strcmp(key, "site") == 0) {
 			if (add_site(val, SITE))
 				goto out;
+			continue;
 		}
 
 		if (strcmp(key, "arbitrator") == 0) {
 			if (add_site(val, ARBITRATOR))
 				goto out;
+			continue;
 		}
 
 		if (strcmp(key, "ticket") == 0) {
@@ -458,6 +464,7 @@ no_value:
 			/* last_ticket is valid until another one is needed -
 			 * and then it already has the new address and
 			 * is valid again. */
+			continue;
 		}
 
 		if (strcmp(key, "expire") == 0) {
@@ -469,20 +476,29 @@ no_value:
 
 			if (last_ticket)
 				last_ticket->expiry = defaults.expiry;
+			continue;
 		}
 
-		if (strcmp(key, "site-user") == 0)
+		if (strcmp(key, "site-user") == 0) {
 			safe_copy(booth_conf->site_user, optarg, BOOTH_NAME_LEN,
 					"site-user");
-		if (strcmp(key, "site-group") == 0)
+			continue;
+		}
+		if (strcmp(key, "site-group") == 0) {
 			safe_copy(booth_conf->site_group, optarg, BOOTH_NAME_LEN,
 					"site-group");
-		if (strcmp(key, "arbitrator-user") == 0)
+			continue;
+		}
+		if (strcmp(key, "arbitrator-user") == 0) {
 			safe_copy(booth_conf->arb_user, optarg, BOOTH_NAME_LEN,
 					"arbitrator-user");
-		if (strcmp(key, "arbitrator-group") == 0)
+			continue;
+		}
+		if (strcmp(key, "arbitrator-group") == 0) {
 			safe_copy(booth_conf->arb_group, optarg, BOOTH_NAME_LEN,
 					"arbitrator-group");
+			continue;
+		}
 
 
 		if (strcmp(key, "timeout") == 0) {
@@ -494,6 +510,7 @@ no_value:
 
 			if (last_ticket)
 				last_ticket->timeout = defaults.timeout;
+			continue;
 		}
 
 		if (strcmp(key, "retries") == 0) {
@@ -505,6 +522,7 @@ no_value:
 
 			if (last_ticket)
 				last_ticket->retries = defaults.retries;
+			continue;
 		}
 
 		if (strcmp(key, "acquire-after") == 0) {
@@ -516,6 +534,7 @@ no_value:
 
 			if (last_ticket)
 				last_ticket->acquire_after = defaults.acquire_after;
+			continue;
 		}
 
 		if (strcmp(key, "before-acquire-handler") == 0) {
@@ -527,6 +546,7 @@ no_value:
 
 			if (last_ticket)
 				last_ticket->ext_verifier = defaults.ext_verifier;
+			continue;
 		}
 
 
@@ -537,7 +557,12 @@ no_value:
 			if (last_ticket)
 				memcpy(last_ticket->weight, defaults.weight,
 						sizeof(last_ticket->weight));
+			continue;
 		}
+
+
+		error = "Unknown item";
+		goto out;
 	}
 
 	if ((booth_conf->site_count % 2) == 0) {
