@@ -488,8 +488,13 @@ class UT():
             self.gdb.sendline("continue")
         time.sleep(1)
         self.drain_booth_log()
-        # stop it
-        self.booth.sendintr()
+        # stop it - via GDB!
+        self.gdb.sendintr()
+        # If we sent the signal to booth, the next
+        # "print state_to_string()" or "continue"
+        # might catch the signal - and fail to do
+        # what we want/need.
+        #
         # This additional signal seems to be unnecessary.
         #posix.kill(self.gdb.pid, signal.SIGINT)
         # In case it's really needed we should drain booth's signals queue,
