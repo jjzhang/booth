@@ -25,9 +25,17 @@ outgoing0:
 
 ticket1:
     ext_verifier        "/bin/false"
+    # cause re-query of the verifier
+    state               ST_STABLE
 
+gdb1:
+    break ticket_broadcast_proposed_state § commands § bt § c § end
+
+# We just tell the others we don't have it anymore.
 outgoing2:
+    header.cmd          OP_COMMITTED
+    ticket.owner        -1
 
 finally:
-    ticket.state        ST_INIT
-    ticket.owner        NULL
+    state        ST_STABLE
+    owner        NULL

@@ -152,9 +152,21 @@ int get_ticket_locally_if_allowed(struct ticket_config *tk)
 	if (rv) {
 		log_error("May not acquire ticket.");
 
-		/* Give it to somebody else. */
-		if (owner_and_valid(tk))
-			paxos_start_round(tk, NULL);
+		/* Give it to somebody else.
+		 * Just send a commit message, as the
+		 * others couldn't help anyway. */
+		if (owner_and_valid(tk)) {
+			disown_ticket(tk);
+			tk->proposed_owner = NULL;
+
+			/* Just go one further - others may easily override. */
+			tk->new_ballot++;
+
+			ticket_broadcast_proposed_state(tk, OP_COMMITTED);
+			tk->state = ST_STABLE;
+		}
+
+		return rv;
 	} else {
 		log_info("May keep ticket.");
 	}
