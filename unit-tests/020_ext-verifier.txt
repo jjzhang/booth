@@ -1,0 +1,33 @@
+# vim: ft=sh et :
+#
+# Testing whether the external verifier (before-acquire-handler)
+# is obeyed.
+
+
+ticket:
+    state               ST_STABLE
+    last_ack_ballot     40
+    new_ballot          50
+    owner               local
+    retries             6
+    timeout             1
+    # may keep ticket all the time
+    expiry              3000
+    # but shall start renewal now
+    expires             time(0) + 1000
+
+
+
+outgoing0:
+    header.cmd          OP_PREPARING
+
+# now say that we may not have it anymore.
+
+ticket1:
+    ext_verifier        "/bin/false"
+
+outgoing2:
+
+finally:
+    ticket.state        ST_INIT
+    ticket.owner        NULL
