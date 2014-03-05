@@ -8,23 +8,26 @@ set -e
 
 service="${1:?Need a resource name as first argument.}"
 
-# might say "resource g_http is NOT running", but still returns 0.
-if ! crm_resource -W --resource "$service" &> /dev/null ; then
-	echo "Error: Resource name '$service' is now known."
-	exit 1
+
+# We expect an output like
+#   p_dummy        (ocf::pacemaker:Dummy): Started geo-rz2-a 
+
+if crm_simulate --ticket-grant "$BOOTH_TICKET" --simulate --live-check |
+	sed -n '/^Revised cluster status:/,$p' |
+	egrep "^\s+$service\s+\(.*\): Started (\S+)$"
+then
+	# can be started - we're done.
+	exit 0
 fi
 
 
-all_INF=1
-for eligible_node in `crm_node -p` ; do
-	stat=`crm_failcount -G -r "$service" -N "$eligible_node"`
-	if [[ "$stat" == "scope=status "*"name="*" value="* &&
-		"$stat" != *" value=INFINITY" ]] ; then
-		all_INF=0
-	fi
-done
+# Some error occured.
+# Try to help the admin with a bit of diagnostic.
+#
+# disallow ms-resources, ie. only primitives wanted here
+if ! crm_resource -l | grep -v ":" | grep "$service" ; then
+	ha_logger "Defined resource '$service' in $BOOTH_CONF_PATH is not a primitive??"
+fi
 
+exit 1
 
-# if INFINITY on all nodes, the service can't run anywhere.
-# so tell booth to _not_ get the ticket.
-exit $all_INF
