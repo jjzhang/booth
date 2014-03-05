@@ -5,6 +5,7 @@
 
 
 ticket:
+    name                "tick1"
     state               ST_STABLE
     last_ack_ballot     40
     new_ballot          50
@@ -15,21 +16,33 @@ ticket:
     expiry              3000
     # but shall start renewal now
     expires             time(0) + 1000
+    ext_verifier        "test `set|grep ^BOOTH|wc -l` -ge 5"
 
 
 
 outgoing0:
     header.cmd          OP_PREPARING
 
-# now say that we may not have it anymore.
 
 ticket1:
-    ext_verifier        "/bin/false"
+    ext_verifier        'test "$BOOTH_TICKET" == "tick1"'
     # cause re-query of the verifier
     state               ST_STABLE
 
-gdb1:
-    break ticket_broadcast_proposed_state § commands § bt § c § end
+#
+#gdb1:
+#    break ticket_broadcast_proposed_state § commands § bt § c § end
+
+
+outgoing1:
+    header.cmd          OP_PREPARING
+
+
+# now say that we may not have it anymore.
+ticket2:
+    ext_verifier        'test "$BOOTH_TICKET" == "tick2FOO"'
+    # cause re-query of the verifier
+    state               ST_STABLE
 
 # We just tell the others we don't have it anymore.
 outgoing2:
