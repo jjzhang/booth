@@ -31,7 +31,7 @@
 #include "inline-fn.h"
 #include "log.h"
 #include "booth.h"
-#include "paxos.h"
+#include "raft.h"
 #include "handler.h"
 
 #define TK_LINE			256

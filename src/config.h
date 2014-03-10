@@ -22,6 +22,7 @@
 
 #include <stdint.h>
 #include "booth.h"
+#include "raft.h"
 #include "transport.h"
 
 
@@ -65,35 +66,39 @@ struct ticket_config {
 	/** \name Runtime values.
 	 * @{ */
 	/** Current state. */
-	cmd_request_t state;
+	server_state_e state;
 
 	/** When something has to be done */
 	struct timeval next_cron;
 
-	/** Current owner of ticket. */
-	struct booth_site *owner;
+	/** Current leader. This is effectively the log[] in Raft. */
+	struct booth_site *leader;
 
-	/** Timestamp of expiration. */
-	time_t expires;
+	/** Timestamp of leadership expiration. */
+	time_t term_expires;
 
 	/** Last ballot number that was agreed on. */
-	uint32_t last_ack_ballot;
+	uint32_t current_term;
 	/** @} */
+
+
+	/** */
+	uint32_t commit_index;
+
+	/** */
+	uint32_t last_applied;
+	uint32_t next_index[MAX_NODES];
+	uint32_t match_index[MAX_NODES];
 
 
 	/** \name Needed while proposals are being done.
 	 * @{ */
-	/** Who tries to change the current status. */
-	struct booth_site *proposer;
+	/** Whom to vote for the next time.
+	 * Needed to push a ticket to someone else. */
+	struct booth_site *vote_for;
 
-	/** Current owner of ticket. */
-	struct booth_site *proposed_owner;
 
-	/** New/current ballot number.
-	 * Might be < prev_ballot if overflown.
-	 * This only every goes "up" (logically). */
-	uint32_t new_ballot;
-
+#if 0
 	/** Bitmap of sites that acknowledge that state. */
 	uint64_t proposal_acknowledges;
 
@@ -104,6 +109,8 @@ struct ticket_config {
 
 	/** Timestamp of proposal expiration. */
 	time_t proposal_expires;
+
+#endif
 
 	/** Number of send retries left.
 	 * Used on the new owner.

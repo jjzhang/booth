@@ -96,19 +96,25 @@ struct ticket_msg {
 	/** Ticket name. */
 	boothc_ticket id;
 
-	/** Owner. May be NO_OWNER. See add_site().  */
-	uint32_t owner;
+	/** Current leader. May be NO_OWNER. See add_site().
+* For a OP_REQ_VOTE this is  */
+	uint32_t leader;
 
-	/** Current ballot number. Might be < prev_ballot if overflown. */
-	uint32_t ballot;
-	/** Previous ballot. */
-	uint32_t prev_ballot;
+	/** Current term. */
+	uint32_t term;
+	uint32_t term_valid_for;
 
-	/* Would we want to say _whose_ proposal is more important
-	 * when sending OP_REJECTED ? */
+	union {
+		uint32_t prev_log_term;
+		uint32_t last_log_term;
+	};
 
-	/** Seconds until expiration. */
-	uint32_t expiry;
+	union {
+		uint32_t prev_log_index;
+		uint32_t last_log_index;
+	};
+
+	uint32_t leader_commit;
 } __attribute__((packed));
 
 
@@ -118,32 +124,6 @@ struct boothc_ticket_msg {
 } __attribute__((packed));
 
 
-/** State and message IDs.
- *
- * These numbers are unlikely to conflict with other enums.
- * All have to be swabbed to network order before sending.
- * 
- * \dot
- * digraph states {
- *		node [shape=box];
- *		ST_INIT [label="ST_INIT"];
- *
- *		subgraph messages { // messages
- *		rank=same;
- *		node [shape=point, rank=same];
- *		edge [style=tapered, penwidth=3, arrowtail=none, arrowhead=none, dir=forward];
- *
- *		ST_INIT:e -> ST_INITs [label="sends out CMD_CATCHUP"];
- *		}
- *
- *		ST_INIT -> ST_STABLE [label="recv CMR_CATCHUP"];
- *		ST_STABLE;
- *
- *		ST_STABLE -> OP_PROPOSING [label="booth call to assign ticket"];
- * }
- * \enddot
- *
- * */
 #define CHAR2CONST(a,b,c,d) ((a << 24) | (b << 16) | (c << 8) | d)
 #define STG2CONST(X) ({ const char _ggg[4] = X; return (uint32_t*)_ggg; })
 typedef enum {
@@ -151,27 +131,18 @@ typedef enum {
 	CMD_LIST    = CHAR2CONST('C', 'L', 's', 't'),
 	CMD_GRANT   = CHAR2CONST('C', 'G', 'n', 't'),
 	CMD_REVOKE  = CHAR2CONST('C', 'R', 'v', 'k'),
-	CMD_CATCHUP = CHAR2CONST('C', 'C', 't', 'p'),
 
 	/* Replies */
 	CMR_GENERAL = CHAR2CONST('G', 'n', 'l', 'R'), // Increase distance to CMR_GRANT
 	CMR_LIST    = CHAR2CONST('R', 'L', 's', 't'),
 	CMR_GRANT   = CHAR2CONST('R', 'G', 'n', 't'),
 	CMR_REVOKE  = CHAR2CONST('R', 'R', 'v', 'k'),
-	CMR_CATCHUP = CHAR2CONST('R', 'C', 't', 'p'),
 
-	/* Paxos */
-	OP_PREPARING = CHAR2CONST('P', 'r', 'e', 'p'),
-	OP_PROMISING = CHAR2CONST('P', 'r', 'o', 'm'),
-	OP_PROPOSING = CHAR2CONST('P', 'r', 'o', 'p'),
-	OP_ACCEPTING = CHAR2CONST('A', 'c', 'p', 't'),
-	OP_RECOVERY  = CHAR2CONST('R', 'c', 'v', 'y'),
-	OP_COMMITTED = CHAR2CONST('C', 'm', 'm', 't'),
+	/* Raft */
+	OP_REQ_VOTE = CHAR2CONST('R', 'V', 'o', 't'),
+	OP_VOTE_FOR = CHAR2CONST('V', 't', 'F', 'r'),
+	OP_APP_ENTRY= CHAR2CONST('A', 'p', 'p', 'E'),
 	OP_REJECTED  = CHAR2CONST('R', 'J', 'C', '!'),
-
-	/* These are not used over the wire */
-	ST_INIT      = CHAR2CONST('I', 'n', 'i', 't'),
-	ST_STABLE    = CHAR2CONST('S', 't', 'b', 'l'),
 } cmd_request_t;
 
 

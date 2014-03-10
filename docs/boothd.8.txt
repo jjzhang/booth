@@ -26,8 +26,8 @@ geographically dispersed distances to run certain resources. It is designed to
 be an add-on to Pacemaker, which extends Pacemaker to support geographically
 distributed clustering.
 
-It is based on the PAXOS protocol, see eg. 
-<http://research.microsoft.com/en-us/um/people/lamport/pubs/lamport-paxos.pdf>
+It is based on the RAFT protocol, see eg. 
+<https://ramcloud.stanford.edu/wiki/download/attachments/11370504/raft.pdf>
 for details.
 
 

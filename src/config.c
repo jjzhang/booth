@@ -29,7 +29,7 @@
 #include <string.h>
 #include "booth.h"
 #include "config.h"
-#include "paxos.h"
+#include "raft.h"
 #include "ticket.h"
 #include "log.h"
 
@@ -105,11 +105,6 @@ int add_site(char *addr_string, int type)
 	booth_conf->site_bits |= site->bitmask;
 
 	site->tcp_fd = -1;
-
-	if (site->type == SITE)
-		site->role = PROPOSER | ACCEPTOR | LEARNER;
-	else if (site->type == ARBITRATOR)
-		site->role = ACCEPTOR | LEARNER;
 
 
 	booth_conf->site_count++;
