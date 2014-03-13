@@ -65,11 +65,19 @@ int ticket_write(struct ticket_config *tk);
 void process_tickets(void);
 void tickets_log_info(void);
 char *state_to_string(uint32_t state_ho);
+int send_reject(struct booth_site *dest, struct ticket_config *tk, cmd_result_t code);
+int ticket_broadcast(struct ticket_config *tk, cmd_request_t cmd, cmd_result_t res);
 
 
 static inline void ticket_next_cron_at(struct ticket_config *tk, struct timeval when)
 {
 	tk->next_cron = when;
+}
+
+static inline void ticket_next_cron_at_coarse(struct ticket_config *tk, time_t when)
+{
+	tk->next_cron.tv_sec  = when;
+	tk->next_cron.tv_usec = 0;
 }
 
 static inline void ticket_next_cron_in(struct ticket_config *tk, float seconds)

@@ -121,21 +121,21 @@ static int pcmk_write_ticket_atomic(struct ticket_config *tk, int grant)
 	int rv;
 
 
-	/* The values are appended to "-v", so that NO_OWNER
+	/* The values are appended to "-v", so that NO_ONE
 	 * (which is -1) isn't seen as another option. */
 	snprintf(cmd, COMMAND_MAX,
 			"crm_ticket -t '%s' "
 			"%s --force "
 			"-S owner -v%" PRIi32 " "
 			"-S expires -v%" PRIi64 " "
-			"-S ballot -v%" PRIi64,
+			"-S term -v%" PRIi64,
 			tk->name,
 			(grant > 0 ? "-g" :
 			 grant < 0 ? "-r" :
 			 ""),
-			(int32_t)get_node_id(tk->owner),
-			(int64_t)tk->expires,
-			(int64_t)tk->last_ack_ballot);
+			(int32_t)get_node_id(tk->leader),
+			(int64_t)tk->term_expires,
+			(int64_t)tk->current_term);
 
 	rv = system(cmd);
 	log_info("command: '%s' was executed", cmd);
@@ -224,9 +224,9 @@ static int pcmk_store_ticket_nonatomic(struct ticket_config *tk)
 
 	/* Always try to store *each* attribute, even if there's an error
 	 * for one of them. */
-	rv = crm_ticket_set(tk, "owner", (int32_t)get_node_id(tk->owner));
-	rv = crm_ticket_set(tk, "expires", tk->expires)         || rv;
-	rv = crm_ticket_set(tk, "ballot", tk->last_ack_ballot)  || rv;
+	rv = crm_ticket_set(tk, "owner", (int32_t)get_node_id(tk->leader));
+	rv = crm_ticket_set(tk, "expires", tk->term_expires)  || rv;
+	rv = crm_ticket_set(tk, "term", tk->current_term)     || rv;
 
 	if (rv)
 		log_error("setting crm_ticket attributes failed; %s",
@@ -292,25 +292,25 @@ static int pcmk_load_ticket(struct ticket_config *tk)
 
 	rv = crm_ticket_get(tk, "expires", &v);
 	if (!rv) {
-		tk->expires = v;
+		tk->term_expires = v;
 	}
 
-	rv = crm_ticket_get(tk, "ballot", &v);
+	rv = crm_ticket_get(tk, "term", &v);
 	if (!rv) {
-		tk->new_ballot =
-			tk->last_ack_ballot = v;
+		tk->current_term = v;
 	}
 
 	rv = crm_ticket_get(tk, "owner", &v);
 	if (!rv) {
 		/* No check, node could have been deconfigured. */
-		find_site_by_id(v, &tk->proposed_owner);
+		find_site_by_id(v, &tk->leader);
 	}
 
 
-	disown_if_expired(tk);
+	if (disown_if_expired(tk))
+		pcmk_revoke_ticket(tk);
 
-	tk->proposal_acknowledges = local->bitmask;
+//	tk->proposal_acknowledges = local->bitmask;
 
 	/* We load only when the state is completely unknown. */
 	tk->state = ST_INIT;

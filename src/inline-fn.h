@@ -24,6 +24,7 @@
 #include <assert.h>
 #include <string.h>
 #include "config.h"
+#include "ticket.h"
 #include "transport.h"
 
 
@@ -36,27 +37,28 @@ inline static uint32_t get_local_id(void)
 
 inline static uint32_t get_node_id(struct booth_site *node)
 {
-	return node ? node->site_id : NO_OWNER;
+	return node ? node->site_id : NO_ONE;
 }
 
 
-inline static int ticket_valid_for(const struct ticket_config *tk)
+inline static int term_valid_for(const struct ticket_config *tk)
 {
 	int left;
 
-	left = tk->expires - time(NULL);
+	left = tk->term_expires - time(NULL);
 	return (left < 0) ? 0 : left;
 }
 
 
 /** Returns number of seconds left, if any. */
-inline static int owner_and_valid(const struct ticket_config *tk)
+inline static int leader_and_valid(const struct ticket_config *tk)
 {
-	if (tk->owner != local)
+	if (tk->leader != local)
 		return 0;
 
-	return ticket_valid_for(tk);
+	return term_valid_for(tk);
 }
+
 
 static inline void init_header_bare(struct boothc_header *h) {
 	h->magic   = htonl(BOOTHC_MAGIC);
@@ -94,10 +96,12 @@ static inline void init_ticket_msg(struct boothc_ticket_msg *msg,
 	} else {
 		memcpy(msg->ticket.id, tk->name, sizeof(msg->ticket.id));
 
-		msg->ticket.expiry      = htonl(ticket_valid_for(tk));
-		msg->ticket.owner       = htonl(get_node_id(tk->owner));
-		msg->ticket.ballot      = htonl(tk->new_ballot);
-		msg->ticket.prev_ballot = htonl(tk->last_ack_ballot);
+		msg->ticket.leader         = htonl(get_node_id(tk->leader ?: tk->voted_for));
+		msg->ticket.term           = htonl(tk->current_term);
+		msg->ticket.term_valid_for = htonl(term_valid_for(tk));
+
+		msg->ticket.prev_log_index = htonl(tk->last_applied);
+		msg->ticket.leader_commit  = htonl(tk->commit_index);
 	}
 }
 
@@ -108,43 +112,34 @@ static inline struct booth_transport const *transport(void)
 }
 
 
-static inline const char *ticket_owner_string(struct booth_site *site)
+static inline const char *site_string(struct booth_site *site)
 {
 	return site ? site->addr_string : "NONE";
 }
 
 
+static inline const char *ticket_leader_string(struct ticket_config *tk)
+{
+	return site_string(tk->leader);
+}
+
+
 static inline void disown_ticket(struct ticket_config *tk)
 {
-	/* ONLY the "current state" is changed;
-	 * current paxos rounds should not be affected.
-	 *   tk->proposed_owner = NULL;
-	 */
-	tk->owner = NULL;
-	time(&tk->expires);
+	tk->leader = NULL;
+	time(&tk->term_expires);
 }
 
-static inline void disown_if_expired(struct ticket_config *tk)
+static inline int disown_if_expired(struct ticket_config *tk)
 {
-	if (time(NULL) >= tk->expires ||
-			(!tk->proposed_owner && !tk->owner))
+	if (time(NULL) >= tk->term_expires ||
+			!tk->leader) {
 		disown_ticket(tk);
+		return 1;
+	}
+
+	return 0;
 }
-
-
-static inline int all_agree(struct ticket_config *tk)
-{
-	return tk->proposal_acknowledges == booth_conf->site_bits;
-}
-
-static inline int majority_agree(struct ticket_config *tk)
-{
-	/* Use ">" to get majority decision, even for an even number
-	 * of participants. */
-	return __builtin_popcount(tk->proposal_acknowledges) * 2 >
-			booth_conf->site_count;
-}
-
 
 
 
@@ -155,7 +150,7 @@ static inline int majority_agree(struct ticket_config *tk)
  *                              |        |       |
  *                              |--------+-------| allowed range
  *                                       |
- *                                       current ballot
+ *                                       current commit index
  *
  * So, on overflow it looks like that:
  *                                UINT32_MAX  0
@@ -163,44 +158,44 @@ static inline int majority_agree(struct ticket_config *tk)
  *                              |        |       |
  *                              |--------+-------| allowed range
  *                                       |
- *                                       current ballot
+ *                                       current commit index
  *
  * This should be possible by using the same datatype and relying
  * on the under/overflow semantics.
  *
  *
  * Having 30 bits available, and assuming an expire time of
- * one minute and a (high) ballot step of 64 == 2^6 (because
+ * one minute and a (high) commit index step of 64 == 2^6 (because
  * of weights), we get 2^24 minutes of range - which is ~750
  * years. "Should be enough for everybody."
  */
-static inline int ballot_is_higher_than(uint32_t b_high, uint32_t b_low)
+static inline int index_is_higher_than(uint32_t c_high, uint32_t c_low)
 {
 	uint32_t diff;
 
-	if (b_high == b_low)
+	if (c_high == c_low)
 		return 0;
 
-	diff = b_high - b_low;
+	diff = c_high - c_low;
 	if (diff < UINT32_MAX/4)
 		return 1;
 
-	diff = b_low - b_high;
+	diff = c_low - c_high;
 	if (diff < UINT32_MAX/4)
 		return 0;
 
-	assert(!"ballot out of range - invalid");
+	assert(!"commit index out of range - invalid");
 }
 
 
-static inline uint32_t ballot_max2(uint32_t a, uint32_t b)
+static inline uint32_t index_max2(uint32_t a, uint32_t b)
 {
-	return ballot_is_higher_than(a, b) ? a : b;
+	return index_is_higher_than(a, b) ? a : b;
 }
 
-static inline uint32_t ballot_max3(uint32_t a, uint32_t b, uint32_t c)
+static inline uint32_t index_max3(uint32_t a, uint32_t b, uint32_t c)
 {
-	return ballot_max2( ballot_max2(a, b), c);
+	return index_max2( index_max2(a, b), c);
 }
 
 
@@ -243,20 +238,20 @@ static inline int timeval_in_past(struct timeval which)
 }
 
 
-static inline time_t next_renewal_starts_at(struct ticket_config *tk)
+static inline time_t next_vote_starts_at(struct ticket_config *tk)
 {
 	time_t half_exp, retries_needed;
 
 	/* If not owner, don't renew. */
-	if (tk->owner != local)
+	if (tk->leader != local)
 		return 0;
 
 	/* Try to renew at half of expiry time. */
-	half_exp = tk->expires - tk->expiry/2;
+	half_exp = tk->term_expires - tk->term_duration/2;
 	/* Also start renewal if we couldn't get
 	 * a few message retransmission in the alloted
 	 * expiry time. */
-	retries_needed = tk->expires - tk->timeout * tk->retries/2;
+	retries_needed = tk->term_expires - tk->timeout * tk->retries/2;
 
 	/* Return earlier timestamp. */
 	return half_exp < retries_needed
@@ -269,13 +264,25 @@ static inline int should_start_renewal(struct ticket_config *tk)
 {
 	time_t now, when;
 
-	when = next_renewal_starts_at(tk);
+	when = next_vote_starts_at(tk);
 	if (!when)
 		return 0;
 
 	time(&now);
 	return when <= now;
 }
+
+
+static inline int send_heartbeat(struct ticket_config *tk)
+{
+	return ticket_broadcast(tk, OP_HEARTBEAT, RLT_SUCCESS);
+}
+
+static inline struct booth_site *my_vote(struct ticket_config *tk)
+{
+	return tk->votes_for[ local->index ];
+}
+
 
 
 #endif

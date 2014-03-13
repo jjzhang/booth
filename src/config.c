@@ -92,10 +92,10 @@ int add_site(char *addr_string, int type)
 	 * the same result everywhere - no uninitialized bytes. */
 	site->site_id = crc32(nid, site->addr_string,
 			sizeof(site->addr_string));
-	/* Make sure we will never collide with NO_OWNER,
+	/* Make sure we will never collide with NO_ONE,
 	 * or be negative (to get "get_local_id() < 0" working). */
 	mask = 1 << (sizeof(site->site_id)*8 -1);
-	assert(NO_OWNER & mask);
+	assert(NO_ONE & mask);
 	site->site_id &= ~mask;
 
 	site->index = booth_conf->site_count;
@@ -212,7 +212,7 @@ static int add_ticket(const char *name, struct ticket_config **tkp,
 
 	strcpy(tk->name, name);
 	tk->timeout = def->timeout;
-	tk->expiry = def->expiry;
+	tk->term_duration = def->term_duration;
 	tk->retries = def->retries;
 	memcpy(tk->weight, def->weight, sizeof(tk->weight));
 	tk->state = ST_INIT;
@@ -314,7 +314,7 @@ int read_config(const char *path)
 
 	parse_weights("", defaults.weight);
 	defaults.ext_verifier  = NULL;
-	defaults.expiry        = DEFAULT_TICKET_EXPIRY;
+	defaults.term_duration        = DEFAULT_TICKET_EXPIRY;
 	defaults.timeout       = DEFAULT_TICKET_TIMEOUT;
 	defaults.retries       = DEFAULT_RETRIES;
 	defaults.acquire_after = 0;
@@ -463,14 +463,14 @@ no_value:
 		}
 
 		if (strcmp(key, "expire") == 0) {
-			defaults.expiry = strtol(val, &s, 0);
-			if (*s || s == val || defaults.expiry<10) {
+			defaults.term_duration = strtol(val, &s, 0);
+			if (*s || s == val || defaults.term_duration<10) {
 				error = "Expected plain integer value >=10 for expire";
 				goto err;
 			}
 
 			if (last_ticket)
-				last_ticket->expiry = defaults.expiry;
+				last_ticket->term_duration = defaults.term_duration;
 			continue;
 		}
 
@@ -678,7 +678,7 @@ int find_site_by_id(uint32_t site_id, struct booth_site **node)
 	struct booth_site *n;
 	int i;
 
-	if (site_id == NO_OWNER) {
+	if (site_id == NO_ONE) {
 		*node = NULL;
 		return 1;
 	}

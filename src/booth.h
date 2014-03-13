@@ -59,7 +59,8 @@
 
 #define BOOTH_NAME_LEN		64
 
-#define NO_OWNER (-1)
+/* NONE wouldn't be specific enough. */
+#define NO_ONE (-1)
 
 typedef unsigned char boothc_site  [BOOTH_NAME_LEN];
 typedef unsigned char boothc_ticket[BOOTH_NAME_LEN];
@@ -96,18 +97,20 @@ struct ticket_msg {
 	/** Ticket name. */
 	boothc_ticket id;
 
-	/** Current leader. May be NO_OWNER. See add_site().
-* For a OP_REQ_VOTE this is  */
+	/** Current leader. May be NO_ONE. See add_site().
+	 * For a OP_REQ_VOTE this is  */
 	uint32_t leader;
 
 	/** Current term. */
 	uint32_t term;
 	uint32_t term_valid_for;
 
+#if 0
 	union {
 		uint32_t prev_log_term;
 		uint32_t last_log_term;
 	};
+#endif
 
 	union {
 		uint32_t prev_log_index;
@@ -141,8 +144,9 @@ typedef enum {
 	/* Raft */
 	OP_REQ_VOTE = CHAR2CONST('R', 'V', 'o', 't'),
 	OP_VOTE_FOR = CHAR2CONST('V', 't', 'F', 'r'),
-	OP_APP_ENTRY= CHAR2CONST('A', 'p', 'p', 'E'),
-	OP_REJECTED  = CHAR2CONST('R', 'J', 'C', '!'),
+	OP_HEARTBEAT= CHAR2CONST('H', 'r', 't', 'B'), /* AppendEntry in Raft */
+	OP_MY_INDEX = CHAR2CONST('M', 'I', 'd', 'x'), /* Answer to Heartbeat */
+	OP_REJECTED = CHAR2CONST('R', 'J', 'C', '!'),
 } cmd_request_t;
 
 
@@ -157,6 +161,7 @@ typedef enum {
 	RLT_OVERGRANT           = CHAR2CONST('O', 'v', 'e', 'r'),
 	RLT_PROBABLY_SUCCESS    = CHAR2CONST('S', 'u', 'c', '?'),
 	RLT_BUSY                = CHAR2CONST('B', 'u', 's', 'y'),
+	RLT_TERM_OUTDATED       = CHAR2CONST('t', 'O', 'd', 'a'),
 } cmd_result_t;
 
 
