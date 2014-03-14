@@ -161,7 +161,8 @@ typedef enum {
 	RLT_OVERGRANT           = CHAR2CONST('O', 'v', 'e', 'r'),
 	RLT_PROBABLY_SUCCESS    = CHAR2CONST('S', 'u', 'c', '?'),
 	RLT_BUSY                = CHAR2CONST('B', 'u', 's', 'y'),
-	RLT_TERM_OUTDATED       = CHAR2CONST('t', 'O', 'd', 'a'),
+	RLT_TERM_OUTDATED       = CHAR2CONST('T', 'O', 'd', 't'),
+	RLT_TERM_STILL_VALID    = CHAR2CONST('T', 'V', 'l', 'd'),
 } cmd_result_t;
 
 
@@ -233,4 +234,21 @@ struct command_line {
 	struct boothc_ticket_msg msg;
 };
 extern struct command_line cl;
+
+
+
+/* http://gcc.gnu.org/onlinedocs/gcc/Typeof.html */
+#define min(a__,b__) \
+	({ typeof (a__) _a = (a__); \
+	 typeof (b__) _b = (b__); \
+	 _a < _b ? _a : _b; })
+#define max(a__,b__) \
+	({ typeof (a__) _a = (a__); \
+	 typeof (b__) _b = (b__); \
+	 _a > _b ? _a : _b; })
+
+
+
+
+
 #endif /* _BOOTH_H */

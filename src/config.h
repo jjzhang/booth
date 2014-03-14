@@ -53,8 +53,6 @@ struct ticket_config {
 	 * The ticket may be acquired after that timespan by
 	 * another site. */
 	int acquire_after; /* TODO: needed? */
-#if 0
-#endif
 
 
 	/* Program to ask whether it makes sense to
@@ -169,6 +167,10 @@ int find_site_by_name(unsigned char *site, struct booth_site **node, int any_typ
 int find_site_by_id(uint32_t site_id, struct booth_site **node);
 
 const char *type_to_string(int type);
+
+
+#include <stdio.h>
+#define R(tk_) printf("## %12s:%3d state %s, term %d, index %d, leader %s\n", __FILE__, __LINE__, state_to_string(tk_->state), tk_->current_term, tk_->commit_index, site_string(tk_->leader))
 
 
 #endif /* _CONFIG_H */

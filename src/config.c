@@ -215,7 +215,6 @@ static int add_ticket(const char *name, struct ticket_config **tkp,
 	tk->term_duration = def->term_duration;
 	tk->retries = def->retries;
 	memcpy(tk->weight, def->weight, sizeof(tk->weight));
-	tk->state = ST_INIT;
 
 	if (tkp)
 		*tkp = tk;

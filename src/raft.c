@@ -62,6 +62,35 @@ inline static void site_voted_for(struct ticket_config *tk,
 }
 
 
+static void become_follower(struct ticket_config *tk,
+		struct boothc_ticket_msg *msg)
+{
+	uint32_t i;
+	int duration;
+
+	tk->state = ST_FOLLOWER;
+
+
+	duration = tk->term_duration;
+	if (msg)
+		duration = min(duration, ntohl(msg->ticket.term_valid_for));
+	tk->term_expires = time(NULL) + duration;
+
+
+	if (msg) {
+		i = ntohl(msg->ticket.term);
+		tk->current_term = max(i, tk->current_term);
+
+		/* § 5.3 */
+		i = ntohl(msg->ticket.leader_commit);
+		tk->commit_index = max(i, tk->commit_index);
+	}
+
+
+	ticket_write(tk);
+}
+
+
 static struct booth_site *majority_votes(struct ticket_config *tk)
 {
 	int i, n;
@@ -102,7 +131,6 @@ static int answer_HEARTBEAT (
 	       )
 {
 	uint32_t term;
-	uint32_t index;
 
 	term = ntohl(msg->ticket.term);
 	log_debug("leader: %s, have %s; term %d vs %d",
@@ -111,13 +139,10 @@ static int answer_HEARTBEAT (
 	if (term < tk->current_term)
 		return 0; //send_reject(sender, tk, RLT_TERM_OUTDATED);
 
-	/* § 5.3 */
-	index = ntohl(msg->ticket.leader_commit);
-	if (index > tk->commit_index)
-		tk->commit_index = index;
+	become_follower(tk, msg);
+	assert(sender == leader);
 
-	assert(tk->leader == leader);
-
+	tk->leader = leader;
 
 	return 0;
 }
@@ -138,6 +163,15 @@ static int process_VOTE_FOR(
 	if (term < tk->current_term)
 		return send_reject(sender, tk, RLT_TERM_OUTDATED);
 
+
+	if (term == tk->current_term &&
+			tk->election_end < time(NULL)) {
+		/* Election already ended - either by time or majority.
+		 * Ignore. */
+		return 0;
+	}
+
+
 	if (term > tk->current_term)
 		clear_election(tk);
 
@@ -149,15 +183,18 @@ static int process_VOTE_FOR(
 	if (new_leader) {
 		tk->leader = new_leader;
 
+		tk->term_expires = time(NULL) + tk->term_duration;
+		tk->election_end = 0;
+		tk->voted_for = NULL;
+
 		if ( new_leader == local)  {
-			tk->current_term++;
+			tk->commit_index++; // ??
 			tk->state = ST_LEADER;
 			send_heartbeat(tk);
-			tk->voted_for = NULL;
+			ticket_write(tk);
 		}
 		else
-			tk->state = ST_FOLLOWER;
-
+			become_follower(tk, NULL);
 	}
 
 	set_ticket_wakeup(tk);
@@ -172,6 +209,33 @@ static int process_REJECTED(
 		struct boothc_ticket_msg *msg
 		)
 {
+	uint32_t rv;
+
+	rv   = ntohl(msg->header.result);
+
+	if (tk->state == ST_CANDIDATE &&
+			rv == RLT_TERM_OUTDATED) {
+		log_info("Am out of date, become follower.");
+		tk->leader = leader;
+		become_follower(tk, msg);
+		return 0;
+	}
+
+
+	if (tk->state == ST_CANDIDATE &&
+			rv == RLT_TERM_STILL_VALID) {
+		log_error("There's a leader that I don't see: \"%s\"",
+				site_string(leader));
+		tk->leader = leader;
+		become_follower(tk, msg);
+		return 0;
+	}
+
+	log_error("unhandled reject: in state %s, got %s.",
+			state_to_string(tk->state),
+			state_to_string(rv));
+	tk->leader = leader;
+	become_follower(tk, msg);
 	return 0;
 }
 
@@ -185,6 +249,7 @@ static int answer_REQ_VOTE(
 		)
 {
 	uint32_t term;
+	int valid;
 	struct boothc_ticket_msg omsg;
 
 
@@ -192,7 +257,21 @@ static int answer_REQ_VOTE(
 
 	/* §5.1 */
 	if (term < tk->current_term)
+	{
+		log_info("sending REJECT, term too low.");
 		return send_reject(sender, tk, RLT_TERM_OUTDATED);
+	}
+
+
+	/* This if() should trigger more or less always, as
+	 * OP_REQ_VOTE *starts* an election.
+	 *   if (tk->election_end < time(NULL))
+	 */
+	valid = term_valid_for(tk);
+	if (valid) {
+		log_debug("no election allowed, term valid for %d??", valid);
+		return send_reject(sender, tk, RLT_TERM_STILL_VALID);
+	}
 
 	/* §5.2, §5.4 */
 	if (!tk->voted_for &&
@@ -226,6 +305,7 @@ int new_election(struct ticket_config *tk, struct booth_site *preference)
 
 	/* §5.2 */
 	tk->current_term++;
+	tk->term_expires = 0;
 	tk->election_end = now + tk->term_duration;
 
 	log_debug("start new election! term=%d, until %" PRIi64,
@@ -255,14 +335,25 @@ int raft_answer(
 {
 	int cmd;
 	uint32_t term;
+	int rv;
 
 	cmd = ntohl(msg->header.cmd);
 	term = ntohl(msg->ticket.term);
+	R(tk);
 
 	log_debug("got message %s from \"%s\", term %d vs. %d",
 			state_to_string(cmd),
 			from->addr_string,
 			term, tk->current_term);
+
+
+	if (cmd == OP_REJECTED) {
+		R(tk);
+		rv = process_REJECTED(tk, from, leader, msg);
+		R(tk);
+		return (rv);
+	}
+
 
 	/* §5.1 */
 	if (term > tk->current_term) {
@@ -274,17 +365,25 @@ int raft_answer(
 				ticket_leader_string(tk));
 	}
 
+	R(tk);
 
 	switch (cmd) {
 	case OP_REQ_VOTE:
-		return answer_REQ_VOTE (tk, from, leader, msg);
+		rv = answer_REQ_VOTE (tk, from, leader, msg);
+		break;
 	case OP_VOTE_FOR:
-		return process_VOTE_FOR(tk, from, leader, msg);
+		rv = process_VOTE_FOR(tk, from, leader, msg);
+		break;
 	case OP_HEARTBEAT:
-		return answer_HEARTBEAT(tk, from, leader, msg);
+		rv = answer_HEARTBEAT(tk, from, leader, msg);
+		break;
 	case OP_REJECTED:
-		return process_REJECTED(tk, from, leader, msg);
+		assert(!"here");
+		break;
+	default:
+		log_error("unprocessed message, cmd %x", cmd);
+		rv = -EINVAL;
 	}
-	log_error("unprocessed message, cmd %x", cmd);
-	return -EINVAL;
+	R(tk);
+	return rv;
 }

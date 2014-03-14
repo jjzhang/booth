@@ -278,11 +278,15 @@ int setup_ticket(void)
 		tk->leader = NULL;
 		tk->term_expires = 0;
 
-//		abort_proposal(tk);
+		//		abort_proposal(tk);
 
 		if (local->type == SITE) {
 			pcmk_handler.load_ticket(tk);
 		}
+
+		/* There might be a leader; wait for its notification. */
+		tk->term_expires = time(NULL) + tk->term_duration;
+		tk->state = ST_FOLLOWER;
 	}
 
 
@@ -362,172 +366,6 @@ reply:
 }
 
 
-#if 0
-/** Got a CMD_CATCHUP query.
- * In this file because it's mostly used during startup. */
-static int ticket_answer_catchup(
-		struct ticket_config *tk,
-		struct booth_site *from,
-		struct boothc_ticket_msg *msg,
-		uint32_t ballot,
-		struct booth_site *new_owner)
-{
-	int rv;
-
-
-	log_debug("got CATCHUP query for \"%s\" from %s",
-			msg->ticket.id, from->addr_string);
-
-	/* We do _always_ answer.
-	 * In case all booth daemons are restarted at the same time, nobody
-	 * would answer any questions, leading to timeouts and delays.
-	 * Just admit we don't know. */
-
-	rv = (tk->state == ST_INIT) ?
-		RLT_PROBABLY_SUCCESS : RLT_SUCCESS;
-
-	init_ticket_msg(msg, CMR_CATCHUP, rv, tk);
-
-	/* On catchup, don't tell about ongoing proposals;
-	 * if we did, the other site might believe that the
-	 * ballot numbers have already been used.
-	 * Send the known ballot number, so that a PREPARE
-	 * gets accepted. */
-	msg->ticket.ballot = msg->ticket.prev_ballot;
-
-	return booth_udp_send(from, msg, sizeof(*msg));
-}
-
-
-/** Got a CMR_CATCHUP message.
- * Gets handled here because it's not PAXOS per se,
- * but only needed during startup. */
-static int ticket_process_catchup(
-		struct ticket_config *tk,
-		struct booth_site *from,
-		struct boothc_ticket_msg *msg,
-		uint32_t ballot,
-		struct booth_site *new_owner)
-{
-	int rv;
-	uint32_t prev_ballot;
-	time_t peer_expiry;
-
-
-	log_info("got CATCHUP answer for \"%s\" from %s; says owner %s with ballot %d",
-			tk->name, from->addr_string,
-			ticket_leader_string(new_owner), ballot);
-	prev_ballot = ntohl(msg->ticket.prev_ballot);
-
-	rv = ntohl(msg->header.result);
-	if (rv != RLT_SUCCESS &&
-			rv != RLT_PROBABLY_SUCCESS) {
-		log_error("dropped because of wrong rv: 0x%x", rv);
-		return -EINVAL;
-	}
-
-	if (ballot == tk->new_ballot &&
-			ballot == tk->last_ack_ballot &&
-			new_owner == tk->owner)  {
-		/* Peer says the same thing we're believing. */
-		tk->proposal_acknowledges |= from->bitmask | local->bitmask;
-		tk->expires                = ntohl(msg->ticket.expiry) + time(NULL);
-
-		if (should_switch_state_p(tk)) {
-			if (tk->state == ST_INIT)
-				tk->state = ST_STABLE;
-		}
-
-		disown_if_expired(tk);
-		log_debug("catchup: peer ack 0x%" PRIx64 ", now state '%s'",
-			tk->proposal_acknowledges,
-			state_to_string(tk->state));
-		goto ex;
-	}
-
-
-	if (ticket_valid_for(tk) == 0 && !tk->owner) {
-		/* We see the ticket as expired, and therefore don't know an owner.
-		 * So believe some other host. */
-		tk->state = ST_STABLE;
-		log_debug("catchup: no owner locally, believe peer.");
-		goto accept;
-	}
-
-
-	if (ballot >= tk->new_ballot &&
-			ballot >= tk->last_ack_ballot &&
-			rv == RLT_SUCCESS) {
-		/* Peers seems to know better, but as yet we only have _her_
-		 * word for that. */
-		log_debug("catchup: peer has higher ballot: %d >= %d/%d",
-				ballot, tk->new_ballot, tk->last_ack_ballot);
-
-accept:
-		peer_expiry               = ntohl(msg->ticket.expiry) + time(NULL);
-		tk->expires               = (tk->expires > peer_expiry) ?
-			tk->expires : peer_expiry;
-		tk->new_ballot            = ballot_max2(ballot, tk->new_ballot);
-		tk->last_ack_ballot       = ballot_max2(prev_ballot, tk->last_ack_ballot);
-		tk->owner                 = new_owner;
-		tk->proposal_acknowledges = from->bitmask;
-
-		/* We stay in ST_INIT and wait for confirmation. */
-		goto ex;
-	}
-
-
-	if (ballot >= tk->last_ack_ballot &&
-			rv == RLT_PROBABLY_SUCCESS &&
-			tk->state == ST_INIT &&
-			tk->retry_number > 3) {
-		/* Peer seems to know better than us, and there's no
-		 * convincing other report. Just take it. */
-		tk->state = ST_STABLE;
-		log_debug("catchup: exceeded retries, peer has higher ballot.");
-		goto accept;
-	}
-
-
-	if (ballot < tk->new_ballot ||
-			ballot < tk->last_ack_ballot) {
-		/* Peer seems outdated ... tell it to reload? */
-		log_debug("catchup: peer outdated?");
-#if 0
-		init_ticket_msg(&msg, CMD_DO_CATCHUP, RLT_SUCCESS, tk, &tk->current_state);
-#endif
-		goto ex;
-	}
-
-
-	if (ballot >= tk->last_ack_ballot &&
-			local->type == SITE &&
-			new_owner == tk->owner) {
-		/* We've got some information (local Pacemaker?), and a peer
-		 * says same owner, with same or higher ballot number. */
-		log_debug("catchup: peer agrees about owner.");
-		goto ex;
-	}
-
-	log_debug("catchup: unhandled situation!");
-
-ex:
-	ticket_write(tk);
-
-	if (tk->state == ST_STABLE) {
-		/* If we believe to have enough information, we can try to
-		 * acquire the ticket (again). */
-		time(&tk->expires);
-	}
-
-	/* Allow further actions. */
-	ticket_activate_timeout(tk);
-
-	return 0;
-}
-#endif
-
-
 int ticket_broadcast(struct ticket_config *tk, cmd_request_t cmd, cmd_result_t res)
 {
 	struct boothc_ticket_msg msg;
@@ -572,6 +410,7 @@ static void ticket_cron(struct ticket_config *tk)
 	now = time(NULL);
 
 
+	R(tk);
 	/* Has an owner, has an expiry date, and expiry date in the past?
 	 * Losing the ticket must happen in _every_ state. */
 	if (tk->term_expires &&
@@ -602,29 +441,39 @@ static void ticket_cron(struct ticket_config *tk)
 		return;
 	}
 
+	R(tk);
 
 	switch(tk->state) {
 	case ST_INIT:
 		/* Unknown state, ask others. */
 //		ticket_send_catchup(tk);
-		return;
+		break;
 
 
 	case ST_FOLLOWER:
+		if (tk->term_expires &&
+				now > tk->term_expires) {
+			new_election(tk, NULL);
+		}
+		break;
 
 	case ST_CANDIDATE:
 		/* §5.2 */
 		if (now > tk->election_end)
 			new_election(tk, NULL);
-		return;
+		break;
 
 	case ST_LEADER:
 		tk->term_expires = now + tk->term_duration;
-		ticket_broadcast(tk, OP_HEARTBEAT, RLT_SUCCESS);
+		send_heartbeat(tk);
+		ticket_write(tk);
+		set_ticket_wakeup(tk);
+		break;
 
 	default:
 		break;
 	}
+	R(tk);
 }
 
 
@@ -770,6 +619,7 @@ void set_ticket_wakeup(struct ticket_config *tk)
 		ticket_next_cron_at_coarse(tk, tk->election_end);
 		break;
 
+	case ST_INIT:
 	case ST_FOLLOWER:
 		/* If there is (or should be) some owner, check on her later on.
 		 * If no one is interested - don't care. */
