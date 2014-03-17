@@ -263,11 +263,25 @@ static int answer_REQ_VOTE(
 	}
 
 
-	/* This if() should trigger more or less always, as
+	/* This if() would trigger more or less always, as
 	 * OP_REQ_VOTE *starts* an election.
 	 *   if (tk->election_end < time(NULL))
 	 */
+
+	/* If the received term was _higher_ than the locally
+	 * known one, we've already converted to ST_FOLLOWER.
+	 * So the term is equal now. */
+
+
+	/* Important: Ignore duplicated packets! */
 	valid = term_valid_for(tk);
+	if (valid &&
+			term == tk->current_term &&
+			sender == tk->leader) {
+		log_debug("Duplicate OP_VOTE_FOR ignored.");
+		return 0;
+	}
+
 	if (valid) {
 		log_debug("no election allowed, term valid for %d??", valid);
 		return send_reject(sender, tk, RLT_TERM_STILL_VALID);
@@ -363,6 +377,8 @@ int raft_answer(
 		log_info("higher term %d vs. %d, following \"%s\"",
 				term, tk->current_term,
 				ticket_leader_string(tk));
+		/* TODO: note that we've already switched state?
+		 * Or make that test in every single function? */
 	}
 
 	R(tk);
