@@ -171,11 +171,14 @@ static int process_HEARTBEAT(
 	if (term == tk->current_term &&
 			leader == tk->leader) {
 		/* Hooray, an ACK! */
-		log_debug("Got heartbeat ACK from \"%s\".",
-				site_string(sender));
-
 		/* So at least _someone_ is listening. */
 		tk->hb_received |= sender->bitmask;
+
+		log_debug("Got heartbeat ACK from \"%s\", %d/%d agree.",
+				site_string(sender),
+				count_bits(tk->hb_received),
+				booth_conf->site_count);
+
 
 		if (majority_of_bits(tk, tk->hb_received)) {
 			/* OK, at least half of the nodes are reachable;
