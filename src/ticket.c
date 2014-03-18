@@ -464,10 +464,22 @@ static void ticket_cron(struct ticket_config *tk)
 		break;
 
 	case ST_LEADER:
+		if (tk->hb_sent_at + tk->timeout > now) {
+			/* Heartbeat timeout reached. Oops ... */
+			tk->retry_number ++;
+			log_error("Not enough answers to heartbeat on try #%d: "
+					"only got %d answers (mask 0x%" PRIx64 ")!",
+					tk->retry_number,
+					count_bits(tk->hb_received),
+					tk->hb_received);
+
+			/* Don't give up, though - there's still some time until leadership is lost. */
+		}
 		tk->term_expires = now + tk->term_duration;
 		send_heartbeat(tk);
 		ticket_write(tk);
-		set_ticket_wakeup(tk);
+		ticket_activate_timeout(tk);
+		// set_ticket_wakeup(tk);
 		break;
 
 	default:
@@ -584,7 +596,7 @@ int message_recv(struct boothc_ticket_msg *msg, int msglen)
 		assert(ntohl(msg->header.result) == 0);
 
 		rv = raft_answer(tk, source, msg);
-// TODO		assert((tk->proposal_acknowledges & ~booth_conf->site_bits) == 0);
+		// TODO		assert((tk->proposal_acknowledges & ~booth_conf->site_bits) == 0);
 		return rv;
 	}
 #endif

@@ -123,6 +123,9 @@ static struct booth_site *majority_votes(struct ticket_config *tk)
 	return NULL;
 }
 
+
+
+/* For follower. */
 static int answer_HEARTBEAT (
 		struct ticket_config *tk,
 		struct booth_site *sender,
@@ -131,6 +134,9 @@ static int answer_HEARTBEAT (
 	       )
 {
 	uint32_t term;
+	struct boothc_ticket_msg omsg;
+
+
 
 	term = ntohl(msg->ticket.term);
 	log_debug("leader: %s, have %s; term %d vs %d",
@@ -144,7 +150,61 @@ static int answer_HEARTBEAT (
 
 	tk->leader = leader;
 
-	return 0;
+
+	/* Yeth, mathter. */
+	init_ticket_msg(&omsg, OP_HEARTBEAT, RLT_SUCCESS, tk);
+	return booth_udp_send(sender, &omsg, sizeof(omsg));
+}
+
+
+/* For leader. */
+static int process_HEARTBEAT(
+		struct ticket_config *tk,
+		struct booth_site *sender,
+		struct booth_site *leader,
+		struct boothc_ticket_msg *msg
+	       )
+{
+	uint32_t term;
+
+	term = ntohl(msg->ticket.term);
+	if (term == tk->current_term &&
+			leader == tk->leader) {
+		/* Hooray, an ACK! */
+		log_debug("Got heartbeat ACK from \"%s\".",
+				site_string(sender));
+
+		/* So at least _someone_ is listening. */
+		tk->hb_received |= sender->bitmask;
+
+		if (majority_of_bits(tk, tk->hb_received)) {
+			/* OK, at least half of the nodes are reachable;
+			 * no need to do anything until
+			 * the next heartbeat should be sent. */
+			set_ticket_wakeup(tk);
+			tk->retry_number = 0;
+		} else {
+			/* Not enough answers yet;
+			 * wait until timeout expires. */
+			ticket_activate_timeout(tk);
+		}
+		return 0;
+	}
+
+	if (term < tk->current_term) {
+		/* Doesn't know what he's talking about - perhaps
+		 * doesn't receive our packets? */
+		log_error("Stale/wrong heartbeat from \"%s\": "
+				"term %d instead of %d",
+				site_string(sender),
+				term, tk->current_term);
+		return 0;
+	}
+
+	/* Uh oh. Higher term?? Should we simply believe that? */
+	/* TODO */
+	log_error("Got higher term number from");
+	assert(0);
 }
 
 
@@ -385,13 +445,20 @@ int raft_answer(
 
 	switch (cmd) {
 	case OP_REQ_VOTE:
-		rv = answer_REQ_VOTE (tk, from, leader, msg);
+		rv = answer_REQ_VOTE(tk, from, leader, msg);
 		break;
 	case OP_VOTE_FOR:
 		rv = process_VOTE_FOR(tk, from, leader, msg);
 		break;
 	case OP_HEARTBEAT:
-		rv = answer_HEARTBEAT(tk, from, leader, msg);
+		if (tk->leader == local &&
+				tk->state == ST_LEADER)
+			rv = process_HEARTBEAT(tk, from, leader, msg);
+		else if (tk->leader != local &&
+				tk->state == ST_FOLLOWER)
+			rv = answer_HEARTBEAT(tk, from, leader, msg);
+		else
+			assert("invalid combination - leader, follower");
 		break;
 	case OP_REJECTED:
 		assert(!"here");

@@ -275,6 +275,9 @@ static inline int should_start_renewal(struct ticket_config *tk)
 
 static inline int send_heartbeat(struct ticket_config *tk)
 {
+	tk->hb_received = local->bitmask;
+	tk->hb_sent_at  = time(NULL);
+
 	return ticket_broadcast(tk, OP_HEARTBEAT, RLT_SUCCESS);
 }
 
@@ -282,6 +285,20 @@ static inline struct booth_site *my_vote(struct ticket_config *tk)
 {
 	return tk->votes_for[ local->index ];
 }
+
+
+static inline int count_bits(uint64_t val) {
+	return __builtin_popcount(val);
+}
+
+static inline int majority_of_bits(struct ticket_config *tk, uint64_t val)
+{
+	/* Use ">" to get majority decision, even for an even number
+	 * of participants. */
+	return count_bits(val) * 2 >
+		booth_conf->site_count;
+}
+
 
 
 
