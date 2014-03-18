@@ -547,7 +547,6 @@ void tickets_log_info(void)
 /* UDP message receiver. */
 int message_recv(struct boothc_ticket_msg *msg, int msglen)
 {
-	int rv;
 	uint32_t from;
 	struct booth_site *source;
 	struct ticket_config *tk;
@@ -581,26 +580,7 @@ int message_recv(struct boothc_ticket_msg *msg, int msglen)
 	}
 
 
-	rv = raft_answer(tk, source, leader, msg);
-#if 0
-	cmd = ntohl(msg->header.cmd);
-	switch (cmd) {
-	case CMD_CATCHUP:
-		return ticket_answer_catchup(tk, source, msg, ballot, new_owner_p);
-
-	case CMR_CATCHUP:
-		return ticket_process_catchup(tk, source, msg, ballot, new_owner_p);
-
-	default:
-		/* only used in catchup, and not even really there ?? */
-		assert(ntohl(msg->header.result) == 0);
-
-		rv = raft_answer(tk, source, msg);
-		// TODO		assert((tk->proposal_acknowledges & ~booth_conf->site_bits) == 0);
-		return rv;
-	}
-#endif
-	return rv;
+	return raft_answer(tk, source, leader, msg);
 }
 
 

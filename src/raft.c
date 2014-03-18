@@ -124,6 +124,49 @@ static struct booth_site *majority_votes(struct ticket_config *tk)
 }
 
 
+static int newer_term(struct ticket_config *tk,
+		struct booth_site *sender,
+		struct booth_site *leader,
+		struct boothc_ticket_msg *msg)
+{
+	uint32_t term;
+
+	term = ntohl(msg->ticket.term);
+	/* §5.1 */
+	if (term > tk->current_term) {
+		tk->state = ST_FOLLOWER;
+		tk->current_term = term;
+		tk->leader = leader;
+		log_info("higher term %d vs. %d, following \"%s\"",
+				term, tk->current_term,
+				ticket_leader_string(tk));
+		return 1;
+	}
+
+	return 0;
+}
+
+static int term_too_low(struct ticket_config *tk,
+		struct booth_site *sender,
+		struct booth_site *leader,
+		struct boothc_ticket_msg *msg)
+{
+	uint32_t term;
+
+	term = ntohl(msg->ticket.term);
+	/* §5.1 */
+	if (term < tk->current_term)
+	{
+		log_info("sending REJECT, term too low.");
+		send_reject(sender, tk, RLT_TERM_OUTDATED);
+		return 1;
+	}
+
+	return 0;
+}
+
+
+
 
 /* For follower. */
 static int answer_HEARTBEAT (
@@ -142,8 +185,13 @@ static int answer_HEARTBEAT (
 	log_debug("leader: %s, have %s; term %d vs %d",
 			site_string(leader), ticket_leader_string(tk),
 			term, tk->current_term);
+
+	/* No reject. (?) */
 	if (term < tk->current_term)
-		return 0; //send_reject(sender, tk, RLT_TERM_OUTDATED);
+		return 0;
+
+	/* Needed? */
+	newer_term(tk, sender, leader, msg);
 
 	become_follower(tk, msg);
 	assert(sender == leader);
@@ -167,7 +215,28 @@ static int process_HEARTBEAT(
 {
 	uint32_t term;
 
+
+	if (newer_term(tk, sender, leader, msg)) {
+		/* Uh oh. Higher term?? Should we simply believe that? */
+		log_error("Got higher term number from");
+		return 0;
+	}
+
+
 	term = ntohl(msg->ticket.term);
+
+	/* Don't send a reject. */
+	if (term < tk->current_term) {
+		/* Doesn't know what he's talking about - perhaps
+		 * doesn't receive our packets? */
+		log_error("Stale/wrong heartbeat from \"%s\": "
+				"term %d instead of %d",
+				site_string(sender),
+				term, tk->current_term);
+		return 0;
+	}
+
+
 	if (term == tk->current_term &&
 			leader == tk->leader) {
 		/* Hooray, an ACK! */
@@ -191,23 +260,9 @@ static int process_HEARTBEAT(
 			 * wait until timeout expires. */
 			ticket_activate_timeout(tk);
 		}
-		return 0;
 	}
 
-	if (term < tk->current_term) {
-		/* Doesn't know what he's talking about - perhaps
-		 * doesn't receive our packets? */
-		log_error("Stale/wrong heartbeat from \"%s\": "
-				"term %d instead of %d",
-				site_string(sender),
-				term, tk->current_term);
-		return 0;
-	}
-
-	/* Uh oh. Higher term?? Should we simply believe that? */
-	/* TODO */
-	log_error("Got higher term number from");
-	assert(0);
+	return 0;
 }
 
 
@@ -223,8 +278,8 @@ static int process_VOTE_FOR(
 
 
 	term = ntohl(msg->ticket.term);
-	if (term < tk->current_term)
-		return send_reject(sender, tk, RLT_TERM_OUTDATED);
+	if (term_too_low(tk, sender, leader, msg))
+		return 0;
 
 
 	if (term == tk->current_term &&
@@ -235,8 +290,10 @@ static int process_VOTE_FOR(
 	}
 
 
-	if (term > tk->current_term)
+	if (newer_term(tk, sender, leader, msg)) {
 		clear_election(tk);
+	}
+
 
 	site_voted_for(tk, sender, leader);
 
@@ -316,26 +373,13 @@ static int answer_REQ_VOTE(
 	struct boothc_ticket_msg omsg;
 
 
+	if (term_too_low(tk, sender, leader, msg))
+		return 0;
+	if (newer_term(tk, sender, leader, msg))
+		goto vote_for_her;
+
+
 	term = ntohl(msg->ticket.term);
-
-	/* §5.1 */
-	if (term < tk->current_term)
-	{
-		log_info("sending REJECT, term too low.");
-		return send_reject(sender, tk, RLT_TERM_OUTDATED);
-	}
-
-
-	/* This if() would trigger more or less always, as
-	 * OP_REQ_VOTE *starts* an election.
-	 *   if (tk->election_end < time(NULL))
-	 */
-
-	/* If the received term was _higher_ than the locally
-	 * known one, we've already converted to ST_FOLLOWER.
-	 * So the term is equal now. */
-
-
 	/* Important: Ignore duplicated packets! */
 	valid = term_valid_for(tk);
 	if (valid &&
@@ -353,6 +397,7 @@ static int answer_REQ_VOTE(
 	/* §5.2, §5.4 */
 	if (!tk->voted_for &&
 			ntohl(msg->ticket.last_log_index) >= tk->last_applied) {
+vote_for_her:
 		tk->voted_for = sender;
 		site_voted_for(tk, sender, leader);
 		goto yes_you_can;
@@ -411,40 +456,15 @@ int raft_answer(
 	       )
 {
 	int cmd;
-	uint32_t term;
 	int rv;
 
 	cmd = ntohl(msg->header.cmd);
-	term = ntohl(msg->ticket.term);
 	R(tk);
 
-	log_debug("got message %s from \"%s\", term %d vs. %d",
+	log_debug("got message %s from \"%s\"",
 			state_to_string(cmd),
-			from->addr_string,
-			term, tk->current_term);
+			from->addr_string);
 
-
-	if (cmd == OP_REJECTED) {
-		R(tk);
-		rv = process_REJECTED(tk, from, leader, msg);
-		R(tk);
-		return (rv);
-	}
-
-
-	/* §5.1 */
-	if (term > tk->current_term) {
-		tk->state = ST_FOLLOWER;
-		tk->current_term = term;
-		tk->leader = leader;
-		log_info("higher term %d vs. %d, following \"%s\"",
-				term, tk->current_term,
-				ticket_leader_string(tk));
-		/* TODO: note that we've already switched state?
-		 * Or make that test in every single function? */
-	}
-
-	R(tk);
 
 	switch (cmd) {
 	case OP_REQ_VOTE:
@@ -464,7 +484,7 @@ int raft_answer(
 			assert("invalid combination - leader, follower");
 		break;
 	case OP_REJECTED:
-		assert(!"here");
+		rv = process_REJECTED(tk, from, leader, msg);
 		break;
 	default:
 		log_error("unprocessed message, cmd %x", cmd);
