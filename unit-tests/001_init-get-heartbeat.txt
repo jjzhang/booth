@@ -1,0 +1,25 @@
+# vim: ft=sh et :
+
+
+ticket:
+    state               ST_FOLLOWER
+    current_term        1
+    leader              0
+
+# should be accepted
+message0:               # valid heartbeat
+    header.cmd          OP_HEARTBEAT
+    header.result       RLT_SUCCESS
+    header.from         booth_conf->site[2].site_id
+    ticket.leader       booth_conf->site[2].site_id
+    ticket.term_valid_for 3
+    ticket.term         20
+
+# nothing goes out
+
+
+# after a delay, check final state
+finally:
+# should be overwritten
+    current_term        20
+    leader              booth_conf->site+2
