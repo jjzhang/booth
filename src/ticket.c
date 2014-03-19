@@ -378,31 +378,6 @@ int ticket_broadcast(struct ticket_config *tk, cmd_request_t cmd, cmd_result_t r
 }
 
 
-#if 0
-/** Send new state request to all sites.
- * Perhaps this should take a flag for ACCEPTOR etc.?
- * No need currently, as all nodes are more or less identical. */
-int ticket_broadcast_proposed_state(struct ticket_config *tk, cmd_request_t state)
-{
-	struct boothc_ticket_msg msg;
-
-	tk->state                 = state;
-	init_ticket_msg(&msg, state, RLT_SUCCESS, tk);
-	msg.ticket.leader         = htonl(get_node_id(tk->proposed_owner));
-
-	log_debug("broadcasting '%s' for ticket \"%s\"",
-			state_to_string(state), tk->name);
-
-	/* Switch state after one second, if the majority says ok. */
-	gettimeofday(&tk->proposal_switch, NULL);
-	tk->proposal_switch.tv_sec++;
-
-
-	return transport()->broadcast(&msg, sizeof(msg));
-}
-#endif
-
-
 static void ticket_cron(struct ticket_config *tk)
 {
 	time_t now;
