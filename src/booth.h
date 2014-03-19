@@ -105,19 +105,15 @@ struct ticket_msg {
 	uint32_t term;
 	uint32_t term_valid_for;
 
-#if 0
 	union {
-		uint32_t prev_log_term;
-		uint32_t last_log_term;
-	};
-#endif
-
-	union {
-		uint32_t prev_log_index;
-		uint32_t last_log_index;
+		uint32_t prev_log_index; // TODO: NEEDED?
+		uint32_t last_log_index; // TODO: NEEDED?
+		/* No log index as such needed -- we only need to know the
+		 * _current_ ticket owner. */
+		uint32_t owner;
 	};
 
-	uint32_t leader_commit;
+	uint32_t leader_commit; // TODO: NEEDED?
 } __attribute__((packed));
 
 
