@@ -135,11 +135,12 @@ static int newer_term(struct ticket_config *tk,
 	/* §5.1 */
 	if (term > tk->current_term) {
 		tk->state = ST_FOLLOWER;
-		tk->current_term = term;
 		tk->leader = leader;
 		log_info("higher term %d vs. %d, following \"%s\"",
 				term, tk->current_term,
 				ticket_leader_string(tk));
+
+		tk->current_term = term;
 		return 1;
 	}
 
