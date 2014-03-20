@@ -4,49 +4,59 @@
 
 
 ticket:
-    state               ST_STABLE
-    last_ack_ballot     40
-    new_ballot          50
-    owner               local
-    retries             6
+    state               ST_LEADER
+    current_term        40
+    leader              local
+    retries             10000   # needed so that heartbeats are sent _now_
     timeout             1
     # may keep ticket all the time
-    expiry              3000
+    term_duration       3000
     # but shall start renewal now
-    expires             time(0) + 1000
+    term_expires        time(0) + 1000
 
 
 
 outgoing0:
-    header.cmd          OP_PREPARING
+    header.cmd          OP_HEARTBEAT
+    ticket.term         40
 outgoing1:
-    header.cmd          OP_PREPARING
+    header.cmd          OP_HEARTBEAT
+    ticket.term         40
 outgoing2:
-    header.cmd          OP_PREPARING
+    header.cmd          OP_HEARTBEAT
+    ticket.term         40
 outgoing3:
-    header.cmd          OP_PREPARING
+    header.cmd          OP_HEARTBEAT
+    ticket.term         40
 
+# yes, you're the leader.
 message4:
-    header.cmd          OP_PROMISING
+    header.cmd          OP_HEARTBEAT
     header.from         booth_conf->site[2].site_id
     header.result       0
-    ticket.prev_ballot  45
-    ticket.ballot       booth_conf->ticket[0].new_ballot
+    ticket.term         40
+    ticket.leader       local->site_id
+
+# doesn't stop ... there is no retry limit
 
 outgoing5:
-    header.cmd          OP_PROPOSING
+    header.cmd          OP_HEARTBEAT
 outgoing6:
-    header.cmd          OP_PROPOSING
+    header.cmd          OP_HEARTBEAT
 outgoing7:
-    header.cmd          OP_PROPOSING
+    header.cmd          OP_HEARTBEAT
 outgoing8:
-    header.cmd          OP_PROPOSING
+    header.cmd          OP_HEARTBEAT
 outgoing9:
-    header.cmd          OP_PROPOSING
+    header.cmd          OP_HEARTBEAT
 outgoing10:
-    header.cmd          OP_PROPOSING
+    header.cmd          OP_HEARTBEAT
     
 
-# Now retry counter should trigger, and restart paxos
-outgoing11:
-    header.cmd          OP_PREPARING
+# Now term expires
+ticket11:
+    term_expires        time(0) - 1
+
+# no outgoing message, gets to be follower
+finally:
+    state               ST_FOLLOWER
