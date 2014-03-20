@@ -381,6 +381,7 @@ int ticket_broadcast(struct ticket_config *tk, cmd_request_t cmd, cmd_result_t r
 static void ticket_cron(struct ticket_config *tk)
 {
 	time_t now;
+	int rv;
 
 	now = time(NULL);
 
@@ -450,11 +451,20 @@ static void ticket_cron(struct ticket_config *tk)
 
 			/* Don't give up, though - there's still some time until leadership is lost. */
 		}
-		tk->term_expires = now + tk->term_duration;
-		send_heartbeat(tk);
-		ticket_write(tk);
+
+		rv = run_handler(tk, tk->ext_verifier, 1);
+		if (rv) {
+			tk->state = ST_FOLLOWER;
+			tk->leader= NULL;
+			// resp. no owner anymore, new takers?
+			ticket_broadcast(tk, OP_REQ_VOTE, RLT_SUCCESS);
+			ticket_write(tk);
+		} else {
+			tk->term_expires = now + tk->term_duration;
+			send_heartbeat(tk);
+			// ticket_write(tk); // not correct here -- no acks received yet
+		}
 		ticket_activate_timeout(tk);
-		// set_ticket_wakeup(tk);
 		break;
 
 	default:
