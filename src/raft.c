@@ -48,8 +48,8 @@ inline static void site_voted_for(struct ticket_config *tk,
 		struct booth_site *vote)
 {
 	log_info("site \"%s\" votes for \"%s\"",
-			who->addr_string,
-			vote->addr_string);
+			site_string(who),
+			site_string(vote));
 
 	if (!tk->votes_for[who->index]) {
 		tk->votes_for[who->index] = vote;
@@ -195,7 +195,7 @@ static int answer_HEARTBEAT (
 	newer_term(tk, sender, leader, msg);
 
 	become_follower(tk, msg);
-	assert(sender == leader);
+	assert(sender == leader || !leader);
 
 	tk->leader = leader;
 
