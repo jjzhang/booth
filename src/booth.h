@@ -196,6 +196,7 @@ struct booth_site {
 
 
 extern struct booth_site *local;
+extern struct booth_site * no_leader;
 
 /** @} */
 
