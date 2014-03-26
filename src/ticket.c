@@ -179,8 +179,10 @@ int get_ticket_locally_if_allowed(struct ticket_config *tk)
 get_it:
 	if (leader_and_valid(tk)) {
 		return send_heartbeat(tk);
-	}
-	else {
+	} else {
+		/* Have to take away?? */
+		/* shouldn't happen*/
+		assert(0);
 		new_election(tk, local);
 		return ticket_broadcast(tk, OP_REQ_VOTE, RLT_SUCCESS);
 	}
@@ -286,7 +288,8 @@ int setup_ticket(void)
 
 		/* There might be a leader; wait for its notification. */
 		tk->term_expires = time(NULL) + tk->term_duration;
-		tk->state = ST_FOLLOWER;
+		tk->state        = ST_FOLLOWER;
+		/* TODO: send query packet to see sooner who's online. */
 	}
 
 
