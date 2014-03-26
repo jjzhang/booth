@@ -215,6 +215,10 @@ int do_revoke_ticket(struct ticket_config *tk)
 	disown_ticket(tk);
 	tk->voted_for = no_leader;
 	ticket_write(tk);
+
+	tk->state = ST_FOLLOWER;
+	/* Start a new vote round, with a new term number. */
+	tk->current_term++;
 	return ticket_broadcast(tk, OP_REQ_VOTE, RLT_SUCCESS);
 #if 0
 	rv = paxos_start_round(tk, NULL);
