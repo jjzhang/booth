@@ -195,6 +195,7 @@ static int answer_HEARTBEAT (
 	newer_term(tk, sender, leader, msg);
 
 	become_follower(tk, msg);
+	/* Racy??? */
 	assert(sender == leader || !leader);
 
 	tk->leader = leader;

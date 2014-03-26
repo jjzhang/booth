@@ -173,22 +173,17 @@ int get_ticket_locally_if_allowed(struct ticket_config *tk)
 
 		return rv;
 	} else {
-		log_info("May keep ticket.");
+		log_info("May get/keep ticket.");
 	}
 
 get_it:
 	if (leader_and_valid(tk)) {
 		return send_heartbeat(tk);
 	} else {
-		/* Have to take away?? */
-		/* shouldn't happen*/
-		assert(0);
+		/* Ticket should now become active locally, wasn't before. */
 		new_election(tk, local);
 		return ticket_broadcast(tk, OP_REQ_VOTE, RLT_SUCCESS);
 	}
-#if 0
-	return paxos_start_round(tk, local);
-#endif
 }
 
 
