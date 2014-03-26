@@ -325,7 +325,7 @@ class UT():
         # string value?
         if re.match(r'^"', value):
             res = self.send_cmd("print strcpy(" + name + ", " + value + ")")
-        if re.match(r"^'", value):
+        elif re.match(r"^'", value):
             # single-quoted; GDB only understands double quotes.
             v1 = re.sub(r"^'", '', value)
             v2 = re.sub(r"'$", '', v1)
