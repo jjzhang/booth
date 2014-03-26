@@ -426,7 +426,18 @@ int new_election(struct ticket_config *tk, struct booth_site *preference)
 
 
 	/* §5.2 */
-	tk->current_term++;
+	/* If there was _no_ answer, don't keep incrementing the term number
+	 * indefinitely. If there was no peer, there'll probably be no one
+	 * listening now either.
+	 * Own vote can be disregarded.
+	 * Not entirely correct? After startup the term should be incremented
+	 * once, to speed up becoming a leader?
+	 * Perhaps only increment once, and then try to rebuild with the same
+	 * term number? With 5 nodes the 2 node partition would still increment
+	 * endlessly. */
+	if (count_bits(tk->votes_received) > 1)
+		tk->current_term++;
+
 	tk->term_expires = 0;
 	tk->election_end = now + tk->term_duration;
 
