@@ -590,6 +590,7 @@ static int booth_udp_broadcast(void *buf, int len)
 	if (!booth_conf || !booth_conf->site_count)
 		return -1;
 
+	rvs = 0;
 	foreach_node(i, site) {
 		if (site != local) {
 			rv = booth_udp_send(site, buf, len);
