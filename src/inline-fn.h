@@ -100,7 +100,6 @@ static inline void init_ticket_msg(struct boothc_ticket_msg *msg,
 		msg->ticket.term           = htonl(tk->current_term);
 		msg->ticket.term_valid_for = htonl(term_valid_for(tk));
 
-		msg->ticket.prev_log_index = htonl(tk->last_applied);
 		msg->ticket.leader_commit  = htonl(tk->commit_index);
 	}
 }

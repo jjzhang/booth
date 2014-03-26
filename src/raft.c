@@ -396,8 +396,7 @@ static int answer_REQ_VOTE(
 	}
 
 	/* §5.2, §5.4 */
-	if (!tk->voted_for &&
-			ntohl(msg->ticket.last_log_index) >= tk->last_applied) {
+	if (!tk->voted_for) {
 vote_for_her:
 		tk->voted_for = sender;
 		site_voted_for(tk, sender, leader);

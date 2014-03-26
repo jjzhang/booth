@@ -50,8 +50,7 @@ do
 				T32(tick, buffer, 36+64 +  0, "Leader:         %08x")
 				T32(tick, buffer, 36+64 +  4, "Term:           %08x")
 				T32(tick, buffer, 36+64 +  8, "Term valid for: %08x")
-				T32(tick, buffer, 36+64 + 12, "last Log index: %8d")
-				T32(tick, buffer, 36+64 + 16, "Leader commit:  %8d")
+				T32(tick, buffer, 36+64 + 12, "Leader commit:  %8d")
 			end
 
 			pinfo.cols.info = "Booth, cmd " .. cmd:string()

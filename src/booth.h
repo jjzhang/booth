@@ -112,13 +112,8 @@ struct ticket_msg {
 	uint32_t term;
 	uint32_t term_valid_for;
 
-	union {
-		uint32_t prev_log_index; // TODO: NEEDED?
-		uint32_t last_log_index; // TODO: NEEDED?
-		/* No log index as such needed -- we only need to know the
-		 * _current_ ticket owner. */
-		uint32_t owner;
-	};
+	/* Perhaps we need to send a status along, too - like
+	 *  starting, running, stopping, error, ...? */
 
 	uint32_t leader_commit; // TODO: NEEDED?
 } __attribute__((packed));
