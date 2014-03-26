@@ -59,8 +59,15 @@
 
 #define BOOTH_NAME_LEN		64
 
-/* NONE wouldn't be specific enough. */
+#define CHAR2CONST(a,b,c,d) ((a << 24) | (b << 16) | (c << 8) | d)
+
+
+/* Says that the ticket shouldn't be active anywhere.
+ * NONE wouldn't be specific enough. */
 #define NO_ONE (-1)
+/* Says that another one should recover. */
+#define TICKET_LOST CHAR2CONST('L', 'O', 'S', 'T')
+
 
 typedef unsigned char boothc_site  [BOOTH_NAME_LEN];
 typedef unsigned char boothc_ticket[BOOTH_NAME_LEN];
@@ -123,8 +130,6 @@ struct boothc_ticket_msg {
 } __attribute__((packed));
 
 
-#define CHAR2CONST(a,b,c,d) ((a << 24) | (b << 16) | (c << 8) | d)
-#define STG2CONST(X) ({ const char _ggg[4] = X; return (uint32_t*)_ggg; })
 typedef enum {
 	/* 0x43 = "C"ommands */
 	CMD_LIST    = CHAR2CONST('C', 'L', 's', 't'),
