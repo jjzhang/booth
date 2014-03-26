@@ -43,6 +43,8 @@ int run_handler(struct ticket_config *tk,
 	int rv;
 	char expires[16];
 
+	if (!cmd)
+		return 0;
 
 	assert(synchronous);
 	sprintf(expires, "%" PRId64, tk->term_expires);
