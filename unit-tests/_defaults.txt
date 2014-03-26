@@ -51,6 +51,5 @@ message:
     ticket.leader           -1
     ticket.term             0
     ticket.term_valid_for   0
-    ticket.last_log_index   0
     ticket.leader_commit    -1
 
