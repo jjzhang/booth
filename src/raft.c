@@ -470,6 +470,7 @@ int raft_answer(
 	int cmd;
 	int rv;
 
+	rv = 0;
 	cmd = ntohl(msg->header.cmd);
 	R(tk);
 
