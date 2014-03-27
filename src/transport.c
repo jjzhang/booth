@@ -564,24 +564,42 @@ int booth_udp_send(struct booth_site *to, void *buf, int len)
 
 	rv = sendto(local->udp_fd, buf, len, MSG_NOSIGNAL,
 			(struct sockaddr *)&to->sa6, to->saddrlen);
+	if (rv == len) {
+		rv = 0;
+	} else if (rv < 0) {
+		rv = errno;
+		log_error("Cannot send to \"%s\": %d %s",
+				to->addr_string,
+				errno,
+				strerror(errno));
+	} else {
+		rv = EBUSY;
+		log_error("Packet sent to \"%s\" got truncated",
+				to->addr_string);
+	}
+
 	return rv;
 }
 
 static int booth_udp_broadcast(void *buf, int len)
 {
-	int i;
+	int i, rv, rvs;
 	struct booth_site *site;
 
 
 	if (!booth_conf || !booth_conf->site_count)
 		return -1;
 
+	rvs = 0;
 	foreach_node(i, site) {
-		if (site != local)
-			booth_udp_send(site, buf, len);
+		if (site != local) {
+			rv = booth_udp_send(site, buf, len);
+			if (!rvs)
+				rvs = rv;
+		}
 	}
 
-	return 0;
+	return rvs;
 }
 
 static int booth_udp_exit(void)

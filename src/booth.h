@@ -59,7 +59,15 @@
 
 #define BOOTH_NAME_LEN		64
 
-#define NO_OWNER (-1)
+#define CHAR2CONST(a,b,c,d) ((a << 24) | (b << 16) | (c << 8) | d)
+
+
+/* Says that the ticket shouldn't be active anywhere.
+ * NONE wouldn't be specific enough. */
+#define NO_ONE (-1)
+/* Says that another one should recover. */
+#define TICKET_LOST CHAR2CONST('L', 'O', 'S', 'T')
+
 
 typedef unsigned char boothc_site  [BOOTH_NAME_LEN];
 typedef unsigned char boothc_ticket[BOOTH_NAME_LEN];
@@ -96,19 +104,18 @@ struct ticket_msg {
 	/** Ticket name. */
 	boothc_ticket id;
 
-	/** Owner. May be NO_OWNER. See add_site().  */
-	uint32_t owner;
+	/** Current leader. May be NO_ONE. See add_site().
+	 * For a OP_REQ_VOTE this is  */
+	uint32_t leader;
 
-	/** Current ballot number. Might be < prev_ballot if overflown. */
-	uint32_t ballot;
-	/** Previous ballot. */
-	uint32_t prev_ballot;
+	/** Current term. */
+	uint32_t term;
+	uint32_t term_valid_for;
 
-	/* Would we want to say _whose_ proposal is more important
-	 * when sending OP_REJECTED ? */
+	/* Perhaps we need to send a status along, too - like
+	 *  starting, running, stopping, error, ...? */
 
-	/** Seconds until expiration. */
-	uint32_t expiry;
+	uint32_t leader_commit; // TODO: NEEDED?
 } __attribute__((packed));
 
 
@@ -118,60 +125,24 @@ struct boothc_ticket_msg {
 } __attribute__((packed));
 
 
-/** State and message IDs.
- *
- * These numbers are unlikely to conflict with other enums.
- * All have to be swabbed to network order before sending.
- * 
- * \dot
- * digraph states {
- *		node [shape=box];
- *		ST_INIT [label="ST_INIT"];
- *
- *		subgraph messages { // messages
- *		rank=same;
- *		node [shape=point, rank=same];
- *		edge [style=tapered, penwidth=3, arrowtail=none, arrowhead=none, dir=forward];
- *
- *		ST_INIT:e -> ST_INITs [label="sends out CMD_CATCHUP"];
- *		}
- *
- *		ST_INIT -> ST_STABLE [label="recv CMR_CATCHUP"];
- *		ST_STABLE;
- *
- *		ST_STABLE -> OP_PROPOSING [label="booth call to assign ticket"];
- * }
- * \enddot
- *
- * */
-#define CHAR2CONST(a,b,c,d) ((a << 24) | (b << 16) | (c << 8) | d)
-#define STG2CONST(X) ({ const char _ggg[4] = X; return (uint32_t*)_ggg; })
 typedef enum {
 	/* 0x43 = "C"ommands */
 	CMD_LIST    = CHAR2CONST('C', 'L', 's', 't'),
 	CMD_GRANT   = CHAR2CONST('C', 'G', 'n', 't'),
 	CMD_REVOKE  = CHAR2CONST('C', 'R', 'v', 'k'),
-	CMD_CATCHUP = CHAR2CONST('C', 'C', 't', 'p'),
 
 	/* Replies */
 	CMR_GENERAL = CHAR2CONST('G', 'n', 'l', 'R'), // Increase distance to CMR_GRANT
 	CMR_LIST    = CHAR2CONST('R', 'L', 's', 't'),
 	CMR_GRANT   = CHAR2CONST('R', 'G', 'n', 't'),
 	CMR_REVOKE  = CHAR2CONST('R', 'R', 'v', 'k'),
-	CMR_CATCHUP = CHAR2CONST('R', 'C', 't', 'p'),
 
-	/* Paxos */
-	OP_PREPARING = CHAR2CONST('P', 'r', 'e', 'p'),
-	OP_PROMISING = CHAR2CONST('P', 'r', 'o', 'm'),
-	OP_PROPOSING = CHAR2CONST('P', 'r', 'o', 'p'),
-	OP_ACCEPTING = CHAR2CONST('A', 'c', 'p', 't'),
-	OP_RECOVERY  = CHAR2CONST('R', 'c', 'v', 'y'),
-	OP_COMMITTED = CHAR2CONST('C', 'm', 'm', 't'),
-	OP_REJECTED  = CHAR2CONST('R', 'J', 'C', '!'),
-
-	/* These are not used over the wire */
-	ST_INIT      = CHAR2CONST('I', 'n', 'i', 't'),
-	ST_STABLE    = CHAR2CONST('S', 't', 'b', 'l'),
+	/* Raft */
+	OP_REQ_VOTE = CHAR2CONST('R', 'V', 'o', 't'),
+	OP_VOTE_FOR = CHAR2CONST('V', 't', 'F', 'r'),
+	OP_HEARTBEAT= CHAR2CONST('H', 'r', 't', 'B'), /* AppendEntry in Raft */
+	OP_MY_INDEX = CHAR2CONST('M', 'I', 'd', 'x'), /* Answer to Heartbeat */
+	OP_REJECTED = CHAR2CONST('R', 'J', 'C', '!'),
 } cmd_request_t;
 
 
@@ -186,6 +157,8 @@ typedef enum {
 	RLT_OVERGRANT           = CHAR2CONST('O', 'v', 'e', 'r'),
 	RLT_PROBABLY_SUCCESS    = CHAR2CONST('S', 'u', 'c', '?'),
 	RLT_BUSY                = CHAR2CONST('B', 'u', 's', 'y'),
+	RLT_TERM_OUTDATED       = CHAR2CONST('T', 'O', 'd', 't'),
+	RLT_TERM_STILL_VALID    = CHAR2CONST('T', 'V', 'l', 'd'),
 } cmd_result_t;
 
 
@@ -223,6 +196,7 @@ struct booth_site {
 
 
 extern struct booth_site *local;
+extern struct booth_site * no_leader;
 
 /** @} */
 
@@ -257,4 +231,21 @@ struct command_line {
 	struct boothc_ticket_msg msg;
 };
 extern struct command_line cl;
+
+
+
+/* http://gcc.gnu.org/onlinedocs/gcc/Typeof.html */
+#define min(a__,b__) \
+	({ typeof (a__) _a = (a__); \
+	 typeof (b__) _b = (b__); \
+	 _a < _b ? _a : _b; })
+#define max(a__,b__) \
+	({ typeof (a__) _a = (a__); \
+	 typeof (b__) _b = (b__); \
+	 _a > _b ? _a : _b; })
+
+
+
+
+
 #endif /* _BOOTH_H */

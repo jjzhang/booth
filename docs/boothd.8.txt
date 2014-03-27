@@ -26,8 +26,8 @@ geographically dispersed distances to run certain resources. It is designed to
 be an add-on to Pacemaker, which extends Pacemaker to support geographically
 distributed clustering.
 
-It is based on the PAXOS protocol, see eg. 
-<http://research.microsoft.com/en-us/um/people/lamport/pubs/lamport-paxos.pdf>
+It is based on the RAFT protocol, see eg. 
+<https://ramcloud.stanford.edu/wiki/download/attachments/11370504/raft.pdf>
 for details.
 
 
@@ -139,14 +139,14 @@ The following key/value pairs are defined:
 	The UDP/TCP port to use. Default is '9929'.
 
 *'transport'*::
-	The transport protocol to use for PAXOS exchanges.
+	The transport protocol to use for Raft exchanges.
 	Currently only UDP is available.
 +
 Please note that the client mode always uses TCP to talk to a daemon; Booth 
 will always bind and listen to *both* UDP and TCP ports.
 
 *'site'*, *'arbitrator'*::
-	Defines a PAXOS member with the given IP, which should be a service IP.
+	Defines a Raft member with the given IP, which should be a service IP.
 +
 You will need at least three members for normal operation; an odd number is 
 preferred.
@@ -158,7 +158,7 @@ The next items modify per-ticket defaults. They are stored as defaults for
 further tickets, and are used as value for the last defined ticket (if any).
 
 *'expire'*::
-	The lease time for a ticket, in seconds. After that time the ticket gets 
+	The lease time for a ticket, in seconds. After that time the ticket can be 
 	revoked, and another site can get it.
 +
 Typically 'booth' will try to renew a held ticket after half the lease time.
@@ -171,7 +171,7 @@ The default is '3'.
 
 *'weights'*::
 	A comma-separated list of integers that define the weight of individual 
-	PAXOS members, in the same order as the 'site' and 'arbitrator' lines.
+	Raft members, in the same order as the 'site' and 'arbitrator' lines.
 +
 Default is '0' for all; this means that the ordering within the configuration 
 file defines a kind of priority for conflicting requests.
@@ -207,7 +207,7 @@ default is to use 'hacluster':'haclient'; for an arbitrator this user and group
 might not exists, so that will default to 'nobody':'nobody'.
 
 
-*'before-acquire-handler'::
+*'before-acquire-handler'*::
 	If set, this script/program will be called before 'boothd' tries to
 	acquire or renew a ticket. Only a clean exit will allow 'boothd' to
 	proceed; any other return value will cancel the operation.
@@ -302,6 +302,17 @@ FILES
 	Directory that holds PID/lock files. See also the 'status' command.
 
 
+RAFT IMPLEMENTATION
+-------------------
+
+Basically, each Pacemaker ticket corresponds to a separate Raft cluster.
+
+A ticket is granted _only_ to the Raft _Leader_, but a Leader needs not grant the ticket to Pacemaker.
+To move a ticket, the Leader withdraws, and votes for the new Leader instead.
+
+So, the Raft "log" consists of -- nothing, more or less; there's no history to keep.
+
+
 SYSTEMD INTEGRATION
 -------------------
 
@@ -365,3 +376,4 @@ Free use of this software is
 granted under the terms of the GNU General Public License (GPL).
 
 
+// vim: set ft=asciidoc : 

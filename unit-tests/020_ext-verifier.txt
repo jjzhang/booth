@@ -6,28 +6,26 @@
 
 ticket:
     name                "tick1"
-    state               ST_STABLE
-    last_ack_ballot     40
-    new_ballot          50
-    owner               local
-    retries             6
-    timeout             1
+    state               ST_LEADER
+    current_term        40
+    leader              local
     # may keep ticket all the time
-    expiry              3000
+    term_duration       3000
     # but shall start renewal now
-    expires             time(0) + 1000
+    term_expires        time(0) + 1000
     ext_verifier        "test `set|grep ^BOOTH|wc -l` -ge 5"
+    hb_sent_at          time(0) - 10
 
 
 
 outgoing0:
-    header.cmd          OP_PREPARING
+    header.cmd          OP_HEARTBEAT
 
 
 ticket1:
     ext_verifier        'test "$BOOTH_TICKET" == "tick1"'
     # cause re-query of the verifier
-    state               ST_STABLE
+    hb_sent_at          time(0) - 10
 
 #
 #gdb1:
@@ -35,20 +33,20 @@ ticket1:
 
 
 outgoing1:
-    header.cmd          OP_PREPARING
+    header.cmd          OP_HEARTBEAT
 
 
 # now say that we may not have it anymore.
 ticket2:
     ext_verifier        'test "$BOOTH_TICKET" == "tick2FOO"'
     # cause re-query of the verifier
-    state               ST_STABLE
+    hb_sent_at          time(0) - 10
 
 # We just tell the others we don't have it anymore.
 outgoing2:
-    header.cmd          OP_COMMITTED
-    ticket.owner        -1
+    header.cmd          OP_REQ_VOTE
+    ticket.leader       -1
 
 finally:
-    state        ST_STABLE
-    owner        NULL
+    state        ST_FOLLOWER
+    leader       NULL

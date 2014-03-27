@@ -22,6 +22,7 @@
 
 #include <stdint.h>
 #include "booth.h"
+#include "raft.h"
 #include "transport.h"
 
 
@@ -39,8 +40,8 @@ struct ticket_config {
 	/** Name of ticket. */
 	boothc_ticket name;
 
-	/** How many seconds until expiration. */
-	int expiry;
+	/** How many seconds a term lasts (if not refreshed). */
+	int term_duration;
 
 	/** Network related timeouts. */
 	int timeout;
@@ -51,7 +52,8 @@ struct ticket_config {
 	/** If >0, time to wait for a site to get fenced.
 	 * The ticket may be acquired after that timespan by
 	 * another site. */
-	int acquire_after;
+	int acquire_after; /* TODO: needed? */
+
 
 	/* Program to ask whether it makes sense to
 	 * acquire the ticket */
@@ -65,35 +67,52 @@ struct ticket_config {
 	/** \name Runtime values.
 	 * @{ */
 	/** Current state. */
-	cmd_request_t state;
+	server_state_e state;
 
 	/** When something has to be done */
 	struct timeval next_cron;
 
-	/** Current owner of ticket. */
-	struct booth_site *owner;
+	/** Current leader. This is effectively the log[] in Raft. */
+	struct booth_site *leader;
 
-	/** Timestamp of expiration. */
-	time_t expires;
+	/** Timestamp of leadership expiration */
+	time_t term_expires;
+	/** End of election period */
+	time_t election_end;
+	struct booth_site *voted_for;
 
-	/** Last ballot number that was agreed on. */
-	uint32_t last_ack_ballot;
+
+	/** Who the various sites vote for.
+	 * NO_OWNER = no vote yet. */
+	struct booth_site *votes_for[MAX_NODES];
+	/* bitmap */
+	uint64_t votes_received;
+
+	/** Last voting round that was seen. */
+	uint32_t current_term;
 	/** @} */
 
 
+	/** */
+	uint32_t commit_index;
+
+	/** */
+	uint32_t last_applied;
+	uint32_t next_index[MAX_NODES];
+	uint32_t match_index[MAX_NODES];
+
+
+	uint64_t hb_received;
+	time_t hb_sent_at;
+
 	/** \name Needed while proposals are being done.
 	 * @{ */
-	/** Who tries to change the current status. */
-	struct booth_site *proposer;
+	/** Whom to vote for the next time.
+	 * Needed to push a ticket to someone else. */
 
-	/** Current owner of ticket. */
-	struct booth_site *proposed_owner;
 
-	/** New/current ballot number.
-	 * Might be < prev_ballot if overflown.
-	 * This only every goes "up" (logically). */
-	uint32_t new_ballot;
 
+#if 0
 	/** Bitmap of sites that acknowledge that state. */
 	uint64_t proposal_acknowledges;
 
@@ -104,6 +123,8 @@ struct ticket_config {
 
 	/** Timestamp of proposal expiration. */
 	time_t proposal_expires;
+
+#endif
 
 	/** Number of send retries left.
 	 * Used on the new owner.
@@ -149,6 +170,10 @@ int find_site_by_name(unsigned char *site, struct booth_site **node, int any_typ
 int find_site_by_id(uint32_t site_id, struct booth_site **node);
 
 const char *type_to_string(int type);
+
+
+#include <stdio.h>
+#define R(tk_) printf("## %12s:%3d state %s, term %d, index %d, leader %s\n", __FILE__, __LINE__, state_to_string(tk_->state), tk_->current_term, tk_->commit_index, site_string(tk_->leader))
 
 
 #endif /* _CONFIG_H */

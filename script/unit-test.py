@@ -325,7 +325,7 @@ class UT():
         # string value?
         if re.match(r'^"', value):
             res = self.send_cmd("print strcpy(" + name + ", " + value + ")")
-        if re.match(r"^'", value):
+        elif re.match(r"^'", value):
             # single-quoted; GDB only understands double quotes.
             v1 = re.sub(r"^'", '', value)
             v2 = re.sub(r"'$", '', v1)
@@ -395,6 +395,8 @@ class UT():
             stopped_at = self.continue_debuggee(timeout=3)
             if not stopped_at:
                 self.user_debug("Not stopped at any breakpoint?")
+            if re.search(r"^Program received signal SIGABRT,", stopped_at, re.MULTILINE):
+                self.user_debug("assert() failed")
             if re.search(r"^Program received signal SIGSEGV,", stopped_at, re.MULTILINE):
                 self.user_debug("Segfault")
             if re.search(r"^Breakpoint \d+, (0x\w+ in )?%s " % fn, stopped_at, re.MULTILINE):

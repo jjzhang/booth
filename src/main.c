@@ -70,6 +70,12 @@ static int client_maxi;
 static int client_size = 0;
 
 
+static const struct booth_site _no_leader = {
+	.addr_string = "none",
+	.site_id = NO_ONE,
+};
+struct booth_site *no_leader = (struct booth_site*)& _no_leader;
+
 typedef enum
 {
 	BOOTHD_STARTED=0,

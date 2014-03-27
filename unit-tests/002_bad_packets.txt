@@ -1,21 +1,21 @@
 # vim: ft=sh et :
 #
 # This test is mostly concerned with ignoring invalid packets.
-# We're expecting catchup queries.
+# We're expecting heartbeat packets.
 
 
 ticket:
-    state               ST_INIT
-    last_ack_ballot     1
-    new_ballot          12
+    state               ST_LEADER
+    leader              local
+    current_term        500
 
 
 # defaults
 message:
-    header.cmd          CMR_CATCHUP
-    ticket.ballot       99
-    ticket.prev_ballot  98
-    header.from         booth_conf->site[2].site_id
+    header.cmd          OP_HEARTBEAT
+    ticket.term         500
+    #header.from         booth_conf->site[2].site_id
+    header.from         local->site_id
     header.result       0
 
 
@@ -23,14 +23,14 @@ message0:               # bad result code
     header.result       243521741
 
 outgoing0:
-    state               ST_INIT
+    state               ST_LEADER
 
 
 message1:               # bad sender
     header.from         71
 
 outgoing1:
-    state               ST_INIT
+    state               ST_LEADER
 
 
 
@@ -38,45 +38,33 @@ message2:               # bad version
     header.version      512
 
 outgoing2:
-    state               ST_INIT
+    state               ST_LEADER
 
 
 message3:               # bad magic
     header.version      31
 
 outgoing3:
-    state               ST_INIT
+    state               ST_LEADER
 
 message4:               # bad length
     header.length       16
 
 outgoing4:
-    state               ST_INIT
+    state               ST_LEADER
 
 
 message5:               # bad ticket ID
     ticket.id           "gibtsnich"
 
 outgoing5:
-    state               ST_INIT
-
-
-## TODO: ballot number ranges, discarding invalid.
-## see assert in ballot_is_higher_than() 
-##message6:               # bad ballot number
-##    ticket.ballot       -15 + (1 << 29)
-##
-##outgoing6:
-##    state               ST_INIT
+    state               ST_LEADER
 
 
 message100:             # should work
-    ticket.ballot       199
-    ticket.prev_ballot  198
+    ticket.term         510
 
 # no outgoing message
 finally:                
-    state               ST_STABLE
-    new_ballot          199
-    last_ack_ballot     198
-
+    state               ST_FOLLOWER
+    current_term        510

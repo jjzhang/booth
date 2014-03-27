@@ -19,15 +19,18 @@ ticket:
 # time(0)+1
     # local is site[0] per convention
 
-    owner           booth_conf->site+1
-    expires         time(0)+1
-    last_ack_ballot 242
+    leader          booth_conf->site+1
+    #owner           booth_conf->site+1
+    #expires         time(0)+1
+    term_expires    time(0)+1
+    #last_ack_ballot 242
 
-    proposer        0
-    proposed_owner  0
-    new_ballot      0
-    proposal_acknowledges   0
-    retry_number    0
+    leader          0
+    #proposer        0
+    #proposed_owner  0
+    #new_ballot      0
+    #proposal_acknowledges   0
+    #retry_number    0
 
 
 
@@ -45,8 +48,8 @@ message:
     header.version          BOOTHC_VERSION
     header.magic            BOOTHC_MAGIC
     header.length           sizeof(struct boothc_ticket_msg)
-    ticket.owner            -1
-    ticket.ballot           0
-    ticket.prev_ballot      0
-    ticket.expiry           0
+    ticket.leader           -1
+    ticket.term             0
+    ticket.term_valid_for   0
+    ticket.leader_commit    -1
 
