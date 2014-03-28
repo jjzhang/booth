@@ -200,6 +200,7 @@ static int answer_HEARTBEAT (
 
 	tk->leader = leader;
 
+	ticket_activate_timeout(tk);
 
 	/* Yeth, mathter. */
 	init_ticket_msg(&omsg, OP_HEARTBEAT, RLT_SUCCESS, tk);
