@@ -203,28 +203,26 @@ int do_grant_ticket(struct ticket_config *tk)
 }
 
 
-/** Start a PAXOS round for revoking.
+/** Revoke round.
  * That can be started from any site. */
 int do_revoke_ticket(struct ticket_config *tk)
 {
-	int rv;
-
 	if (!tk->leader)
 		return RLT_SUCCESS;
 
 	disown_ticket(tk);
 	tk->voted_for = no_leader;
-	ticket_write(tk);
+	//	ticket_write(tk); only when majority wants that? or, if tk->leader was == local, in every case, because the ticket shouldn't be here anymore?
+	/* 1) lose ticket
+	 * 2) if majority is available, "none" gets it
+	 * 3) if majority not available, they might have voted for somebody else in the meantime anyway
+	 */
+
 
 	tk->state = ST_FOLLOWER;
 	/* Start a new vote round, with a new term number. */
 	tk->current_term++;
 	return ticket_broadcast(tk, OP_REQ_VOTE, RLT_SUCCESS);
-#if 0
-	rv = paxos_start_round(tk, NULL);
-#endif
-
-	return rv;
 }
 
 
