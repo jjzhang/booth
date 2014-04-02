@@ -59,9 +59,10 @@ AC_PROG_LN_S
 AC_PROG_MAKE_SET
 AC_PROG_RANLIB
 
-AC_PATH_PROGS(HELP2MAN, help2man)
 AC_PATH_PROGS(PKGCONFIG, pkg-config)
-AM_CONDITIONAL(HAVE_HELP2MAN, test x"${HELP2MAN}" != x"")
+AC_PATH_PROGS(ASCIIDOC, asciidoc)
+
+AM_CONDITIONAL(BUILD_ASCIIDOC, test x"${ASCIIDOC}" != x"")
 
 # Checks for libraries.
 AC_CHECK_LIB([socket], [socket])
