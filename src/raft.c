@@ -422,7 +422,7 @@ int new_election(struct ticket_config *tk, struct booth_site *preference)
 
 	time(&now);
 	log_debug("start new election?, now=%" PRIi64 ", end %" PRIi64,
-			now, tk->election_end);
+			(int64_t)now, (int64_t)(tk->election_end));
 	if (now <= tk->election_end)
 		return 0;
 
@@ -444,7 +444,7 @@ int new_election(struct ticket_config *tk, struct booth_site *preference)
 	tk->election_end = now + tk->term_duration;
 
 	log_debug("start new election! term=%d, until %" PRIi64,
-			tk->current_term, tk->election_end);
+			tk->current_term, (int64_t)tk->election_end);
 	clear_election(tk);
 
 	if(preference)

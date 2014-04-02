@@ -17,17 +17,5 @@ boothd_CPPFLAGS		= $(GLIB_CFLAGS)
 noinst_HEADERS		= booth.h pacemaker.h \
 			  config.h log.h raft.h ticket.h transport.h handler.h
 
-if HAVE_HELP2MAN
-man_MANS		= booth.8 boothd.8
-MAINTAINERCLEANFILES	+= $(man_MANS)
-EXTRA_DIST		= $(man_MANS)
-
-%.8: %
-	$(HELP2MAN) -s 8 -N -o $@ ./$<
-
-booth.8: boothd.8
-	cp $< $@
-endif
-
 lint:
 	-splint $(INCLUDES) $(LINT_FLAGS) $(CFLAGS) *.c

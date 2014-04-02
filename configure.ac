@@ -59,9 +59,10 @@ AC_PROG_LN_S
 AC_PROG_MAKE_SET
 AC_PROG_RANLIB
 
-AC_PATH_PROGS(HELP2MAN, help2man)
 AC_PATH_PROGS(PKGCONFIG, pkg-config)
-AM_CONDITIONAL(HAVE_HELP2MAN, test x"${HELP2MAN}" != x"")
+AC_PATH_PROGS(ASCIIDOC, asciidoc)
+
+AM_CONDITIONAL(BUILD_ASCIIDOC, test x"${ASCIIDOC}" != x"")
 
 # Checks for libraries.
 AC_CHECK_LIB([socket], [socket])
@@ -117,7 +118,8 @@ AC_CHECK_FUNCS([alarm alphasort atexit bzero dup2 endgrent endpwent fcntl \
 		sched_get_priority_max sched_setscheduler])
 
 AC_CONFIG_FILES([Makefile
-		 src/Makefile])
+		 src/Makefile
+		 docs/Makefile])
 
 # ===============================================
 # Helpers
@@ -127,7 +129,8 @@ AC_CONFIG_FILES([Makefile
 cc_supports_flag() {
          local CFLAGS="-Werror $@"
          AC_MSG_CHECKING(whether $CC supports "$@")
-         AC_COMPILE_IFELSE([int main(){return 0;}] ,[RC=0; AC_MSG_RESULT(yes)],[RC=1; AC_MSG_RESULT(no)])
+         AC_COMPILE_IFELSE([AC_LANG_SOURCE([[int main(){return 0;}]])],
+           [RC=0; AC_MSG_RESULT(yes)],[RC=1; AC_MSG_RESULT(no)])
          return $RC
 }
 
