@@ -88,16 +88,6 @@ int add_site(char *addr_string, int type)
 	 * Perhaps use hash over string or address? */
 	strcpy(site->addr_string, addr_string);
 
-	nid = crc32(0L, NULL, 0);
-	/* booth_config() uses memset(), so sizeof() is guaranteed to give
-	 * the same result everywhere - no uninitialized bytes. */
-	site->site_id = crc32(nid, site->addr_string,
-			sizeof(site->addr_string));
-	/* Make sure we will never collide with NO_ONE,
-	 * or be negative (to get "get_local_id() < 0" working). */
-	mask = 1 << (sizeof(site->site_id)*8 -1);
-	assert(NO_ONE & mask);
-	site->site_id &= ~mask;
 
 	site->index = booth_conf->site_count;
 	site->bitmask = 1 << booth_conf->site_count;
@@ -106,13 +96,6 @@ int add_site(char *addr_string, int type)
 	booth_conf->site_bits |= site->bitmask;
 
 	site->tcp_fd = -1;
-
-	for(i=0; i<site->index; i++)
-		if (booth_conf->site[i].site_id == site->site_id) {
-			log_error("Got a site-ID collision. Please file a bug on https://github.com/ClusterLabs/booth/issues/new, attaching the configuration file.");
-			exit(1);
-		}
-
 
 	booth_conf->site_count++;
 
@@ -144,6 +127,31 @@ int add_site(char *addr_string, int type)
 		log_error("Address string \"%s\" is bad", site->addr_string);
 		rv = EINVAL;
 	}
+
+
+	nid = crc32(0L, NULL, 0);
+	/* Using the ASCII representation in site->addr_string (both sizeof()
+	 * and strlen()) gives quite a lot of collisions; a brute-force run
+	 * from 0.0.0.0 to 24.0.0.0 gives ~4% collisions, and this tends to
+	 * increase even more.
+	 * Whether there'll be a collision in real-life, with 3 or 5 nodes, is
+	 * another question ... but for now get the ID from the binary
+	 * representation - that had *no* collisions up to 32.0.0.0. */
+	site->site_id = crc32(nid, (void*)&site->sa6, site->saddrlen);
+	/* Make sure we will never collide with NO_ONE,
+	 * or be negative (to get "get_local_id() < 0" working). */
+	mask = 1 << (sizeof(site->site_id)*8 -1);
+	assert(NO_ONE & mask);
+	site->site_id &= ~mask;
+
+
+	/* Test for collisions with other sites */
+	for(i=0; i<site->index; i++)
+		if (booth_conf->site[i].site_id == site->site_id) {
+			log_error("Got a site-ID collision. Please file a bug on https://github.com/ClusterLabs/booth/issues/new, attaching the configuration file.");
+			exit(1);
+		}
+
 
 out:
 	return rv;
