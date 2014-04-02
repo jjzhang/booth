@@ -67,6 +67,7 @@ int add_site(char *addr_string, int type)
 	struct booth_site *site;
 	uLong nid;
 	uint32_t mask;
+	int i;
 
 
 	rv = 1;
@@ -105,6 +106,12 @@ int add_site(char *addr_string, int type)
 	booth_conf->site_bits |= site->bitmask;
 
 	site->tcp_fd = -1;
+
+	for(i=0; i<site->index; i++)
+		if (booth_conf->site[i].site_id == site->site_id) {
+			log_error("Got a site-ID collision. Please file a bug on https://github.com/ClusterLabs/booth/issues/new, attaching the configuration file.");
+			exit(1);
+		}
 
 
 	booth_conf->site_count++;
