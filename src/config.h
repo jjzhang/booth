@@ -90,6 +90,13 @@ struct ticket_config {
 
 	/** Last voting round that was seen. */
 	uint32_t current_term;
+
+	/** Do ticket updates whenever we get enough heartbeats.
+	 * But do that only once.
+	 * This is reset to 0 whenever we broadcast heartbeat and set
+	 * to 1 once enough acks are received.
+	 */
+	uint32_t majority_acks_received;
 	/** @} */
 
 

@@ -258,6 +258,10 @@ static int process_HEARTBEAT(
 			 * the next heartbeat should be sent. */
 			set_ticket_wakeup(tk);
 			tk->retry_number = 0;
+			if( !tk->majority_acks_received ) {
+				tk->majority_acks_received = 1;
+				ticket_write(tk);
+			}
 		} else {
 			/* Not enough answers yet;
 			 * wait until timeout expires. */
@@ -314,7 +318,6 @@ static int process_VOTE_FOR(
 			tk->commit_index++; // ??
 			tk->state = ST_LEADER;
 			send_heartbeat(tk);
-			ticket_write(tk);
 		}
 		else
 			become_follower(tk, NULL);

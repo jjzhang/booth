@@ -276,6 +276,7 @@ static inline int send_heartbeat(struct ticket_config *tk)
 {
 	tk->hb_received = local->bitmask;
 	tk->hb_sent_at  = time(NULL);
+	tk->majority_acks_received = 0;
 
 	return ticket_broadcast(tk, OP_HEARTBEAT, RLT_SUCCESS);
 }
