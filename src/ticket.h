@@ -96,8 +96,6 @@ static inline void ticket_activate_timeout(struct ticket_config *tk)
 {
 	/* TODO: increase timeout when no answers */
 	ticket_next_cron_in(tk, tk->timeout);
-
-	tk->retry_number ++;
 }
 
 

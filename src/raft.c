@@ -181,15 +181,18 @@ static int answer_HEARTBEAT (
 	struct boothc_ticket_msg omsg;
 
 
-
 	term = ntohl(msg->ticket.term);
 	log_debug("leader: %s, have %s; term %d vs %d",
 			site_string(leader), ticket_leader_string(tk),
 			term, tk->current_term);
 
 	/* No reject. (?) */
-	if (term < tk->current_term)
+	if (term < tk->current_term) {
+		log_info("ignoring lower term %d vs. %d, from \"%s\"",
+				term, tk->current_term,
+				ticket_leader_string(tk));
 		return 0;
+	}
 
 	/* Needed? */
 	newer_term(tk, sender, leader, msg);
@@ -200,9 +203,10 @@ static int answer_HEARTBEAT (
 
 	tk->leader = leader;
 
+	/* why do we need this? */
 	ticket_activate_timeout(tk);
 
-	/* Yeth, mathter. */
+	/* Ack the heartbeat (we comply). */
 	init_ticket_msg(&omsg, OP_HEARTBEAT, RLT_SUCCESS, tk);
 	return booth_udp_send(sender, &omsg, sizeof(omsg));
 }
@@ -260,12 +264,9 @@ static int process_HEARTBEAT(
 			tk->retry_number = 0;
 			if( !tk->majority_acks_received ) {
 				tk->majority_acks_received = 1;
+				tk->term_expires = time(NULL) + tk->term_duration;
 				ticket_write(tk);
 			}
-		} else {
-			/* Not enough answers yet;
-			 * wait until timeout expires. */
-			ticket_activate_timeout(tk);
 		}
 	}
 
@@ -460,6 +461,7 @@ int new_election(struct ticket_config *tk, struct booth_site *preference)
 	tk->state = ST_CANDIDATE;
 
 	ticket_broadcast(tk, OP_REQ_VOTE, RLT_SUCCESS);
+	ticket_activate_timeout(tk);
 	return 0;
 }
 

@@ -411,8 +411,6 @@ static void ticket_cron(struct ticket_config *tk)
 
 		ticket_write(tk);
 
-		ticket_activate_timeout(tk);
-
 		/* May not try to re-acquire now, need to find out
 		 * what others think. */
 		return;
@@ -428,6 +426,8 @@ static void ticket_cron(struct ticket_config *tk)
 
 
 	case ST_FOLLOWER:
+		/* in case we got restarted and this ticket belongs to
+		 * us */
 		if (tk->is_granted && tk->leader == local) {
 			tk->current_term++;
 			new_election(tk, NULL);
@@ -441,31 +441,39 @@ static void ticket_cron(struct ticket_config *tk)
 		break;
 
 	case ST_LEADER:
-		if (tk->hb_sent_at + tk->timeout > now) {
-			/* Heartbeat timeout reached. Oops ... */
-			tk->retry_number ++;
-			log_error("Not enough answers to heartbeat on try #%d: "
+		/* we get here after we broadcasted a heartbeat;
+		 * by this time all sites should've acked the heartbeat
+		 */
+		/* if (tk->hb_sent_at + tk->timeout <= now) { */
+		if (count_bits(tk->hb_received) < booth_conf->site_count) {
+			if (!majority_of_bits(tk, tk->hb_received)) {
+				tk->retry_number ++;
+				log_warn("not enough answers to heartbeat on try #%d: "
 					"only got %d answers (mask 0x%" PRIx64 ")!",
 					tk->retry_number,
 					count_bits(tk->hb_received),
 					tk->hb_received);
-
 			/* Don't give up, though - there's still some time until leadership is lost. */
+			} else {
+				log_warn("some sites not acked heartbeat on try #%d: "
+					"only got %d answers (mask 0x%" PRIx64 ")!",
+					tk->retry_number,
+					count_bits(tk->hb_received),
+					tk->hb_received);
+			}
 		}
 
 		rv = run_handler(tk, tk->ext_verifier, 1);
 		if (rv) {
 			tk->state = ST_FOLLOWER;
-			tk->leader= NULL;
+			disown_ticket(tk);
 			// resp. no owner anymore, new takers?
 			ticket_broadcast(tk, OP_REQ_VOTE, RLT_SUCCESS);
 			ticket_write(tk);
 		} else {
-			tk->term_expires = now + tk->term_duration;
 			send_heartbeat(tk);
-			// ticket_write(tk); // not correct here -- no acks received yet
+			ticket_activate_timeout(tk);
 		}
-		ticket_activate_timeout(tk);
 		break;
 
 	default:
