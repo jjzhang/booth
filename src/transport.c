@@ -309,11 +309,18 @@ static void process_tcp_listener(int ci)
 static int setup_tcp_listener(void)
 {
 	int s, rv;
+	int one = 1;
 
 	s = socket(local->family, SOCK_STREAM, 0);
 	if (s == -1) {
 		log_error("failed to create tcp socket %s", strerror(errno));
 		return s;
+	}
+
+	rv = setsockopt(s, SOL_SOCKET, SO_REUSEADDR, (char *)&one, sizeof(one));
+	if (rv == -1) {
+		log_error("failed to set the SO_REUSEADDR option");
+		return rv;
 	}
 
 	rv = bind(s, &local->sa6, local->saddrlen);
@@ -472,6 +479,7 @@ static int booth_tcp_exit(void)
 int setup_udp_server(int try_only)
 {
 	int rv, fd;
+	int one = 1;
 	unsigned int recvbuf_size;
 
 	fd = socket(local->family, SOCK_DGRAM, 0);
@@ -484,6 +492,12 @@ int setup_udp_server(int try_only)
 	if (rv == -1) {
 		log_error("failed to set non-blocking operation "
 			  "on UDP socket: %s", strerror(errno));
+		goto ex;
+	}
+
+	rv = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (char *)&one, sizeof(one));
+	if (rv == -1) {
+		log_error("failed to set the SO_REUSEADDR option");
 		goto ex;
 	}
 
