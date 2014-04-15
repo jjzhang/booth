@@ -267,8 +267,15 @@ static int crm_ticket_get(struct ticket_config *tk,
 	}
 
 	rv = EINVAL;
-	if (sscanf(line, "%" PRIi64, &v) == 1)
+	if (!strncmp(line, "false", 5)) {
+		v = 0;
 		rv = 0;
+	} else if (!strncmp(line, "true", 4)) {
+		v = 1;
+		rv = 0;
+	} else if (sscanf(line, "%" PRIi64, &v) == 1) {
+		rv = 0;
+	}
 
 	*data = v;
 
@@ -306,6 +313,10 @@ static int pcmk_load_ticket(struct ticket_config *tk)
 		find_site_by_id(v, &tk->leader);
 	}
 
+	rv = crm_ticket_get(tk, "granted", &v);
+	if (!rv) {
+		tk->is_granted = v;
+	}
 
 	if (disown_if_expired(tk))
 		pcmk_revoke_ticket(tk);

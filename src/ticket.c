@@ -195,7 +195,7 @@ int do_grant_ticket(struct ticket_config *tk)
 
 	if (tk->leader == local)
 		return RLT_SUCCESS;
-	if (tk->leader)
+	if (is_owned(tk))
 		return RLT_OVERGRANT;
 
 	rv = get_ticket_locally_if_allowed(tk);
@@ -207,7 +207,7 @@ int do_grant_ticket(struct ticket_config *tk)
  * That can be started from any site. */
 int do_revoke_ticket(struct ticket_config *tk)
 {
-	if (!tk->leader)
+	if (!is_owned(tk))
 		return RLT_SUCCESS;
 
 	disown_ticket(tk);
@@ -273,7 +273,6 @@ int setup_ticket(void)
 	struct ticket_config *tk;
 	int i;
 
-	 /* TODO */
 	foreach_ticket(i, tk) {
 		tk->leader = NULL;
 		tk->term_expires = 0;
@@ -284,8 +283,9 @@ int setup_ticket(void)
 			pcmk_handler.load_ticket(tk);
 		}
 
-		/* There might be a leader; wait for its notification. */
-		tk->term_expires = time(NULL) + tk->term_duration;
+		/* We'll start the election immediately if the ticket
+		 * belonged to us */
+		/* tk->term_expires = time(NULL) + tk->term_duration;*/
 		tk->state        = ST_FOLLOWER;
 		/* TODO: send query packet to see sooner who's online. */
 	}
@@ -323,7 +323,7 @@ int ticket_answer_grant(int fd, struct boothc_ticket_msg *msg)
 		goto reply;
 	}
 
-	if (tk->leader) {
+	if (is_owned(tk)) {
 		log_error("client wants to get an (already granted!) ticket \"%s\"",
 				msg->ticket.id);
 		rv = RLT_OVERGRANT;
@@ -349,7 +349,7 @@ int ticket_answer_revoke(int fd, struct boothc_ticket_msg *msg)
 		goto reply;
 	}
 
-	if (!tk->leader) {
+	if (!is_owned(tk)) {
 		log_info("client wants to revoke a free ticket \"%s\"",
 				msg->ticket.id);
 		/* Return a different result code? */
@@ -391,7 +391,7 @@ static void ticket_cron(struct ticket_config *tk)
 	/* Has an owner, has an expiry date, and expiry date in the past?
 	 * Losing the ticket must happen in _every_ state. */
 	if (tk->term_expires &&
-			tk->leader &&
+			is_owned(tk) &&
 			now > tk->term_expires) {
 		log_info("LOST ticket: \"%s\" no longer at %s",
 				tk->name,
@@ -428,8 +428,8 @@ static void ticket_cron(struct ticket_config *tk)
 
 
 	case ST_FOLLOWER:
-		if (tk->term_expires &&
-				now > tk->term_expires) {
+		if (tk->is_granted && tk->leader == local) {
+			tk->current_term++;
 			new_election(tk, NULL);
 		}
 		break;
@@ -601,7 +601,7 @@ void set_ticket_wakeup(struct ticket_config *tk)
 	case ST_FOLLOWER:
 		/* If there is (or should be) some owner, check on her later on.
 		 * If no one is interested - don't care. */
-		if ((tk->leader || tk->acquire_after) &&
+		if ((is_owned(tk) || tk->acquire_after) &&
 				(local->type == SITE))
 			ticket_next_cron_at_coarse(tk,
 					tk->term_expires + tk->acquire_after);

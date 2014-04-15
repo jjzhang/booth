@@ -75,6 +75,8 @@ struct ticket_config {
 	/** Current leader. This is effectively the log[] in Raft. */
 	struct booth_site *leader;
 
+	/** Is the ticket granted? */
+	int is_granted;
 	/** Timestamp of leadership expiration */
 	time_t term_expires;
 	/** End of election period */

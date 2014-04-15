@@ -60,6 +60,13 @@ inline static int leader_and_valid(const struct ticket_config *tk)
 }
 
 
+/** Is this some leader? */
+inline static int is_owned(const struct ticket_config *tk)
+{
+	return (tk->leader && tk->leader != no_leader);
+}
+
+
 static inline void init_header_bare(struct boothc_header *h) {
 	h->magic   = htonl(BOOTHC_MAGIC);
 	h->version = htonl(BOOTHC_VERSION);
@@ -126,6 +133,7 @@ static inline const char *ticket_leader_string(struct ticket_config *tk)
 static inline void disown_ticket(struct ticket_config *tk)
 {
 	tk->leader = NULL;
+	tk->is_granted = 0;
 	time(&tk->term_expires);
 }
 
