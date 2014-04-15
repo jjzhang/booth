@@ -380,10 +380,12 @@ static int answer_REQ_VOTE(
 	struct boothc_ticket_msg omsg;
 
 
+	if (leader == no_leader)
+		return 0;
 	if (term_too_low(tk, sender, leader, msg))
 		return 0;
 	if (newer_term(tk, sender, leader, msg))
-		goto vote_for_her;
+		goto vote_for_sender;
 
 
 	term = ntohl(msg->ticket.term);
@@ -403,7 +405,7 @@ static int answer_REQ_VOTE(
 
 	/* §5.2, §5.4 */
 	if (!tk->voted_for) {
-vote_for_her:
+vote_for_sender:
 		tk->voted_for = sender;
 		site_voted_for(tk, sender, leader);
 		goto yes_you_can;
