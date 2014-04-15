@@ -38,7 +38,6 @@ int raft_answer(struct ticket_config *tk,
 		struct boothc_ticket_msg *msg);
 
 int new_election(struct ticket_config *tk, struct booth_site *new_leader);
-int start_election(struct ticket_config *tk, struct booth_site *new_leader);
 
 
 #endif /* _RAFT_H */

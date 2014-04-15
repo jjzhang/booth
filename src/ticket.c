@@ -181,6 +181,7 @@ get_it:
 		return send_heartbeat(tk);
 	} else {
 		/* Ticket should now become active locally, wasn't before. */
+		tk->current_term++;
 		new_election(tk, local);
 		return rv;
 	}
@@ -401,13 +402,10 @@ static void ticket_cron(struct ticket_config *tk)
 		disown_ticket(tk);
 
 		/* New vote round; §5.2 */
-		if (local->type == SITE)
+		if (local->type == SITE) {
+			tk->current_term++;
 			new_election(tk, NULL);
-/* should be "always" that way
-		else
-			tk->state = ST_FOLLOWER;
- */
-//		abort_proposal(tk); TODO
+		}
 
 		ticket_write(tk);
 
@@ -436,6 +434,7 @@ static void ticket_cron(struct ticket_config *tk)
 
 	case ST_CANDIDATE:
 		/* §5.2 */
+		/* This is previous election timed out */
 		if (now > tk->election_end)
 			new_election(tk, NULL);
 		break;
