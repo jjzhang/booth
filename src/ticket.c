@@ -213,12 +213,12 @@ int do_revoke_ticket(struct ticket_config *tk)
 
 	disown_ticket(tk);
 	tk->voted_for = no_leader;
-	//	ticket_write(tk); only when majority wants that? or, if tk->leader was == local, in every case, because the ticket shouldn't be here anymore?
+	if (tk->is_granted && tk->leader == local)
+		ticket_write(tk); //	only when majority wants that? or, if tk->leader was == local, in every case, because the ticket shouldn't be here anymore?
 	/* 1) lose ticket
 	 * 2) if majority is available, "none" gets it
 	 * 3) if majority not available, they might have voted for somebody else in the meantime anyway
 	 */
-
 
 	tk->state = ST_FOLLOWER;
 	/* Start a new vote round, with a new term number. */
@@ -345,7 +345,8 @@ int ticket_answer_revoke(int fd, struct boothc_ticket_msg *msg)
 	struct ticket_config *tk;
 
 	if (!check_ticket(msg->ticket.id, &tk)) {
-		log_error("Client asked to grant unknown ticket");
+		log_error("Client wants to revoke an unknown ticket %s",
+				msg->ticket.id);
 		rv = RLT_INVALID_ARG;
 		goto reply;
 	}

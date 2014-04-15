@@ -103,7 +103,7 @@ static inline void init_ticket_msg(struct boothc_ticket_msg *msg,
 	} else {
 		memcpy(msg->ticket.id, tk->name, sizeof(msg->ticket.id));
 
-		msg->ticket.leader         = htonl(get_node_id(tk->leader ?: tk->voted_for));
+		msg->ticket.leader         = htonl(get_node_id(tk->leader ? tk->leader : tk->voted_for));
 		msg->ticket.term           = htonl(tk->current_term);
 		msg->ticket.term_valid_for = htonl(term_valid_for(tk));
 
