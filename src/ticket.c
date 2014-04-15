@@ -182,7 +182,7 @@ get_it:
 	} else {
 		/* Ticket should now become active locally, wasn't before. */
 		new_election(tk, local);
-		return ticket_broadcast(tk, OP_REQ_VOTE, RLT_SUCCESS);
+		return rv;
 	}
 }
 
