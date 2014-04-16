@@ -388,6 +388,7 @@ static void ticket_cron(struct ticket_config *tk)
 {
 	time_t now;
 	int rv;
+	int vote_cnt;
 
 	now = time(NULL);
 
@@ -448,20 +449,27 @@ static void ticket_cron(struct ticket_config *tk)
 		 * by this time all sites should've acked the heartbeat
 		 */
 		/* if (tk->hb_sent_at + tk->timeout <= now) { */
-		if (count_bits(tk->hb_received) < booth_conf->site_count) {
+		vote_cnt = count_bits(tk->hb_received) - 1;
+		if ((vote_cnt+1) < booth_conf->site_count) {
 			if (!majority_of_bits(tk, tk->hb_received)) {
 				tk->retry_number ++;
-				log_warn("not enough answers to heartbeat on try #%d: "
+				if (!vote_cnt) {
+					log_warn("no answers to heartbeat on try #%d, "
+					"we are most probably alone!",
+					tk->retry_number);
+				} else {
+					log_warn("not enough answers to heartbeat on try #%d: "
 					"only got %d answers (mask 0x%" PRIx64 ")!",
 					tk->retry_number,
-					count_bits(tk->hb_received),
+					vote_cnt,
 					tk->hb_received);
+				}
 			/* Don't give up, though - there's still some time until leadership is lost. */
 			} else {
 				log_warn("some sites not acked heartbeat on try #%d: "
 					"only got %d answers (mask 0x%" PRIx64 ")!",
 					tk->retry_number,
-					count_bits(tk->hb_received),
+					vote_cnt,
 					tk->hb_received);
 			}
 		}
