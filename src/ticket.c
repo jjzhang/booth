@@ -208,12 +208,15 @@ int do_grant_ticket(struct ticket_config *tk)
  * That can be started from any site. */
 int do_revoke_ticket(struct ticket_config *tk)
 {
+	int write_cib;
+
 	if (!is_owned(tk))
 		return RLT_SUCCESS;
 
+	write_cib = (tk->is_granted && tk->leader == local);
 	disown_ticket(tk);
 	tk->voted_for = no_leader;
-	if (tk->is_granted && tk->leader == local)
+	if (write_cib)
 		ticket_write(tk); //	only when majority wants that? or, if tk->leader was == local, in every case, because the ticket shouldn't be here anymore?
 	/* 1) lose ticket
 	 * 2) if majority is available, "none" gets it
