@@ -126,7 +126,7 @@ A basic file looks like this:
 site="192.168.201.100"
 site="192.168.202.100"
 arbitrator="192.168.203.100"
-ticket="I-want-a-pony"
+ticket="ticket-db8"
 -----------------------
 
 
@@ -142,7 +142,7 @@ The following key/value pairs are defined:
 	The transport protocol to use for Raft exchanges.
 	Currently only UDP is available.
 +
-Please note that the client mode always uses TCP to talk to a daemon; Booth 
+The client mode always uses TCP to talk to a daemon; Booth 
 will always bind and listen to *both* UDP and TCP ports.
 
 *'site'*, *'arbitrator'*::
@@ -167,14 +167,14 @@ Typically 'booth' will try to renew a held ticket after half the lease time.
 	After that time 'booth' will re-send packets if there was an insufficient 
 	number of replies.
 +
-The default is '3'.
+The default is '10'.
 
 *'weights'*::
 	A comma-separated list of integers that define the weight of individual 
 	Raft members, in the same order as the 'site' and 'arbitrator' lines.
 +
-Default is '0' for all; this means that the ordering within the configuration 
-file defines a kind of priority for conflicting requests.
+Default is '0' for all; this means that the order in the configuration 
+file defines priority for conflicting requests.
 
 *'acquire-after'*::
 	Setting this to a positive value will make 'booth' try to acquire a ticket 
@@ -187,16 +187,15 @@ to activate the ticket. (Only one will succeed, though.)
 A typical delay might be 60 seconds.
 
 *'retries'*::
-	Defines how often broadcast packets are sent out before the current 
-	action (grant, revoke) is aborted.
+	Defines how many times to retry broadcasting packets before the
+	current operation (grant, revoke) is aborted.
 +
-Default is 10; values lower than 3 are forbidden, and high values won't 
-make much sense, too.
+Default is 10. Values lower than 3 are illegal.
 +
-Please note that this counts only for a single packet; if ticket *renewal*
-runs into this limit (because the network was temporarily down), but the
-ticket is still valid afterwards, a new renewal run will be started 
-automatically.
+This counts only for a single broadcast; if ticket *renewal* runs
+into this limit (because the network was temporarily down), but
+the ticket is still valid afterwards, a new renewal run will be
+started automatically.
 
 
 *'site-user'*, *'site-group'*, *'arbitrator-user'*, *'arbitrator-group'*::
@@ -208,20 +207,20 @@ might not exists, so that will default to 'nobody':'nobody'.
 
 
 *'before-acquire-handler'*::
-	If set, this script/program will be called before 'boothd' tries to
-	acquire or renew a ticket. Only a clean exit will allow 'boothd' to
-	proceed; any other return value will cancel the operation.
+	If set, this command will be called before 'boothd' tries to
+	acquire or renew a ticket. On exit code other than 0,
+	'boothd' cancels the operation.
 +
-This makes it possible to check whether it makes sense to try
-to acquire the ticket; eg. if a service in the
+This makes it possible to check whether it is appropriate
+to acquire the ticket. For instance, if a service in the
 dependency-chain has a failcount of 'INFINITY' on all
-available nodes, the service will be unable to run - and so
-another cluster (and not this one!) should try to start it.
+available nodes, the service will be unable to run. In that case,
+it is of no use to claim the ticket.
 +
-Please assume that 'boothd' will wait synchronously for the result of that
-call, so having that program return quickly would be an advantage.
+'boothd' waits synchronously for the result of the handler, so make
+sure that the program returns quickly.
 +
-Please see below for details about available environment variables.
+See below for details about booth specific environment variables.
 
 
 A more verbose example of a configuration file might be
@@ -237,7 +236,7 @@ site="::ffff:192.168.202.100"
 # A-1120
 arbitrator="192.168.203.100"
 
-ticket="I-want-a-pony"
+ticket="ticket-db8"
     expire        = 600
     acquire-after = 60
     timeout       = 10
@@ -248,24 +247,18 @@ ticket="I-want-a-pony"
 NOTES
 -----
 
-Please note that Booth tickets are not meant to be real-time - a reasonable 
-'expire' time might be 300 seconds (5 minutes). Due to possible delays on the 
-WAN connections it makes no sense to expect detection of problems and failover 
-within a few seconds.
+Tickets are not meant to be moved around quickly--a reasonable
+'expire' time might be 300 seconds (5 minutes).
 
+'booth' works with both IPv4 and IPv6 addresses.
 
-'booth' works with IPv6 addresses, too.
+'booth' renews a ticket before it expires, to account for
+possible transmission delays.
 
-
-'booth' will start to renew a ticket before it expires, to account
-for transmission delays.
-
-This will happen so that (the bigger one of) half the 'expire' time, or 
-'timeout'*'retries'/2 seconds, will be left for the renewal.
-
-Of course, that means that with bad configuration values (eg. 'expire' 60 
-seconds, 'timeout' 3 seconds, and 'retries' > 40) the ticket renewal 
-process will be started just after the ticket got acquired.
+The renewal time is calculated as larger of half the 'expire'
+time and 'timeout'*'retries'/2. Hence, with small 'expire' values
+(eg. 60 seconds) the ticket renewal process will be started just
+after the ticket got acquired.
 
 
 HANDLERS
@@ -274,13 +267,13 @@ HANDLERS
 Currently, there's only one external handler defined (see the 'before-acquire-handler'
 configuration item above).
 
-It gets the following data via the environment:
+The following data is available as environment variables:
 
 *'BOOTH_TICKET'::
 	The ticket name, as given in the configuration file. (See 'ticket' item above.)
 
 *'BOOTH_LOCAL'::
-	The local site specification, as defined in 'site'.
+	The local site name, as defined in 'site'.
 
 *'BOOTH_CONF_PATH'::
 	The path to the active configuration file.
@@ -289,7 +282,7 @@ It gets the following data via the environment:
 	The configuration name, as used by the '-c' commandline argument.
 
 *'BOOTH_TICKET_EXPIRES'::
-	Timestamp for the ticket expiration (seconds since 1.1.1970), or '0'.
+	When the ticket expires (in seconds since 1.1.1970), or '0'.
 
 
 FILES
@@ -305,26 +298,28 @@ FILES
 RAFT IMPLEMENTATION
 -------------------
 
-Basically, each Pacemaker ticket corresponds to a separate Raft cluster.
+In essence, every ticket corresponds to a separate Raft cluster.
 
-A ticket is granted _only_ to the Raft _Leader_, but a Leader needs not grant the ticket to Pacemaker.
-To move a ticket, the Leader withdraws, and votes for the new Leader instead.
-
-So, the Raft "log" consists of -- nothing, more or less; there's no history to keep.
+A ticket is granted _only_ to the Raft _Leader_, but a Leader
+needs not grant the ticket to Pacemaker.  To move a ticket, the
+Leader withdraws, and votes for the new Leader instead.
 
 
 SYSTEMD INTEGRATION
 -------------------
 
-The Booth sources (and, very likely, packages too) include a 'systemd' unit
-file for 'boothd'.
+The 'boothd' 'systemd' unit file should be distributed with booth.
 
-So don't forget to install 'boothd' into 'systemd' after configuration!
+The booth daemon for a site or an arbitrator may be started
+through systemd:
 
 -----------
 # systemctl enable booth@{configurationname}.service
 # systemctl start  booth@{configurationname}.service
 -----------
+
+The configuration name is required for 'systemctl', even in case
+of the default name 'booth'.
 
 
 EXIT STATUS
@@ -353,7 +348,8 @@ AUTHOR
 'boothd' was originally written (mostly) by Jiaju Zhang.
 Many people have contributed to it.
 
-In 2013 Philipp Marek took over maintainership.
+In 2013 Philipp Marek took over maintainership, followed by Dejan
+Muhamedagic.
 
 
 
@@ -371,6 +367,8 @@ COPYING
 Copyright (C) 2011 Jiaju Zhang <jjzhang@suse.de>
 
 Copyright (C) 2013-2014 Philipp Marek <philipp.marek@linbit.com>
+
+Copyright (C) 2014 Dejan Muhamedagic <dmuhamedagic@suse.com>
 
 Free use of this software is
 granted under the terms of the GNU General Public License (GPL).
