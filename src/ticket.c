@@ -616,7 +616,7 @@ void set_ticket_wakeup(struct ticket_config *tk)
 
 	case ST_INIT:
 	case ST_FOLLOWER:
-		/* If there is (or should be) some owner, check on her later on.
+		/* If there is (or should be) some owner, check on it later on.
 		 * If no one is interested - don't care. */
 		if ((is_owned(tk) || tk->acquire_after) &&
 				(local->type == SITE))

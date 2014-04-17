@@ -204,8 +204,8 @@ static int answer_HEARTBEAT (
 
 	tk->leader = leader;
 
-	/* why do we need this? */
-	ticket_activate_timeout(tk);
+	/* run ticket_cron if the ticket expires */
+	set_ticket_wakeup(tk);
 
 	/* Ack the heartbeat (we comply). */
 	init_ticket_msg(&omsg, OP_HEARTBEAT, RLT_SUCCESS, tk);
