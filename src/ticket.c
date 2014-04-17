@@ -456,23 +456,19 @@ static void ticket_cron(struct ticket_config *tk)
 			if (!majority_of_bits(tk, tk->hb_received)) {
 				tk->retry_number ++;
 				if (!vote_cnt) {
-					log_warn("no answers to heartbeat on try #%d, "
+					log_warn("no answers to heartbeat for ticket %s on try #%d, "
 					"we are most probably alone!",
+					tk->name,
 					tk->retry_number);
 				} else {
-					log_warn("not enough answers to heartbeat on try #%d: "
+					log_warn("not enough answers to heartbeat for ticket %s on try #%d: "
 					"only got %d answers (mask 0x%" PRIx64 ")!",
+					tk->name,
 					tk->retry_number,
 					vote_cnt,
 					tk->hb_received);
 				}
 			/* Don't give up, though - there's still some time until leadership is lost. */
-			} else {
-				log_warn("some sites not acked heartbeat on try #%d: "
-					"only got %d answers (mask 0x%" PRIx64 ")!",
-					tk->retry_number,
-					vote_cnt,
-					tk->hb_received);
 			}
 		}
 
