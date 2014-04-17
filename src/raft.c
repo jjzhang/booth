@@ -261,11 +261,12 @@ static int process_HEARTBEAT(
 			/* OK, at least half of the nodes are reachable;
 			 * no need to do anything until
 			 * the next heartbeat should be sent. */
-			set_ticket_wakeup(tk);
-			tk->retry_number = 0;
 			if( !tk->majority_acks_received ) {
+			/* Write the ticket to the CIB and set the next
+			 * wakeup time (but do that only once) */
 				tk->majority_acks_received = 1;
-				tk->term_expires = time(NULL) + tk->term_duration;
+				set_ticket_wakeup(tk);
+				tk->retry_number = 0;
 				ticket_write(tk);
 			}
 		}

@@ -377,8 +377,10 @@ int ticket_broadcast(struct ticket_config *tk, cmd_request_t cmd, cmd_result_t r
 	struct boothc_ticket_msg msg;
 
 	init_ticket_msg(&msg, cmd, res, tk);
-	log_debug("broadcasting '%s' for ticket \"%s\"",
-			state_to_string(cmd), tk->name);
+	log_debug("broadcasting '%s' for ticket \"%s\" (term=%d, valid=%d)",
+			state_to_string(cmd), tk->name,
+			ntohl(msg.ticket.term),
+			ntohl(msg.ticket.term_valid_for));
 
 	return transport()->broadcast(&msg, sizeof(msg));
 }
