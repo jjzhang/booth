@@ -213,6 +213,11 @@ int do_revoke_ticket(struct ticket_config *tk)
 	if (!is_owned(tk))
 		return RLT_SUCCESS;
 
+	log_info("revoke ticket %s: state '%s' "
+			"leader \"%s\" ",
+			tk->name,
+			state_to_string(tk->state),
+			ticket_leader_string(tk));
 	write_cib = (tk->is_granted && tk->leader == local);
 	disown_ticket(tk);
 	tk->voted_for = no_leader;
