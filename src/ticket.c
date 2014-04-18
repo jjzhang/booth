@@ -405,7 +405,7 @@ static void ticket_cron(struct ticket_config *tk)
 	 * Losing the ticket must happen in _every_ state. */
 	if (tk->term_expires &&
 			is_owned(tk) &&
-			now > tk->term_expires) {
+			now >= tk->term_expires) {
 		log_info("LOST ticket: \"%s\" no longer at %s",
 				tk->name,
 				ticket_leader_string(tk));
