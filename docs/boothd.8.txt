@@ -167,7 +167,7 @@ Typically 'booth' will try to renew a held ticket after half the lease time.
 	After that time 'booth' will re-send packets if there was an insufficient 
 	number of replies.
 +
-The default is '10'.
+The default is '5' seconds.
 
 *'weights'*::
 	A comma-separated list of integers that define the weight of individual 

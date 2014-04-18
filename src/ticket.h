@@ -27,7 +27,7 @@
 #include "config.h"
 
 #define DEFAULT_TICKET_EXPIRY	600
-#define DEFAULT_TICKET_TIMEOUT	10
+#define DEFAULT_TICKET_TIMEOUT	5
 #define DEFAULT_RETRIES			10
 
 
