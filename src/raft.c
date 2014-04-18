@@ -204,14 +204,57 @@ static int answer_HEARTBEAT (
 
 	tk->leader = leader;
 
-	/* run ticket_cron if the ticket expires */
-	set_ticket_wakeup(tk);
-
 	/* Ack the heartbeat (we comply). */
 	init_ticket_msg(&omsg, OP_HEARTBEAT, RLT_SUCCESS, tk);
 	return booth_udp_send(sender, &omsg, sizeof(omsg));
 }
 
+static int process_UPDATE (
+		struct ticket_config *tk,
+		struct booth_site *sender,
+		struct booth_site *leader,
+		struct boothc_ticket_msg *msg
+	       )
+{
+	uint32_t term;
+
+
+	term = ntohl(msg->ticket.term);
+	log_debug("leader: %s, have %s; term %d vs %d",
+			site_string(leader), ticket_leader_string(tk),
+			term, tk->current_term);
+
+	/* No reject. (?) */
+	if (term < tk->current_term) {
+		log_warn("ignoring lower term %d vs. %d, from \"%s\"",
+				term, tk->current_term,
+				ticket_leader_string(tk));
+		return 0;
+	}
+
+	become_follower(tk, msg);
+
+	/* run ticket_cron if the ticket expires */
+	set_ticket_wakeup(tk);
+
+	return 0;
+}
+
+/* update the ticket on the leader, write it to the CIB, and
+   send out the update message to others with the new expiry
+   time
+*/
+static int leader_update_ticket(struct ticket_config *tk)
+{
+	struct boothc_ticket_msg msg;
+
+	tk->term_expires = time(NULL) + tk->term_duration;
+	tk->retry_number = 0;
+	ticket_write(tk);
+	set_ticket_wakeup(tk);
+	init_ticket_msg(&msg, OP_UPDATE, RLT_SUCCESS, tk);
+	return transport()->broadcast(&msg, sizeof(msg));
+}
 
 /* For leader. */
 static int process_HEARTBEAT(
@@ -259,15 +302,13 @@ static int process_HEARTBEAT(
 
 		if (majority_of_bits(tk, tk->hb_received)) {
 			/* OK, at least half of the nodes are reachable;
-			 * no need to do anything until
-			 * the next heartbeat should be sent. */
+			 * Update the ticket and send update messages out
+			 */
 			if( !tk->majority_acks_received ) {
 			/* Write the ticket to the CIB and set the next
 			 * wakeup time (but do that only once) */
 				tk->majority_acks_received = 1;
-				set_ticket_wakeup(tk);
-				tk->retry_number = 0;
-				ticket_write(tk);
+				return leader_update_ticket(tk);
 			}
 		}
 	}
@@ -502,11 +543,23 @@ int raft_answer(
 		else
 			assert("invalid combination - leader, follower");
 		break;
+	case OP_UPDATE:
+		if (tk->leader != local && tk->state == ST_FOLLOWER) {
+			rv = process_UPDATE(tk, from, leader, msg);
+		} else {
+			log_error("unexpected message, cmd %s, from %s",
+				state_to_string(cmd),
+				from->addr_string);
+			rv = -EINVAL;
+		}
+		break;
 	case OP_REJECTED:
 		rv = process_REJECTED(tk, from, leader, msg);
 		break;
 	default:
-		log_error("unprocessed message, cmd %x", cmd);
+		log_error("unprocessed message, cmd %s, from %s",
+			state_to_string(cmd),
+			from->addr_string);
 		rv = -EINVAL;
 	}
 	R(tk);
