@@ -159,6 +159,7 @@ typedef enum {
 	RLT_BUSY                = CHAR2CONST('B', 'u', 's', 'y'),
 	RLT_TERM_OUTDATED       = CHAR2CONST('T', 'O', 'd', 't'),
 	RLT_TERM_STILL_VALID    = CHAR2CONST('T', 'V', 'l', 'd'),
+	RLT_REDIRECT            = CHAR2CONST('R', 'e', 'd', 'r'),
 } cmd_result_t;
 
 

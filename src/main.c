@@ -552,11 +552,72 @@ out:
 }
 
 
+static int test_reply(int reply_code, cmd_request_t cmd)
+{
+	int rv = 0;
+
+	switch (reply_code) {
+	case RLT_OVERGRANT:
+		log_info("You're granting a granted ticket. "
+			 "If you wanted to migrate a ticket, "
+			 "use revoke first, then use grant.");
+		rv = -1;
+		break;
+
+	case RLT_ASYNC:
+		if (cmd == CMD_GRANT)
+			log_info("grant command sent, result will be returned "
+				 "asynchronously, you can get the result from "
+				 "the log files");
+		else if (cmd == CMD_REVOKE)
+			log_info("revoke command sent, result will be returned "
+				 "asynchronously, you can get the result from "
+				 "the log files.");
+		else
+			log_error("internal error reading reply result!");
+		rv = 0;
+		break;
+
+	case RLT_SYNC_SUCC:
+	case RLT_SUCCESS:
+		if (cmd == CMD_GRANT)
+			log_info("grant succeeded!");
+		else if (cmd == CMD_REVOKE)
+			log_info("revoke succeeded!");
+		rv = 0;
+		break;
+
+	case RLT_SYNC_FAIL:
+		if (cmd == CMD_GRANT)
+			log_info("grant failed!");
+		else if (cmd == CMD_REVOKE)
+			log_info("revoke failed!");
+		rv = -1;
+		break;
+
+	case RLT_INVALID_ARG:
+		log_error("ticket \"%s\" does not exist",
+				cl.msg.ticket.id);
+		break;
+
+	case RLT_REDIRECT:
+		/* talk to another site */
+		rv = 1;
+		break;
+
+	default:
+		log_error("got an error code: %x", rv);
+		rv = -1;
+	}
+	return rv;
+}
+
 static int do_command(cmd_request_t cmd)
 {
 	struct booth_site *site;
-	struct boothc_header reply;
+	struct boothc_ticket_msg reply;
 	struct booth_transport const *tpt;
+	uint32_t leader_id;
 	int rv;
 
 	rv = 0;
@@ -591,6 +652,7 @@ static int do_command(cmd_request_t cmd)
 		}
 	}
 
+redirect:
 	init_header(&cl.msg.header, cmd, 0, sizeof(cl.msg));
 
 	/* Always use TCP for client - at least for now. */
@@ -603,69 +665,20 @@ static int do_command(cmd_request_t cmd)
 	if (rv < 0)
 		goto out_close;
 
-
 	rv = tpt->recv(site, &reply, sizeof(reply));
 	if (rv < 0)
 		goto out_close;
 
-	if (reply.result == htonl(RLT_INVALID_ARG)) {
-		log_info("invalid argument!");
-		rv = -1;
-		goto out_close;
+	rv = test_reply(ntohl(reply.header.result), cmd);
+	if (rv == 1) {
+		local_transport->close(site);
+		leader_id = ntohl(reply.ticket.leader);
+		if (!find_site_by_id(leader_id, &site)) {
+			log_error("Message with unknown redirect site %x received", leader_id);
+			return rv;
+		}
+		goto redirect;
 	}
-
-	if (reply.result == htonl(RLT_OVERGRANT)) {
-		log_info("You're granting a granted ticket. "
-			 "If you wanted to migrate a ticket, "
-			 "use revoke first, then use grant.");
-		rv = -1;
-		goto out_close;
-	}
-
-
-	rv = ntohl(reply.result);
-	switch (rv) {
-	case RLT_ASYNC:
-		if (cmd == CMD_GRANT)
-			log_info("grant command sent, result will be returned "
-				 "asynchronously, you can get the result from "
-				 "the log files");
-		else if (cmd == CMD_REVOKE)
-			log_info("revoke command sent, result will be returned "
-				 "asynchronously, you can get the result from "
-				 "the log files.");
-		else
-			log_error("internal error reading reply result!");
-		rv = 0;
-		break;
-
-	case RLT_SYNC_SUCC:
-	case RLT_SUCCESS:
-		if (cmd == CMD_GRANT)
-			log_info("grant succeeded!");
-		else if (cmd == CMD_REVOKE)
-			log_info("revoke succeeded!");
-		rv = 0;
-		break;
-
-	case RLT_SYNC_FAIL:
-		if (cmd == CMD_GRANT)
-			log_info("grant failed!");
-		else if (cmd == CMD_REVOKE)
-			log_info("revoke failed!");
-		rv = -1;
-		break;
-
-	case RLT_INVALID_ARG:
-		log_error("\"Invalid argument\", most probably ticket name \"%s\" wrong.",
-				cl.msg.ticket.id);
-		break;
-
-	default:
-		log_error("got an error code: %x", rv);
-		rv = -1;
-	}
-
 
 out_close:
 	if (site)

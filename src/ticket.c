@@ -204,32 +204,23 @@ int do_grant_ticket(struct ticket_config *tk)
 }
 
 
-/** Revoke round.
- * That can be started from any site. */
+/** Ticket revoke.
+ * Only to be started from the leader. */
 int do_revoke_ticket(struct ticket_config *tk)
 {
-	int write_cib;
+	log_info("revoke ticket %s", tk->name);
 
-	if (!is_owned(tk))
-		return RLT_SUCCESS;
-
-	log_info("revoke ticket %s: state '%s' "
-			"leader \"%s\" ",
-			tk->name,
-			state_to_string(tk->state),
-			ticket_leader_string(tk));
-	write_cib = (tk->is_granted && tk->leader == local);
 	disown_ticket(tk);
 	tk->voted_for = no_leader;
-	if (write_cib)
-		ticket_write(tk); //	only when majority wants that? or, if tk->leader was == local, in every case, because the ticket shouldn't be here anymore?
+	ticket_write(tk); //	only when majority wants that? or, if tk->leader was == local, in every case, because the ticket shouldn't be here anymore?
 	/* 1) lose ticket
 	 * 2) if majority is available, "none" gets it
 	 * 3) if majority not available, they might have voted for somebody else in the meantime anyway
 	 */
 
 	tk->state = ST_FOLLOWER;
-	/* Start a new vote round, with a new term number. */
+	/* Start a new vote round, with a new term number, to let
+	 * everybody know that the ticket got revoked */
 	tk->current_term++;
 	return ticket_broadcast(tk, OP_REQ_VOTE, RLT_SUCCESS);
 }
@@ -364,6 +355,15 @@ int ticket_answer_revoke(int fd, struct boothc_ticket_msg *msg)
 				msg->ticket.id);
 		/* Return a different result code? */
 		rv = RLT_SUCCESS;
+		goto reply;
+	}
+
+	if (tk->leader != local) {
+		log_info("we do not own the ticket \"%s\", "
+				"redirect to leader %s",
+				msg->ticket.id, ticket_leader_string(tk));
+		/* Return a different result code? */
+		rv = RLT_REDIRECT;
 		goto reply;
 	}
 
