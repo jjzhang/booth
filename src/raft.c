@@ -392,7 +392,7 @@ static int answer_REQ_VOTE(
 
 	term = ntohl(msg->ticket.term);
 	/* Important: Ignore duplicated packets! */
-	valid = term_valid_for(tk);
+	valid = term_time_left(tk);
 	if (valid &&
 			term == tk->current_term &&
 			sender == tk->leader) {

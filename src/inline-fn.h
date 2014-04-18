@@ -41,7 +41,7 @@ inline static uint32_t get_node_id(struct booth_site *node)
 }
 
 
-inline static int term_valid_for(const struct ticket_config *tk)
+inline static int term_time_left(const struct ticket_config *tk)
 {
 	int left;
 
@@ -56,7 +56,7 @@ inline static int leader_and_valid(const struct ticket_config *tk)
 	if (tk->leader != local)
 		return 0;
 
-	return term_valid_for(tk);
+	return term_time_left(tk);
 }
 
 
@@ -105,7 +105,7 @@ static inline void init_ticket_msg(struct boothc_ticket_msg *msg,
 
 		msg->ticket.leader         = htonl(get_node_id(tk->leader ? tk->leader : tk->voted_for));
 		msg->ticket.term           = htonl(tk->current_term);
-		msg->ticket.term_valid_for = htonl(term_valid_for(tk));
+		msg->ticket.term_valid_for = htonl(term_time_left(tk));
 
 		msg->ticket.leader_commit  = htonl(tk->commit_index);
 	}
