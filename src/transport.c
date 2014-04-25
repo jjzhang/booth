@@ -214,8 +214,15 @@ int _find_myself(int family, struct booth_site **mep, int fuzzy_allowed)
 				memset(tb, 0, sizeof(tb));
 				parse_rtattr(tb, IFA_MAX, IFA_RTA(ifa), len);
 				memset(ipaddr, 0, BOOTH_IPADDR_LEN);
-				memcpy(ipaddr, RTA_DATA(tb[IFA_ADDRESS]),
-						BOOTH_IPADDR_LEN);
+				/* prefer IFA_LOCAL if it exists, for p-t-p
+				 * interfaces, otherwise use IFA_ADDRESS */
+				if (tb[IFA_LOCAL]) {
+					memcpy(ipaddr, RTA_DATA(tb[IFA_LOCAL]),
+							BOOTH_IPADDR_LEN);
+				} else {
+					memcpy(ipaddr, RTA_DATA(tb[IFA_ADDRESS]),
+							BOOTH_IPADDR_LEN);
+				}
 
 				/* First try with exact addresses, then optionally with subnet matching. */
 				if (ifa->ifa_prefixlen > address_bits_matched)
