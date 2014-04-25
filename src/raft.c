@@ -427,8 +427,10 @@ static int answer_REQ_VOTE(
 		return 0;
 	if (term_too_low(tk, sender, leader, msg))
 		return 0;
-	if (newer_term(tk, sender, leader, msg))
+	if (newer_term(tk, sender, leader, msg)) {
+		clear_election(tk);
 		goto vote_for_sender;
+	}
 
 
 	term = ntohl(msg->ticket.term);
