@@ -62,13 +62,11 @@ inline static void site_voted_for(struct ticket_config *tk,
 }
 
 
-static void become_follower(struct ticket_config *tk,
+static void follower_update_ticket(struct ticket_config *tk,
 		struct boothc_ticket_msg *msg)
 {
 	uint32_t i;
 	int duration;
-
-	tk->state = ST_FOLLOWER;
 
 
 	duration = tk->term_duration;
@@ -85,9 +83,13 @@ static void become_follower(struct ticket_config *tk,
 		i = ntohl(msg->ticket.leader_commit);
 		tk->commit_index = max(i, tk->commit_index);
 	}
+}
 
-
-	ticket_write(tk);
+static void become_follower(struct ticket_config *tk,
+		struct boothc_ticket_msg *msg)
+{
+	tk->state = ST_FOLLOWER;
+	follower_update_ticket(tk, msg);
 }
 
 
@@ -232,7 +234,8 @@ static int process_UPDATE (
 		return 0;
 	}
 
-	become_follower(tk, msg);
+	follower_update_ticket(tk, msg);
+	ticket_write(tk);
 
 	/* run ticket_cron if the ticket expires */
 	set_ticket_wakeup(tk);
