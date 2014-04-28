@@ -64,7 +64,7 @@
 
 /* Says that the ticket shouldn't be active anywhere.
  * NONE wouldn't be specific enough. */
-#define NO_ONE (-1)
+#define NO_ONE ((uint32_t)-1)
 /* Says that another one should recover. */
 #define TICKET_LOST CHAR2CONST('L', 'O', 'S', 'T')
 

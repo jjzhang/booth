@@ -696,7 +696,7 @@ int find_site_by_id(uint32_t site_id, struct booth_site **node)
 	int i;
 
 	if (site_id == NO_ONE) {
-		*node = NULL;
+		*node = no_leader;
 		return 1;
 	}
 
