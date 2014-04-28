@@ -396,6 +396,7 @@ static void ticket_cron(struct ticket_config *tk)
 	time_t now;
 	int rv;
 	int vote_cnt;
+	struct booth_site *new_leader;
 
 	now = time(NULL);
 
@@ -446,9 +447,15 @@ static void ticket_cron(struct ticket_config *tk)
 
 	case ST_CANDIDATE:
 		/* §5.2 */
-		/* This is previous election timed out */
-		if (now > tk->election_end)
+		/* not everybody answered, but if we have majority... */
+		new_leader = majority_votes(tk);
+		if (new_leader) {
+			leader_elected(tk, new_leader);
+			set_ticket_wakeup(tk);
+		} else if (now > tk->election_end) {
+			/* This is previous election timed out */
 			new_election(tk, NULL);
+		}
 		break;
 
 	case ST_LEADER:

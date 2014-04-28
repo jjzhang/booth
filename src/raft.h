@@ -29,8 +29,12 @@ typedef enum {
 	ST_LEADER    = CHAR2CONST('L', 'e', 'a', 'd'),
 } server_state_e;
 
-
 struct ticket_config;
+
+void leader_elected(struct ticket_config *tk,
+		struct booth_site *new_leader);
+
+struct booth_site *majority_votes(struct ticket_config *tk);
 
 int raft_answer(struct ticket_config *tk,
 		struct booth_site *from,

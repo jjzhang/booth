@@ -43,7 +43,7 @@ inline static void clear_election(struct ticket_config *tk)
 }
 
 
-inline static void site_voted_for(struct ticket_config *tk,
+inline static void record_vote(struct ticket_config *tk,
 		struct booth_site *who,
 		struct booth_site *vote)
 {
@@ -93,7 +93,7 @@ static void become_follower(struct ticket_config *tk,
 }
 
 
-static struct booth_site *majority_votes(struct ticket_config *tk)
+struct booth_site *majority_votes(struct ticket_config *tk)
 {
 	int i, n;
 	struct booth_site *v;
@@ -123,6 +123,20 @@ static struct booth_site *majority_votes(struct ticket_config *tk)
 	}
 
 	return NULL;
+}
+
+
+static int all_voted(struct ticket_config *tk)
+{
+	int i, cnt = 0;
+
+	for(i=0; i<booth_conf->site_count; i++) {
+		if (tk->votes_for[i]) {
+			cnt++;
+		}
+	}
+
+	return (cnt == booth_conf->site_count);
 }
 
 
@@ -320,40 +334,11 @@ static int process_HEARTBEAT(
 }
 
 
-static int process_VOTE_FOR(
+void leader_elected(
 		struct ticket_config *tk,
-		struct booth_site *sender,
-		struct booth_site *leader,
-		struct boothc_ticket_msg *msg
+		struct booth_site *new_leader
 		)
 {
-	uint32_t term;
-	struct booth_site *new_leader;
-
-
-	term = ntohl(msg->ticket.term);
-	if (term_too_low(tk, sender, leader, msg))
-		return 0;
-
-
-	if (term == tk->current_term &&
-			tk->election_end < time(NULL)) {
-		/* Election already ended - either by time or majority.
-		 * Ignore. */
-		return 0;
-	}
-
-
-	if (newer_term(tk, sender, leader, msg)) {
-		clear_election(tk);
-	}
-
-
-	site_voted_for(tk, sender, leader);
-
-
-	/* §5.2 */
-	new_leader = majority_votes(tk);
 	if (new_leader) {
 		tk->leader = new_leader;
 
@@ -361,7 +346,7 @@ static int process_VOTE_FOR(
 		tk->election_end = 0;
 		tk->voted_for = NULL;
 
-		if ( new_leader == local)  {
+		if (new_leader == local)  {
 			tk->commit_index++; // ??
 			tk->state = ST_LEADER;
 			send_heartbeat(tk);
@@ -369,8 +354,41 @@ static int process_VOTE_FOR(
 		else
 			become_follower(tk, NULL);
 	}
+}
 
-	set_ticket_wakeup(tk);
+
+static int process_VOTE_FOR(
+		struct ticket_config *tk,
+		struct booth_site *sender,
+		struct booth_site *leader,
+		struct boothc_ticket_msg *msg
+		)
+{
+	if (term_too_low(tk, sender, leader, msg))
+		return 0;
+
+	if (newer_term(tk, sender, leader, msg)) {
+		clear_election(tk);
+	}
+
+
+	record_vote(tk, sender, leader);
+
+
+	if (tk->state != ST_CANDIDATE) {
+		/* lost candidate status, somebody rejected our proposal */
+		return 0;
+	}
+
+
+	/* only if all voted can we take the ticket now, otherwise
+	 * wait for timeout in ticket_cron */
+	if (all_voted(tk)) {
+		/* §5.2 */
+		leader_elected(tk, majority_votes(tk));
+		set_ticket_wakeup(tk);
+	}
+
 	return 0;
 }
 
@@ -388,7 +406,11 @@ static int process_REJECTED(
 
 	if (tk->state == ST_CANDIDATE &&
 			rv == RLT_TERM_OUTDATED) {
-		log_info("Am out of date, become follower.");
+		log_warn("from %s: ticket %s outdated (term %d), following %s",
+				site_string(sender),
+				tk->name, ntohl(msg->ticket.term),
+				site_string(leader)
+				);
 		tk->leader = leader;
 		become_follower(tk, msg);
 		return 0;
@@ -397,14 +419,16 @@ static int process_REJECTED(
 
 	if (tk->state == ST_CANDIDATE &&
 			rv == RLT_TERM_STILL_VALID) {
-		log_error("There's a leader that I don't see: \"%s\"",
+		log_warn("from %s: there's a leader that I don't see: \"%s\"",
+				site_string(sender),
 				site_string(leader));
 		tk->leader = leader;
 		become_follower(tk, msg);
 		return 0;
 	}
 
-	log_error("unhandled reject: in state %s, got %s.",
+	log_warn("from %s: in state %s, got %s (unexpected reject)",
+			site_string(sender),
 			state_to_string(tk->state),
 			state_to_string(rv));
 	tk->leader = leader;
@@ -453,7 +477,7 @@ static int answer_REQ_VOTE(
 	if (!tk->voted_for) {
 vote_for_sender:
 		tk->voted_for = sender;
-		site_voted_for(tk, sender, leader);
+		record_vote(tk, sender, leader);
 		goto yes_you_can;
 	}
 
@@ -499,7 +523,7 @@ int new_election(struct ticket_config *tk, struct booth_site *preference)
 		new_leader = preference;
 	else
 		new_leader = (local->type == SITE) ? local : NULL;
-	site_voted_for(tk, local, new_leader);
+	record_vote(tk, local, new_leader);
 	tk->voted_for = new_leader;
 
 	tk->state = ST_CANDIDATE;
