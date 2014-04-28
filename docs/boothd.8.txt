@@ -177,14 +177,14 @@ Default is '0' for all; this means that the order in the configuration
 file defines priority for conflicting requests.
 
 *'acquire-after'*::
-	Setting this to a positive value will make 'booth' try to acquire a ticket 
-	that got lost.
+	Try to acquire a lost ticket _after_ this period passed.
 +
-Ie. if the site that _had_ the ticket is not reachable any more,
-then 'acquire-after' seconds after ticket expiration other sites will try
-to activate the ticket. (Only one will succeed, though.)
+This is to allow for some time for the site that lost the ticket
+to relinquish the resources, by either stopping them or fencing a
+node.
 +
-A typical delay might be 60 seconds.
+A typical delay might be 60 seconds, but ultimately it depends on
+the protected resources and the fencing configuration.
 
 *'retries'*::
 	Defines how many times to retry broadcasting packets before the
