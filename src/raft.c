@@ -426,8 +426,6 @@ static int answer_REQ_VOTE(
 	struct boothc_ticket_msg omsg;
 
 
-	if (leader == no_leader)
-		return 0;
 	if (term_too_low(tk, sender, leader, msg))
 		return 0;
 	if (newer_term(tk, sender, leader, msg)) {
