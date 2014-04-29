@@ -103,7 +103,8 @@ static inline void init_ticket_msg(struct boothc_ticket_msg *msg,
 	} else {
 		memcpy(msg->ticket.id, tk->name, sizeof(msg->ticket.id));
 
-		msg->ticket.leader         = htonl(get_node_id(tk->leader ? tk->leader : tk->voted_for));
+		msg->ticket.leader         = htonl(get_node_id(
+			(tk->leader && tk->leader != no_leader) ? tk->leader : tk->voted_for));
 		msg->ticket.term           = htonl(tk->current_term);
 		msg->ticket.term_valid_for = htonl(term_time_left(tk));
 
@@ -132,7 +133,7 @@ static inline const char *ticket_leader_string(struct ticket_config *tk)
 
 static inline void disown_ticket(struct ticket_config *tk)
 {
-	tk->leader = NULL;
+	tk->leader = no_leader;
 	tk->is_granted = 0;
 	time(&tk->term_expires);
 }

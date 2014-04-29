@@ -21,7 +21,6 @@
 
 #include "booth.h"
 
-
 typedef enum {
 	ST_INIT      = CHAR2CONST('I', 'n', 'i', 't'),
 	ST_FOLLOWER  = CHAR2CONST('F', 'l', 'l', 'w'),
@@ -41,7 +40,8 @@ int raft_answer(struct ticket_config *tk,
 		struct booth_site *leader,
 		struct boothc_ticket_msg *msg);
 
-int new_election(struct ticket_config *tk, struct booth_site *new_leader);
+int new_election(struct ticket_config *tk,
+		struct booth_site *new_leader, int update_term);
 
 
 #endif /* _RAFT_H */

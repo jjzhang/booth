@@ -181,8 +181,7 @@ get_it:
 		return send_heartbeat(tk);
 	} else {
 		/* Ticket should now become active locally, wasn't before. */
-		tk->current_term++;
-		new_election(tk, local);
+		rv = new_election(tk, local, 1);
 		return rv;
 	}
 }
@@ -276,6 +275,7 @@ int setup_ticket(void)
 	foreach_ticket(i, tk) {
 		tk->leader = NULL;
 		tk->term_expires = 0;
+		tk->state = ST_INIT;
 
 		//		abort_proposal(tk);
 
@@ -283,13 +283,16 @@ int setup_ticket(void)
 			pcmk_handler.load_ticket(tk);
 		}
 
-		/* We'll start the election immediately if the ticket
-		 * belonged to us */
-		/* tk->term_expires = time(NULL) + tk->term_duration;*/
-		tk->state        = ST_FOLLOWER;
-		/* TODO: send query packet to see sooner who's online. */
+		/* we'll start election if the ticket seems to be
+		 * uptodate
+		 */
+		if (tk->is_granted && tk->leader == local) {
+			tk->state = ST_FOLLOWER;
+		} else {
+			/* otherwise, query status */
+			ticket_broadcast(tk, OP_STATUS, RLT_SUCCESS);
+		}
 	}
-
 
 	return 0;
 }
@@ -416,8 +419,7 @@ static void ticket_cron(struct ticket_config *tk)
 
 		/* New vote round; §5.2 */
 		if (local->type == SITE) {
-			tk->current_term++;
-			new_election(tk, NULL);
+			new_election(tk, NULL, 1);
 		}
 
 		ticket_write(tk);
@@ -431,17 +433,14 @@ static void ticket_cron(struct ticket_config *tk)
 
 	switch(tk->state) {
 	case ST_INIT:
-		/* Unknown state, ask others. */
-//		ticket_send_catchup(tk);
+		/* init state, nothing to do */
 		break;
-
 
 	case ST_FOLLOWER:
 		/* in case we got restarted and this ticket belongs to
 		 * us */
 		if (tk->is_granted && tk->leader == local) {
-			tk->current_term++;
-			new_election(tk, NULL);
+			get_ticket_locally_if_allowed(tk);
 		}
 		break;
 
@@ -454,7 +453,7 @@ static void ticket_cron(struct ticket_config *tk)
 			set_ticket_wakeup(tk);
 		} else if (now > tk->election_end) {
 			/* This is previous election timed out */
-			new_election(tk, NULL);
+			new_election(tk, NULL, 0);
 		}
 		break;
 
@@ -637,7 +636,7 @@ void set_ticket_wakeup(struct ticket_config *tk)
 		break;
 
 	default:
-		log_error("why here?");
+		log_error("unknown ticket state: %d", tk->state);
 	}
 }
 

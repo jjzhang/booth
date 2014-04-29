@@ -62,10 +62,33 @@ inline static void record_vote(struct ticket_config *tk,
 }
 
 
-static void follower_update_ticket(struct ticket_config *tk,
+static int cmp_msg_ticket(struct ticket_config *tk,
+		struct boothc_ticket_msg *msg)
+{
+	if (tk->current_term != ntohl(msg->ticket.term)) {
+		return tk->current_term - ntohl(msg->ticket.term);
+	}
+	return tk->commit_index - ntohl(msg->ticket.leader_commit);
+}
+
+static void update_term_from_msg(struct ticket_config *tk,
 		struct boothc_ticket_msg *msg)
 {
 	uint32_t i;
+
+
+	i = ntohl(msg->ticket.term);
+	tk->current_term = max(i, tk->current_term);
+
+	/* § 5.3 */
+	i = ntohl(msg->ticket.leader_commit);
+	tk->commit_index = max(i, tk->commit_index);
+}
+
+
+static void update_ticket_from_msg(struct ticket_config *tk,
+		struct boothc_ticket_msg *msg)
+{
 	int duration;
 
 
@@ -76,12 +99,7 @@ static void follower_update_ticket(struct ticket_config *tk,
 
 
 	if (msg) {
-		i = ntohl(msg->ticket.term);
-		tk->current_term = max(i, tk->current_term);
-
-		/* § 5.3 */
-		i = ntohl(msg->ticket.leader_commit);
-		tk->commit_index = max(i, tk->commit_index);
+		update_term_from_msg(tk, msg);
 	}
 }
 
@@ -89,7 +107,7 @@ static void become_follower(struct ticket_config *tk,
 		struct boothc_ticket_msg *msg)
 {
 	tk->state = ST_FOLLOWER;
-	follower_update_ticket(tk, msg);
+	update_ticket_from_msg(tk, msg);
 }
 
 
@@ -225,6 +243,7 @@ static int answer_HEARTBEAT (
 	return booth_udp_send(sender, &omsg, sizeof(omsg));
 }
 
+
 static int process_UPDATE (
 		struct ticket_config *tk,
 		struct booth_site *sender,
@@ -248,7 +267,7 @@ static int process_UPDATE (
 		return 0;
 	}
 
-	follower_update_ticket(tk, msg);
+	update_ticket_from_msg(tk, msg);
 	ticket_write(tk);
 
 	/* run ticket_cron if the ticket expires */
@@ -347,7 +366,7 @@ void leader_elected(
 		tk->voted_for = NULL;
 
 		if (new_leader == local)  {
-			tk->commit_index++; // ??
+			tk->commit_index++;
 			tk->state = ST_LEADER;
 			send_heartbeat(tk);
 		}
@@ -490,7 +509,8 @@ yes_you_can:
 }
 
 
-int new_election(struct ticket_config *tk, struct booth_site *preference)
+int new_election(struct ticket_config *tk,
+	struct booth_site *preference, int update_term)
 {
 	struct booth_site *new_leader;
 	time_t now;
@@ -507,10 +527,10 @@ int new_election(struct ticket_config *tk, struct booth_site *preference)
 	/* If there was _no_ answer, don't keep incrementing the term number
 	 * indefinitely. If there was no peer, there'll probably be no one
 	 * listening now either. However, we don't know if we were
-	 * invoked due to a timeout. It's up to the caller to
-	 * increment the term!
-	tk->current_term++;
+	 * invoked due to a timeout (caller does).
 	 */
+	if (update_term)
+		tk->current_term++;
 
 	tk->term_expires = 0;
 	tk->election_end = now + tk->term_duration;
@@ -530,6 +550,109 @@ int new_election(struct ticket_config *tk, struct booth_site *preference)
 
 	ticket_broadcast(tk, OP_REQ_VOTE, RLT_SUCCESS);
 	ticket_activate_timeout(tk);
+	return 0;
+}
+
+
+static int send_ticket (
+		int cmd,
+		struct ticket_config *tk,
+		struct booth_site *to_site
+	       )
+{
+	struct boothc_ticket_msg omsg;
+
+
+	init_ticket_msg(&omsg, cmd, RLT_SUCCESS, tk);
+	return booth_udp_send(to_site, &omsg, sizeof(omsg));
+}
+
+
+/* we were a leader and somebody says that they have a more up
+ * to date ticket
+ * there was probably connectivity loss
+ * tricky
+ */
+static int leader_handle_newer_ticket(
+		struct ticket_config *tk,
+		struct booth_site *sender,
+		struct booth_site *leader,
+		struct boothc_ticket_msg *msg
+	       )
+{
+	if (leader == no_leader || !leader || leader == local) {
+		/* at least nobody else owns the ticket */
+		/* it is not kosher to update from their copy, but since
+		 * they don't own the ticket, nothing bad can happen
+		 */
+		update_term_from_msg(tk, msg);
+		/* send heartbeat so that all can update and follow us
+		 */
+		return get_ticket_locally_if_allowed(tk);
+	}
+
+	/* eek, two leaders, split brain */
+	/* normally shouldn't happen; run election */
+	log_error("from %s: ticket %s at %s! (disowning ticket)",
+			site_string(sender),
+			tk->name, site_string(leader)
+			);
+	disown_ticket(tk);
+	ticket_write(tk);
+	log_error("Two ticket owners! Possible bug. Please report at https://github.com/ClusterLabs/booth/issues/new.");
+	return get_ticket_locally_if_allowed(tk);
+}
+
+/* reply to STATUS */
+static int process_MY_INDEX (
+		struct ticket_config *tk,
+		struct booth_site *sender,
+		struct booth_site *leader,
+		struct boothc_ticket_msg *msg
+	       )
+{
+	int i;
+
+	if (!msg->ticket.term_valid_for) {
+		/* ticket not valid */
+		return 0;
+	}
+
+	i = cmp_msg_ticket(tk, msg);
+
+	if (i > 0) {
+		/* let them know about our newer ticket */
+		send_ticket(OP_MY_INDEX, tk, sender);
+		if (tk->state == ST_LEADER)
+			return send_ticket(OP_UPDATE, tk, sender);
+	}
+
+	if (i == 0) {
+		return 0;
+	}
+
+	/* they have a newer ticket, trouble if we're already leader
+	 * for it */
+	if (tk->state == ST_LEADER) {
+		log_warn("from %s: more uptodate ticket %s at %s",
+				site_string(sender),
+				tk->name,
+				site_string(leader)
+				);
+		return leader_handle_newer_ticket(tk, sender, leader, msg);
+	}
+
+	update_ticket_from_msg(tk, msg);
+	if (leader == local) {
+		/* if we were the leader but we rebooted in the
+		 * meantime; try with the heartbeat
+		 */
+		return get_ticket_locally_if_allowed(tk);
+	} else {
+		/* we can only follow at this stage */
+		tk->leader = leader;
+		tk->state = ST_FOLLOWER;
+	}
 	return 0;
 }
 
@@ -565,7 +688,8 @@ int raft_answer(
 				tk->state == ST_LEADER)
 			rv = process_HEARTBEAT(tk, from, leader, msg);
 		else if (tk->leader != local &&
-				tk->state == ST_FOLLOWER)
+				(tk->state == ST_FOLLOWER ||
+				tk->state == ST_CANDIDATE))
 			rv = answer_HEARTBEAT(tk, from, leader, msg);
 		else
 			assert("invalid combination - leader, follower");
@@ -582,6 +706,12 @@ int raft_answer(
 		break;
 	case OP_REJECTED:
 		rv = process_REJECTED(tk, from, leader, msg);
+		break;
+	case OP_MY_INDEX:
+		rv = process_MY_INDEX(tk, from, leader, msg);
+		break;
+	case OP_STATUS:
+		rv = send_ticket(OP_MY_INDEX, tk, from);
 		break;
 	default:
 		log_error("unprocessed message, cmd %s, from %s",

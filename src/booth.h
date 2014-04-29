@@ -137,12 +137,15 @@ typedef enum {
 	CMR_GRANT   = CHAR2CONST('R', 'G', 'n', 't'),
 	CMR_REVOKE  = CHAR2CONST('R', 'R', 'v', 'k'),
 
+	/* get status from another server */
+	OP_STATUS   = CHAR2CONST('S', 't', 'a', 't'),
+	OP_MY_INDEX = CHAR2CONST('M', 'I', 'd', 'x'), /* Answer to status */
+
 	/* Raft */
 	OP_REQ_VOTE = CHAR2CONST('R', 'V', 'o', 't'),
 	OP_VOTE_FOR = CHAR2CONST('V', 't', 'F', 'r'),
 	OP_HEARTBEAT= CHAR2CONST('H', 'r', 't', 'B'), /* Heartbeat */
 	OP_UPDATE   = CHAR2CONST('U', 'p', 'd', 'E'), /* Update ticket */
-	OP_MY_INDEX = CHAR2CONST('M', 'I', 'd', 'x'), /* Answer to Heartbeat */
 	OP_REJECTED = CHAR2CONST('R', 'J', 'C', '!'),
 } cmd_request_t;
 
