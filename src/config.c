@@ -102,6 +102,14 @@ int add_site(char *addr_string, int type)
 	rv = 0;
 	memset(&site->sa6, 0, sizeof(site->sa6));
 
+	nid = crc32(0L, NULL, 0);
+	/* Using the ASCII representation in site->addr_string (both sizeof()
+	 * and strlen()) gives quite a lot of collisions; a brute-force run
+	 * from 0.0.0.0 to 24.0.0.0 gives ~4% collisions, and this tends to
+	 * increase even more.
+	 * Whether there'll be a collision in real-life, with 3 or 5 nodes, is
+	 * another question ... but for now get the ID from the binary
+	 * representation - that had *no* collisions up to 32.0.0.0. */
 	if (inet_pton(AF_INET,
 				site->addr_string,
 				&site->sa4.sin_addr) > 0) {
@@ -111,6 +119,7 @@ int add_site(char *addr_string, int type)
 		site->sa4.sin_port = htons(booth_conf->port);
 		site->saddrlen = sizeof(site->sa4);
 		site->addrlen = sizeof(site->sa4.sin_addr);
+		site->site_id = crc32(nid, (void*)&site->sa4.sin_addr, site->addrlen);
 
 	} else if (inet_pton(AF_INET6,
 				site->addr_string,
@@ -122,22 +131,13 @@ int add_site(char *addr_string, int type)
 		site->sa6.sin6_port = htons(booth_conf->port);
 		site->saddrlen = sizeof(site->sa6);
 		site->addrlen = sizeof(site->sa6.sin6_addr);
+		site->site_id = crc32(nid, (void*)&site->sa6.sin6_addr, site->addrlen);
 
 	} else {
 		log_error("Address string \"%s\" is bad", site->addr_string);
 		rv = EINVAL;
 	}
 
-
-	nid = crc32(0L, NULL, 0);
-	/* Using the ASCII representation in site->addr_string (both sizeof()
-	 * and strlen()) gives quite a lot of collisions; a brute-force run
-	 * from 0.0.0.0 to 24.0.0.0 gives ~4% collisions, and this tends to
-	 * increase even more.
-	 * Whether there'll be a collision in real-life, with 3 or 5 nodes, is
-	 * another question ... but for now get the ID from the binary
-	 * representation - that had *no* collisions up to 32.0.0.0. */
-	site->site_id = crc32(nid, (void*)&site->sa6, site->saddrlen);
 	/* Make sure we will never collide with NO_ONE,
 	 * or be negative (to get "get_local_id() < 0" working). */
 	mask = 1 << (sizeof(site->site_id)*8 -1);
