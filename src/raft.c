@@ -586,9 +586,9 @@ static int leader_handle_newer_ticket(
 		 * they don't own the ticket, nothing bad can happen
 		 */
 		update_term_from_msg(tk, msg);
-		/* send heartbeat so that all can update and follow us
+		/* get the ticket again, if we can
 		 */
-		return get_ticket_locally_if_allowed(tk);
+		return acquire_ticket(tk);
 	}
 
 	/* eek, two leaders, split brain */
@@ -600,7 +600,7 @@ static int leader_handle_newer_ticket(
 	disown_ticket(tk);
 	ticket_write(tk);
 	log_error("Two ticket owners! Possible bug. Please report at https://github.com/ClusterLabs/booth/issues/new.");
-	return get_ticket_locally_if_allowed(tk);
+	return acquire_ticket(tk);
 }
 
 /* reply to STATUS */
@@ -645,9 +645,9 @@ static int process_MY_INDEX (
 	update_ticket_from_msg(tk, msg);
 	if (leader == local) {
 		/* if we were the leader but we rebooted in the
-		 * meantime; try with the heartbeat
+		 * meantime; try to get the ticket again
 		 */
-		return get_ticket_locally_if_allowed(tk);
+		return acquire_ticket(tk);
 	} else {
 		/* we can only follow at this stage */
 		tk->leader = leader;

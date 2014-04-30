@@ -143,7 +143,7 @@ int ticket_write(struct ticket_config *tk)
  * makes sense.
 * Eg. if the services have a failcount of INFINITY,
 * we can't serve here anyway. */
-int get_ticket_locally_if_allowed(struct ticket_config *tk)
+int acquire_ticket(struct ticket_config *tk)
 {
 	int rv;
 
@@ -172,18 +172,11 @@ int get_ticket_locally_if_allowed(struct ticket_config *tk)
 		}
 
 		return rv;
-	} else {
-		log_info("May get/keep ticket.");
 	}
 
 get_it:
-	if (leader_and_valid(tk)) {
-		return send_heartbeat(tk);
-	} else {
-		/* Ticket should now become active locally, wasn't before. */
-		rv = new_election(tk, local, 1);
-		return rv;
-	}
+	rv = new_election(tk, local, 1);
+	return rv;
 }
 
 
@@ -198,7 +191,7 @@ int do_grant_ticket(struct ticket_config *tk)
 	if (is_owned(tk))
 		return RLT_OVERGRANT;
 
-	rv = get_ticket_locally_if_allowed(tk);
+	rv = acquire_ticket(tk);
 	return rv;
 }
 
@@ -449,7 +442,7 @@ static void ticket_cron(struct ticket_config *tk)
 		/* in case we got restarted and this ticket belongs to
 		 * us */
 		if (tk->is_granted && tk->leader == local) {
-			get_ticket_locally_if_allowed(tk);
+			acquire_ticket(tk);
 		}
 		break;
 

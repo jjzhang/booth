@@ -53,7 +53,7 @@ int find_ticket_by_name(const char *ticket, struct ticket_config **found);
 
 void set_ticket_wakeup(struct ticket_config *tk);
 
-int get_ticket_locally_if_allowed(struct ticket_config *tk);
+int acquire_ticket(struct ticket_config *tk);
 
 int ticket_answer_list(int fd, struct boothc_ticket_msg *msg);
 int ticket_answer_grant(int fd, struct boothc_ticket_msg *msg);
