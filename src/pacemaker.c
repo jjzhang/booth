@@ -318,14 +318,6 @@ static int pcmk_load_ticket(struct ticket_config *tk)
 		tk->is_granted = v;
 	}
 
-	if (disown_if_expired(tk))
-		pcmk_revoke_ticket(tk);
-
-//	tk->proposal_acknowledges = local->bitmask;
-
-	/* We load only when the state is completely unknown. */
-	tk->state = ST_INIT;
-
 	return rv;
 }
 

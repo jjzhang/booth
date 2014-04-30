@@ -266,6 +266,14 @@ int list_ticket(char **pdata, unsigned int *len)
 	return 0;
 }
 
+void reset_ticket(struct ticket_config *tk)
+{
+	disown_ticket(tk);
+	tk->current_term = 0;
+	tk->commit_index = 0;
+	tk->state = ST_INIT;
+}
+
 
 int setup_ticket(void)
 {
@@ -273,15 +281,16 @@ int setup_ticket(void)
 	int i;
 
 	foreach_ticket(i, tk) {
-		tk->leader = NULL;
-		tk->term_expires = 0;
-		tk->state = ST_INIT;
-
-		//		abort_proposal(tk);
+		reset_ticket(tk);
 
 		if (local->type == SITE) {
 			pcmk_handler.load_ticket(tk);
+			if (time(NULL) >= tk->term_expires) {
+				reset_ticket(tk);
+				ticket_write(tk);
+			}
 		}
+
 
 		/* we'll start election if the ticket seems to be
 		 * uptodate
