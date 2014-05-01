@@ -216,7 +216,7 @@ int client_add(int fd, const struct booth_transport *tpt,
 void process_connection(int ci)
 {
 	struct boothc_ticket_msg msg;
-	int rv, len, exp, fd;
+	int rv, len, expr, fd;
 	void (*deadfn) (int ci);
 
 
@@ -242,11 +242,11 @@ bad_len:
 			log_error("got wrong length %u", len);
 			return;
 		}
-		exp = len - sizeof(msg.header);
-		rv = do_read(clients[ci].fd, msg.header.data, exp);
+		expr = len - sizeof(msg.header);
+		rv = do_read(clients[ci].fd, msg.header.data, expr);
 		if (rv < 0) {
 			log_error("connection %d read data error %d, wanted %d",
-					ci, rv, exp);
+					ci, rv, expr);
 			goto kill;
 		}
 	}
