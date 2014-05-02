@@ -21,10 +21,10 @@ SYNOPSIS
 
 DESCRIPTION
 -----------
-Booth manages tickets which authorizes one of the cluster sites located in
-geographically dispersed distances to run certain resources. It is designed to
-be an add-on to Pacemaker, which extends Pacemaker to support geographically
-distributed clustering.
+Booth manages tickets which authorizes one of the cluster sites
+located in geographically dispersed distances to run certain
+resources. It is designed to be extend Pacemaker to support
+geographically distributed clustering.
 
 It is based on the RAFT protocol, see eg. 
 <https://ramcloud.stanford.edu/wiki/download/attachments/11370504/raft.pdf>
@@ -90,13 +90,13 @@ argument determines the mode of operation.
 
 *'daemon'*::
 	Tells 'boothd' to serve a site. The locally configured interfaces are
-	searched for an IP address that got defined in the configuration,
-	so that Booth can operate in /arbitrator/ resp. /site/ mode.
+	searched for an IP address that is defined in the configuration.
+	booth then runs in either /arbitrator/ or /site/ mode.
 
 
 *'client'*::
-	Allows to list the ticket information (see also 'crm_ticket -L'),
-	and to revoke or (initially) grant tickets to a site.
+	Booth clients can list the ticket information (see also 'crm_ticket -L'),
+	and revoke or grant tickets to a site.
 +
 In this mode the configuration file is searched for an IP address that is 
 locally reachable, ie. matches a configured subnet.
@@ -106,13 +106,13 @@ long as the config file and the service IP is locally reachable.
 Example: If the booth service IP is 192.168.55.200, and the local node has
 192.168.55.15 configured on an interface, it knows which site it belongs to.
 +
-The client can also ask another site; use '-s' to tell where to connect to.
+Use '-s' to direct client to connect to a different site.
 
 
 *'status'*::
 	'boothd' looks for the (locked) PID file and the UDP socket, prints
-	some output to stdout (for use in shell scripts) and returns a
-	OCF-compatible return code.
+	some output to stdout (for use in shell scripts) and returns
+	an OCF-compatible return code.
 	With '-D', a human-readable message is printed to STDERR as well.
 
 
@@ -120,7 +120,10 @@ The client can also ask another site; use '-s' to tell where to connect to.
 CONFIGURATION FILE
 ------------------
 
-A basic file looks like this:
+The configuration file must be identical on all sites and
+arbitrators.
+
+A minimal file may look like this:
 
 -----------------------
 site="192.168.201.100"
@@ -130,8 +133,8 @@ ticket="ticket-db8"
 -----------------------
 
 
-You can use comment lines, by starting them with a hash-sign (''#'').
-Whitespace at the start and end of the line, and around the ''='', are ignored.
+Comments start with a hash-sign (''#'').  Whitespace at the start
+and end of the line, and around the ''='', are ignored.
 
 The following key/value pairs are defined:
 
@@ -140,34 +143,38 @@ The following key/value pairs are defined:
 
 *'transport'*::
 	The transport protocol to use for Raft exchanges.
-	Currently only UDP is available.
+	Currently only UDP is supported.
 +
-The client mode always uses TCP to talk to a daemon; Booth 
-will always bind and listen to *both* UDP and TCP ports.
+Clients use TCP to communicate with a daemon; Booth 
+will always bind and listen to both UDP and TCP ports.
 
-*'site'*, *'arbitrator'*::
-	Defines a Raft member with the given IP, which should be a service IP.
-+
-You will need at least three members for normal operation; an odd number is 
-preferred.
+*'site'*::
+	Defines a site Raft member with the given IP. Sites can
+	acquire tickets. The sites' IP should be managed by the cluster.
+
+*'arbitrator'*::
+	Defines an arbitrator Raft member with the given IP.
+	Arbitrators help reach consensus in elections and cannot hold
+	tickets.
+
+Booth needs at least three members for normal operation. Odd
+number of members provides more redundancy.
 
 *'ticket'*::
-	Registers a ticket. Multiple tickets can be handled in a single Booth instance.
+	Registers a ticket. Multiple tickets can be handled by single
+	Booth instance.
 
-The next items modify per-ticket defaults. They are stored as defaults for 
-further tickets, and are used as value for the last defined ticket (if any).
+The next items modify per-ticket defaults. Modifications are
+inherited by tickets which follow in the configuration file.
+
+All times are in seconds.
 
 *'expire'*::
-	The lease time for a ticket, in seconds. After that time the ticket can be 
-	revoked, and another site can get it.
+	The lease time for a ticket. After that time the ticket can be 
+	acquired by another site if the ticket holder is not
+	reachable.
 +
-Typically 'booth' will try to renew a held ticket after half the lease time.
-
-*'timeout'*::
-	After that time 'booth' will re-send packets if there was an insufficient 
-	number of replies.
-+
-The default is '5' seconds.
+'booth' renews a ticket after half the lease time.
 
 *'weights'*::
 	A comma-separated list of integers that define the weight of individual 
@@ -186,9 +193,16 @@ node.
 A typical delay might be 60 seconds, but ultimately it depends on
 the protected resources and the fencing configuration.
 
+*'timeout'*::
+	After that time 'booth' will re-send packets if there was an insufficient 
+	number of replies. This should be long enough to allow
+	packets to reach other members.
++
+The default is '5' seconds.
+
 *'retries'*::
-	Defines how many times to retry broadcasting packets before the
-	current operation (grant, revoke) is aborted.
+	Defines how many times to retry sending packets before giving
+	up waiting for acks from other members.
 +
 Default is 10. Values lower than 3 are illegal.
 +
@@ -203,7 +217,7 @@ started automatically.
 +
 On a (Pacemaker) site the booth process will have to call 'crm_ticket', so the 
 default is to use 'hacluster':'haclient'; for an arbitrator this user and group 
-might not exists, so that will default to 'nobody':'nobody'.
+might not exists, so there we default to 'nobody':'nobody'.
 
 
 *'before-acquire-handler'*::
@@ -242,6 +256,49 @@ ticket="ticket-db8"
     timeout       = 10
     retries       = 5
 -----------------------
+
+
+BOOTH TICKET MANAGEMENT
+-----------------------
+
+The booth cluster guarantees that every ticket is owned by only
+one site at the time.
+
+Only granted tickets are managed by 'booth'.
+
+Tickets must be initially granted with the 'booth client grant'
+command. Once it gets granted, the ticket is managed by the booth
+cluster.
+
+If the ticket gets lost, i.e. that the other members of the booth
+cluster do not hear from the ticket owner in a sufficiently long
+time, one of the remaining sites will acquire the ticket. This is
+what is called _ticket failover_.
+
+If the remaining members cannot form a majority, then the ticket
+cannot fail over.
+
+A ticket may be revoked at any time with the 'booth client
+revoke' command. For revoke to succeed, the site holding the
+ticket must be reachable. If that site is not reachable, 'booth'
+allows neither revoke nor grant until the ticket expires.  Only
+then the ticket is considered lost and ticket failover is tried.
+
+Once the ticket is administratively revoked, it is not managed by
+the booth cluster anymore. For the booth cluster to start
+managing the ticket again, it must be first granted to a site.
+
+The grant operation, in case not all sites are reachable, may get
+delayed for the ticket expire time (and, if defined, the
+'acquire-after' time). Under certain circumstances, the rest of
+the booth members may not know if the ticket is currently granted
+at the unreachable site.
+
+While the ticket is managed by 'booth', it is dangerous to manage
+it manually using either `crm_ticket` command, `hawk`, or `crm site
+ticket`. Neither of these tools is aware of 'booth' and,
+consequently, 'booth' itself may not notice any ticket status
+changes.
 
 
 NOTES
@@ -301,8 +358,7 @@ RAFT IMPLEMENTATION
 In essence, every ticket corresponds to a separate Raft cluster.
 
 A ticket is granted _only_ to the Raft _Leader_, but a Leader
-needs not grant the ticket to Pacemaker.  To move a ticket, the
-Leader withdraws, and votes for the new Leader instead.
+needs not grant the ticket to Pacemaker.
 
 
 SYSTEMD INTEGRATION
