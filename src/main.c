@@ -1142,9 +1142,9 @@ static int do_status(int type)
 
 
 
-	rv = setup_udp_server(1);
+	rv = setup_tcp_listener(1);
 	if (rv == 0) {
-		reason = "UDP port not in use.";
+		reason = "TCP port not in use.";
 		goto quit;
 	}
 

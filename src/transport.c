@@ -313,7 +313,7 @@ static void process_tcp_listener(int ci)
 	log_debug("client connection %d fd %d", i, fd);
 }
 
-static int setup_tcp_listener(void)
+int setup_tcp_listener(int test_only)
 {
 	int s, rv;
 	int one = 1;
@@ -331,6 +331,12 @@ static int setup_tcp_listener(void)
 	}
 
 	rv = bind(s, &local->sa6, local->saddrlen);
+	if (test_only) {
+		rv = (rv == -1) ? errno : 0;
+		close(s);
+		return rv;
+	}
+
 	if (rv == -1) {
 		log_error("failed to bind socket %s", strerror(errno));
 		return rv;
@@ -352,7 +358,7 @@ static int booth_tcp_init(void * unused __attribute__((unused)))
 	if (get_local_id() < 0)
 		return -1;
 
-	rv = setup_tcp_listener();
+	rv = setup_tcp_listener(0);
 	if (rv < 0)
 		return rv;
 
@@ -483,7 +489,7 @@ static int booth_tcp_exit(void)
 	return 0;
 }
 
-int setup_udp_server(int try_only)
+static int setup_udp_server(void)
 {
 	int rv, fd;
 	int one = 1;
@@ -509,11 +515,6 @@ int setup_udp_server(int try_only)
 	}
 
 	rv = bind(fd, (struct sockaddr *)&local->sa6, local->saddrlen);
-	if (try_only) {
-		rv = (rv == -1) ? errno : 0;
-		close(fd);
-		return rv;
-	}
 
 	if (rv == -1) {
 		log_error("failed to bind UDP socket to [%s]:%d: %s",
@@ -567,7 +568,7 @@ static int booth_udp_init(void *f)
 {
 	int rv;
 
-	rv = setup_udp_server(0);
+	rv = setup_udp_server();
 	if (rv < 0)
 		return rv;
 
