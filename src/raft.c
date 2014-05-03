@@ -369,8 +369,7 @@ void leader_elected(
 			tk->commit_index++;
 			tk->state = ST_LEADER;
 			send_heartbeat(tk);
-		}
-		else
+		} else
 			become_follower(tk, NULL);
 	}
 }
@@ -649,9 +648,9 @@ static int process_MY_INDEX (
 		 */
 		return acquire_ticket(tk);
 	} else {
-		/* we can only follow at this stage */
 		tk->leader = leader;
-		tk->state = ST_FOLLOWER;
+		tk->state = (!leader || leader == no_leader) ?
+			ST_INIT : ST_FOLLOWER;
 	}
 	return 0;
 }
