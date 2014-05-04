@@ -36,7 +36,7 @@ inline static void clear_election(struct ticket_config *tk)
 	int i;
 	struct booth_site *site;
 
-	log_info("clear election");
+	log_debug("clear election");
 	tk->votes_received = 0;
 	foreach_node(i, site)
 		tk->votes_for[site->index] = NULL;
@@ -170,7 +170,8 @@ static int newer_term(struct ticket_config *tk,
 	if (term > tk->current_term) {
 		tk->state = ST_FOLLOWER;
 		tk->leader = leader;
-		log_info("higher term %d vs. %d, following \"%s\"",
+		log_debug("from %s: higher term %d vs. %d, following \"%s\"",
+				sender->addr_string,
 				term, tk->current_term,
 				ticket_leader_string(tk));
 
@@ -482,6 +483,20 @@ static int process_REJECTED(
 }
 
 
+static int send_ticket (
+		int cmd,
+		struct ticket_config *tk,
+		struct booth_site *to_site
+	       )
+{
+	struct boothc_ticket_msg omsg;
+
+
+	init_ticket_msg(&omsg, cmd, RLT_SUCCESS, tk);
+	return booth_udp_send(to_site, &omsg, sizeof(omsg));
+}
+
+
 /* §5.2 */
 static int answer_REQ_VOTE(
 		struct ticket_config *tk,
@@ -514,7 +529,7 @@ static int answer_REQ_VOTE(
 	}
 
 	if (valid) {
-		log_debug("no election allowed, term valid for %d??", valid);
+		log_info("no election allowed, term valid for %d??", valid);
 		return send_reject(sender, tk, RLT_TERM_STILL_VALID);
 	}
 
@@ -530,8 +545,7 @@ vote_for_sender:
 yes_you_can:
 	init_ticket_msg(&omsg, OP_VOTE_FOR, RLT_SUCCESS, tk);
 	omsg.ticket.leader = htonl(get_node_id(tk->voted_for));
-
-	return transport()->broadcast(&omsg, sizeof(omsg));
+	return booth_udp_send(sender, &omsg, sizeof(omsg));
 }
 
 
@@ -577,20 +591,6 @@ int new_election(struct ticket_config *tk,
 	ticket_broadcast(tk, OP_REQ_VOTE, RLT_SUCCESS);
 	ticket_activate_timeout(tk);
 	return 0;
-}
-
-
-static int send_ticket (
-		int cmd,
-		struct ticket_config *tk,
-		struct booth_site *to_site
-	       )
-{
-	struct boothc_ticket_msg omsg;
-
-
-	init_ticket_msg(&omsg, cmd, RLT_SUCCESS, tk);
-	return booth_udp_send(to_site, &omsg, sizeof(omsg));
 }
 
 
