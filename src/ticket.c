@@ -200,21 +200,11 @@ int do_grant_ticket(struct ticket_config *tk)
  * Only to be started from the leader. */
 int do_revoke_ticket(struct ticket_config *tk)
 {
-	log_info("revoke ticket %s", tk->name);
+	log_info("revoking ticket %s", tk->name);
 
-	disown_ticket(tk);
-	tk->voted_for = no_leader;
-	ticket_write(tk); //	only when majority wants that? or, if tk->leader was == local, in every case, because the ticket shouldn't be here anymore?
-	/* 1) lose ticket
-	 * 2) if majority is available, "none" gets it
-	 * 3) if majority not available, they might have voted for somebody else in the meantime anyway
-	 */
-
-	tk->state = ST_FOLLOWER;
-	/* Start a new vote round, with a new term number, to let
-	 * everybody know that the ticket got revoked */
-	tk->current_term++;
-	return ticket_broadcast(tk, OP_REQ_VOTE, RLT_SUCCESS);
+	reset_ticket(tk);
+	ticket_write(tk);
+	return ticket_broadcast(tk, OP_REVOKE, RLT_SUCCESS);
 }
 
 

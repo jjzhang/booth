@@ -276,6 +276,33 @@ static int process_UPDATE (
 	return 0;
 }
 
+static int process_REVOKE (
+		struct ticket_config *tk,
+		struct booth_site *sender,
+		struct booth_site *leader,
+		struct boothc_ticket_msg *msg
+	       )
+{
+	if (tk->leader != sender) {
+		log_error("from %s: non-leader wants to revoke ticket %s (ignoring)",
+			sender->addr_string, tk->name);
+		return 1;
+	} else if (tk->state != ST_FOLLOWER) {
+		log_error("from %s: unexpected ticket %s revoke in state %s (ignoring)",
+			sender->addr_string,
+			state_to_string(tk->state),
+			tk->name);
+		return 1;
+	} else {
+		log_info("from %s: leader revokes ticket %s",
+			sender->addr_string, tk->name);
+		reset_ticket(tk);
+		ticket_write(tk);
+	}
+
+	return 0;
+}
+
 /* update the ticket on the leader, write it to the CIB, and
    send out the update message to others with the new expiry
    time
@@ -705,6 +732,9 @@ int raft_answer(
 		break;
 	case OP_REJECTED:
 		rv = process_REJECTED(tk, from, leader, msg);
+		break;
+	case OP_REVOKE:
+		rv = process_REVOKE(tk, from, leader, msg);
 		break;
 	case OP_MY_INDEX:
 		rv = process_MY_INDEX(tk, from, leader, msg);
