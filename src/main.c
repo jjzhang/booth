@@ -84,12 +84,6 @@ typedef enum
 
 int poll_timeout = POLL_TIMEOUT;
 
-typedef enum {
-	OP_LIST = 1,
-	OP_GRANT,
-	OP_REVOKE,
-} operation_t;
-
 
 
 struct booth_config *booth_conf;
@@ -903,11 +897,11 @@ static int read_arguments(int argc, char **argv)
 
     if (cl.type == CLIENT) {
 		if (!strcmp(op, "list"))
-			cl.op = OP_LIST;
+			cl.op = CMD_LIST;
 		else if (!strcmp(op, "grant"))
-			cl.op = OP_GRANT;
+			cl.op = CMD_GRANT;
 		else if (!strcmp(op, "revoke"))
-			cl.op = OP_REVOKE;
+			cl.op = CMD_REVOKE;
 		else {
 			fprintf(stderr, "client operation \"%s\" is unknown\n",
 					op);
@@ -954,7 +948,7 @@ static int read_arguments(int argc, char **argv)
 			safe_copy(cl.lockfile, optarg, sizeof(cl.lockfile), "lock file");
 			break;
 		case 't':
-			if (cl.op == OP_GRANT || cl.op == OP_REVOKE) {
+			if (cl.op == CMD_GRANT || cl.op == CMD_REVOKE) {
 				safe_copy(cl.msg.ticket.id, optarg,
 						sizeof(cl.msg.ticket.id), "ticket name");
 			} else {
@@ -1270,15 +1264,15 @@ static int do_client(void)
 	}
 
 	switch (cl.op) {
-	case OP_LIST:
+	case CMD_LIST:
 		rv = query_get_string_answer(CMD_LIST);
 		break;
 
-	case OP_GRANT:
+	case CMD_GRANT:
 		rv = do_grant();
 		break;
 
-	case OP_REVOKE:
+	case CMD_REVOKE:
 		rv = do_revoke();
 		break;
 	}
