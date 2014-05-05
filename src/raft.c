@@ -237,8 +237,7 @@ static int answer_HEARTBEAT (
 			site_string(leader), ticket_leader_string(tk),
 			term, tk->current_term);
 
-	/* No reject. (?) */
-	if (term < tk->current_term) {
+	if (tk->state != ST_CANDIDATE && term < tk->current_term) {
 		log_info("ignoring lower term %d vs. %d, from \"%s\"",
 				term, tk->current_term,
 				ticket_leader_string(tk));
