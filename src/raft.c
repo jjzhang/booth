@@ -161,7 +161,8 @@ static int all_voted(struct ticket_config *tk)
 static int newer_term(struct ticket_config *tk,
 		struct booth_site *sender,
 		struct booth_site *leader,
-		struct boothc_ticket_msg *msg)
+		struct boothc_ticket_msg *msg,
+		int in_election)
 {
 	uint32_t term;
 
@@ -169,11 +170,18 @@ static int newer_term(struct ticket_config *tk,
 	/* §5.1 */
 	if (term > tk->current_term) {
 		tk->state = ST_FOLLOWER;
-		tk->leader = leader;
-		log_debug("from %s: higher term %d vs. %d, following \"%s\"",
-				sender->addr_string,
-				term, tk->current_term,
-				ticket_leader_string(tk));
+		if (!in_election) {
+			tk->leader = leader;
+			log_debug("from %s: higher term %d vs. %d, following \"%s\"",
+					sender->addr_string,
+					term, tk->current_term,
+					ticket_leader_string(tk));
+		} else {
+			tk->leader = no_leader;
+			log_debug("from %s: higher term %d vs. %d (election)",
+					sender->addr_string,
+					term, tk->current_term);
+		}
 
 		tk->term_expires = time(NULL) + tk->term_duration;
 		tk->current_term = term;
@@ -231,7 +239,7 @@ static int answer_HEARTBEAT (
 	}
 
 	/* Needed? */
-	newer_term(tk, sender, leader, msg);
+	newer_term(tk, sender, leader, msg, 0);
 
 	become_follower(tk, msg);
 	/* Racy??? */
@@ -331,7 +339,7 @@ static int process_HEARTBEAT(
 	uint32_t term;
 
 
-	if (newer_term(tk, sender, leader, msg)) {
+	if (newer_term(tk, sender, leader, msg, 0)) {
 		/* Uh oh. Higher term?? Should we simply believe that? */
 		log_error("Got higher term number from");
 		return 0;
@@ -413,7 +421,7 @@ static int process_VOTE_FOR(
 	if (term_too_low(tk, sender, leader, msg))
 		return 0;
 
-	if (newer_term(tk, sender, leader, msg)) {
+	if (newer_term(tk, sender, leader, msg, 0)) {
 		clear_election(tk);
 	}
 
@@ -717,8 +725,12 @@ int raft_answer(
 				(tk->state == ST_FOLLOWER ||
 				tk->state == ST_CANDIDATE))
 			rv = answer_HEARTBEAT(tk, from, leader, msg);
-		else
-			assert("invalid combination - leader, follower");
+		else {
+			log_error("unexpected message, cmd %s, from %s",
+				state_to_string(cmd),
+				from->addr_string);
+			rv = -EINVAL;
+		}
 		break;
 	case OP_UPDATE:
 		if (tk->leader != local && tk->state == ST_FOLLOWER) {
