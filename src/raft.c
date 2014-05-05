@@ -78,7 +78,14 @@ static void update_term_from_msg(struct ticket_config *tk,
 
 
 	i = ntohl(msg->ticket.term);
-	tk->current_term = max(i, tk->current_term);
+	/* if we failed to start the election, then accept the term
+	 * from the leader
+	 * */
+	if (tk->state == ST_CANDIDATE) {
+		tk->current_term = i;
+	} else {
+		tk->current_term = max(i, tk->current_term);
+	}
 
 	/* § 5.3 */
 	i = ntohl(msg->ticket.leader_commit);
@@ -106,8 +113,8 @@ static void update_ticket_from_msg(struct ticket_config *tk,
 static void become_follower(struct ticket_config *tk,
 		struct boothc_ticket_msg *msg)
 {
-	tk->state = ST_FOLLOWER;
 	update_ticket_from_msg(tk, msg);
+	tk->state = ST_FOLLOWER;
 }
 
 
@@ -518,14 +525,6 @@ static int answer_REQ_VOTE(
 	struct boothc_ticket_msg omsg;
 
 
-	if (term_too_low(tk, sender, leader, msg))
-		return 0;
-	if (newer_term(tk, sender, leader, msg)) {
-		clear_election(tk);
-		goto vote_for_sender;
-	}
-
-
 	term = ntohl(msg->ticket.term);
 	/* Important: Ignore duplicated packets! */
 	valid = term_time_left(tk);
@@ -540,6 +539,15 @@ static int answer_REQ_VOTE(
 		log_info("no election allowed, term valid for %d??", valid);
 		return send_reject(sender, tk, RLT_TERM_STILL_VALID);
 	}
+
+	if (term_too_low(tk, sender, leader, msg))
+		return 0;
+
+	if (newer_term(tk, sender, leader, msg, 1)) {
+		clear_election(tk);
+		goto vote_for_sender;
+	}
+
 
 	/* §5.2, §5.4 */
 	if (!tk->voted_for) {
