@@ -5,13 +5,13 @@ geographically dispersed distances to run certain resources. It is designed to
 be an add-on of Pacemaker, which extends Pacemaker to support geographically
 distributed clustering.
     
-Booth includes an implementation of Paxos and Paxos Lease algorithm, which
-guarantees the distributed consensus among different cluster sites. One
-development goal of the Paxos implementation is to be flexible enough so that
-it can also be used by some other projects which need Paxos.
+Booth is based on the Raft consensus algorithm. Though the
+implementation is not complete (there is no log), booth
+guarantees that the ticket is always available at just one site
+as long as it has exclusive control of the tickets.
 
-Now, the Booth is still in heavy development, review and comments are highly
-appreciated ;)
-    
-Regards,
-Jiaju Zhang <jjzhang@suse.de>
+The git repository is available at github:
+
+https://github.com/ClusterLabs/booth
+
+github can also track issues or bug reports.
