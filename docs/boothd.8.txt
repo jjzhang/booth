@@ -295,7 +295,7 @@ the booth members may not know if the ticket is currently granted
 at the unreachable site.
 
 While the ticket is managed by 'booth', it is dangerous to manage
-it manually using either `crm_ticket` command, `hawk`, or `crm site
+it manually using either `crm_ticket` command or `crm site
 ticket`. Neither of these tools is aware of 'booth' and,
 consequently, 'booth' itself may not notice any ticket status
 changes.
