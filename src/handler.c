@@ -60,10 +60,10 @@ int run_handler(struct ticket_config *tk,
 	} else {
 		rv = system(cmd);
 		if (rv)
-			log_error("Error calling \"%s\": %s",
+			log_warn("handler \"%s\" exited with error %s",
 					cmd, interpret_rv(rv));
 		else
-			log_info("Ran \"%s\" successfully.", cmd);
+			log_info("handler \"%s\" exited with success", cmd);
 	}
 
 	return rv;

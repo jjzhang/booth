@@ -47,7 +47,7 @@ inline static void record_vote(struct ticket_config *tk,
 		struct booth_site *who,
 		struct booth_site *vote)
 {
-	log_info("site \"%s\" votes for \"%s\"",
+	log_debug("site %s votes for %s",
 			site_string(who),
 			site_string(vote));
 
@@ -56,8 +56,8 @@ inline static void record_vote(struct ticket_config *tk,
 		tk->votes_received |= who->bitmask;
 	} else {
 		if (tk->votes_for[who->index] != vote)
-			log_error("voted previously (but in same term!) for \"%s\"...",
-					tk->votes_for[who->index]->addr_string);
+			log_warn("voted previously (but in same term!) for %s...",
+					site_string(tk->votes_for[who->index]));
 	}
 }
 
@@ -132,18 +132,18 @@ struct booth_site *majority_votes(struct ticket_config *tk)
 
 		n = v->index;
 		count[n]++;
-		log_info("Majority: %d \"%s\" wants %d \"%s\" => %d",
-				i, booth_conf->site[i].addr_string,
-				n, v->addr_string,
+		log_debug("Majority: %d %s wants %d %s => %d",
+				i, site_string(&booth_conf->site[i]),
+				n, site_string(v),
 				count[n]);
 
 		if (count[n]*2 <= booth_conf->site_count)
 			continue;
 
 
-		log_info("Majority reached: %d of %d for \"%s\"",
+		log_debug("Majority reached: %d of %d for %s",
 				count[n], booth_conf->site_count,
-				v->addr_string);
+				site_string(v));
 		return v;
 	}
 
@@ -179,14 +179,14 @@ static int newer_term(struct ticket_config *tk,
 		tk->state = ST_FOLLOWER;
 		if (!in_election) {
 			tk->leader = leader;
-			log_debug("from %s: higher term %d vs. %d, following \"%s\"",
-					sender->addr_string,
+			log_debug("from %s: higher term %d vs. %d, following %s",
+					site_string(sender),
 					term, tk->current_term,
 					ticket_leader_string(tk));
 		} else {
 			tk->leader = no_leader;
 			log_debug("from %s: higher term %d vs. %d (election)",
-					sender->addr_string,
+					site_string(sender),
 					term, tk->current_term);
 		}
 
@@ -207,9 +207,11 @@ static int term_too_low(struct ticket_config *tk,
 
 	term = ntohl(msg->ticket.term);
 	/* §5.1 */
-	if (term < tk->current_term)
-	{
-		log_info("sending REJECT, term too low.");
+	if (term < tk->current_term) {
+		log_info("sending reject to %s, its term too low "
+			"(%d vs. %d)", site_string(leader),
+			term, tk->current_term
+			);
 		send_reject(sender, tk, RLT_TERM_OUTDATED);
 		return 1;
 	}
@@ -237,8 +239,11 @@ static int answer_HEARTBEAT (
 			site_string(leader), ticket_leader_string(tk),
 			term, tk->current_term);
 
+	/* if we're candidate, it may be that we got a heartbeat from
+	 * a legitimate leader, so don't ignore a lower term
+	 */
 	if (tk->state != ST_CANDIDATE && term < tk->current_term) {
-		log_info("ignoring lower term %d vs. %d, from \"%s\"",
+		log_info("ignoring lower term %d vs. %d, from %s",
 				term, tk->current_term,
 				ticket_leader_string(tk));
 		return 0;
@@ -276,7 +281,7 @@ static int process_UPDATE (
 
 	/* No reject. (?) */
 	if (term < tk->current_term) {
-		log_warn("ignoring lower term %d vs. %d, from \"%s\"",
+		log_info("ignoring lower term %d vs. %d, from %s",
 				term, tk->current_term,
 				ticket_leader_string(tk));
 		return 0;
@@ -300,17 +305,17 @@ static int process_REVOKE (
 {
 	if (tk->leader != sender) {
 		log_error("from %s: non-leader wants to revoke ticket %s (ignoring)",
-			sender->addr_string, tk->name);
+			site_string(sender), tk->name);
 		return 1;
 	} else if (tk->state != ST_FOLLOWER) {
 		log_error("from %s: unexpected ticket %s revoke in state %s (ignoring)",
-			sender->addr_string,
+			site_string(sender),
 			state_to_string(tk->state),
 			tk->name);
 		return 1;
 	} else {
 		log_info("from %s: leader revokes ticket %s",
-			sender->addr_string, tk->name);
+			site_string(sender), tk->name);
 		reset_ticket(tk);
 		ticket_write(tk);
 	}
@@ -344,22 +349,22 @@ static int process_HEARTBEAT(
 {
 	uint32_t term;
 
+	term = ntohl(msg->ticket.term);
 
 	if (newer_term(tk, sender, leader, msg, 0)) {
-		/* Uh oh. Higher term?? Should we simply believe that? */
-		log_error("Got higher term number from");
+		/* unexpected higher term */
+		log_warn("got higher term from %s (%d vs. %d)",
+				site_string(sender),
+				term, tk->current_term);
 		return 0;
 	}
-
-
-	term = ntohl(msg->ticket.term);
 
 	/* Don't send a reject. */
 	if (term < tk->current_term) {
 		/* Doesn't know what he's talking about - perhaps
 		 * doesn't receive our packets? */
-		log_error("Stale/wrong heartbeat from \"%s\": "
-				"term %d instead of %d",
+		log_warn("from %s: unexpected "
+				"term %d instead of %d (ignoring)",
 				site_string(sender),
 				term, tk->current_term);
 		return 0;
@@ -368,17 +373,16 @@ static int process_HEARTBEAT(
 
 	if (term == tk->current_term &&
 			leader == tk->leader) {
-		/* Hooray, an ACK! */
-		/* So at least _someone_ is listening. */
-		tk->hb_received |= sender->bitmask;
+		/* got an ack! */
+		tk->acks_received |= sender->bitmask;
 
-		log_debug("Got heartbeat ACK from \"%s\", %d/%d agree.",
+		log_debug("got heartbeat ACK from %s, %d/%d agree.",
 				site_string(sender),
-				count_bits(tk->hb_received),
+				count_bits(tk->acks_received),
 				booth_conf->site_count);
 
 
-		if (majority_of_bits(tk, tk->hb_received)) {
+		if (majority_of_bits(tk, tk->acks_received)) {
 			/* OK, at least half of the nodes are reachable;
 			 * Update the ticket and send update messages out
 			 */
@@ -479,7 +483,7 @@ static int process_REJECTED(
 
 	if (tk->state == ST_CANDIDATE &&
 			rv == RLT_TERM_STILL_VALID) {
-		log_warn("from %s: there's a leader that I don't see: \"%s\"",
+		log_warn("from %s: there's a leader I didn't see: %s, following",
 				site_string(sender),
 				site_string(leader));
 		tk->leader = leader;
@@ -535,29 +539,30 @@ static int answer_REQ_VOTE(
 	}
 
 	if (valid) {
-		log_info("no election allowed, term valid for %d??", valid);
+		log_warn("no election allowed for %s, term still valid for %d",
+			tk->name, valid);
 		return send_reject(sender, tk, RLT_TERM_STILL_VALID);
 	}
 
 	if (term_too_low(tk, sender, leader, msg))
 		return 0;
 
+	/* if it's a newer term or ... */
 	if (newer_term(tk, sender, leader, msg, 1)) {
 		clear_election(tk);
 		goto vote_for_sender;
 	}
 
 
+	/* ... we didn't vote yet, then vote for the sender */
 	/* §5.2, §5.4 */
 	if (!tk->voted_for) {
 vote_for_sender:
 		tk->voted_for = sender;
 		record_vote(tk, sender, leader);
-		goto yes_you_can;
 	}
 
 
-yes_you_can:
 	init_ticket_msg(&omsg, OP_VOTE_FOR, RLT_SUCCESS, tk);
 	omsg.ticket.leader = htonl(get_node_id(tk->voted_for));
 	return booth_udp_send(sender, &omsg, sizeof(omsg));
@@ -712,9 +717,9 @@ int raft_answer(
 	cmd = ntohl(msg->header.cmd);
 	R(tk);
 
-	log_debug("got message %s from \"%s\"",
+	log_debug("got message %s from %s",
 			state_to_string(cmd),
-			from->addr_string);
+			site_string(from));
 
 
 	switch (cmd) {
@@ -733,9 +738,9 @@ int raft_answer(
 				tk->state == ST_CANDIDATE))
 			rv = answer_HEARTBEAT(tk, from, leader, msg);
 		else {
-			log_error("unexpected message, cmd %s, from %s",
+			log_warn("unexpected message %s, from %s",
 				state_to_string(cmd),
-				from->addr_string);
+				site_string(from));
 			rv = -EINVAL;
 		}
 		break;
@@ -743,9 +748,9 @@ int raft_answer(
 		if (tk->leader != local && tk->state == ST_FOLLOWER) {
 			rv = process_UPDATE(tk, from, leader, msg);
 		} else {
-			log_error("unexpected message, cmd %s, from %s",
+			log_warn("unexpected message %s, from %s",
 				state_to_string(cmd),
-				from->addr_string);
+				site_string(from));
 			rv = -EINVAL;
 		}
 		break;
@@ -762,9 +767,8 @@ int raft_answer(
 		rv = send_ticket(OP_MY_INDEX, tk, from);
 		break;
 	default:
-		log_error("unprocessed message, cmd %s, from %s",
-			state_to_string(cmd),
-			from->addr_string);
+		log_error("unknown message %s, from %s",
+			state_to_string(cmd), site_string(from));
 		rv = -EINVAL;
 	}
 	R(tk);

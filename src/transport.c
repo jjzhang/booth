@@ -441,9 +441,9 @@ int booth_tcp_open(struct booth_site *to)
 	rv = connect_nonb(s, (struct sockaddr *)&to->sa6, to->saddrlen, 10);
 	if (rv == -1) {
 		if( errno == ETIMEDOUT)
-			log_error("connect to \"%s\" got a timeout", to->addr_string);
+			log_error("connect to %s got a timeout", site_string(to));
 		else 
-			log_error("connect to \"%s\" got an error: %s", to->addr_string,
+			log_error("connect to %s got an error: %s", site_string(to),
 					strerror(errno));
 		goto error;
 	}
@@ -518,7 +518,7 @@ static int setup_udp_server(void)
 
 	if (rv == -1) {
 		log_error("failed to bind UDP socket to [%s]:%d: %s",
-				local->addr_string, booth_conf->port,
+				site_string(local), booth_conf->port,
 				strerror(errno));
 		goto ex;
 	}
@@ -590,14 +590,14 @@ int booth_udp_send(struct booth_site *to, void *buf, int len)
 		rv = 0;
 	} else if (rv < 0) {
 		rv = errno;
-		log_error("Cannot send to \"%s\": %d %s",
-				to->addr_string,
+		log_error("Cannot send to %s: %d %s",
+				site_string(to),
 				errno,
 				strerror(errno));
 	} else {
 		rv = EBUSY;
-		log_error("Packet sent to \"%s\" got truncated",
-				to->addr_string);
+		log_error("Packet sent to %s got truncated",
+				site_string(to));
 	}
 
 	return rv;

@@ -152,7 +152,8 @@ int acquire_ticket(struct ticket_config *tk)
 
 	rv = run_handler(tk, tk->ext_verifier, 1);
 	if (rv) {
-		log_error("May not acquire ticket.");
+		log_warn("we are not allowed to acquire ticket %s",
+			tk->name);
 
 		/* Give it to somebody else.
 		 * Just send a commit message, as the
@@ -313,13 +314,14 @@ int ticket_answer_grant(int fd, struct boothc_ticket_msg *msg)
 
 
 	if (!check_ticket(msg->ticket.id, &tk)) {
-		log_error("Client asked to grant unknown ticket");
+		log_warn("client asked to grant unknown ticket %s",
+				msg->ticket.id);
 		rv = RLT_INVALID_ARG;
 		goto reply;
 	}
 
 	if (is_owned(tk)) {
-		log_error("client wants to get an (already granted!) ticket \"%s\"",
+		log_warn("client wants to grant an (already granted!) ticket %s",
 				msg->ticket.id);
 		rv = RLT_OVERGRANT;
 		goto reply;
@@ -339,14 +341,14 @@ int ticket_answer_revoke(int fd, struct boothc_ticket_msg *msg)
 	struct ticket_config *tk;
 
 	if (!check_ticket(msg->ticket.id, &tk)) {
-		log_error("Client wants to revoke an unknown ticket %s",
+		log_warn("client wants to revoke an unknown ticket %s",
 				msg->ticket.id);
 		rv = RLT_INVALID_ARG;
 		goto reply;
 	}
 
 	if (!is_owned(tk)) {
-		log_info("client wants to revoke a free ticket \"%s\"",
+		log_info("client wants to revoke a free ticket %s",
 				msg->ticket.id);
 		/* Return a different result code? */
 		rv = RLT_SUCCESS;
@@ -354,10 +356,9 @@ int ticket_answer_revoke(int fd, struct boothc_ticket_msg *msg)
 	}
 
 	if (tk->leader != local) {
-		log_info("we do not own the ticket \"%s\", "
+		log_info("we do not own the ticket %s, "
 				"redirect to leader %s",
 				msg->ticket.id, ticket_leader_string(tk));
-		/* Return a different result code? */
 		rv = RLT_REDIRECT;
 		goto reply;
 	}
@@ -377,7 +378,7 @@ int ticket_broadcast(struct ticket_config *tk, cmd_request_t cmd, cmd_result_t r
 	struct boothc_ticket_msg msg;
 
 	init_ticket_msg(&msg, cmd, res, tk);
-	log_debug("broadcasting '%s' for ticket \"%s\" (term=%d, valid=%d)",
+	log_debug("broadcasting '%s' for ticket %s (term=%d, valid=%d)",
 			state_to_string(cmd), tk->name,
 			ntohl(msg.ticket.term),
 			ntohl(msg.ticket.term_valid_for));
@@ -386,10 +387,27 @@ int ticket_broadcast(struct ticket_config *tk, cmd_request_t cmd, cmd_result_t r
 }
 
 
+static void ticket_lost(struct ticket_config *tk)
+{
+	log_warn("LOST ticket: %s no longer at %s",
+			tk->name,
+			ticket_leader_string(tk));
+
+	/* Couldn't renew in time - ticket lost. */
+	disown_ticket(tk);
+
+	/* New vote round; §5.2 */
+	if (local->type == SITE) {
+		new_election(tk, NULL, 1);
+	}
+
+	ticket_write(tk);
+}
+
+
 static void ticket_cron(struct ticket_config *tk)
 {
 	time_t now;
-	int rv;
 	int vote_cnt;
 	struct booth_site *new_leader;
 
@@ -402,25 +420,9 @@ static void ticket_cron(struct ticket_config *tk)
 	if (tk->term_expires &&
 			is_owned(tk) &&
 			now >= tk->term_expires) {
-		log_info("LOST ticket: \"%s\" no longer at %s",
-				tk->name,
-				ticket_leader_string(tk));
-
-		/* Couldn't renew in time - ticket lost. */
-		disown_ticket(tk);
-
-		/* New vote round; §5.2 */
-		if (local->type == SITE) {
-			new_election(tk, NULL, 1);
-		}
-
-		ticket_write(tk);
-
-		/* May not try to re-acquire now, need to find out
-		 * what others think. */
+		ticket_lost(tk);
 		return;
 	}
-
 	R(tk);
 
 	switch(tk->state) {
@@ -453,37 +455,31 @@ static void ticket_cron(struct ticket_config *tk)
 		/* we get here after we broadcasted a heartbeat;
 		 * by this time all sites should've acked the heartbeat
 		 */
-		vote_cnt = count_bits(tk->hb_received) - 1;
+		vote_cnt = count_bits(tk->acks_received) - 1;
 		if ((vote_cnt+1) < booth_conf->site_count) {
-			if (!majority_of_bits(tk, tk->hb_received)) {
+			if (!majority_of_bits(tk, tk->acks_received)) {
 				tk->retry_number ++;
 				if (!vote_cnt) {
 					log_warn("no answers to heartbeat for ticket %s on try #%d, "
-					"we are most probably alone!",
+					"we are alone",
 					tk->name,
 					tk->retry_number);
 				} else {
 					log_warn("not enough answers to heartbeat for ticket %s on try #%d: "
-					"only got %d answers (mask 0x%" PRIx64 ")!",
+					"only got %d answers",
 					tk->name,
 					tk->retry_number,
-					vote_cnt,
-					tk->hb_received);
+					vote_cnt);
 				}
 			/* Don't give up, though - there's still some time until leadership is lost. */
 			}
 		}
 
-		rv = run_handler(tk, tk->ext_verifier, 1);
-		if (rv) {
-			tk->state = ST_FOLLOWER;
-			disown_ticket(tk);
-			// resp. no owner anymore, new takers?
-			ticket_broadcast(tk, OP_REQ_VOTE, RLT_SUCCESS);
-			ticket_write(tk);
-		} else {
-			send_heartbeat(tk);
+		send_heartbeat(tk);
+		if (tk->retry_number < tk->retries) {
 			ticket_activate_timeout(tk);
+		} else {
+			set_ticket_wakeup(tk);
 		}
 		break;
 
@@ -538,7 +534,7 @@ void tickets_log_info(void)
 	foreach_ticket(i, tk) {
 		log_info("Ticket %s: state '%s' "
 				"commit index %d "
-				"leader \"%s\" "
+				"leader %s "
 				"expires %-24.24s",
 				tk->name,
 				state_to_string(tk->state),
@@ -572,15 +568,15 @@ int message_recv(struct boothc_ticket_msg *msg, int msglen)
 	}
 
 	if (!check_ticket(msg->ticket.id, &tk)) {
-		log_error("got invalid ticket name \"%s\" from %s",
-				msg->ticket.id, source->addr_string);
+		log_warn("got invalid ticket name %s from %s",
+				msg->ticket.id, site_string(source));
 		return -EINVAL;
 	}
 
 
 	leader_u = ntohl(msg->ticket.leader);
 	if (!find_site_by_id(leader_u, &leader)) {
-		log_error("Message with unknown owner %x received", leader_u);
+		log_error("Message with unknown owner %u received", leader_u);
 		return -EINVAL;
 	}
 

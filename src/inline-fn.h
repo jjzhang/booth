@@ -283,7 +283,7 @@ static inline int should_start_renewal(struct ticket_config *tk)
 
 static inline int send_heartbeat(struct ticket_config *tk)
 {
-	tk->hb_received = local->bitmask;
+	tk->acks_received = local->bitmask;
 	tk->hb_sent_at  = time(NULL);
 	tk->majority_acks_received = 0;
 

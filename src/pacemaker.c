@@ -138,7 +138,7 @@ static int pcmk_write_ticket_atomic(struct ticket_config *tk, int grant)
 			(int64_t)tk->current_term);
 
 	rv = system(cmd);
-	log_info("command: '%s' was executed", cmd);
+	log_debug("command: '%s' was executed", cmd);
 	if (rv != 0)
 		log_error("error: \"%s\" failed, %s", cmd, interpret_rv(rv));
 
@@ -165,7 +165,7 @@ static int pcmk_grant_ticket(struct ticket_config *tk)
 
 	snprintf(cmd, COMMAND_MAX, "crm_ticket -t %s -g --force",
 			tk->name);
-	log_info("command: '%s' was executed", cmd);
+	log_debug("command: '%s' was executed", cmd);
 	rv = system(cmd);
 	if (rv != 0)
 		log_error("error: \"%s\" failed, %s", cmd, interpret_rv(rv));
@@ -190,7 +190,7 @@ static int pcmk_revoke_ticket(struct ticket_config *tk)
 
 	snprintf(cmd, COMMAND_MAX, "crm_ticket -t %s -r --force",
 			tk->name);
-	log_info("command: '%s' was executed", cmd);
+	log_debug("command: '%s' was executed", cmd);
 	rv = system(cmd);
 	if (rv != 0)
 		log_error("error: \"%s\" failed, %s", cmd, interpret_rv(rv));
