@@ -594,6 +594,11 @@ static int test_reply(int reply_code, cmd_request_t cmd)
 				cl.msg.ticket.id);
 		break;
 
+	case RLT_EXT_FAILED:
+		log_error("before-acquire-handler for ticket \"%s\" failed, grant denied",
+				cl.msg.ticket.id);
+		break;
+
 	case RLT_REDIRECT:
 		/* talk to another site */
 		rv = 1;

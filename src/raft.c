@@ -439,6 +439,14 @@ static int process_VOTE_FOR(
 	}
 
 
+	/* leader wants to step down? */
+	if (leader == no_leader && sender == tk->leader &&
+			(tk->state == ST_FOLLOWER || tk->state == ST_CANDIDATE)) {
+		log_info("ticket %s owner %s wants to step down",
+			tk->name, site_string(tk->leader));
+		return new_round(tk);
+	}
+
 	record_vote(tk, sender, leader);
 
 
@@ -597,7 +605,7 @@ int new_election(struct ticket_config *tk,
 	tk->term_expires = 0;
 	tk->election_end = now + tk->term_duration;
 
-	log_debug("start new election! term=%d, until %" PRIi64,
+	log_info("starting new election, term=%d, until %" PRIi64,
 			tk->current_term, (int64_t)tk->election_end);
 	clear_election(tk);
 
@@ -645,10 +653,8 @@ static int leader_handle_newer_ticket(
 			site_string(sender),
 			tk->name, site_string(leader)
 			);
-	disown_ticket(tk);
-	ticket_write(tk);
 	log_error("Two ticket owners! Possible bug. Please report at https://github.com/ClusterLabs/booth/issues/new.");
-	return acquire_ticket(tk);
+	return new_round(tk);
 }
 
 /* reply to STATUS */
@@ -694,12 +700,15 @@ static int process_MY_INDEX (
 	update_ticket_from_msg(tk, msg);
 	tk->leader = leader;
 	if (leader == local) {
-		/* if we were the leader but we rebooted in the
-		 * meantime; try to get the ticket again
-		 */
-		tk->state = ST_LEADER;
-		rv = send_heartbeat(tk);
-		ticket_activate_timeout(tk);
+		rv = test_external_prog(tk, 1);
+		if (!rv) {
+			/* if we were the leader but we rebooted in the
+			 * meantime; try to get the ticket again
+			 */
+			tk->state = ST_LEADER;
+			rv = send_heartbeat(tk);
+			ticket_activate_timeout(tk);
+		}
 		return rv;
 	} else {
 		tk->state = (!leader || leader == no_leader) ?

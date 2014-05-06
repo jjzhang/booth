@@ -143,12 +143,10 @@ int ticket_write(struct ticket_config *tk)
  * makes sense.
 * Eg. if the services have a failcount of INFINITY,
 * we can't serve here anyway. */
-int acquire_ticket(struct ticket_config *tk)
+int test_external_prog(struct ticket_config *tk,
+		int start_election)
 {
 	int rv;
-
-	if (!tk->ext_verifier)
-		goto get_it;
 
 	rv = run_handler(tk, tk->ext_verifier, 1);
 	if (rv) {
@@ -160,24 +158,25 @@ int acquire_ticket(struct ticket_config *tk)
 		 * others couldn't help anyway. */
 		if (leader_and_valid(tk)) {
 			disown_ticket(tk);
-#if 0
-			tk->proposed_owner = NULL;
-
-			/* Just go one further - others may easily override. */
-			tk->new_ballot++;
-
-			ticket_broadcast_proposed_state(tk, OP_COMMITTED);
-			tk->state = ST_STABLE;
-#endif
-			ticket_broadcast(tk, OP_VOTE_FOR, RLT_SUCCESS);
+			if (start_election) {
+				ticket_broadcast(tk, OP_VOTE_FOR, RLT_SUCCESS);
+			}
 		}
-
-		return rv;
 	}
 
-get_it:
-	rv = new_election(tk, local, 1);
 	return rv;
+}
+
+
+/* Try to acquire a ticket
+ * Could be manual grant or after ticket loss
+ */
+int acquire_ticket(struct ticket_config *tk)
+{
+	if (test_external_prog(tk, 0))
+		return RLT_EXT_FAILED;
+
+	return new_election(tk, local, 1);
 }
 
 
@@ -280,9 +279,11 @@ int setup_ticket(void)
 		 * the heartbeat
 		 */
 		if (tk->is_granted && tk->leader == local) {
-			tk->state = ST_LEADER;
-			send_heartbeat(tk);
-			ticket_activate_timeout(tk);
+			if (!test_external_prog(tk, 1)) {
+				tk->state = ST_LEADER;
+				send_heartbeat(tk);
+				ticket_activate_timeout(tk);
+			}
 		} else {
 			/* otherwise, query status */
 			ticket_broadcast(tk, OP_STATUS, RLT_SUCCESS);
@@ -389,21 +390,19 @@ int ticket_broadcast(struct ticket_config *tk, cmd_request_t cmd, cmd_result_t r
 }
 
 
-static void ticket_lost(struct ticket_config *tk)
+int new_round(struct ticket_config *tk)
 {
-	log_warn("LOST ticket: %s no longer at %s",
-			tk->name,
-			ticket_leader_string(tk));
+	int rv = 0;
 
-	/* Couldn't renew in time - ticket lost. */
 	disown_ticket(tk);
 
 	/* New vote round; §5.2 */
 	if (local->type == SITE) {
-		new_election(tk, NULL, 1);
+		rv = new_election(tk, NULL, 1);
+		ticket_write(tk);
 	}
 
-	ticket_write(tk);
+	return rv;
 }
 
 
@@ -422,7 +421,13 @@ static void ticket_cron(struct ticket_config *tk)
 	if (tk->term_expires &&
 			is_owned(tk) &&
 			now >= tk->term_expires) {
-		ticket_lost(tk);
+
+		log_warn("LOST ticket: %s no longer at %s",
+				tk->name,
+				ticket_leader_string(tk));
+
+		/* Couldn't renew in time - ticket lost. */
+		new_round(tk);
 		return;
 	}
 	R(tk);
