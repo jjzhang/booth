@@ -276,11 +276,13 @@ int setup_ticket(void)
 		}
 
 
-		/* we'll start election if the ticket seems to be
-		 * uptodate
+		/* if the ticket is uptodate and belongs to us, try with
+		 * the heartbeat
 		 */
 		if (tk->is_granted && tk->leader == local) {
-			tk->state = ST_FOLLOWER;
+			tk->state = ST_LEADER;
+			send_heartbeat(tk);
+			ticket_activate_timeout(tk);
 		} else {
 			/* otherwise, query status */
 			ticket_broadcast(tk, OP_STATUS, RLT_SUCCESS);
@@ -431,11 +433,8 @@ static void ticket_cron(struct ticket_config *tk)
 		break;
 
 	case ST_FOLLOWER:
-		/* in case we got restarted and this ticket belongs to
-		 * us */
-		if (tk->is_granted && tk->leader == local) {
-			acquire_ticket(tk);
-		}
+		/* nothing here either, ticket loss is caught earlier
+		 * */
 		break;
 
 	case ST_CANDIDATE:
@@ -444,7 +443,6 @@ static void ticket_cron(struct ticket_config *tk)
 		new_leader = majority_votes(tk);
 		if (new_leader) {
 			leader_elected(tk, new_leader);
-			set_ticket_wakeup(tk);
 		} else if (now > tk->election_end) {
 			/* This is previous election timed out */
 			new_election(tk, NULL, 0);

@@ -415,8 +415,11 @@ void leader_elected(
 			tk->commit_index++;
 			tk->state = ST_LEADER;
 			send_heartbeat(tk);
-		} else
+			ticket_activate_timeout(tk);
+		} else {
 			become_follower(tk, NULL);
+			set_ticket_wakeup(tk);
+		}
 	}
 }
 
@@ -450,7 +453,6 @@ static int process_VOTE_FOR(
 	if (all_voted(tk)) {
 		/* §5.2 */
 		leader_elected(tk, majority_votes(tk));
-		set_ticket_wakeup(tk);
 	}
 
 	return 0;
@@ -658,6 +660,7 @@ static int process_MY_INDEX (
 	       )
 {
 	int i;
+	int rv;
 
 	if (!msg->ticket.term_valid_for) {
 		/* ticket not valid */
@@ -689,13 +692,16 @@ static int process_MY_INDEX (
 	}
 
 	update_ticket_from_msg(tk, msg);
+	tk->leader = leader;
 	if (leader == local) {
 		/* if we were the leader but we rebooted in the
 		 * meantime; try to get the ticket again
 		 */
-		return acquire_ticket(tk);
+		tk->state = ST_LEADER;
+		rv = send_heartbeat(tk);
+		ticket_activate_timeout(tk);
+		return rv;
 	} else {
-		tk->leader = leader;
 		tk->state = (!leader || leader == no_leader) ?
 			ST_INIT : ST_FOLLOWER;
 	}
