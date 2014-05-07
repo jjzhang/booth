@@ -176,7 +176,6 @@ static int newer_term(struct ticket_config *tk,
 					term, tk->current_term);
 		}
 
-		tk->term_expires = time(NULL) + tk->term_duration;
 		tk->current_term = term;
 		return 1;
 	}
