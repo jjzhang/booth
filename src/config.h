@@ -111,8 +111,9 @@ struct ticket_config {
 	uint32_t match_index[MAX_NODES];
 
 
+	uint32_t acks_expected;
 	uint64_t acks_received;
-	time_t hb_sent_at;
+	time_t req_sent_at;
 
 	/** \name Needed while proposals are being done.
 	 * @{ */

@@ -139,11 +139,11 @@ typedef enum {
 
 	/* get status from another server */
 	OP_STATUS   = CHAR2CONST('S', 't', 'a', 't'),
-	OP_MY_INDEX = CHAR2CONST('M', 'I', 'd', 'x'), /* Answer to status */
+	OP_MY_INDEX = CHAR2CONST('M', 'I', 'd', 'x'), /* reply to status */
 
 	/* Raft */
-	OP_REQ_VOTE = CHAR2CONST('R', 'V', 'o', 't'),
-	OP_VOTE_FOR = CHAR2CONST('V', 't', 'F', 'r'),
+	OP_REQ_VOTE = CHAR2CONST('R', 'V', 'o', 't'), /* start election */
+	OP_VOTE_FOR = CHAR2CONST('V', 't', 'F', 'r'), /* reply to REQ_VOTE */
 	OP_HEARTBEAT= CHAR2CONST('H', 'r', 't', 'B'), /* Heartbeat */
 	OP_UPDATE   = CHAR2CONST('U', 'p', 'd', 'E'), /* Update ticket */
 	OP_REVOKE   = CHAR2CONST('R', 'e', 'v', 'k'), /* Revoke ticket */

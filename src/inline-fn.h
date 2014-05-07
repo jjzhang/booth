@@ -280,12 +280,18 @@ static inline int should_start_renewal(struct ticket_config *tk)
 	return when <= now;
 }
 
+static inline void expect_replies(struct ticket_config *tk,
+		int reply_type)
+{
+	tk->acks_expected = reply_type;
+	tk->acks_received = local->bitmask;
+	tk->req_sent_at  = time(NULL);
+	tk->majority_acks_received = 0;
+}
 
 static inline int send_heartbeat(struct ticket_config *tk)
 {
-	tk->acks_received = local->bitmask;
-	tk->hb_sent_at  = time(NULL);
-	tk->majority_acks_received = 0;
+	expect_replies(tk, OP_HEARTBEAT);
 
 	return ticket_broadcast(tk, OP_HEARTBEAT, RLT_SUCCESS);
 }

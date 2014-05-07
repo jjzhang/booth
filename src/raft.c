@@ -151,20 +151,6 @@ struct booth_site *majority_votes(struct ticket_config *tk)
 }
 
 
-static int all_voted(struct ticket_config *tk)
-{
-	int i, cnt = 0;
-
-	for(i=0; i<booth_conf->site_count; i++) {
-		if (tk->votes_for[i]) {
-			cnt++;
-		}
-	}
-
-	return (cnt == booth_conf->site_count);
-}
-
-
 static int newer_term(struct ticket_config *tk,
 		struct booth_site *sender,
 		struct booth_site *leader,
@@ -373,14 +359,6 @@ static int process_HEARTBEAT(
 
 	if (term == tk->current_term &&
 			leader == tk->leader) {
-		/* got an ack! */
-		tk->acks_received |= sender->bitmask;
-
-		log_debug("got heartbeat ACK from %s, %d/%d agree.",
-				site_string(sender),
-				count_bits(tk->acks_received),
-				booth_conf->site_count);
-
 
 		if (majority_of_bits(tk, tk->acks_received)) {
 			/* OK, at least half of the nodes are reachable;
@@ -458,7 +436,7 @@ static int process_VOTE_FOR(
 
 	/* only if all voted can we take the ticket now, otherwise
 	 * wait for timeout in ticket_cron */
-	if (all_voted(tk)) {
+	if (!tk->acks_expected) {
 		/* §5.2 */
 		leader_elected(tk, majority_votes(tk));
 	}
@@ -618,6 +596,7 @@ int new_election(struct ticket_config *tk,
 
 	tk->state = ST_CANDIDATE;
 
+	expect_replies(tk, OP_VOTE_FOR);
 	ticket_broadcast(tk, OP_REQ_VOTE, RLT_SUCCESS);
 	ticket_activate_timeout(tk);
 	return 0;

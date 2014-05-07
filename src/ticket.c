@@ -154,8 +154,8 @@ int test_external_prog(struct ticket_config *tk,
 			tk->name);
 
 		/* Give it to somebody else.
-		 * Just send a commit message, as the
-		 * others couldn't help anyway. */
+		 * Just send a VOTE_FOR message, so the
+		 * others can start elections. */
 		if (leader_and_valid(tk)) {
 			disown_ticket(tk);
 			if (start_election) {
@@ -458,10 +458,10 @@ static void ticket_cron(struct ticket_config *tk)
 		/* we get here after we broadcasted a heartbeat;
 		 * by this time all sites should've acked the heartbeat
 		 */
-		vote_cnt = count_bits(tk->acks_received) - 1;
-		if ((vote_cnt+1) < booth_conf->site_count) {
+		if (tk->acks_expected) {
 			if (!majority_of_bits(tk, tk->acks_received)) {
 				tk->retry_number ++;
+				vote_cnt = count_bits(tk->acks_received) - 1;
 				if (!vote_cnt) {
 					log_warn("no answers to heartbeat for ticket %s on try #%d, "
 					"we are alone",
@@ -548,6 +548,38 @@ void tickets_log_info(void)
 }
 
 
+static int all_replied(struct ticket_config *tk)
+{
+	return (count_bits(tk->acks_received) == booth_conf->site_count);
+}
+
+
+static void update_acks(
+		struct ticket_config *tk,
+		struct booth_site *sender,
+		struct booth_site *leader,
+		struct boothc_ticket_msg *msg
+	       )
+{
+	uint32_t cmd;
+
+	cmd = ntohl(msg->header.cmd);
+	if (tk->acks_expected != cmd)
+		return;
+
+	/* got an ack! */
+	tk->acks_received |= sender->bitmask;
+
+	log_debug("got ACK from %s, %d/%d agree.",
+			site_string(sender),
+			count_bits(tk->acks_received),
+			booth_conf->site_count);
+
+	if (all_replied(tk)) {
+		tk->acks_expected = 0;
+	}
+}
+
 /* UDP message receiver. */
 int message_recv(struct boothc_ticket_msg *msg, int msglen)
 {
@@ -583,6 +615,7 @@ int message_recv(struct boothc_ticket_msg *msg, int msglen)
 		return -EINVAL;
 	}
 
+	update_acks(tk, source, leader, msg);
 
 	return raft_answer(tk, source, leader, msg);
 }
