@@ -615,7 +615,7 @@ int new_election(struct ticket_config *tk,
 		tk->current_term++;
 
 	tk->term_expires = 0;
-	tk->election_end = now + tk->term_duration;
+	tk->election_end = now + tk->timeout;
 
 	log_info("starting new election, term=%d, until %" PRIi64,
 			tk->current_term, (int64_t)tk->election_end);
