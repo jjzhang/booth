@@ -63,12 +63,18 @@ inline static void record_vote(struct ticket_config *tk,
 
 
 static int cmp_msg_ticket(struct ticket_config *tk,
+		struct booth_site *sender,
+		struct booth_site *leader,
 		struct boothc_ticket_msg *msg)
 {
 	if (tk->current_term != ntohl(msg->ticket.term)) {
 		return tk->current_term - ntohl(msg->ticket.term);
 	}
-	return tk->commit_index - ntohl(msg->ticket.leader_commit);
+	/* compare commit_index only from the leader */
+	if (sender == leader) {
+		return tk->commit_index - ntohl(msg->ticket.leader_commit);
+	}
+	return 0;
 }
 
 static void update_term_from_msg(struct ticket_config *tk,
@@ -680,7 +686,7 @@ static int process_MY_INDEX (
 		return 0;
 	}
 
-	i = cmp_msg_ticket(tk, msg);
+	i = cmp_msg_ticket(tk, sender, leader, msg);
 
 	if (i > 0) {
 		/* let them know about our newer ticket */
