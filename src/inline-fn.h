@@ -77,26 +77,27 @@ static inline void init_header_bare(struct boothc_header *h) {
 }
 
 static inline void init_header(struct boothc_header *h, int cmd,
-			int result, int data_len)
+			int result, int reason, int data_len)
 {
 	init_header_bare(h);
 	h->length  = htonl(data_len);
 	h->cmd     = htonl(cmd);
 	h->result  = htonl(result);
+	h->reason  = htonl(reason);
 }
 
 static inline void init_ticket_site_header(struct boothc_ticket_msg *msg, int cmd)
 {
-	init_header(&msg->header, cmd, 0, sizeof(*msg));
+	init_header(&msg->header, cmd, 0, 0, sizeof(*msg));
 }
 
 static inline void init_ticket_msg(struct boothc_ticket_msg *msg,
-		int cmd, int rv,
+		int cmd, int rv, int reason,
 		struct ticket_config *tk)
 {
 	assert(sizeof(msg->ticket.id) == sizeof(tk->name));
 
-	init_header(&msg->header, cmd, rv, sizeof(*msg));
+	init_header(&msg->header, cmd, rv, reason, sizeof(*msg));
 
 	if (!tk) {
 		memset(&msg->ticket, 0, sizeof(msg->ticket));
@@ -297,7 +298,7 @@ static inline int send_heartbeat(struct ticket_config *tk)
 {
 	expect_replies(tk, OP_HEARTBEAT);
 
-	return ticket_broadcast(tk, OP_HEARTBEAT, RLT_SUCCESS);
+	return ticket_broadcast(tk, OP_HEARTBEAT, RLT_SUCCESS, 0);
 }
 
 static inline struct booth_site *my_vote(struct ticket_config *tk)

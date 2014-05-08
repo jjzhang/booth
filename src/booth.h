@@ -93,6 +93,8 @@ struct boothc_header {
 
 	/** The command respectively protocol state. See cmd_request_t. */
 	uint32_t cmd;
+	/** The reason for this RPC. */
+	uint32_t reason;
 	/** Result of operation. 0 == OK */
 	uint32_t result;
 
@@ -151,7 +153,6 @@ typedef enum {
 } cmd_request_t;
 
 
-/* TODO: make readable constants */
 typedef enum {
 	/* for compatibility with other functions */
 	RLT_SUCCESS             = 0,
@@ -168,6 +169,19 @@ typedef enum {
 	RLT_REDIRECT            = CHAR2CONST('R', 'e', 'd', 'r'),
 } cmd_result_t;
 
+
+typedef enum {
+	/* for compatibility with other functions */
+	OR_JUST_SO              = 0,
+	OR_AGAIN                = CHAR2CONST('A', 'a', 'a', 'a'),
+	OR_RESULT               = CHAR2CONST('R', 's', 'l', 't'),
+	OR_TKT_LOST             = CHAR2CONST('T', 'L', 's', 't'),
+	OR_REACQUIRE            = CHAR2CONST('R', 'a', 'c', 'q'),
+	OR_ADMIN                = CHAR2CONST('A', 'd', 'm', 'n'),
+	OR_LOCAL_FAIL           = CHAR2CONST('L', 'o', 'c', 'F'),
+	OR_STEPDOWN             = CHAR2CONST('S', 'p', 'd', 'n'),
+	OR_SPLIT                = CHAR2CONST('S', 'p', 'l', 't'),
+} cmd_reason_t;
 
 /** @} */
 

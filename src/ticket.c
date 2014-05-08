@@ -132,7 +132,7 @@ int test_external_prog(struct ticket_config *tk,
 		if (leader_and_valid(tk)) {
 			disown_ticket(tk);
 			if (start_election) {
-				ticket_broadcast(tk, OP_VOTE_FOR, RLT_SUCCESS);
+				ticket_broadcast(tk, OP_VOTE_FOR, RLT_SUCCESS, OR_LOCAL_FAIL);
 			}
 		}
 	}
@@ -144,12 +144,12 @@ int test_external_prog(struct ticket_config *tk,
 /* Try to acquire a ticket
  * Could be manual grant or after ticket loss
  */
-int acquire_ticket(struct ticket_config *tk)
+int acquire_ticket(struct ticket_config *tk, cmd_reason_t reason)
 {
 	if (test_external_prog(tk, 0))
 		return RLT_EXT_FAILED;
 
-	return new_election(tk, local, 1);
+	return new_election(tk, local, 1, reason);
 }
 
 
@@ -166,7 +166,7 @@ int do_grant_ticket(struct ticket_config *tk)
 
 	tk->delay_grant = time(NULL) +
 			tk->term_duration + tk->acquire_after;
-	rv = acquire_ticket(tk);
+	rv = acquire_ticket(tk, OR_ADMIN);
 	return rv;
 }
 
@@ -179,7 +179,7 @@ int do_revoke_ticket(struct ticket_config *tk)
 
 	reset_ticket(tk);
 	ticket_write(tk);
-	return ticket_broadcast(tk, OP_REVOKE, RLT_SUCCESS);
+	return ticket_broadcast(tk, OP_REVOKE, RLT_SUCCESS, OR_ADMIN);
 }
 
 
@@ -273,7 +273,7 @@ int setup_ticket(void)
 			}
 		} else {
 			/* otherwise, query status */
-			ticket_broadcast(tk, OP_STATUS, RLT_SUCCESS);
+			ticket_broadcast(tk, OP_STATUS, RLT_SUCCESS, 0);
 		}
 	}
 
@@ -291,7 +291,7 @@ int ticket_answer_list(int fd, struct boothc_ticket_msg *msg)
 	if (rv < 0)
 		return rv;
 
-	init_header(&hdr, CMR_LIST, RLT_SUCCESS, sizeof(hdr) + olen);
+	init_header(&hdr, CMR_LIST, RLT_SUCCESS, 0, sizeof(hdr) + olen);
 
 	return send_header_plus(fd, &hdr, data, olen);
 }
@@ -320,7 +320,7 @@ int ticket_answer_grant(int fd, struct boothc_ticket_msg *msg)
 	rv = do_grant_ticket(tk);
 
 reply:
-	init_header(&msg->header, CMR_GRANT, rv ?: RLT_ASYNC, sizeof(*msg));
+	init_header(&msg->header, CMR_GRANT, rv ?: RLT_ASYNC, 0, sizeof(*msg));
 	return send_ticket_msg(fd, msg);
 }
 
@@ -358,16 +358,17 @@ int ticket_answer_revoke(int fd, struct boothc_ticket_msg *msg)
 		rv = RLT_ASYNC;
 
 reply:
-	init_ticket_msg(msg, CMR_REVOKE, rv, tk);
+	init_ticket_msg(msg, CMR_REVOKE, rv, 0, tk);
 	return send_ticket_msg(fd, msg);
 }
 
 
-int ticket_broadcast(struct ticket_config *tk, cmd_request_t cmd, cmd_result_t res)
+int ticket_broadcast(struct ticket_config *tk,
+		cmd_request_t cmd, cmd_result_t res, cmd_reason_t reason)
 {
 	struct boothc_ticket_msg msg;
 
-	init_ticket_msg(&msg, cmd, res, tk);
+	init_ticket_msg(&msg, cmd, res, reason, tk);
 	log_debug("broadcasting '%s' for ticket %s (term=%d, valid=%d)",
 			state_to_string(cmd), tk->name,
 			ntohl(msg.ticket.term),
@@ -377,7 +378,7 @@ int ticket_broadcast(struct ticket_config *tk, cmd_request_t cmd, cmd_result_t r
 }
 
 
-int new_round(struct ticket_config *tk)
+int new_round(struct ticket_config *tk, cmd_reason_t reason)
 {
 	int rv = 0;
 	struct timespec delay;
@@ -391,7 +392,7 @@ int new_round(struct ticket_config *tk)
 		delay.tv_nsec = 1000000L * (long)cl_rand_from_interval(0, 200);
 		nanosleep(&delay, NULL);
 
-		rv = new_election(tk, NULL, 1);
+		rv = new_election(tk, NULL, 1, reason);
 		ticket_write(tk);
 	}
 
@@ -420,7 +421,7 @@ static void ticket_cron(struct ticket_config *tk)
 				ticket_leader_string(tk));
 
 		/* Couldn't renew in time - ticket lost. */
-		new_round(tk);
+		new_round(tk, OR_TKT_LOST);
 		return;
 	}
 	R(tk);
@@ -443,7 +444,7 @@ static void ticket_cron(struct ticket_config *tk)
 			leader_elected(tk, new_leader);
 		} else if (now > tk->election_end) {
 			/* This is previous election timed out */
-			new_election(tk, NULL, 0);
+			new_election(tk, NULL, 0, OR_AGAIN);
 		}
 		break;
 
@@ -685,6 +686,6 @@ int send_reject(struct booth_site *dest, struct ticket_config *tk, cmd_result_t 
 	struct boothc_ticket_msg msg;
 
 
-	init_ticket_msg(&msg, OP_REJECTED, code, tk);
+	init_ticket_msg(&msg, OP_REJECTED, code, 0, tk);
 	return booth_udp_send(dest, &msg, sizeof(msg));
 }

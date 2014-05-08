@@ -54,8 +54,8 @@ int find_ticket_by_name(const char *ticket, struct ticket_config **found);
 void set_ticket_wakeup(struct ticket_config *tk);
 
 int test_external_prog(struct ticket_config *tk, int start_election);
-int acquire_ticket(struct ticket_config *tk);
-int new_round(struct ticket_config *tk);
+int acquire_ticket(struct ticket_config *tk, cmd_reason_t reason);
+int new_round(struct ticket_config *tk, cmd_reason_t reason);
 
 int ticket_answer_list(int fd, struct boothc_ticket_msg *msg);
 int ticket_answer_grant(int fd, struct boothc_ticket_msg *msg);
@@ -69,7 +69,7 @@ void process_tickets(void);
 void tickets_log_info(void);
 char *state_to_string(uint32_t state_ho);
 int send_reject(struct booth_site *dest, struct ticket_config *tk, cmd_result_t code);
-int ticket_broadcast(struct ticket_config *tk, cmd_request_t cmd, cmd_result_t res);
+int ticket_broadcast(struct ticket_config *tk, cmd_request_t cmd, cmd_result_t res, cmd_reason_t reason);
 
 
 static inline void ticket_next_cron_at(struct ticket_config *tk, struct timeval when)

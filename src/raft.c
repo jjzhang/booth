@@ -250,7 +250,7 @@ static int answer_HEARTBEAT (
 	tk->leader = leader;
 
 	/* Ack the heartbeat (we comply). */
-	init_ticket_msg(&omsg, OP_HEARTBEAT, RLT_SUCCESS, tk);
+	init_ticket_msg(&omsg, OP_HEARTBEAT, RLT_SUCCESS, 0, tk);
 	return booth_udp_send(sender, &omsg, sizeof(omsg));
 }
 
@@ -354,7 +354,7 @@ int leader_update_ticket(struct ticket_config *tk)
 
 	if (!ticket_dangerous(tk)) {
 		ticket_write(tk);
-		init_ticket_msg(&msg, OP_UPDATE, RLT_SUCCESS, tk);
+		init_ticket_msg(&msg, OP_UPDATE, RLT_SUCCESS, 0, tk);
 		rv = transport()->broadcast(&msg, sizeof(msg));
 	}
 
@@ -456,7 +456,7 @@ static int process_VOTE_FOR(
 			(tk->state == ST_FOLLOWER || tk->state == ST_CANDIDATE)) {
 		log_info("ticket %s owner %s wants to step down",
 			tk->name, site_string(tk->leader));
-		return new_round(tk);
+		return new_round(tk, OR_STEPDOWN);
 	}
 
 	record_vote(tk, sender, leader);
@@ -532,7 +532,7 @@ static int send_ticket (
 	struct boothc_ticket_msg omsg;
 
 
-	init_ticket_msg(&omsg, cmd, RLT_SUCCESS, tk);
+	init_ticket_msg(&omsg, cmd, RLT_SUCCESS, 0, tk);
 	return booth_udp_send(to_site, &omsg, sizeof(omsg));
 }
 
@@ -585,17 +585,18 @@ vote_for_sender:
 	}
 
 
-	init_ticket_msg(&omsg, OP_VOTE_FOR, RLT_SUCCESS, tk);
+	init_ticket_msg(&omsg, OP_VOTE_FOR, RLT_SUCCESS, 0, tk);
 	omsg.ticket.leader = htonl(get_node_id(tk->voted_for));
 	return booth_udp_send(sender, &omsg, sizeof(omsg));
 }
 
 
 int new_election(struct ticket_config *tk,
-	struct booth_site *preference, int update_term)
+	struct booth_site *preference, int update_term, cmd_reason_t reason)
 {
 	struct booth_site *new_leader;
 	time_t now;
+	static cmd_reason_t last_reason;
 
 
 	time(&now);
@@ -630,8 +631,15 @@ int new_election(struct ticket_config *tk,
 
 	tk->state = ST_CANDIDATE;
 
+	/* some callers may want just to repeat on timeout */
+	if (reason == OR_AGAIN) {
+		reason = last_reason;
+	} else {
+		last_reason = reason;
+	}
+
 	expect_replies(tk, OP_VOTE_FOR);
-	ticket_broadcast(tk, OP_REQ_VOTE, RLT_SUCCESS);
+	ticket_broadcast(tk, OP_REQ_VOTE, RLT_SUCCESS, reason);
 	ticket_activate_timeout(tk);
 	return 0;
 }
@@ -657,7 +665,7 @@ static int leader_handle_newer_ticket(
 		update_term_from_msg(tk, msg);
 		/* get the ticket again, if we can
 		 */
-		return acquire_ticket(tk);
+		return acquire_ticket(tk, OR_REACQUIRE);
 	}
 
 	/* eek, two leaders, split brain */
@@ -667,7 +675,7 @@ static int leader_handle_newer_ticket(
 			tk->name, site_string(leader)
 			);
 	log_error("Two ticket owners! Possible bug. Please report at https://github.com/ClusterLabs/booth/issues/new.");
-	return new_round(tk);
+	return new_round(tk, OR_SPLIT);
 }
 
 /* reply to STATUS */
