@@ -695,13 +695,9 @@ static int process_MY_INDEX (
 			return send_ticket(OP_UPDATE, tk, sender);
 	}
 
-	if (i == 0) {
-		return 0;
-	}
-
 	/* they have a newer ticket, trouble if we're already leader
 	 * for it */
-	if (tk->state == ST_LEADER) {
+	if (i < 0 && tk->state == ST_LEADER) {
 		log_warn("from %s: more uptodate ticket %s at %s",
 				site_string(sender),
 				tk->name,
