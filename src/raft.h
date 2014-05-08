@@ -30,6 +30,7 @@ typedef enum {
 
 struct ticket_config;
 
+int leader_update_ticket(struct ticket_config *tk);
 void leader_elected(struct ticket_config *tk,
 		struct booth_site *new_leader);
 

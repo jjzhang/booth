@@ -94,34 +94,6 @@ int check_site(char *site, int *is_local)
 }
 
 
-#if 0
-/** Find out what others think about this ticket.
- *
- * If we're a SITE, we can ask (and have to tell) Pacemaker.
- * An ARBITRATOR can only ask others. */
-static int ticket_send_catchup(struct ticket_config *tk)
-{
-	int i, rv = 0;
-	struct booth_site *site;
-	struct boothc_ticket_msg msg;
-
-	foreach_node(i, site) {
-		if (!site->local) {
-			init_ticket_msg(&msg, CMD_CATCHUP, RLT_SUCCESS, tk);
-
-			log_debug("attempting catchup from %s", site->addr_string);
-
-			rv = booth_udp_send(site, &msg, sizeof(msg));
-		}
-	}
-
-	ticket_activate_timeout(tk);
-
-	return rv;
-}
-#endif
-
-
 int ticket_write(struct ticket_config *tk)
 {
 	if (local->type != SITE)
@@ -191,6 +163,8 @@ int do_grant_ticket(struct ticket_config *tk)
 	if (is_owned(tk))
 		return RLT_OVERGRANT;
 
+	tk->delay_grant = time(NULL) +
+			tk->term_duration + tk->acquire_after;
 	rv = acquire_ticket(tk);
 	return rv;
 }
@@ -212,6 +186,7 @@ int list_ticket(char **pdata, unsigned int *len)
 {
 	struct ticket_config *tk;
 	char timeout_str[64];
+	char pending_str[64];
 	char *data, *cp;
 	int i, alloc;
 
@@ -232,19 +207,30 @@ int list_ticket(char **pdata, unsigned int *len)
 		else
 			strcpy(timeout_str, "INF");
 
+		if (tk->delay_grant) {
+			strcpy(pending_str, " (pending until ");
+			strftime(pending_str + strlen(" (pending until "),
+					sizeof(pending_str) - strlen(" (pending until ") - 1,
+					"%F %T", localtime(&tk->delay_grant));
+			strcat(pending_str, ")");
+		} else
+			*pending_str = '\0';
 
-		cp += sprintf(cp,
-				"ticket: %s, leader: %s, expires: %s, commit: %d\n",
+		cp += snprintf(cp,
+				alloc - (cp - data),
+				"ticket: %s, leader: %s, expires: %s, commit: %d%s\n",
 				tk->name,
 				ticket_leader_string(tk),
 				timeout_str,
-				tk->commit_index);
+				tk->commit_index,
+				pending_str);
 
-		*len = cp - data;
-		assert(*len < alloc);
+		if (alloc - (cp - data) <= 0)
+			return -ENOMEM;
 	}
 
 	*pdata = data;
+	*len = cp - data;
 
 	return 0;
 }
@@ -409,7 +395,7 @@ int new_round(struct ticket_config *tk)
 static void ticket_cron(struct ticket_config *tk)
 {
 	time_t now;
-	int vote_cnt;
+	int ack_cnt;
 	struct booth_site *new_leader;
 
 	now = time(NULL);
@@ -459,10 +445,10 @@ static void ticket_cron(struct ticket_config *tk)
 		 * by this time all sites should've acked the heartbeat
 		 */
 		if (tk->acks_expected) {
+			tk->retry_number ++;
 			if (!majority_of_bits(tk, tk->acks_received)) {
-				tk->retry_number ++;
-				vote_cnt = count_bits(tk->acks_received) - 1;
-				if (!vote_cnt) {
+				ack_cnt = count_bits(tk->acks_received) - 1;
+				if (!ack_cnt) {
 					log_warn("no answers to heartbeat for ticket %s on try #%d, "
 					"we are alone",
 					tk->name,
@@ -472,9 +458,15 @@ static void ticket_cron(struct ticket_config *tk)
 					"only got %d answers",
 					tk->name,
 					tk->retry_number,
-					vote_cnt);
+					ack_cnt);
 				}
 			/* Don't give up, though - there's still some time until leadership is lost. */
+			} else {
+				/* we have the majority, update the ticket, at
+				 * least the local copy if we're still not
+				 * allowed to commit
+				 */
+				leader_update_ticket(tk);
 			}
 		}
 
@@ -545,12 +537,6 @@ void tickets_log_info(void)
 				ticket_leader_string(tk),
 				ctime(&tk->term_expires));
 	}
-}
-
-
-static int all_replied(struct ticket_config *tk)
-{
-	return (count_bits(tk->acks_received) == booth_conf->site_count);
 }
 
 

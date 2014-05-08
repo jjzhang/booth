@@ -308,20 +308,52 @@ static int process_REVOKE (
 	return 0;
 }
 
+
+/* is it safe to commit the grant?
+ * if we didn't hear from all sites on the initial grant, we may
+ * need to delay the commit
+ *
+ * TODO: investigate possibility to devise from history whether a
+ * missing site could be holding a ticket or not
+ */
+static int ticket_dangerous(struct ticket_config *tk)
+{
+	if (!tk->delay_grant)
+		return 0;
+
+	if (tk->delay_grant < time(NULL) ||
+			all_sites_replied(tk)) {
+		tk->delay_grant = 0;
+		return 0;
+	}
+
+	return 1;
+}
+
+
 /* update the ticket on the leader, write it to the CIB, and
    send out the update message to others with the new expiry
    time
 */
-static int leader_update_ticket(struct ticket_config *tk)
+int leader_update_ticket(struct ticket_config *tk)
 {
 	struct boothc_ticket_msg msg;
+	int rv = 0;
 
+	if( tk->ticket_updated )
+		return 0;
+
+	tk->ticket_updated = 1;
 	tk->term_expires = time(NULL) + tk->term_duration;
-	tk->retry_number = 0;
-	ticket_write(tk);
+
+	if (!ticket_dangerous(tk)) {
+		ticket_write(tk);
+		init_ticket_msg(&msg, OP_UPDATE, RLT_SUCCESS, tk);
+		rv = transport()->broadcast(&msg, sizeof(msg));
+	}
+
 	set_ticket_wakeup(tk);
-	init_ticket_msg(&msg, OP_UPDATE, RLT_SUCCESS, tk);
-	return transport()->broadcast(&msg, sizeof(msg));
+	return rv;
 }
 
 /* For leader. */
@@ -359,16 +391,12 @@ static int process_HEARTBEAT(
 	if (term == tk->current_term &&
 			leader == tk->leader) {
 
-		if (majority_of_bits(tk, tk->acks_received)) {
+		if (majority_of_bits(tk, tk->acks_received) &&
+				!ticket_dangerous(tk)) {
 			/* OK, at least half of the nodes are reachable;
 			 * Update the ticket and send update messages out
 			 */
-			if( !tk->majority_acks_received ) {
-			/* Write the ticket to the CIB and set the next
-			 * wakeup time (but do that only once) */
-				tk->majority_acks_received = 1;
-				return leader_update_ticket(tk);
-			}
+			return leader_update_ticket(tk);
 		}
 	}
 
@@ -387,6 +415,7 @@ void leader_elected(
 		tk->term_expires = time(NULL) + tk->term_duration;
 		tk->election_end = 0;
 		tk->voted_for = NULL;
+		tk->retry_number = 0;
 
 		if (new_leader == local)  {
 			tk->commit_index++;
@@ -684,6 +713,7 @@ static int process_MY_INDEX (
 			 * meantime; try to get the ticket again
 			 */
 			tk->state = ST_LEADER;
+			tk->retry_number = 0;
 			rv = send_heartbeat(tk);
 			ticket_activate_timeout(tk);
 		}

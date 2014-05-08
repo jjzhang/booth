@@ -248,7 +248,7 @@ static inline int timeval_in_past(struct timeval which)
 
 static inline time_t next_vote_starts_at(struct ticket_config *tk)
 {
-	time_t half_exp, retries_needed;
+	time_t half_exp, retries_needed, t;
 
 	/* If not owner, don't renew. */
 	if (tk->leader != local)
@@ -262,9 +262,13 @@ static inline time_t next_vote_starts_at(struct ticket_config *tk)
 	retries_needed = tk->term_expires - tk->timeout * tk->retries/2;
 
 	/* Return earlier timestamp. */
-	return half_exp < retries_needed
-		? half_exp
-		: retries_needed;
+	t = min(half_exp, retries_needed);
+
+	/* Return earlier timestamp if we need to delay the grant. */
+	if (tk->delay_grant)
+		t = min(tk->delay_grant, t);
+
+	return t;
 }
 
 
@@ -286,7 +290,7 @@ static inline void expect_replies(struct ticket_config *tk,
 	tk->acks_expected = reply_type;
 	tk->acks_received = local->bitmask;
 	tk->req_sent_at  = time(NULL);
-	tk->majority_acks_received = 0;
+	tk->ticket_updated = 0;
 }
 
 static inline int send_heartbeat(struct ticket_config *tk)
@@ -315,6 +319,15 @@ static inline int majority_of_bits(struct ticket_config *tk, uint64_t val)
 }
 
 
+static inline int all_replied(struct ticket_config *tk)
+{
+	return !(tk->acks_received ^ booth_conf->all_bits);
+}
+
+static inline int all_sites_replied(struct ticket_config *tk)
+{
+	return !((tk->acks_received & booth_conf->sites_bits) ^ booth_conf->sites_bits);
+}
 
 
 #endif

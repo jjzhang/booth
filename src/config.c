@@ -93,7 +93,9 @@ int add_site(char *addr_string, int type)
 	site->bitmask = 1 << booth_conf->site_count;
 	/* Catch site overflow */
 	assert(site->bitmask);
-	booth_conf->site_bits |= site->bitmask;
+	booth_conf->all_bits |= site->bitmask;
+	if (type == SITE)
+		booth_conf->sites_bits |= site->bitmask;
 
 	site->tcp_fd = -1;
 

@@ -98,7 +98,7 @@ struct ticket_config {
 	 * This is reset to 0 whenever we broadcast heartbeat and set
 	 * to 1 once enough acks are received.
 	 */
-	uint32_t majority_acks_received;
+	uint32_t ticket_updated;
 	/** @} */
 
 
@@ -111,8 +111,21 @@ struct ticket_config {
 	uint32_t match_index[MAX_NODES];
 
 
+	/* if it is potentially dangerous to grant the ticket
+	 * immediately, then this is set to some point in time,
+	 * usually (now + term_duration + acquire_after)
+	 */
+	time_t delay_grant;
+
+	/* if we expect some acks, then set this to the id of
+	 * the RPC which others will send us; it is cleared once all
+	 * replies were received
+	 */
 	uint32_t acks_expected;
+	/* bitmask of servers which sent acks
+	 */
 	uint64_t acks_received;
+	/* timestamp of the request, currently unused */
 	time_t req_sent_at;
 
 	/** \name Needed while proposals are being done.
@@ -150,8 +163,10 @@ struct booth_config {
     transport_layer_t proto;
     uint16_t port;
 
-    /** Stores the OR of the individual host bitmasks. */
-    uint64_t site_bits;
+    /** Stores the OR of sites bitmasks. */
+    uint64_t sites_bits;
+    /** Stores the OR of all members' bitmasks. */
+    uint64_t all_bits;
 
     char site_user[BOOTH_NAME_LEN];
     char site_group[BOOTH_NAME_LEN];
