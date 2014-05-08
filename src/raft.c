@@ -757,7 +757,7 @@ int raft_answer(
 				tk->state == ST_LEADER)
 			rv = process_HEARTBEAT(tk, from, leader, msg);
 		else if (tk->leader != local &&
-				(tk->state == ST_FOLLOWER ||
+				(tk->state == ST_INIT ||tk->state == ST_FOLLOWER ||
 				tk->state == ST_CANDIDATE))
 			rv = answer_HEARTBEAT(tk, from, leader, msg);
 		else {
