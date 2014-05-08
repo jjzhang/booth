@@ -25,6 +25,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <time.h>
+#include  <clplumbing/cl_random.h>
 #include "ticket.h"
 #include "config.h"
 #include "pacemaker.h"
@@ -379,11 +380,17 @@ int ticket_broadcast(struct ticket_config *tk, cmd_request_t cmd, cmd_result_t r
 int new_round(struct ticket_config *tk)
 {
 	int rv = 0;
+	struct timespec delay;
 
 	disown_ticket(tk);
 
 	/* New vote round; §5.2 */
 	if (local->type == SITE) {
+		/* delay the next election start for up to 200ms */
+		delay.tv_sec = 0;
+		delay.tv_nsec = 1000000L * (long)cl_rand_from_interval(0, 200);
+		nanosleep(&delay, NULL);
+
 		rv = new_election(tk, NULL, 1);
 		ticket_write(tk);
 	}
