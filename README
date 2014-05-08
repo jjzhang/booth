@@ -1,9 +1,11 @@
 The Booth Cluster Ticket Manager
+=============
     
-Booth manages the ticket which authorizes one of the cluster sites located in
-geographically dispersed distances to run certain resources. It is designed to
-be an add-on of Pacemaker, which extends Pacemaker to support geographically
-distributed clustering.
+Booth manages the ticket which authorizes one of the cluster
+sites located in geographically dispersed distances to run
+certain resources. It is designed to be an add-on of Pacemaker,
+which extends Pacemaker to support geographically distributed
+clustering.
     
 Booth is based on the Raft consensus algorithm. Though the
 implementation is not complete (there is no log), booth
@@ -12,6 +14,85 @@ as long as it has exclusive control of the tickets.
 
 The git repository is available at github:
 
-https://github.com/ClusterLabs/booth
+<https://github.com/ClusterLabs/booth>
 
 github can also track issues or bug reports.
+
+Description of a booth cluster
+==============================
+
+Booth cluster is a collection of cooperative servers
+communicating using the booth protocol. The purpose of the booth
+cluster is to manage cluster tickets. The booth cluster consists
+of at least three servers.
+
+A booth server can be either a site or an arbitrator. Arbitrators
+help resolve ties in elections.
+
+The basic unit of operation in the booth cluster is a ticket.
+Every non-granted ticket is in the initial state on all servers.
+For granted tickets, the server holding the ticket is the leader
+and other servers are followers. The leader issues heartbeats and
+ticket updates to the followers. The followers are required to
+obey the leader.
+
+Booth startup
+------------
+
+On startup, the booth process first loads tickets, if available,
+from the CIB. Afterwards, it broadcasts a query to get tickets'
+status from other servers. Local copies are updated from ticket
+replies.
+
+If the server discovers that itself is the ticket leader, it
+tries to establish its authority again by broadcasting heartbeat.
+If it succeeds, it continues as the leader for this ticket. The
+other booth servers become followers. This procedure is possible
+only immediately after the booth startup.
+
+Grant and revoke operations
+------------
+
+A ticket first has to be granted using the 'booth client grant'
+command.
+
+Obviously, it is not possible to grant a ticket which is
+currently granted.
+
+Ticket revoke is the operation which is the opposite of grant.
+An administrative revoke may be started at any server, but the
+operation itself happens only at the leader. If the leader is
+unreachable, the ticket cannot be revoked.
+
+A ticket grant may be delayed if not all sites are reachable.
+The delay is the ticket expiry time extended by acquire-after, if
+set. This is to ensure that the unreachable site relinquished the
+ticket it may have been holding and stopped the corresponding
+cluster resources.
+
+If the user is absolutely sure that the unreachable site does not
+hold the ticket, the delay may be skipped by using the '--force'
+option of the 'booth grant' command.
+
+If in effect, the grant delay time is shown in the 'booth list'
+command output.
+
+Ticket management
+------------
+
+A granted ticket is managed by the booth servers so that its
+availability is maximized without breaking the basic guarantee
+that the ticket is granted to one site only.
+
+The server where the ticket is granted is the leader, the other
+servers are followers. The leader occasionally sends heartbeats,
+once every half ticket expiry under normal circumstances.
+
+If a follower doesn't hear from the leader longer than the ticket
+expiry time, it will consider the ticket lost, and try to acquire
+it by starting new elections.
+
+Elections are described in the raft paper at
+<https://ramcloud.stanford.edu/wiki/download/attachments/11370504/raft.pdf>.
+
+# vim: set ft=asciidoc :
