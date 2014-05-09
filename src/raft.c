@@ -104,17 +104,16 @@ static void update_ticket_from_msg(struct ticket_config *tk,
 {
 	int duration;
 
-
 	duration = tk->term_duration;
 	if (msg)
 		duration = min(duration, ntohl(msg->ticket.term_valid_for));
 	tk->term_expires = time(NULL) + duration;
 
-
 	if (msg) {
 		update_term_from_msg(tk, msg);
 	}
 }
+
 
 static void become_follower(struct ticket_config *tk,
 		struct boothc_ticket_msg *msg)
@@ -502,7 +501,6 @@ static int process_REJECTED(
 		return 0;
 	}
 
-
 	if (tk->state == ST_CANDIDATE &&
 			rv == RLT_TERM_STILL_VALID) {
 		log_warn("from %s: there's a leader I didn't see: %s, following",
@@ -513,12 +511,25 @@ static int process_REJECTED(
 		return 0;
 	}
 
+	if (tk->state == ST_CANDIDATE &&
+			rv == RLT_YOU_OUTDATED) {
+		log_warn("from %s: our ticket %s is outdated",
+				site_string(sender),
+				tk->name);
+		tk->leader = leader;
+		if (leader && leader != no_leader) {
+			become_follower(tk, msg);
+		} else {
+			update_ticket_from_msg(tk, msg);
+			tk->state = ST_INIT;
+		}
+		return 0;
+	}
+
 	log_warn("from %s: in state %s, got %s (unexpected reject)",
 			site_string(sender),
 			state_to_string(tk->state),
 			state_to_string(rv));
-	tk->leader = leader;
-	become_follower(tk, msg);
 	return 0;
 }
 
@@ -536,6 +547,52 @@ static int send_ticket (
 	return booth_udp_send(to_site, &omsg, sizeof(omsg));
 }
 
+static int ticket_seems_ok(struct ticket_config *tk)
+{
+	int time_left;
+
+	time_left = term_time_left(tk);
+	if (!time_left)
+		return 0; /* quite sure */
+	if (tk->state == ST_CANDIDATE)
+		return 0; /* in state of flux */
+	if (tk->state == ST_LEADER)
+		return 1; /* quite sure */
+	if (tk->state == ST_FOLLOWER &&
+			time_left >= tk->term_duration/3)
+		return 1; /* almost quite sure */
+	return 0;
+}
+
+
+static int test_reason(
+		struct ticket_config *tk,
+		struct booth_site *sender,
+		struct booth_site *leader,
+		struct boothc_ticket_msg *msg
+		)
+{
+	int reason;
+
+	reason = ntohl(msg->header.reason);
+	if (reason == OR_TKT_LOST) {
+		if (tk->state == ST_INIT) {
+			log_warn("%s claims that the ticket %s is lost, but it's in %s state",
+					site_string(sender), tk->name,
+					state_to_string(tk->state)
+				);
+			return RLT_YOU_OUTDATED;
+		}
+		if (ticket_seems_ok(tk)) {
+			log_warn("%s claims that the ticket %s is lost, but it seems ok here",
+					site_string(sender), tk->name
+				);
+			return RLT_TERM_STILL_VALID;
+		}
+	}
+	return 0;
+}
+
 
 /* §5.2 */
 static int answer_REQ_VOTE(
@@ -548,7 +605,11 @@ static int answer_REQ_VOTE(
 	uint32_t term;
 	int valid;
 	struct boothc_ticket_msg omsg;
+	cmd_result_t inappr_reason;
 
+	inappr_reason = test_reason(tk, sender, leader, msg);
+	if (inappr_reason)
+		return send_reject(sender, tk, inappr_reason);
 
 	term = ntohl(msg->ticket.term);
 	/* Important: Ignore duplicated packets! */

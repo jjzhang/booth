@@ -166,6 +166,7 @@ typedef enum {
 	RLT_BUSY                = CHAR2CONST('B', 'u', 's', 'y'),
 	RLT_TERM_OUTDATED       = CHAR2CONST('T', 'O', 'd', 't'),
 	RLT_TERM_STILL_VALID    = CHAR2CONST('T', 'V', 'l', 'd'),
+	RLT_YOU_OUTDATED        = CHAR2CONST('O', 'u', 't', 'd'),
 	RLT_REDIRECT            = CHAR2CONST('R', 'e', 'd', 'r'),
 } cmd_result_t;
 
@@ -174,7 +175,6 @@ typedef enum {
 	/* for compatibility with other functions */
 	OR_JUST_SO              = 0,
 	OR_AGAIN                = CHAR2CONST('A', 'a', 'a', 'a'),
-	OR_RESULT               = CHAR2CONST('R', 's', 'l', 't'),
 	OR_TKT_LOST             = CHAR2CONST('T', 'L', 's', 't'),
 	OR_REACQUIRE            = CHAR2CONST('R', 'a', 'c', 'q'),
 	OR_ADMIN                = CHAR2CONST('A', 'd', 'm', 'n'),

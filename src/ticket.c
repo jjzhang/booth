@@ -242,6 +242,7 @@ void reset_ticket(struct ticket_config *tk)
 	tk->current_term = 0;
 	tk->commit_index = 0;
 	tk->state = ST_INIT;
+	tk->voted_for = NULL;
 }
 
 
