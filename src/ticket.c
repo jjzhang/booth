@@ -484,6 +484,11 @@ static void ticket_cron(struct ticket_config *tk)
 				 */
 				leader_update_ticket(tk);
 			}
+		} else {
+			/* this is ticket renewal, check what the
+			 * external test says */
+			if (test_external_prog(tk, 1))
+				return;
 		}
 
 		send_heartbeat(tk);
