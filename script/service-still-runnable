@@ -14,7 +14,7 @@ service="${1:?Need a resource name as first argument.}"
 
 if crm_simulate --ticket-grant "$BOOTH_TICKET" --simulate --live-check |
 	sed -n '/^Revised cluster status:/,$p' |
-	egrep "^\s+$service\s+\(.*\): Started (\S+)$"
+	egrep "^[[:space:]]+$service[[:space:]]+\(.*\):[[:space:]]+Started ([^[:space:]]+) *$" >/dev/null
 then
 	# can be started - we're done.
 	exit 0
