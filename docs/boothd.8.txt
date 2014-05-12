@@ -241,7 +241,8 @@ it is of no use to claim the ticket.
 'boothd' waits synchronously for the result of the handler, so make
 sure that the program returns quickly.
 +
-See below for details about booth specific environment variables.
+See below for details about booth specific environment variables
+and the distributed 'service-still-runnable' script.
 
 
 A more verbose example of a configuration file might be

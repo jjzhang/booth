@@ -33,7 +33,9 @@ SPEC			= $(PACKAGE_NAME).spec
 
 TARFILE			= $(PACKAGE_NAME)-$(VERSION).tar.gz
 
-EXTRA_DIST		= autogen.sh conf/booth.conf.example $(bootharbitrator_SCRIPTS) $(boothsite_SCRIPTS) 
+EXTRA_DIST		= autogen.sh conf/booth.conf.example \
+               $(bootharbitrator_SCRIPTS) $(boothsite_SCRIPTS) \
+               $(boothnoarch_SCRIPTS)
 
 AUTOMAKE_OPTIONS	= foreign
 
@@ -56,6 +58,10 @@ boothsite_SCRIPTS	= script/ocf/booth-site
 bootharbitratordir	= ${INITDDIR}
 
 bootharbitrator_SCRIPTS	= script/lsb/booth-arbitrator 
+
+boothnoarchdir		= $(datadir)/$(PACKAGE_NAME)
+
+boothnoarch_SCRIPTS	= script/service-still-runnable
 
 TESTS			= test/runtests.py
 

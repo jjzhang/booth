@@ -62,6 +62,8 @@ rm -rf %{buildroot}
 %dir /usr/lib/ocf/resource.d/pacemaker/
 /usr/lib/ocf/resource.d/pacemaker/booth-site
 %{_initrddir}/booth-arbitrator
+%dir %{_datadir}/booth
+%{_datadir}/booth/service-still-runnable
 
 
 %changelog
