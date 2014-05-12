@@ -800,6 +800,7 @@ static int process_MY_INDEX (
 	} else {
 		tk->state = (!leader || leader == no_leader) ?
 			ST_INIT : ST_FOLLOWER;
+		set_ticket_wakeup(tk);
 	}
 	return 0;
 }
