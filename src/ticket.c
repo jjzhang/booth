@@ -377,7 +377,7 @@ int ticket_broadcast(struct ticket_config *tk,
 	struct boothc_ticket_msg msg;
 
 	init_ticket_msg(&msg, cmd, res, reason, tk);
-	log_debug("broadcasting '%s' for ticket %s (term=%d, valid=%d)",
+	log_debug("broadcasting '%s' for %s (term=%d, valid=%d)",
 			state_to_string(cmd), tk->name,
 			ntohl(msg.ticket.term),
 			ntohl(msg.ticket.term_valid_for));
@@ -518,7 +518,7 @@ void process_tickets(void)
 	foreach_ticket(i, tk) {
 		sec_until = timeval_to_float(tk->next_cron) - timeval_to_float(now);
 		if (0)
-			log_debug("ticket %s next cron %" PRIx64 ".%03d, "
+			log_debug("%s next cron %" PRIx64 ".%03d, "
 					"now %" PRIx64 "%03d, in %f",
 					tk->name,
 					(uint64_t)tk->next_cron.tv_sec, timeval_msec(tk->next_cron),
@@ -577,7 +577,8 @@ static void update_acks(
 	/* got an ack! */
 	tk->acks_received |= sender->bitmask;
 
-	log_debug("got ACK from %s, %d/%d agree.",
+	log_debug("%s: got ACK from %s, %d/%d agree.",
+			tk->name,
 			site_string(sender),
 			count_bits(tk->acks_received),
 			booth_conf->site_count);

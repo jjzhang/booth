@@ -36,7 +36,7 @@ inline static void clear_election(struct ticket_config *tk)
 	int i;
 	struct booth_site *site;
 
-	log_debug("clear election");
+	log_debug("%s: clear election", tk->name);
 	tk->votes_received = 0;
 	foreach_node(i, site)
 		tk->votes_for[site->index] = NULL;
@@ -47,8 +47,8 @@ inline static void record_vote(struct ticket_config *tk,
 		struct booth_site *who,
 		struct booth_site *vote)
 {
-	log_debug("site %s votes for %s",
-			site_string(who),
+	log_debug("%s: site %s votes for %s",
+			tk->name, site_string(who),
 			site_string(vote));
 
 	if (!tk->votes_for[who->index]) {
@@ -137,7 +137,8 @@ struct booth_site *majority_votes(struct ticket_config *tk)
 
 		n = v->index;
 		count[n]++;
-		log_debug("Majority: %d %s wants %d %s => %d",
+		log_debug("%s: Majority: %d %s wants %d %s => %d",
+				tk->name,
 				i, site_string(&booth_conf->site[i]),
 				n, site_string(v),
 				count[n]);
@@ -146,7 +147,8 @@ struct booth_site *majority_votes(struct ticket_config *tk)
 			continue;
 
 
-		log_debug("Majority reached: %d of %d for %s",
+		log_debug("%s: Majority reached: %d of %d for %s",
+				tk->name,
 				count[n], booth_conf->site_count,
 				site_string(v));
 		return v;
@@ -170,13 +172,15 @@ static int newer_term(struct ticket_config *tk,
 		tk->state = ST_FOLLOWER;
 		if (!in_election) {
 			tk->leader = leader;
-			log_debug("from %s: higher term %d vs. %d, following %s",
+			log_debug("%s: from %s: higher term %d vs. %d, following %s",
+					tk->name,
 					site_string(sender),
 					term, tk->current_term,
 					ticket_leader_string(tk));
 		} else {
 			tk->leader = no_leader;
-			log_debug("from %s: higher term %d vs. %d (election)",
+			log_debug("%s: from %s: higher term %d vs. %d (election)",
+					tk->name,
 					site_string(sender),
 					term, tk->current_term);
 		}
@@ -225,7 +229,8 @@ static int answer_HEARTBEAT (
 
 
 	term = ntohl(msg->ticket.term);
-	log_debug("leader: %s, have %s; term %d vs %d",
+	log_debug("%s: leader: %s, have %s; term %d vs %d",
+			tk->name,
 			site_string(leader), ticket_leader_string(tk),
 			term, tk->current_term);
 
@@ -265,7 +270,8 @@ static int process_UPDATE (
 
 
 	term = ntohl(msg->ticket.term);
-	log_debug("leader: %s, have %s; term %d vs %d",
+	log_debug("%s: leader: %s, have %s; term %d vs %d",
+			tk->name,
 			site_string(leader), ticket_leader_string(tk),
 			term, tk->current_term);
 
@@ -617,7 +623,8 @@ static int answer_REQ_VOTE(
 	if (valid &&
 			term == tk->current_term &&
 			sender == tk->leader) {
-		log_debug("Duplicate OP_VOTE_FOR ignored.");
+		log_debug("%s: Duplicate OP_VOTE_FOR ignored.",
+			tk->name);
 		return 0;
 	}
 
@@ -661,7 +668,8 @@ int new_election(struct ticket_config *tk,
 
 
 	time(&now);
-	log_debug("start new election?, now=%" PRIi64 ", end %" PRIi64,
+	log_debug("%s: start new election?, now=%" PRIi64 ", end %" PRIi64,
+			tk->name,
 			(int64_t)now, (int64_t)(tk->election_end));
 	if (now <= tk->election_end)
 		return 0;
@@ -811,7 +819,8 @@ int raft_answer(
 	cmd = ntohl(msg->header.cmd);
 	R(tk);
 
-	log_debug("got message %s from %s",
+	log_debug("%s: got message %s from %s",
+			tk->name,
 			state_to_string(cmd),
 			site_string(from));
 
