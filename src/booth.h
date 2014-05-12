@@ -93,6 +93,8 @@ struct boothc_header {
 
 	/** The command respectively protocol state. See cmd_request_t. */
 	uint32_t cmd;
+	/** Command options. */
+	uint32_t options;
 	/** The reason for this RPC. */
 	uint32_t reason;
 	/** Result of operation. 0 == OK */
@@ -183,6 +185,12 @@ typedef enum {
 	OR_SPLIT                = CHAR2CONST('S', 'p', 'l', 't'),
 } cmd_reason_t;
 
+/* bitwise command options, currently used only for immediate
+ * grant */
+typedef enum {
+	OPT_IMMEDIATE = 1,
+} cmd_options_t;
+
 /** @} */
 
 /** @{ */
@@ -245,6 +253,7 @@ void safe_copy(char *dest, char *value, size_t buflen, const char *description);
 struct command_line {
 	int type;		/* ACT_ */
 	int op;			/* OP_ */
+	int options;	/* OPT_ */
 	char configfile[BOOTH_PATH_LEN];
 	char lockfile[BOOTH_PATH_LEN];
 

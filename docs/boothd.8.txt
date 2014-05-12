@@ -14,7 +14,7 @@ SYNOPSIS
 
 *booth* ['client'] {'list'} [-S 'site'] ['-D'] [-c 'config']
 
-*booth* ['client'] {'grant'|'revoke'} [-S 'site'] ['-D'] [-t] 'ticket'  [-c 'config']
+*booth* ['client'] {'grant'|'revoke'} [-F] [-S 'site'] ['-D'] [-t] 'ticket'  [-c 'config']
 
 *booth* 'status' ['-D'] [-c 'config']
 
@@ -78,6 +78,11 @@ The configuration name also determines the name of the PID file - for the defaul
 
 *-S*::
 	'systemd' mode: don't fork. This is like '-D' but without the debug output.
+
+*-F*::
+	'immediate grant': Don't wait for unreachable sites to
+	relinquish the ticket. See the 'Booth ticket management'
+	section below for more details. Use with caution!
 
 
 
@@ -270,6 +275,13 @@ Tickets must be initially granted with the 'booth client grant'
 command. Once it gets granted, the ticket is managed by the booth
 cluster.
 
+Ticket grants are delayed in case one or more sites are not
+reachable. The delay is for the ticket 'expire' time plus, if
+defined, the 'acquire-after' time. This delay may be skipped with
+the '-F' option for the grant command. In that case, it is up to
+the administrator to make sure that the unreachable site is not
+holding the ticket.
+
 If the ticket gets lost, i.e. that the other members of the booth
 cluster do not hear from the ticket owner in a sufficiently long
 time, one of the remaining sites will acquire the ticket. This is
@@ -280,9 +292,7 @@ cannot fail over.
 
 A ticket may be revoked at any time with the 'booth client
 revoke' command. For revoke to succeed, the site holding the
-ticket must be reachable. If that site is not reachable, 'booth'
-allows neither revoke nor grant until the ticket expires.  Only
-then the ticket is considered lost and ticket failover is tried.
+ticket must be reachable.
 
 Once the ticket is administratively revoked, it is not managed by
 the booth cluster anymore. For the booth cluster to start

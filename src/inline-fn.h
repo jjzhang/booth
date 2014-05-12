@@ -76,19 +76,21 @@ static inline void init_header_bare(struct boothc_header *h) {
 	h->auth2   = htonl(0);
 }
 
-static inline void init_header(struct boothc_header *h, int cmd,
+static inline void init_header(struct boothc_header *h,
+			int cmd, int options,
 			int result, int reason, int data_len)
 {
 	init_header_bare(h);
 	h->length  = htonl(data_len);
 	h->cmd     = htonl(cmd);
+	h->options = htonl(options);
 	h->result  = htonl(result);
 	h->reason  = htonl(reason);
 }
 
 static inline void init_ticket_site_header(struct boothc_ticket_msg *msg, int cmd)
 {
-	init_header(&msg->header, cmd, 0, 0, sizeof(*msg));
+	init_header(&msg->header, cmd, 0, 0, 0, sizeof(*msg));
 }
 
 static inline void init_ticket_msg(struct boothc_ticket_msg *msg,
@@ -97,7 +99,7 @@ static inline void init_ticket_msg(struct boothc_ticket_msg *msg,
 {
 	assert(sizeof(msg->ticket.id) == sizeof(tk->name));
 
-	init_header(&msg->header, cmd, rv, reason, sizeof(*msg));
+	init_header(&msg->header, cmd, 0, rv, reason, sizeof(*msg));
 
 	if (!tk) {
 		memset(&msg->ticket, 0, sizeof(msg->ticket));

@@ -155,7 +155,7 @@ int acquire_ticket(struct ticket_config *tk, cmd_reason_t reason)
 
 /** Try to get the ticket for the local site.
  * */
-int do_grant_ticket(struct ticket_config *tk)
+int do_grant_ticket(struct ticket_config *tk, int options)
 {
 	int rv;
 
@@ -166,6 +166,15 @@ int do_grant_ticket(struct ticket_config *tk)
 
 	tk->delay_grant = time(NULL) +
 			tk->term_duration + tk->acquire_after;
+
+	if (options & OPT_IMMEDIATE) {
+		log_warn("Grant ticket %s immediately! If there are "
+				"unreachable sites, _hope_ you are sure that they don't "
+				"have the ticket!",
+				tk->name);
+		tk->delay_grant = 0;
+	}
+
 	rv = acquire_ticket(tk, OR_ADMIN);
 	return rv;
 }
@@ -290,7 +299,7 @@ int ticket_answer_list(int fd, struct boothc_ticket_msg *msg)
 	if (rv < 0)
 		return rv;
 
-	init_header(&hdr, CMR_LIST, RLT_SUCCESS, 0, sizeof(hdr) + olen);
+	init_header(&hdr, CMR_LIST, 0, RLT_SUCCESS, 0, sizeof(hdr) + olen);
 
 	return send_header_plus(fd, &hdr, data, olen);
 }
@@ -316,10 +325,10 @@ int ticket_answer_grant(int fd, struct boothc_ticket_msg *msg)
 		goto reply;
 	}
 
-	rv = do_grant_ticket(tk);
+	rv = do_grant_ticket(tk, ntohl(msg->header.options));
 
 reply:
-	init_header(&msg->header, CMR_GRANT, rv ?: RLT_ASYNC, 0, sizeof(*msg));
+	init_header(&msg->header, CMR_GRANT, 0, rv ?: RLT_ASYNC, 0, sizeof(*msg));
 	return send_ticket_msg(fd, msg);
 }
 

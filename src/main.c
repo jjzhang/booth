@@ -272,7 +272,7 @@ bad_len:
 	default:
 		log_error("connection %d cmd %x unknown",
 				ci, ntohl(msg.header.cmd));
-		init_header(&msg.header,CMR_GENERAL, RLT_INVALID_ARG, 0, sizeof(msg.header));
+		init_header(&msg.header,CMR_GENERAL, 0, RLT_INVALID_ARG, 0, sizeof(msg.header));
 		send_header_only(fd, &msg.header);
 		goto kill;
 	}
@@ -501,7 +501,7 @@ static int query_get_string_answer(cmd_request_t cmd)
 	struct booth_transport const *tpt;
 
 	data = NULL;
-	init_header(&cl.msg.header, cmd, 0, 0, sizeof(cl.msg));
+	init_header(&cl.msg.header, cmd, cl.options, 0, 0, sizeof(cl.msg));
 
 	if (!*cl.site)
 		site = local;
@@ -549,6 +549,16 @@ out:
 static int test_reply(int reply_code, cmd_request_t cmd)
 {
 	int rv = 0;
+	const char *op_str;
+
+	if (cmd == CMD_GRANT)
+		op_str = "grant";
+	else if (cmd == CMD_REVOKE)
+		op_str = "revoke";
+	else {
+		log_error("internal error reading reply result!");
+		return -1;
+	}
 
 	switch (reply_code) {
 	case RLT_OVERGRANT:
@@ -559,33 +569,20 @@ static int test_reply(int reply_code, cmd_request_t cmd)
 		break;
 
 	case RLT_ASYNC:
-		if (cmd == CMD_GRANT)
-			log_info("grant command sent, result will be returned "
-				 "asynchronously, you can get the result from "
-				 "the log files");
-		else if (cmd == CMD_REVOKE)
-			log_info("revoke command sent, result will be returned "
-				 "asynchronously, you can get the result from "
-				 "the log files.");
-		else
-			log_error("internal error reading reply result!");
+		log_info("%s command sent, result will be returned "
+			 "asynchronously. Please use \"booth list\" to "
+			 "see the outcome.", op_str);
 		rv = 0;
 		break;
 
 	case RLT_SYNC_SUCC:
 	case RLT_SUCCESS:
-		if (cmd == CMD_GRANT)
-			log_info("grant succeeded!");
-		else if (cmd == CMD_REVOKE)
-			log_info("revoke succeeded!");
+		log_info("%s succeeded!", op_str);
 		rv = 0;
 		break;
 
 	case RLT_SYNC_FAIL:
-		if (cmd == CMD_GRANT)
-			log_info("grant failed!");
-		else if (cmd == CMD_REVOKE)
-			log_info("revoke failed!");
+		log_info("%s failed!", op_str);
 		rv = -1;
 		break;
 
@@ -652,7 +649,7 @@ static int do_command(cmd_request_t cmd)
 	}
 
 redirect:
-	init_header(&cl.msg.header, cmd, 0, 0, sizeof(cl.msg));
+	init_header(&cl.msg.header, cmd, cl.options, 0, 0, sizeof(cl.msg));
 
 	/* Always use TCP for client - at least for now. */
 	tpt = booth_transport + TCP;
@@ -812,12 +809,13 @@ static void print_usage(void)
 	printf("  -t            ticket name\n");
 	printf("  -s            site name\n");
 	printf("  -l LOCKFILE   Specify lock file path (daemon only)\n");
+	printf("  -F            Try to grant the ticket immediately (client only)\n");
 	printf("  -h            Print this help, then exit\n");
 	printf("\n");
 	printf("Please see the man page for details.\n");
 }
 
-#define OPTION_STRING		"c:Dl:t:s:hS"
+#define OPTION_STRING		"c:Dl:t:s:FhS"
 
 
 void safe_copy(char *dest, char *value, size_t buflen, const char *description) {
@@ -980,6 +978,14 @@ static int read_arguments(int argc, char **argv)
 				log_error("\"-s\" not allowed in daemon mode.");
 				exit(EXIT_FAILURE);
 			}
+			break;
+
+		case 'F':
+			if (cl.type != CLIENT || cl.op != CMD_GRANT) {
+				log_error("use \"-F\" only for client grant");
+				exit(EXIT_FAILURE);
+			}
+			cl.options |= OPT_IMMEDIATE;
 			break;
 
 		case 'h':
