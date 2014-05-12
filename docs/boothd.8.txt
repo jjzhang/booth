@@ -12,9 +12,11 @@ SYNOPSIS
 --------
 *boothd* 'daemon' ['-D'] [-c 'config']
 
-*booth* ['client'] {'list'} [-S 'site'] ['-D'] [-c 'config']
+*booth* ['client'] 'list' [-s 'site'] ['-D'] [-c 'config']
 
-*booth* ['client'] {'grant'|'revoke'} [-F] [-S 'site'] ['-D'] [-t] 'ticket'  [-c 'config']
+*booth* ['client'] 'grant' [-F] [-s 'site'] ['-D'] [-t] 'ticket' [-c 'config']
+
+*booth* ['client'] 'revoke' [-s 'site'] ['-D'] [-t] 'ticket'  [-c 'config']
 
 *booth* 'status' ['-D'] [-c 'config']
 
@@ -38,11 +40,11 @@ SHORT EXAMPLES
 ---------------------
 # boothd daemon
 
-# boothd client list
+# booth list
 
-# boothd client grant -t ticket-nfs
+# booth grant -t ticket-nfs
 
-# boothd client revoke -t ticket-nfs
+# booth revoke -t ticket-nfs
 ---------------------
 
 
@@ -275,13 +277,6 @@ Tickets must be initially granted with the 'booth client grant'
 command. Once it gets granted, the ticket is managed by the booth
 cluster.
 
-Ticket grants are delayed in case one or more sites are not
-reachable. The delay is for the ticket 'expire' time plus, if
-defined, the 'acquire-after' time. This delay may be skipped with
-the '-F' option for the grant command. In that case, it is up to
-the administrator to make sure that the unreachable site is not
-holding the ticket.
-
 If the ticket gets lost, i.e. that the other members of the booth
 cluster do not hear from the ticket owner in a sufficiently long
 time, one of the remaining sites will acquire the ticket. This is
@@ -296,13 +291,17 @@ ticket must be reachable.
 
 Once the ticket is administratively revoked, it is not managed by
 the booth cluster anymore. For the booth cluster to start
-managing the ticket again, it must be first granted to a site.
+managing the ticket again, it must be again granted to a site.
 
 The grant operation, in case not all sites are reachable, may get
 delayed for the ticket expire time (and, if defined, the
 'acquire-after' time). Under certain circumstances, the rest of
 the booth members may not know if the ticket is currently granted
 at the unreachable site.
+
+This delay is disabled if the '-F' option is specified. In that
+case, it is up to the administrator to make sure that the
+unreachable site is not holding the ticket.
 
 While the ticket is managed by 'booth', it is dangerous to manage
 it manually using either `crm_ticket` command or `crm site
