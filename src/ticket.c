@@ -176,6 +176,8 @@ int do_grant_ticket(struct ticket_config *tk, int options)
 	}
 
 	rv = acquire_ticket(tk, OR_ADMIN);
+	if (rv)
+		tk->delay_grant = 0;
 	return rv;
 }
 
@@ -217,7 +219,7 @@ int list_ticket(char **pdata, unsigned int *len)
 		else
 			strcpy(timeout_str, "INF");
 
-		if (tk->delay_grant) {
+		if (tk->leader == local && tk->delay_grant > time(NULL)) {
 			strcpy(pending_str, " (pending until ");
 			strftime(pending_str + strlen(" (pending until "),
 					sizeof(pending_str) - strlen(" (pending until ") - 1,

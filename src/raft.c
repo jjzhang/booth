@@ -120,6 +120,7 @@ static void become_follower(struct ticket_config *tk,
 {
 	update_ticket_from_msg(tk, msg);
 	tk->state = ST_FOLLOWER;
+	tk->delay_grant = 0;
 }
 
 
@@ -687,8 +688,8 @@ int new_election(struct ticket_config *tk,
 	tk->term_expires = 0;
 	tk->election_end = now + tk->timeout;
 
-	log_info("starting new election, term=%d, until %" PRIi64,
-			tk->current_term, (int64_t)tk->election_end);
+	log_info("%s: starting new election, term=%d, until %" PRIi64,
+			tk->name, tk->current_term, (int64_t)tk->election_end);
 	clear_election(tk);
 
 	if(preference)
