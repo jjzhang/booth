@@ -626,14 +626,14 @@ static int do_command(cmd_request_t cmd)
 			log_error("Site \"%s\" not configured.", cl.site);
 			goto out_close;
 		}
-
-		if (site->type == ARBITRATOR) {
-			log_error("Site \"%s\" is an arbitrator, cannot grant ticket there.", cl.site);
-			goto out_close;
-		}
-
-		assert(site->type == SITE);
 	}
+
+	if (site->type == ARBITRATOR) {
+		log_error("Site \"%s\" is an arbitrator, cannot grant/revoke ticket there.", cl.site);
+		goto out_close;
+	}
+
+	assert(site->type == SITE);
 
 	/* We don't check for existence of ticket, so that asking can be
 	 * done without local configuration, too.
