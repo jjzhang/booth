@@ -198,10 +198,10 @@ const char *type_to_string(int type);
 
 
 #include <stdio.h>
-#define R(tk_) printf("## %12s:%3d state %s, %d:%d, " \
+#define R(tk_) do { if (ANYDEBUG) printf("## %12s:%3d state %s, %d:%d, " \
 	"leader %s, exp %s", __FILE__, __LINE__, \
 	state_to_string(tk_->state), tk_->current_term, \
-	tk_->commit_index, site_string(tk_->leader), ctime(&tk_->term_expires))
+	tk_->commit_index, site_string(tk_->leader), ctime(&tk_->term_expires)); } while(0)
 
 
 #endif /* _CONFIG_H */
