@@ -61,7 +61,7 @@ bootharbitrator_SCRIPTS	= script/lsb/booth-arbitrator
 
 boothnoarchdir		= $(datadir)/$(PACKAGE_NAME)
 
-boothnoarch_SCRIPTS	= script/service-still-runnable
+boothnoarch_SCRIPTS	= script/service-runnable
 
 TESTS			= test/runtests.py
 

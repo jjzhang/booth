@@ -242,7 +242,7 @@ it is of no use to claim the ticket.
 sure that the program returns quickly.
 +
 See below for details about booth specific environment variables
-and the distributed 'service-still-runnable' script.
+and the distributed 'service-runnable' script.
 
 
 A more verbose example of a configuration file might be
