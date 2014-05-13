@@ -27,7 +27,7 @@ cluster is to manage cluster tickets. The booth cluster consists
 of at least three servers.
 
 A booth server can be either a site or an arbitrator. Arbitrators
-help resolve ties in elections.
+help resolve ties in elections, but cannot hold tickets.
 
 The basic unit of operation in the booth cluster is a ticket.
 Every non-granted ticket is in the initial state on all servers.
@@ -71,13 +71,13 @@ ticket it may have been holding and stopped the corresponding
 cluster resources.
 
 If the user is absolutely sure that the unreachable site does not
-hold the ticket, the delay may be skipped by using the '--force'
+hold the ticket, the delay may be skipped by using the '-F'
 option of the 'booth grant' command.
 
 If in effect, the grant delay time is shown in the 'booth list'
 command output.
 
-Ticket management
+Ticket management and server operation
 ------------
 
 A granted ticket is managed by the booth servers so that its
@@ -92,7 +92,68 @@ If a follower doesn't hear from the leader longer than the ticket
 expiry time, it will consider the ticket lost, and try to acquire
 it by starting new elections.
 
-Elections are described in the raft paper at
+A server starts elections by broadcasting the REQ_VOTE RPC.
+Other servers reply with the VOTE_FOR RPC, in which they record
+its vote. Normally, the sender of the first REQ_VOTE gets the
+vote of the receiver. Whichever server gets a majority of votes
+wins the elections. On ties, elections are restarted. To
+decrease chance of elections ending in a tie, a server waits for a
+short random period before sending out the REQ_VOTE packets.
+Everything else being equal, the server which sends REQ_VOTE
+first gets elected.
+
+Elections are described in more detail in the raft paper at
 <https://ramcloud.stanford.edu/wiki/download/attachments/11370504/raft.pdf>.
+
+Ticket renewal (or update) is a two-step process. Before actually
+writing the ticket to the CIB, the server holding the ticket
+first tries to establish that it still has the majority for that
+ticket. That is done by broadcasting a heartbeat. If the server
+receives enough acknowledgements, it then stores the ticket to
+the CIB and broadcasts the UPDATE RPC with updated ticket expiry
+time so that the followers can update local ticket copies. Ticket
+renewals run every half ticket expire time.
+
+Before ticket renewal, the leader runs an external program if
+such program is set in 'before-acquire-handler'. The external
+program should ensure that the cluster managed service which is
+protected by this ticket can run at this site. If that program
+fails, the leader relinquishes the ticket. It announces its
+intention to step down by broadcasting an unsolicited VOTE_FOR
+with an empty vote. On receiving such RPC other servers start new
+elections to elect a new leader.
+
+Split brain
+------------
+
+On split brains two possible issues arise: leader in minority and
+follower disconnected from the leader.
+
+Let's take a look at the first one. The leader in minority
+eventually expires the ticket because it cannot receieve majority
+of acknowledgements in reply to its heartbeats. The other
+partition runs elections (at about the same time, as they find
+the ticket lost after its expiry) and, if it can get the
+majority, the elections winner becomes a new leader for the
+ticket. After split brain gets resolved, the old leader will
+become follower as soon as it receives heartbeat from the new
+leader. Note the timing: the old leader releases the ticket at
+around the same time as when new elections in the other partition
+are held. This is because the leader ensures that the ticket
+expire time is always the same on all servers in the booth
+cluster.
+
+The second situation, where a follower is disconnected from the
+leader, is a bit more difficult to handle. After the ticket
+expiry time, the follower will consider the ticket lost and start
+new elections. The elections repeatedly get restarted until the
+split brain is resolved. Then, the rest of the cluster send
+rejects in reply to REQ_VOTE RPC because the ticket is still
+valid and therefore couldn't have been lost. They know that
+because the reason for elections is included with every REQ_VOTE.
+
+Short intermittent split brains are handled well because the
+leader keeps resending heartbeats until it gets replies from all
+servers serving sites.
 
 # vim: set ft=asciidoc :
