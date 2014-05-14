@@ -163,6 +163,7 @@ typedef enum {
 	RLT_SYNC_FAIL           = CHAR2CONST('F', 'a', 'i', 'l'),
 	RLT_INVALID_ARG         = CHAR2CONST('I', 'A', 'r', 'g'),
 	RLT_EXT_FAILED          = CHAR2CONST('X', 'P', 'r', 'g'),
+	RLT_TICKET_IDLE         = CHAR2CONST('T', 'i', 'd', 'l'),
 	RLT_OVERGRANT           = CHAR2CONST('O', 'v', 'e', 'r'),
 	RLT_PROBABLY_SUCCESS    = CHAR2CONST('S', 'u', 'c', '?'),
 	RLT_BUSY                = CHAR2CONST('B', 'u', 's', 'y'),

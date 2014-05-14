@@ -128,6 +128,9 @@ struct ticket_config {
 	/* timestamp of the request, currently unused */
 	time_t req_sent_at;
 
+	/* don't log warnings unnecessarily
+	 */
+	int expect_more_rejects;
 	/** \name Needed while proposals are being done.
 	 * @{ */
 	/** Whom to vote for the next time.

@@ -123,8 +123,7 @@ int test_external_prog(struct ticket_config *tk,
 
 	rv = run_handler(tk, tk->ext_verifier, 1);
 	if (rv) {
-		log_warn("we are not allowed to acquire ticket %s",
-			tk->name);
+		tk_log_warn("we are not allowed to acquire ticket");
 
 		/* Give it to somebody else.
 		 * Just send a VOTE_FOR message, so the
@@ -159,6 +158,8 @@ int do_grant_ticket(struct ticket_config *tk, int options)
 {
 	int rv;
 
+	tk_log_info("granting ticket");
+
 	if (tk->leader == local)
 		return RLT_SUCCESS;
 	if (is_owned(tk))
@@ -168,10 +169,9 @@ int do_grant_ticket(struct ticket_config *tk, int options)
 			tk->term_duration + tk->acquire_after;
 
 	if (options & OPT_IMMEDIATE) {
-		log_warn("Grant ticket %s immediately! If there are "
+		tk_log_warn("granting ticket immediately! If there are "
 				"unreachable sites, _hope_ you are sure that they don't "
-				"have the ticket!",
-				tk->name);
+				"have the ticket!");
 		tk->delay_grant = 0;
 	}
 
@@ -186,7 +186,7 @@ int do_grant_ticket(struct ticket_config *tk, int options)
  * Only to be started from the leader. */
 int do_revoke_ticket(struct ticket_config *tk)
 {
-	log_info("revoking ticket %s", tk->name);
+	tk_log_info("revoking ticket");
 
 	reset_ticket(tk);
 	ticket_write(tk);
@@ -283,6 +283,7 @@ int setup_ticket(void)
 			}
 		} else {
 			/* otherwise, query status */
+			tk_log_info("broadcasting state query");
 			ticket_broadcast(tk, OP_STATUS, RLT_SUCCESS, 0);
 		}
 	}
@@ -350,14 +351,13 @@ int ticket_answer_revoke(int fd, struct boothc_ticket_msg *msg)
 	if (!is_owned(tk)) {
 		log_info("client wants to revoke a free ticket %s",
 				msg->ticket.id);
-		/* Return a different result code? */
-		rv = RLT_SUCCESS;
+		rv = RLT_TICKET_IDLE;
 		goto reply;
 	}
 
 	if (tk->leader != local) {
-		log_info("we do not own the ticket %s, "
-				"redirect to leader %s",
+		log_info("the ticket %s is not granted here, "
+				"redirect to %s",
 				msg->ticket.id, ticket_leader_string(tk));
 		rv = RLT_REDIRECT;
 		goto reply;
@@ -379,8 +379,8 @@ int ticket_broadcast(struct ticket_config *tk,
 	struct boothc_ticket_msg msg;
 
 	init_ticket_msg(&msg, cmd, res, reason, tk);
-	log_debug("broadcasting '%s' for %s (term=%d, valid=%d)",
-			state_to_string(cmd), tk->name,
+	tk_log_debug("broadcasting '%s' (term=%d, valid=%d)",
+			state_to_string(cmd),
 			ntohl(msg.ticket.term),
 			ntohl(msg.ticket.term_valid_for));
 
@@ -410,6 +410,23 @@ int new_round(struct ticket_config *tk, cmd_reason_t reason)
 }
 
 
+static void log_lost_servers(struct ticket_config *tk)
+{
+	struct booth_site *n;
+	int i;
+
+	for (i = 0; i < booth_conf->site_count; i++) {
+		n = booth_conf->site + i;
+		if (!(tk->acks_received & n->bitmask)) {
+			tk_log_warn("%s %s didn't acknowledge our request, "
+			"will retry %d times",
+			(n->type == ARBITRATOR ? "arbitrator" : "site"),
+			site_string(n),
+			tk->retries);
+		}
+	}
+}
+
 static void ticket_cron(struct ticket_config *tk)
 {
 	time_t now;
@@ -426,9 +443,11 @@ static void ticket_cron(struct ticket_config *tk)
 			is_owned(tk) &&
 			now >= tk->term_expires) {
 
-		log_warn("LOST ticket: %s no longer at %s",
-				tk->name,
-				ticket_leader_string(tk));
+		if (tk->leader != local) {
+			tk_log_warn("lost at %s", site_string(tk->leader));
+		} else {
+			tk_log_warn("lost majority (revoking locally)");
+		}
 
 		/* Couldn't renew in time - ticket lost. */
 		new_round(tk, OR_TKT_LOST);
@@ -467,19 +486,23 @@ static void ticket_cron(struct ticket_config *tk)
 			if (!majority_of_bits(tk, tk->acks_received)) {
 				ack_cnt = count_bits(tk->acks_received) - 1;
 				if (!ack_cnt) {
-					log_warn("no answers to heartbeat for ticket %s on try #%d, "
+					tk_log_warn("no answers to heartbeat (try #%d), "
 					"we are alone",
-					tk->name,
 					tk->retry_number);
 				} else {
-					log_warn("not enough answers to heartbeat for ticket %s on try #%d: "
+					tk_log_warn("not enough answers to heartbeat (try #%d): "
 					"only got %d answers",
-					tk->name,
 					tk->retry_number,
 					ack_cnt);
 				}
 			/* Don't give up, though - there's still some time until leadership is lost. */
 			} else {
+				if (tk->retry_number <= 1) {
+					/* log those that we couldn't reach, but do
+					 * that only on the first retry
+					 */
+					log_lost_servers(tk);
+				}
 				/* we have the majority, update the ticket, at
 				 * least the local copy if we're still not
 				 * allowed to commit
@@ -497,6 +520,7 @@ static void ticket_cron(struct ticket_config *tk)
 		if (tk->retry_number < tk->retries) {
 			ticket_activate_timeout(tk);
 		} else {
+			tk->retry_number = 0;
 			set_ticket_wakeup(tk);
 		}
 		break;
@@ -520,16 +544,15 @@ void process_tickets(void)
 	foreach_ticket(i, tk) {
 		sec_until = timeval_to_float(tk->next_cron) - timeval_to_float(now);
 		if (0)
-			log_debug("%s next cron %" PRIx64 ".%03d, "
+			tk_log_debug("next cron %" PRIx64 ".%03d, "
 					"now %" PRIx64 "%03d, in %f",
-					tk->name,
 					(uint64_t)tk->next_cron.tv_sec, timeval_msec(tk->next_cron),
 					(uint64_t)now.tv_sec, timeval_msec(now),
 					sec_until);
 		if (sec_until > 0.0)
 			continue;
 
-		log_debug("ticket cron: doing %s", tk->name);
+		tk_log_debug("ticket cron");
 
 
 		/* Set next value, handler may override.
@@ -550,11 +573,10 @@ void tickets_log_info(void)
 	int i;
 
 	foreach_ticket(i, tk) {
-		log_info("Ticket %s: state '%s' "
+		tk_log_info("state '%s' "
 				"commit index %d "
 				"leader %s "
 				"expires %-24.24s",
-				tk->name,
 				state_to_string(tk->state),
 				tk->commit_index,
 				ticket_leader_string(tk),
@@ -579,8 +601,7 @@ static void update_acks(
 	/* got an ack! */
 	tk->acks_received |= sender->bitmask;
 
-	log_debug("%s: got ACK from %s, %d/%d agree.",
-			tk->name,
+	tk_log_debug("got ACK from %s, %d/%d agree.",
 			site_string(sender),
 			count_bits(tk->acks_received),
 			booth_conf->site_count);
@@ -621,7 +642,7 @@ int message_recv(struct boothc_ticket_msg *msg, int msglen)
 
 	leader_u = ntohl(msg->ticket.leader);
 	if (!find_site_by_id(leader_u, &leader)) {
-		log_error("Message with unknown owner %u received", leader_u);
+		tk_log_error("message with unknown leader %u received", leader_u);
 		return -EINVAL;
 	}
 
@@ -669,7 +690,7 @@ void set_ticket_wakeup(struct ticket_config *tk)
 		break;
 
 	default:
-		log_error("unknown ticket state: %d", tk->state);
+		tk_log_error("unknown ticket state: %d", tk->state);
 	}
 }
 

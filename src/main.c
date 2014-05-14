@@ -568,6 +568,11 @@ static int test_reply(int reply_code, cmd_request_t cmd)
 		rv = -1;
 		break;
 
+	case RLT_TICKET_IDLE:
+		log_info("ticket is not owned");
+		rv = 0;
+		break;
+
 	case RLT_ASYNC:
 		log_info("%s command sent, result will be returned "
 			 "asynchronously. Please use \"booth list\" to "

@@ -24,9 +24,23 @@
 #include <heartbeat/glue_config.h>
 #include <clplumbing/cl_log.h>
 
-#define log_debug(fmt, args...)		do { if (ANYDEBUG) cl_log(LOG_DEBUG, fmt, ##args); } while (0)
+#define log_debug(fmt, args...)		do { \
+	if (ANYDEBUG) cl_log(LOG_DEBUG, fmt, ##args); } \
+	while (0)
 #define log_info(fmt, args...)		cl_log(LOG_INFO, fmt, ##args)
 #define log_warn(fmt, args...)		cl_log(LOG_WARNING, fmt, ##args)
 #define log_error(fmt, args...)		cl_log(LOG_ERR, fmt, ##args)
+
+/* all tk_* macros prepend "%(tk->name): " (the caller needs to
+ * have the ticket named tk!)
+ */
+#define tk_cl_log(sev, fmt, args...)		cl_log(sev, "%s: " fmt, tk->name, ##args)
+
+#define tk_log_debug(fmt, args...)		do { \
+	if (ANYDEBUG) tk_cl_log(LOG_DEBUG, fmt, ##args); } \
+	while (0)
+#define tk_log_info(fmt, args...)		tk_cl_log(LOG_INFO, fmt, ##args)
+#define tk_log_warn(fmt, args...)		tk_cl_log(LOG_WARNING, fmt, ##args)
+#define tk_log_error(fmt, args...)		tk_cl_log(LOG_ERR, fmt, ##args)
 
 #endif /* _LOG_H */

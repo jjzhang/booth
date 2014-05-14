@@ -56,14 +56,14 @@ int run_handler(struct ticket_config *tk,
 		setenv("BOOTH_TICKET_EXPIRES", expires, 1);
 
 	if (rv) {
-		log_error("Cannot set environment: %d", errno);
+		log_error("Cannot set environment: %s", strerror(errno));
 	} else {
 		rv = system(cmd);
 		if (rv)
-			log_warn("handler \"%s\" exited with error %s",
+			tk_log_warn("handler \"%s\" exited with error %s",
 					cmd, interpret_rv(rv));
 		else
-			log_info("handler \"%s\" exited with success", cmd);
+			tk_log_debug("handler \"%s\" exited with success", cmd);
 	}
 
 	return rv;
