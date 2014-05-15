@@ -290,10 +290,18 @@ static inline int should_start_renewal(struct ticket_config *tk)
 static inline void expect_replies(struct ticket_config *tk,
 		int reply_type)
 {
+	tk->retry_number = 0;
 	tk->acks_expected = reply_type;
 	tk->acks_received = local->bitmask;
 	tk->req_sent_at  = time(NULL);
 	tk->ticket_updated = 0;
+}
+
+static inline void no_resends(struct ticket_config *tk)
+{
+	tk->retry_number = 0;
+	tk->acks_expected = 0;
+	tk->acks_received = 0;
 }
 
 static inline int send_heartbeat(struct ticket_config *tk)

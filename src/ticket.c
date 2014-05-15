@@ -415,6 +415,12 @@ static void log_lost_servers(struct ticket_config *tk)
 	struct booth_site *n;
 	int i;
 
+	if (tk->retry_number != 1)
+		/* log those that we couldn't reach, but do
+		 * that only on the first retry
+		 */
+		return;
+
 	for (i = 0; i < booth_conf->site_count; i++) {
 		n = booth_conf->site + i;
 		if (!(tk->acks_received & n->bitmask)) {
@@ -427,16 +433,71 @@ static void log_lost_servers(struct ticket_config *tk)
 	}
 }
 
+static void resend_msg(struct ticket_config *tk)
+{
+	struct booth_site *n;
+	int i;
+
+	if (!(tk->acks_received ^ local->bitmask)) {
+		ticket_broadcast(tk, tk->acks_expected, RLT_SUCCESS, 0);
+	} else {
+		for (i = 0; i < booth_conf->site_count; i++) {
+			n = booth_conf->site + i;
+			if (!(tk->acks_received & n->bitmask)) {
+				tk_log_debug("resending %s to %s",
+						state_to_string(tk->acks_expected),
+						site_string(n)
+						);
+				send_msg(tk->acks_expected, tk, n);
+			}
+		}
+	}
+}
+
+static void handle_resends(struct ticket_config *tk)
+{
+	int ack_cnt;
+
+	tk->retry_number ++;
+	if (!majority_of_bits(tk, tk->acks_received)) {
+		ack_cnt = count_bits(tk->acks_received) - 1;
+		if (!ack_cnt) {
+			tk_log_warn("no answers to heartbeat (try #%d), "
+			"we are alone",
+			tk->retry_number);
+		} else {
+			tk_log_warn("not enough answers to heartbeat (try #%d): "
+			"only got %d answers",
+			tk->retry_number,
+			ack_cnt);
+		}
+	} else {
+		log_lost_servers(tk);
+		/* we have the majority, update the ticket, at
+		 * least the local copy if we're still not
+		 * allowed to commit
+		 */
+		leader_update_ticket(tk);
+	}
+
+	if (tk->retry_number <= tk->retries) {
+		resend_msg(tk);
+		ticket_activate_timeout(tk);
+	} else {
+		tk_log_debug("giving up on sending retries");
+		no_resends(tk);
+		set_ticket_wakeup(tk);
+	}
+}
+
 static void ticket_cron(struct ticket_config *tk)
 {
 	time_t now;
-	int ack_cnt;
 	struct booth_site *new_leader;
 
 	now = time(NULL);
 
 
-	R(tk);
 	/* Has an owner, has an expiry date, and expiry date in the past?
 	 * Losing the ticket must happen in _every_ state. */
 	if (tk->term_expires &&
@@ -453,7 +514,6 @@ static void ticket_cron(struct ticket_config *tk)
 		new_round(tk, OR_TKT_LOST);
 		return;
 	}
-	R(tk);
 
 	switch(tk->state) {
 	case ST_INIT:
@@ -473,62 +533,27 @@ static void ticket_cron(struct ticket_config *tk)
 			leader_elected(tk, new_leader);
 		} else if (now > tk->election_end) {
 			/* This is previous election timed out */
+			tk_log_info("election timed out");
 			new_election(tk, NULL, 0, OR_AGAIN);
 		}
 		break;
 
 	case ST_LEADER:
-		/* we get here after we broadcasted a heartbeat;
-		 * by this time all sites should've acked the heartbeat
-		 */
+		/* timeout or ticket renewal? */
 		if (tk->acks_expected) {
-			tk->retry_number ++;
-			if (!majority_of_bits(tk, tk->acks_received)) {
-				ack_cnt = count_bits(tk->acks_received) - 1;
-				if (!ack_cnt) {
-					tk_log_warn("no answers to heartbeat (try #%d), "
-					"we are alone",
-					tk->retry_number);
-				} else {
-					tk_log_warn("not enough answers to heartbeat (try #%d): "
-					"only got %d answers",
-					tk->retry_number,
-					ack_cnt);
-				}
-			/* Don't give up, though - there's still some time until leadership is lost. */
-			} else {
-				if (tk->retry_number <= 1) {
-					/* log those that we couldn't reach, but do
-					 * that only on the first retry
-					 */
-					log_lost_servers(tk);
-				}
-				/* we have the majority, update the ticket, at
-				 * least the local copy if we're still not
-				 * allowed to commit
-				 */
-				leader_update_ticket(tk);
+			handle_resends(tk);
+		} else {
+			/* this is ticket renewal, run local test */
+			if (!test_external_prog(tk, 1)) {
+				send_heartbeat(tk);
+				ticket_activate_timeout(tk);
 			}
-		} else {
-			/* this is ticket renewal, check what the
-			 * external test says */
-			if (test_external_prog(tk, 1))
-				return;
-		}
-
-		send_heartbeat(tk);
-		if (tk->retry_number < tk->retries) {
-			ticket_activate_timeout(tk);
-		} else {
-			tk->retry_number = 0;
-			set_ticket_wakeup(tk);
 		}
 		break;
 
 	default:
 		break;
 	}
-	R(tk);
 }
 
 
@@ -607,7 +632,8 @@ static void update_acks(
 			booth_conf->site_count);
 
 	if (all_replied(tk)) {
-		tk->acks_expected = 0;
+		no_resends(tk);
+		set_ticket_wakeup(tk);
 	}
 }
 
@@ -722,7 +748,22 @@ int send_reject(struct booth_site *dest, struct ticket_config *tk, cmd_result_t 
 {
 	struct boothc_ticket_msg msg;
 
-
 	init_ticket_msg(&msg, OP_REJECTED, code, 0, tk);
+	return booth_udp_send(dest, &msg, sizeof(msg));
+}
+
+int send_msg (
+		int cmd,
+		struct ticket_config *tk,
+		struct booth_site *dest
+	       )
+{
+	struct boothc_ticket_msg msg;
+
+	if (cmd == OP_MY_INDEX) {
+		tk_log_info("sending status to %s",
+				site_string(dest));
+	}
+	init_ticket_msg(&msg, cmd, RLT_SUCCESS, 0, tk);
 	return booth_udp_send(dest, &msg, sizeof(msg));
 }

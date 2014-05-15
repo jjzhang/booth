@@ -369,7 +369,6 @@ int leader_update_ticket(struct ticket_config *tk)
 				ctime(&tk->delay_grant));
 	}
 
-	set_ticket_wakeup(tk);
 	return rv;
 }
 
@@ -432,7 +431,6 @@ void leader_elected(
 		tk->term_expires = time(NULL) + tk->term_duration;
 		tk->election_end = 0;
 		tk->voted_for = NULL;
-		tk->retry_number = 0;
 
 		if (new_leader == local)  {
 			tk_log_info("the ticket is granted here");
@@ -553,23 +551,6 @@ static int process_REJECTED(
 	return 0;
 }
 
-
-static int send_ticket (
-		int cmd,
-		struct ticket_config *tk,
-		struct booth_site *to_site
-	       )
-{
-	struct boothc_ticket_msg omsg;
-
-
-	if (cmd == OP_MY_INDEX) {
-		tk_log_info("sending status to %s",
-				site_string(to_site));
-	}
-	init_ticket_msg(&omsg, cmd, RLT_SUCCESS, 0, tk);
-	return booth_udp_send(to_site, &omsg, sizeof(omsg));
-}
 
 static int ticket_seems_ok(struct ticket_config *tk)
 {
@@ -783,11 +764,11 @@ static int process_MY_INDEX (
 
 	if (i > 0) {
 		/* let them know about our newer ticket */
-		send_ticket(OP_MY_INDEX, tk, sender);
+		send_msg(OP_MY_INDEX, tk, sender);
 		if (tk->state == ST_LEADER) {
 			tk_log_info("sending update to %s",
 					site_string(sender));
-			return send_ticket(OP_UPDATE, tk, sender);
+			return send_msg(OP_UPDATE, tk, sender);
 		}
 	}
 
@@ -810,7 +791,6 @@ static int process_MY_INDEX (
 			 * meantime; try to get the ticket again
 			 */
 			tk->state = ST_LEADER;
-			tk->retry_number = 0;
 			tk_log_info("trying to reclaim the ticket");
 			rv = send_heartbeat(tk);
 			ticket_activate_timeout(tk);
@@ -844,7 +824,6 @@ int raft_answer(
 
 	rv = 0;
 	cmd = ntohl(msg->header.cmd);
-	R(tk);
 
 	tk_log_debug("got message %s from %s",
 			state_to_string(cmd),
@@ -893,13 +872,12 @@ int raft_answer(
 		rv = process_MY_INDEX(tk, from, leader, msg);
 		break;
 	case OP_STATUS:
-		rv = send_ticket(OP_MY_INDEX, tk, from);
+		rv = send_msg(OP_MY_INDEX, tk, from);
 		break;
 	default:
 		tk_log_error("unknown message %s, from %s",
 			state_to_string(cmd), site_string(from));
 		rv = -EINVAL;
 	}
-	R(tk);
 	return rv;
 }
