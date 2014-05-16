@@ -25,6 +25,7 @@
 #include <math.h>
 
 #include "config.h"
+#include "log.h"
 
 #define DEFAULT_TICKET_EXPIRY	600
 #define DEFAULT_TICKET_TIMEOUT	5
@@ -100,6 +101,7 @@ static inline void ticket_next_cron_in(struct ticket_config *tk, float seconds)
 static inline void ticket_activate_timeout(struct ticket_config *tk)
 {
 	/* TODO: increase timeout when no answers */
+	tk_log_debug("activate ticket timeout");
 	ticket_next_cron_in(tk, tk->timeout);
 }
 

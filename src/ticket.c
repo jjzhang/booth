@@ -711,11 +711,11 @@ void set_ticket_wakeup(struct ticket_config *tk)
 
 	/* At least every hour, perhaps sooner. */
 	ticket_next_cron_in(tk, 3600);
+	gettimeofday(&now, NULL);
 
 	switch (tk->state) {
 	case ST_LEADER:
 		assert(tk->leader == local);
-		gettimeofday(&now, NULL);
 
 		tv = now;
 		tv.tv_sec = next_vote_starts_at(tk);
@@ -744,6 +744,13 @@ void set_ticket_wakeup(struct ticket_config *tk)
 
 	default:
 		tk_log_error("unknown ticket state: %d", tk->state);
+	}
+
+	if (ANYDEBUG) {
+		float sec_until;
+		gettimeofday(&now, NULL);
+		sec_until = timeval_to_float(tk->next_cron) - timeval_to_float(now);
+		tk_log_debug("set ticket wakeup in %f", sec_until);
 	}
 }
 
