@@ -43,6 +43,7 @@ int list_ticket(char **pdata, unsigned int *len);
 
 int message_recv(struct boothc_ticket_msg *msg, int msglen);
 void reset_ticket(struct ticket_config *tk);
+void reacquire_ticket(struct ticket_config *tk);
 int setup_ticket(void);
 int check_max_len_valid(const char *s, int max);
 

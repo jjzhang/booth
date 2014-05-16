@@ -255,6 +255,44 @@ void reset_ticket(struct ticket_config *tk)
 }
 
 
+void reacquire_ticket(struct ticket_config *tk)
+{
+	int valid;
+
+	valid = (tk->term_expires >= time(NULL));
+	if (!valid) {
+		tk_log_warn("granted here, but not valid "
+			"anymore, will try to reacquire");
+	}
+	if (tk->leader != local) {
+		if (tk->leader && tk->leader != no_leader) {
+			tk_log_error("granted here, but belongs to "
+				"site %s, that's really too bad (will try to reacquire)",
+				site_string(tk->leader));
+		} else {
+			tk_log_warn("granted here, but we're "
+				"not recorded as a grantee (will try to reacquire)");
+		}
+		tk->leader = local;
+	}
+	if (!test_external_prog(tk, 1)) {
+		/* if the ticket is valid, try with
+		 * the heartbeat (otherwise we may get a
+		 * rejected election if the ticket is still valid
+		 * with other servers)
+		 * else it's preferable to acquire the
+		 * ticket through new elections
+		 */
+		if (valid) {
+			tk->state = ST_LEADER;
+			send_heartbeat(tk);
+			ticket_activate_timeout(tk);
+		} else {
+			acquire_ticket(tk, OR_REACQUIRE);
+		}
+	}
+}
+
 int setup_ticket(void)
 {
 	struct ticket_config *tk;
@@ -265,22 +303,11 @@ int setup_ticket(void)
 
 		if (local->type == SITE) {
 			pcmk_handler.load_ticket(tk);
-			if (time(NULL) >= tk->term_expires) {
-				reset_ticket(tk);
-				ticket_write(tk);
-			}
 		}
 
 
-		/* if the ticket is uptodate and belongs to us, try with
-		 * the heartbeat
-		 */
-		if (tk->is_granted && tk->leader == local) {
-			if (!test_external_prog(tk, 1)) {
-				tk->state = ST_LEADER;
-				send_heartbeat(tk);
-				ticket_activate_timeout(tk);
-			}
+		if (tk->is_granted) {
+			reacquire_ticket(tk);
 		} else {
 			/* otherwise, query status */
 			tk_log_info("broadcasting state query");
