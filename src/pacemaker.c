@@ -307,15 +307,26 @@ static int pcmk_load_ticket(struct ticket_config *tk)
 		tk->current_term = v;
 	}
 
-	rv = crm_ticket_get(tk, "owner", &v);
-	if (!rv) {
-		/* No check, node could have been deconfigured. */
-		find_site_by_id(v, &tk->leader);
-	}
-
 	rv = crm_ticket_get(tk, "granted", &v);
 	if (!rv) {
 		tk->is_granted = v;
+	}
+
+	rv = crm_ticket_get(tk, "owner", &v);
+	if (!rv) {
+		/* No check, node could have been deconfigured. */
+		if (!find_site_by_id(v, &tk->leader)) {
+			/* Hmm, no site found for the ticket we have in the
+			 * CIB!?
+			 * Assume that the ticket belonged to us if it was
+			 * granted here!
+			 */
+			tk_log_warn("no site matches; site got reconfigured?");
+			if (tk->is_granted) {
+				tk_log_warn("granted here, assume it belonged to us");
+				tk->leader = local;
+			}
+		}
 	}
 
 	return rv;
