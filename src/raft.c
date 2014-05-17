@@ -21,6 +21,7 @@
 #include <string.h>
 #include <errno.h>
 #include <arpa/inet.h>
+#include <clplumbing/cl_random.h>
 #include "booth.h"
 #include "transport.h"
 #include "inline-fn.h"
@@ -123,7 +124,7 @@ static void become_follower(struct ticket_config *tk,
 {
 	update_ticket_from_msg(tk, msg);
 	tk->state = ST_FOLLOWER;
-	tk->delay_grant = 0;
+	tk->delay_commit = 0;
 }
 
 
@@ -322,56 +323,6 @@ static int process_REVOKE (
 }
 
 
-/* is it safe to commit the grant?
- * if we didn't hear from all sites on the initial grant, we may
- * need to delay the commit
- *
- * TODO: investigate possibility to devise from history whether a
- * missing site could be holding a ticket or not
- */
-static int ticket_dangerous(struct ticket_config *tk)
-{
-	if (!tk->delay_grant)
-		return 0;
-
-	if (tk->delay_grant < time(NULL) ||
-			all_sites_replied(tk)) {
-		tk->delay_grant = 0;
-		return 0;
-	}
-
-	return 1;
-}
-
-
-/* update the ticket on the leader, write it to the CIB, and
-   send out the update message to others with the new expiry
-   time
-*/
-int leader_update_ticket(struct ticket_config *tk)
-{
-	struct boothc_ticket_msg msg;
-	int rv = 0;
-
-	if( tk->ticket_updated )
-		return 0;
-
-	tk->ticket_updated = 1;
-	tk->term_expires = time(NULL) + tk->term_duration;
-
-	if (!ticket_dangerous(tk)) {
-		ticket_write(tk);
-		init_ticket_msg(&msg, OP_UPDATE, RLT_SUCCESS, 0, tk);
-		rv = transport()->broadcast(&msg, sizeof(msg));
-	} else {
-		tk_log_info("delaying ticket commit to CIB until %s "
-				"(or all sites are reached)",
-				ctime(&tk->delay_grant));
-	}
-
-	return rv;
-}
-
 /* For leader. */
 static int process_HEARTBEAT(
 		struct ticket_config *tk,
@@ -407,8 +358,7 @@ static int process_HEARTBEAT(
 	if (term == tk->current_term &&
 			leader == tk->leader) {
 
-		if (majority_of_bits(tk, tk->acks_received) &&
-				!ticket_dangerous(tk)) {
+		if (majority_of_bits(tk, tk->acks_received)) {
 			/* OK, at least half of the nodes are reachable;
 			 * Update the ticket and send update messages out
 			 */
@@ -417,34 +367,6 @@ static int process_HEARTBEAT(
 	}
 
 	return 0;
-}
-
-
-void leader_elected(
-		struct ticket_config *tk,
-		struct booth_site *new_leader
-		)
-{
-	if (new_leader) {
-		tk->leader = new_leader;
-
-		tk->term_expires = time(NULL) + tk->term_duration;
-		tk->election_end = 0;
-		tk->voted_for = NULL;
-
-		if (new_leader == local)  {
-			tk_log_info("the ticket is granted here");
-			tk->commit_index++;
-			tk->state = ST_LEADER;
-			send_heartbeat(tk);
-			ticket_activate_timeout(tk);
-		} else {
-			tk_log_info("ticket granted at %s",
-					site_string(new_leader));
-			become_follower(tk, NULL);
-			set_ticket_wakeup(tk);
-		}
-	}
 }
 
 
@@ -711,6 +633,28 @@ int new_election(struct ticket_config *tk,
 }
 
 
+int new_round(struct ticket_config *tk, cmd_reason_t reason)
+{
+	int rv = 0;
+	struct timespec delay;
+
+	disown_ticket(tk);
+
+	/* New vote round; §5.2 */
+	if (local->type == SITE) {
+		/* delay the next election start for up to 200ms */
+		delay.tv_sec = 0;
+		delay.tv_nsec = 1000000L * (long)cl_rand_from_interval(0, 200);
+		nanosleep(&delay, NULL);
+
+		rv = new_election(tk, NULL, 1, reason);
+		ticket_write(tk);
+	}
+
+	return rv;
+}
+
+
 /* we were a leader and somebody says that they have a more up
  * to date ticket
  * there was probably connectivity loss
@@ -766,7 +710,7 @@ static int process_MY_INDEX (
 		/* let them know about our newer ticket */
 		send_msg(OP_MY_INDEX, tk, sender);
 		if (tk->state == ST_LEADER) {
-			tk_log_info("sending update to %s",
+			tk_log_info("sending ticket update to %s",
 					site_string(sender));
 			return send_msg(OP_UPDATE, tk, sender);
 		}

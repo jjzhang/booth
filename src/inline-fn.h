@@ -268,8 +268,8 @@ static inline time_t next_vote_starts_at(struct ticket_config *tk)
 	t = min(half_exp, retries_needed);
 
 	/* Return earlier timestamp if we need to delay the grant. */
-	if (tk->delay_grant > time(NULL))
-		t = min(tk->delay_grant, t);
+	if (tk->delay_commit > time(NULL))
+		t = min(tk->delay_commit, t);
 
 	return t;
 }

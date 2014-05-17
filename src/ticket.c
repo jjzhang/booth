@@ -25,7 +25,6 @@
 #include <stdio.h>
 #include <assert.h>
 #include <time.h>
-#include  <clplumbing/cl_random.h>
 #include "ticket.h"
 #include "config.h"
 #include "pacemaker.h"
@@ -165,19 +164,19 @@ int do_grant_ticket(struct ticket_config *tk, int options)
 	if (is_owned(tk))
 		return RLT_OVERGRANT;
 
-	tk->delay_grant = time(NULL) +
+	tk->delay_commit = time(NULL) +
 			tk->term_duration + tk->acquire_after;
 
 	if (options & OPT_IMMEDIATE) {
 		tk_log_warn("granting ticket immediately! If there are "
 				"unreachable sites, _hope_ you are sure that they don't "
 				"have the ticket!");
-		tk->delay_grant = 0;
+		tk->delay_commit = 0;
 	}
 
 	rv = acquire_ticket(tk, OR_ADMIN);
 	if (rv)
-		tk->delay_grant = 0;
+		tk->delay_commit = 0;
 	return rv;
 }
 
@@ -219,11 +218,11 @@ int list_ticket(char **pdata, unsigned int *len)
 		else
 			strcpy(timeout_str, "INF");
 
-		if (tk->leader == local && tk->delay_grant > time(NULL)) {
-			strcpy(pending_str, " (pending until ");
-			strftime(pending_str + strlen(" (pending until "),
-					sizeof(pending_str) - strlen(" (pending until ") - 1,
-					"%F %T", localtime(&tk->delay_grant));
+		if (tk->leader == local && tk->delay_commit > time(NULL)) {
+			strcpy(pending_str, " (commit pending until ");
+			strftime(pending_str + strlen(" (commit pending until "),
+					sizeof(pending_str) - strlen(" (commit pending until ") - 1,
+					"%F %T", localtime(&tk->delay_commit));
 			strcat(pending_str, ")");
 		} else
 			*pending_str = '\0';
@@ -415,25 +414,87 @@ int ticket_broadcast(struct ticket_config *tk,
 }
 
 
-int new_round(struct ticket_config *tk, cmd_reason_t reason)
+/* is it safe to commit the grant?
+ * if we didn't hear from all sites on the initial grant, we may
+ * need to delay the commit
+ *
+ * TODO: investigate possibility to devise from history whether a
+ * missing site could be holding a ticket or not
+ */
+static int ticket_dangerous(struct ticket_config *tk)
 {
+	if (!tk->delay_commit)
+		return 0;
+
+	if (tk->delay_commit <= time(NULL) ||
+			all_sites_replied(tk)) {
+		tk->delay_commit = 0;
+		return 0;
+	}
+
+	return 1;
+}
+
+
+/* update the ticket on the leader, write it to the CIB, and
+   send out the update message to others with the new expiry
+   time
+*/
+int leader_update_ticket(struct ticket_config *tk)
+{
+	struct boothc_ticket_msg msg;
 	int rv = 0;
-	struct timespec delay;
 
-	disown_ticket(tk);
+	if (tk->ticket_updated >= 2)
+		return 0;
 
-	/* New vote round; §5.2 */
-	if (local->type == SITE) {
-		/* delay the next election start for up to 200ms */
-		delay.tv_sec = 0;
-		delay.tv_nsec = 1000000L * (long)cl_rand_from_interval(0, 200);
-		nanosleep(&delay, NULL);
+	if (tk->ticket_updated < 1) {
+		tk->ticket_updated = 1;
+		tk->term_expires = time(NULL) + tk->term_duration;
 
-		rv = new_election(tk, NULL, 1, reason);
-		ticket_write(tk);
+		tk_log_debug("broadcasting ticket update");
+		init_ticket_msg(&msg, OP_UPDATE, RLT_SUCCESS, 0, tk);
+		rv = transport()->broadcast(&msg, sizeof(msg));
+	}
+
+	if (tk->ticket_updated < 2) {
+		if (!ticket_dangerous(tk)) {
+			tk->ticket_updated = 2;
+			ticket_write(tk);
+		} else {
+			/* log just once, on the first retry */
+			if (tk->retry_number <= 1)
+				tk_log_info("delaying ticket commit to CIB for %ds "
+					"(or all sites are reached)",
+					(int)(tk->delay_commit - time(NULL)));
+		}
 	}
 
 	return rv;
+}
+
+
+void leader_elected(
+		struct ticket_config *tk,
+		struct booth_site *new_leader
+		)
+{
+	if (new_leader == local) {
+		tk->leader = new_leader;
+
+		tk->term_expires = time(NULL) + tk->term_duration;
+		tk->election_end = 0;
+		tk->voted_for = NULL;
+
+		tk_log_info("granted successfully here");
+		tk->commit_index++;
+		tk->state = ST_LEADER;
+		send_heartbeat(tk);
+		ticket_activate_timeout(tk);
+	} else if (new_leader && new_leader != no_leader) {
+		tk_log_error("%s is a new leader, strange",
+				site_string(new_leader));
+	}
 }
 
 
@@ -442,7 +503,7 @@ static void log_lost_servers(struct ticket_config *tk)
 	struct booth_site *n;
 	int i;
 
-	if (tk->retry_number != 1)
+	if (tk->retry_number > 1)
 		/* log those that we couldn't reach, but do
 		 * that only on the first retry
 		 */
@@ -657,6 +718,10 @@ static void update_acks(
 			site_string(sender),
 			count_bits(tk->acks_received),
 			booth_conf->site_count);
+
+	if (tk->delay_commit && all_sites_replied(tk)) {
+		tk->delay_commit = 0;
+	}
 
 	if (all_replied(tk)) {
 		no_resends(tk);

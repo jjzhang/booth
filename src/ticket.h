@@ -57,7 +57,6 @@ void set_ticket_wakeup(struct ticket_config *tk);
 
 int test_external_prog(struct ticket_config *tk, int start_election);
 int acquire_ticket(struct ticket_config *tk, cmd_reason_t reason);
-int new_round(struct ticket_config *tk, cmd_reason_t reason);
 
 int ticket_answer_list(int fd, struct boothc_ticket_msg *msg);
 int ticket_answer_grant(int fd, struct boothc_ticket_msg *msg);
@@ -74,6 +73,9 @@ int send_reject(struct booth_site *dest, struct ticket_config *tk, cmd_result_t 
 int send_msg (int cmd, struct ticket_config *tk, struct booth_site *dest);
 int ticket_broadcast(struct ticket_config *tk, cmd_request_t cmd, cmd_result_t res, cmd_reason_t reason);
 
+int leader_update_ticket(struct ticket_config *tk);
+void leader_elected(struct ticket_config *tk,
+		struct booth_site *new_leader);
 
 static inline void ticket_next_cron_at(struct ticket_config *tk, struct timeval when)
 {

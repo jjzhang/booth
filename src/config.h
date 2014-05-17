@@ -97,6 +97,8 @@ struct ticket_config {
 	 * But do that only once.
 	 * This is reset to 0 whenever we broadcast heartbeat and set
 	 * to 1 once enough acks are received.
+	 * Increased to 2 when the ticket is commited to the CIB (see
+	 * delay_commit).
 	 */
 	uint32_t ticket_updated;
 	/** @} */
@@ -115,7 +117,7 @@ struct ticket_config {
 	 * immediately, then this is set to some point in time,
 	 * usually (now + term_duration + acquire_after)
 	 */
-	time_t delay_grant;
+	time_t delay_commit;
 
 	/* if we expect some acks, then set this to the id of
 	 * the RPC which others will send us; it is cleared once all
