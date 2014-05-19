@@ -69,6 +69,9 @@ struct ticket_config {
 	/** Current state. */
 	server_state_e state;
 
+	/** Next state. Used at startup. */
+	server_state_e next_state;
+
 	/** When something has to be done */
 	struct timeval next_cron;
 

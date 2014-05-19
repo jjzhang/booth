@@ -657,18 +657,22 @@ int new_round(struct ticket_config *tk, cmd_reason_t reason)
 	int rv = 0;
 	struct timespec delay;
 
+	if (local->type == ARBITRATOR) {
+		/* we cannot really do anything, but keep the copy for
+		 * somebody else who perhaps can */
+		return 0;
+	}
+
 	disown_ticket(tk);
 
 	/* New vote round; §5.2 */
-	if (local->type == SITE) {
-		/* delay the next election start for up to 200ms */
-		delay.tv_sec = 0;
-		delay.tv_nsec = 1000000L * (long)cl_rand_from_interval(0, 200);
-		nanosleep(&delay, NULL);
+	/* delay the next election start for up to 200ms */
+	delay.tv_sec = 0;
+	delay.tv_nsec = 1000000L * (long)cl_rand_from_interval(0, 200);
+	nanosleep(&delay, NULL);
 
-		rv = new_election(tk, NULL, 1, reason);
-		ticket_write(tk);
-	}
+	rv = new_election(tk, NULL, 1, reason);
+	ticket_write(tk);
 
 	return rv;
 }
@@ -686,25 +690,24 @@ static int leader_handle_newer_ticket(
 		struct boothc_ticket_msg *msg
 	       )
 {
-	if (leader == no_leader || !leader || leader == local) {
-		/* at least nobody else owns the ticket */
-		/* it is not kosher to update from their copy, but since
-		 * they don't own the ticket, nothing bad can happen
-		 */
-		update_term_from_msg(tk, msg);
-		/* get the ticket again, if we can
-		 */
-		tk_log_info("trying to reclaim the ticket");
-		return acquire_ticket(tk, OR_REACQUIRE);
+	update_term_from_msg(tk, msg);
+	if (leader != no_leader && leader && leader != local) {
+		/* eek, two leaders, split brain */
+		/* normally shouldn't happen; run election */
+		tk_log_error("from %s: ticket granted to %s! (revoking locally)",
+				site_string(sender),
+				site_string(leader)
+				);
+	} else if (term_time_left(tk)) {
+		/* eek, two leaders, split brain */
+		/* normally shouldn't happen; run election */
+		tk_log_error("from %s: ticket granted to %s! (revoking locally)",
+				site_string(sender),
+				site_string(leader)
+				);
 	}
-
-	/* eek, two leaders, split brain */
-	/* normally shouldn't happen; run election */
-	tk_log_error("from %s: ticket granted to %s! (revoking locally)",
-			site_string(sender),
-			site_string(leader)
-			);
-	return new_round(tk, OR_SPLIT);
+	tk->next_state = ST_LEADER;
+	return 0;
 }
 
 /* reply to STATUS */
@@ -734,20 +737,25 @@ static int process_MY_INDEX (
 		}
 	}
 
-	/* they have a newer ticket, trouble if we're already leader
-	 * for it */
-	if (i < 0 && tk->state == ST_LEADER) {
-		tk_log_warn("from %s: more up to date ticket at %s",
-				site_string(sender),
-				site_string(leader)
-				);
-		return leader_handle_newer_ticket(tk, sender, leader, msg);
+	if (tk->state == ST_LEADER) {
+		if (i < 0) {
+			/* they have a newer ticket, trouble if we're already leader
+			 * for it */
+			tk_log_warn("from %s: more up to date ticket at %s",
+					site_string(sender),
+					site_string(leader)
+					);
+			return leader_handle_newer_ticket(tk, sender, leader, msg);
+		} else {
+			/* we have the ticket and we don't care */
+			return 0;
+		}
 	}
 
 	update_ticket_from_msg(tk, msg);
 	tk->leader = leader;
-	if (leader == local) {
-		reacquire_ticket(tk);
+	if (leader == local || tk->is_granted) {
+		tk->next_state = ST_LEADER;
 	} else {
 		if (!leader || leader == no_leader) {
 			tk_log_info("ticket is not granted");
@@ -757,9 +765,11 @@ static int process_MY_INDEX (
 				site_string(leader),
 				site_string(sender));
 			tk->state = ST_FOLLOWER;
+			/* just make sure that we check the ticket soon */
+			tk->next_state = ST_FOLLOWER;
 		}
-		set_ticket_wakeup(tk);
 	}
+	set_ticket_wakeup(tk);
 	return 0;
 }
 

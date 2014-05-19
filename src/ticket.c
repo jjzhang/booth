@@ -257,20 +257,32 @@ void reset_ticket(struct ticket_config *tk)
 void reacquire_ticket(struct ticket_config *tk)
 {
 	int valid;
+	const char *where_granted = "\0";
+	char buff[64];
 
 	valid = (tk->term_expires >= time(NULL));
+
+	if (tk->is_granted) {
+		where_granted = "granted here";
+	} else if (!valid) {
+		snprintf(buff, sizeof(buff), "granted to %s",
+			site_string(tk->leader));
+		where_granted = buff;
+	}
+
 	if (!valid) {
-		tk_log_warn("granted here, but not valid "
-			"anymore, will try to reacquire");
+		tk_log_warn("%s, but not valid "
+			"anymore, will try to reacquire", where_granted);
 	}
 	if (tk->leader != local) {
 		if (tk->leader && tk->leader != no_leader) {
-			tk_log_error("granted here, but belongs to "
-				"site %s, that's really too bad (will try to reacquire)",
-				site_string(tk->leader));
+			tk_log_error("%s, but belongs to site %s, "
+				"that's really too bad (will try to reacquire)",
+				where_granted, site_string(tk->leader));
 		} else {
-			tk_log_warn("granted here, but we're "
-				"not recorded as a grantee (will try to reacquire)");
+			tk_log_warn("%s here, but we're "
+				"not recorded as a grantee (will try to reacquire)",
+				where_granted);
 		}
 		tk->leader = local;
 	}
@@ -294,14 +306,8 @@ int setup_ticket(void)
 			pcmk_handler.load_ticket(tk);
 		}
 
-
-		if (tk->is_granted) {
-			reacquire_ticket(tk);
-		} else {
-			/* otherwise, query status */
-			tk_log_info("broadcasting state query");
-			ticket_broadcast(tk, OP_STATUS, RLT_SUCCESS, 0);
-		}
+		tk_log_info("broadcasting state query");
+		ticket_broadcast(tk, OP_STATUS, RLT_SUCCESS, 0);
 	}
 
 	return 0;
@@ -576,6 +582,18 @@ static void ticket_cron(struct ticket_config *tk)
 	now = time(NULL);
 
 
+	if (tk->next_state) {
+		if (tk->next_state == ST_LEADER) {
+			if (tk->state == ST_LEADER) {
+				new_round(tk, OR_SPLIT);
+			} else {
+				reacquire_ticket(tk);
+			}
+		}
+		tk->next_state = 0;
+		return;
+	}
+
 	/* Has an owner, has an expiry date, and expiry date in the past?
 	 * Losing the ticket must happen in _every_ state. */
 	if (tk->term_expires &&
@@ -588,6 +606,7 @@ static void ticket_cron(struct ticket_config *tk)
 			tk_log_warn("lost majority (revoking locally)");
 		}
 
+		tk->next_state = 0;
 		/* Couldn't renew in time - ticket lost. */
 		new_round(tk, OR_TKT_LOST);
 		return;
@@ -801,6 +820,11 @@ void set_ticket_wakeup(struct ticket_config *tk)
 
 	default:
 		tk_log_error("unknown ticket state: %d", tk->state);
+	}
+
+	if (tk->next_state) {
+		/* we need to do something soon here */
+		ticket_activate_timeout(tk);
 	}
 
 	if (ANYDEBUG) {
