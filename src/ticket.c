@@ -228,12 +228,20 @@ int list_ticket(char **pdata, unsigned int *len)
 
 		cp += snprintf(cp,
 				alloc - (cp - data),
-				"ticket: %s, leader: %s, expires: %s, commit: %d%s\n",
+				"ticket: %s, leader: %s",
 				tk->name,
-				ticket_leader_string(tk),
-				timeout_str,
-				tk->commit_index,
-				pending_str);
+				ticket_leader_string(tk));
+
+		if (is_owned(tk)) {
+			cp += snprintf(cp,
+					alloc - (cp - data),
+					", expires: %s, commit: %d%s\n",
+					timeout_str,
+					tk->commit_index,
+					pending_str);
+		} else {
+			cp += snprintf(cp, alloc - (cp - data), "\n");
+		}
 
 		if (alloc - (cp - data) <= 0)
 			return -ENOMEM;
