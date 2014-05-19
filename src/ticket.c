@@ -677,10 +677,12 @@ void tickets_log_info(void)
 
 	foreach_ticket(i, tk) {
 		tk_log_info("state '%s' "
+				"term %d "
 				"commit index %d "
 				"leader %s "
 				"expires %-24.24s",
 				state_to_string(tk->state),
+				tk->current_term,
 				tk->commit_index,
 				ticket_leader_string(tk),
 				ctime(&tk->term_expires));
