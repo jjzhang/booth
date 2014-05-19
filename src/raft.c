@@ -125,6 +125,13 @@ static void become_follower(struct ticket_config *tk,
 	update_ticket_from_msg(tk, msg);
 	tk->state = ST_FOLLOWER;
 	tk->delay_commit = 0;
+	/* if we're following and the ticket was granted here
+	 * then commit to CIB right away (we're probably restarting)
+	 */
+	if (tk->is_granted) {
+		ticket_write(tk);
+		tk->is_granted = 0;
+	}
 }
 
 
