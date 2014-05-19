@@ -99,8 +99,6 @@ int ticket_write(struct ticket_config *tk)
 	if (local->type != SITE)
 		return -EINVAL;
 
-	disown_if_expired(tk);
-
 	if (tk->leader == local) {
 		pcmk_handler.grant_ticket(tk);
 	} else {
@@ -188,6 +186,7 @@ int do_revoke_ticket(struct ticket_config *tk)
 	tk_log_info("revoking ticket");
 
 	reset_ticket(tk);
+	tk->leader = no_leader;
 	ticket_write(tk);
 	return ticket_broadcast(tk, OP_REVOKE, RLT_SUCCESS, OR_ADMIN);
 }

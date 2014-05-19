@@ -136,7 +136,7 @@ static inline const char *ticket_leader_string(struct ticket_config *tk)
 
 static inline void disown_ticket(struct ticket_config *tk)
 {
-	tk->leader = no_leader;
+	tk->leader = NULL;
 	tk->is_granted = 0;
 	time(&tk->term_expires);
 }

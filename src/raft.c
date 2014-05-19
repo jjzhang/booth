@@ -129,8 +129,8 @@ static void become_follower(struct ticket_config *tk,
 	 * then commit to CIB right away (we're probably restarting)
 	 */
 	if (tk->is_granted) {
+		disown_ticket(tk);
 		ticket_write(tk);
-		tk->is_granted = 0;
 	}
 }
 
@@ -323,6 +323,7 @@ static int process_REVOKE (
 		tk_log_info("%s revokes ticket",
 				site_string(tk->leader));
 		reset_ticket(tk);
+		tk->leader = no_leader;
 		ticket_write(tk);
 	}
 
@@ -521,7 +522,8 @@ static int test_reason(
 
 	reason = ntohl(msg->header.reason);
 	if (reason == OR_TKT_LOST) {
-		if (tk->state == ST_INIT) {
+		if (tk->state == ST_INIT &&
+				tk->leader == no_leader) {
 			tk_log_warn("%s claims that the ticket is lost, "
 					"but it's in %s state (reject sent)",
 					site_string(sender),
