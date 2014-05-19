@@ -453,7 +453,7 @@ int leader_update_ticket(struct ticket_config *tk)
 			ticket_write(tk);
 		} else {
 			/* log just once, on the first retry */
-			if (tk->retry_number <= 1)
+			if (tk->retry_number == 1)
 				tk_log_info("delaying ticket commit to CIB for %ds "
 					"(or all sites are reached)",
 					(int)(tk->delay_commit - time(NULL)));
