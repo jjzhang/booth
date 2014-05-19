@@ -425,8 +425,19 @@ static int process_REJECTED(
 	rv   = ntohl(msg->header.result);
 
 	if (tk->state == ST_CANDIDATE &&
+			leader == local) {
+		/* the sender has us as the leader (!)
+		 * the elections will time out, then we can try again
+		 */
+		tk_log_warn("ticket was granted to us "
+				"(and we didn't know)");
+		tk->expect_more_rejects = 1;
+		return 0;
+	}
+
+	if (tk->state == ST_CANDIDATE &&
 			rv == RLT_TERM_OUTDATED) {
-		tk_log_warn("ticket outdated (term %d), granted at %s",
+		tk_log_warn("ticket outdated (term %d), granted to %s",
 				ntohl(msg->ticket.term),
 				site_string(leader)
 				);
@@ -438,12 +449,12 @@ static int process_REJECTED(
 
 	if (tk->state == ST_CANDIDATE &&
 			rv == RLT_TERM_STILL_VALID) {
-		tk_log_warn("ticket was granted at %s "
+		tk_log_warn("ticket was granted to %s "
 				"(and we didn't know)",
 				site_string(leader));
 		tk->leader = leader;
-		tk->expect_more_rejects = 1;
 		become_follower(tk, msg);
+		tk->expect_more_rejects = 1;
 		return 0;
 	}
 
@@ -452,7 +463,7 @@ static int process_REJECTED(
 		tk->leader = leader;
 		tk->expect_more_rejects = 1;
 		if (leader && leader != no_leader) {
-			tk_log_warn("our ticket is outdated, granted at %s",
+			tk_log_warn("our ticket is outdated, granted to %s",
 				site_string(leader));
 			become_follower(tk, msg);
 		} else {
@@ -681,7 +692,7 @@ static int leader_handle_newer_ticket(
 
 	/* eek, two leaders, split brain */
 	/* normally shouldn't happen; run election */
-	tk_log_error("from %s: ticket granted at %s! (revoking locally)",
+	tk_log_error("from %s: ticket granted to %s! (revoking locally)",
 			site_string(sender),
 			site_string(leader)
 			);
