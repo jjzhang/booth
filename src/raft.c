@@ -560,7 +560,8 @@ static int answer_REQ_VOTE(
 		return 0;
 	}
 
-	if (valid) {
+	/* allow the leader to start new elections on valid tickets */
+	if (sender != tk->leader && valid) {
 		tk_log_warn("election rejected, term still valid for %ds", valid);
 		return send_reject(sender, tk, RLT_TERM_STILL_VALID);
 	}
@@ -708,7 +709,6 @@ static int process_MY_INDEX (
 	       )
 {
 	int i;
-	int rv;
 
 	if (!msg->ticket.term_valid_for) {
 		/* ticket not valid */
@@ -740,23 +740,13 @@ static int process_MY_INDEX (
 	update_ticket_from_msg(tk, msg);
 	tk->leader = leader;
 	if (leader == local) {
-		rv = test_external_prog(tk, 1);
-		if (!rv) {
-			/* if we were the leader but we rebooted in the
-			 * meantime; try to get the ticket again
-			 */
-			tk->state = ST_LEADER;
-			tk_log_info("trying to reclaim the ticket");
-			rv = send_heartbeat(tk);
-			ticket_activate_timeout(tk);
-		}
-		return rv;
+		reacquire_ticket(tk);
 	} else {
 		if (!leader || leader == no_leader) {
 			tk_log_info("ticket is not granted");
 			tk->state = ST_INIT;
 		} else {
-			tk_log_info("ticket granted at %s (says %s)",
+			tk_log_info("ticket granted to %s (says %s)",
 				site_string(leader),
 				site_string(sender));
 			tk->state = ST_FOLLOWER;

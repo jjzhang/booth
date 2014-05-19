@@ -275,20 +275,10 @@ void reacquire_ticket(struct ticket_config *tk)
 		tk->leader = local;
 	}
 	if (!test_external_prog(tk, 1)) {
-		/* if the ticket is valid, try with
-		 * the heartbeat (otherwise we may get a
-		 * rejected election if the ticket is still valid
-		 * with other servers)
-		 * else it's preferable to acquire the
+		/* try to acquire the
 		 * ticket through new elections
 		 */
-		if (valid) {
-			tk->state = ST_LEADER;
-			send_heartbeat(tk);
-			ticket_activate_timeout(tk);
-		} else {
-			acquire_ticket(tk, OR_REACQUIRE);
-		}
+		acquire_ticket(tk, OR_REACQUIRE);
 	}
 }
 
