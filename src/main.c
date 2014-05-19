@@ -57,6 +57,7 @@
 #define CLIENT_NALLOC		32
 
 int daemonize = 0;
+time_t start_time;
 
 
 /** Structure for "clients".
@@ -1302,6 +1303,7 @@ int main(int argc, char *argv[], char *envp[])
 	int rv;
 
 	init_set_proc_title(argc, argv, envp);
+	time(&start_time);
 
 	memset(&cl, 0, sizeof(cl));
 	strncpy(cl.configfile,

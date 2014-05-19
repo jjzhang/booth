@@ -307,6 +307,10 @@ int setup_ticket(void)
 		}
 
 		tk_log_info("broadcasting state query");
+		/* wait until all send their status (or the first
+		 * timeout) */
+		tk->start_postpone = 1;
+		expect_replies(tk, OP_MY_INDEX);
 		ticket_broadcast(tk, OP_STATUS, RLT_SUCCESS, 0);
 	}
 
@@ -574,6 +578,14 @@ static void handle_resends(struct ticket_config *tk)
 	}
 }
 
+int postpone_ticket_processing(struct ticket_config *tk)
+{
+	extern time_t start_time;
+
+	return tk->start_postpone &&
+		((time(NULL) - start_time) < tk->timeout);
+}
+
 static void ticket_cron(struct ticket_config *tk)
 {
 	time_t now;
@@ -581,6 +593,13 @@ static void ticket_cron(struct ticket_config *tk)
 
 	now = time(NULL);
 
+	/* don't process the tickets too early */
+	if (postpone_ticket_processing(tk))
+		return;
+
+	if (tk->acks_expected == OP_MY_INDEX) {
+		no_resends(tk);
+	}
 
 	if (tk->next_state) {
 		if (tk->next_state == ST_LEADER) {
@@ -591,6 +610,7 @@ static void ticket_cron(struct ticket_config *tk)
 			}
 		}
 		tk->next_state = 0;
+		tk->start_postpone = 0;
 		return;
 	}
 
@@ -736,6 +756,7 @@ static void update_acks(
 
 	if (all_replied(tk)) {
 		no_resends(tk);
+		tk->start_postpone = 0;
 		set_ticket_wakeup(tk);
 	}
 }

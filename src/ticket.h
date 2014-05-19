@@ -54,6 +54,7 @@ int do_revoke_ticket(struct ticket_config *tk);
 int find_ticket_by_name(const char *ticket, struct ticket_config **found);
 
 void set_ticket_wakeup(struct ticket_config *tk);
+int postpone_ticket_processing(struct ticket_config *tk);
 
 int test_external_prog(struct ticket_config *tk, int start_election);
 int acquire_ticket(struct ticket_config *tk, cmd_reason_t reason);

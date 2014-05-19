@@ -132,6 +132,10 @@ struct ticket_config {
 	uint64_t acks_received;
 	/* timestamp of the request, currently unused */
 	time_t req_sent_at;
+	/* we need to wait for MY_INDEX from other servers,
+	 * hold the ticket processing for a while until they reply
+	 */
+	int start_postpone;
 
 	/* don't log warnings unnecessarily
 	 */
