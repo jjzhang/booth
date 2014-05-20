@@ -721,12 +721,9 @@ static int process_MY_INDEX (
 	       )
 {
 	int i;
+	int expired;
 
-	if (!msg->ticket.term_valid_for) {
-		/* ticket not valid */
-		return 0;
-	}
-
+	expired = !msg->ticket.term_valid_for;
 	i = cmp_msg_ticket(tk, sender, leader, msg);
 
 	if (i > 0) {
@@ -739,7 +736,19 @@ static int process_MY_INDEX (
 		}
 	}
 
+	/* we have a newer or equal ticket and theirs is expired,
+	 * nothing more to do here */
+	if (i >= 0 && expired) {
+		return 0;
+	}
+
 	if (tk->state == ST_LEADER) {
+		/* we're the leader, thread carefully */
+		if (expired) {
+			/* if their ticket is expired,
+			 * nothing more to do */
+			return 0;
+		}
 		if (i < 0) {
 			/* they have a newer ticket, trouble if we're already leader
 			 * for it */
@@ -754,23 +763,11 @@ static int process_MY_INDEX (
 		}
 	}
 
+	/* their ticket is either newer or not expired, don't
+	 * ignore it */
 	update_ticket_from_msg(tk, msg);
 	tk->leader = leader;
-	if (leader == local || tk->is_granted) {
-		tk->next_state = ST_LEADER;
-	} else {
-		if (!leader || leader == no_leader) {
-			tk_log_info("ticket is not granted");
-			tk->state = ST_INIT;
-		} else {
-			tk_log_info("ticket granted to %s (says %s)",
-				site_string(leader),
-				site_string(sender));
-			tk->state = ST_FOLLOWER;
-			/* just make sure that we check the ticket soon */
-			tk->next_state = ST_FOLLOWER;
-		}
-	}
+	update_ticket_state(tk, sender);
 	set_ticket_wakeup(tk);
 	return 0;
 }

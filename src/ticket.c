@@ -301,6 +301,32 @@ void reacquire_ticket(struct ticket_config *tk)
 	}
 }
 
+void update_ticket_state(struct ticket_config *tk, struct booth_site *sender)
+{
+	if (tk->leader == local || tk->is_granted) {
+		tk->next_state = ST_LEADER;
+	} else {
+		if (!tk->leader || tk->leader == no_leader) {
+			if (sender)
+				tk_log_info("ticket is not granted");
+			else
+				tk_log_info("ticket is not granted (from CIB)");
+			tk->state = ST_INIT;
+		} else {
+			if (sender)
+				tk_log_info("ticket granted to %s (says %s)",
+					site_string(tk->leader),
+					site_string(sender));
+			else
+				tk_log_info("ticket granted to %s (from CIB)",
+					site_string(tk->leader));
+			tk->state = ST_FOLLOWER;
+			/* just make sure that we check the ticket soon */
+			tk->next_state = ST_FOLLOWER;
+		}
+	}
+}
+
 int setup_ticket(void)
 {
 	struct ticket_config *tk;
@@ -310,7 +336,9 @@ int setup_ticket(void)
 		reset_ticket(tk);
 
 		if (local->type == SITE) {
-			pcmk_handler.load_ticket(tk);
+			if (!pcmk_handler.load_ticket(tk)) {
+				update_ticket_state(tk, NULL);
+			}
 		}
 
 		tk_log_info("broadcasting state query");
