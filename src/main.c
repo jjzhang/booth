@@ -378,6 +378,7 @@ static int write_daemon_state(int fd, int state)
 			"booth_state=%s "
 			"booth_type=%s "
 			"booth_cfg_name='%s' "
+			"booth_id=%d "
 			"booth_addr_string='%s' "
 			"booth_port=%d\n",
 		getpid(), 
@@ -386,6 +387,7 @@ static int write_daemon_state(int fd, int state)
 		  "invalid"), 
 		type_to_string(local->type),
 		booth_conf->name,
+		local->site_id,
 		local->addr_string,
 		booth_conf->port);
 
