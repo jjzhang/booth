@@ -137,6 +137,13 @@ struct ticket_config {
 	 */
 	int start_postpone;
 
+	/* Do we need to update the copy in the CIB?
+	 * Normally, the ticket is written only when it changes via
+	 * the UPDATE RPC (for followers) and on expiration update
+	 * (for leaders)
+	*/
+	int update_cib;
+
 	/* don't log warnings unnecessarily
 	 */
 	int expect_more_rejects;

@@ -104,6 +104,7 @@ int ticket_write(struct ticket_config *tk)
 	} else {
 		pcmk_handler.revoke_ticket(tk);
 	}
+	tk->update_cib = 0;
 
 	return 0;
 }
@@ -339,6 +340,7 @@ int setup_ticket(void)
 			if (!pcmk_handler.load_ticket(tk)) {
 				update_ticket_state(tk, NULL);
 			}
+			tk->update_cib = 1;
 		}
 
 		tk_log_info("broadcasting state query");
@@ -629,8 +631,11 @@ static void ticket_cron(struct ticket_config *tk)
 	now = time(NULL);
 
 	/* don't process the tickets too early */
-	if (postpone_ticket_processing(tk))
+	if (postpone_ticket_processing(tk)) {
+		tk_log_debug("ticket processing postponed (start_postpone=%d)",
+				tk->start_postpone);
 		return;
+	}
 
 	if (tk->acks_expected == OP_MY_INDEX) {
 		no_resends(tk);
@@ -646,7 +651,7 @@ static void ticket_cron(struct ticket_config *tk)
 		}
 		tk->next_state = 0;
 		tk->start_postpone = 0;
-		return;
+		goto out;
 	}
 
 	/* Has an owner, has an expiry date, and expiry date in the past?
@@ -706,6 +711,10 @@ static void ticket_cron(struct ticket_config *tk)
 	default:
 		break;
 	}
+
+out:
+	if (tk->update_cib)
+		ticket_write(tk);
 }
 
 
