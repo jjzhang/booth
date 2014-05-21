@@ -119,10 +119,18 @@ static void update_ticket_from_msg(struct ticket_config *tk,
 }
 
 
+static void copy_ticket_from_msg(struct ticket_config *tk,
+		struct boothc_ticket_msg *msg)
+{
+	tk->term_expires = time(NULL) + ntohl(msg->ticket.term_valid_for);
+	tk->current_term = ntohl(msg->ticket.term);
+	tk->commit_index = ntohl(msg->ticket.leader_commit);
+}
+
 static void become_follower(struct ticket_config *tk,
 		struct boothc_ticket_msg *msg)
 {
-	update_ticket_from_msg(tk, msg);
+	copy_ticket_from_msg(tk, msg);
 	tk->state = ST_FOLLOWER;
 	tk->delay_commit = 0;
 	/* if we're following and the ticket was granted here
