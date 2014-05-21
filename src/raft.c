@@ -674,6 +674,7 @@ int new_round(struct ticket_config *tk, cmd_reason_t reason)
 	}
 
 	disown_ticket(tk);
+	ticket_write(tk);
 
 	/* New vote round; §5.2 */
 	/* delay the next election start for up to 200ms */
@@ -682,7 +683,6 @@ int new_round(struct ticket_config *tk, cmd_reason_t reason)
 	nanosleep(&delay, NULL);
 
 	rv = new_election(tk, NULL, 1, reason);
-	ticket_write(tk);
 
 	return rv;
 }
