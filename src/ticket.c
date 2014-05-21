@@ -634,6 +634,8 @@ static void ticket_cron(struct ticket_config *tk)
 	if (postpone_ticket_processing(tk)) {
 		tk_log_debug("ticket processing postponed (start_postpone=%d)",
 				tk->start_postpone);
+		/* but run again soon */
+		ticket_activate_timeout(tk);
 		return;
 	}
 
