@@ -40,6 +40,7 @@ int raft_answer(struct ticket_config *tk,
 int new_election(struct ticket_config *tk,
 		struct booth_site *new_leader, int update_term, cmd_reason_t reason);
 int new_round(struct ticket_config *tk, cmd_reason_t reason);
+void become_follower(struct ticket_config *tk, struct boothc_ticket_msg *msg);
 
 
 #endif /* _RAFT_H */

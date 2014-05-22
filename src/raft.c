@@ -127,7 +127,7 @@ static void copy_ticket_from_msg(struct ticket_config *tk,
 	tk->commit_index = ntohl(msg->ticket.leader_commit);
 }
 
-static void become_follower(struct ticket_config *tk,
+void become_follower(struct ticket_config *tk,
 		struct boothc_ticket_msg *msg)
 {
 	copy_ticket_from_msg(tk, msg);

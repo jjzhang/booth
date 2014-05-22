@@ -529,8 +529,10 @@ void leader_elected(
 		send_heartbeat(tk);
 		ticket_activate_timeout(tk);
 	} else if (new_leader && new_leader != no_leader) {
-		tk_log_error("%s is a new leader, strange",
+		tk_log_info("ticket granted at %s",
 				site_string(new_leader));
+		become_follower(tk, NULL);
+		set_ticket_wakeup(tk);
 	}
 }
 
