@@ -2,6 +2,76 @@ There's a booth-test RPM available that contains two types of tests.
 
 It installs the necessary files into `/usr/share/booth/tests`.
 
+=== Live tests (booth operation)
+
+BEWARE: Run this with _test_ clusters only!
+
+The live testing utility tests booth operation using the given
+`booth.conf`:
+
+	$ /usr/share/booth/tests/test/live_test.sh booth.conf
+
+It is possible to run only specific tests. See tail of the script
+for the list of tests which are currently available.
+
+Example booth.conf:
+
+------------
+transport="UDP"
+port="6666"
+arbitrator="10.2.12.53"
+arbitrator="10.2.13.82"
+site="10.2.12.101"
+site="10.2.13.101"
+site="10.121.187.99"
+
+ticket="ticket-A"
+	expire = 30
+	timeout = 3
+	retries = 3
+	before-acquire-handler = /usr/share/booth/service-runnable d-src1
+------------
+
+A split brain condition is also tested. For that to work, all
+sites need `iptables` installed. The supplied script `booth_path`
+is used to manipulate iptables rules.
+
+It is not necessary to run the test script on one of the sites.
+Just copy the script and make the test `booth.conf` available
+locally:
+
+$ scp testsite:/usr/share/booth/tests/test/live_test.sh .
+$ scp testsite:/etc/booth/booth.conf .
+$ sh live_test.sh booth.conf
+
+You need at least two sites and one arbitrator.
+
+The ticket must be named `ticket-A`.
+
+It is not necessary to configure the `before-acquire-handler`.
+
+Notes:
+
+- (BEWARE!) the supplied configuration files is copied to
+  /etc/booth/booth.conf to all sites/arbitrators thus overwriting
+  any existing configuration
+
+- the utility uses ssh to manage booth at all sites/arbitrators
+  and logs in as user `root`
+
+- it is required that ssh public authentication works without
+  providing the passphrase (otherwise it is impractical)
+
+- the log file is ./test_booth.log (it is actually a shell trace,
+  with timestamps if you're running bash)
+
+- in case one of the tests fail, hb_report is created
+
+If you want to open a bug report, please attach all hb_reports
+and `test_booth.log`.
+
+
+
 
 === Simple tests (commandline, config file)
 

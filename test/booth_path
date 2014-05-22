@@ -1,0 +1,35 @@
+#!/bin/sh
+#
+# manage iptables rules for port 6666
+#
+
+[ $# -lt 1 ] && exit
+action=$1
+port=6666
+testip() {
+	local chain=$1
+	iptables -L $chain | grep -wq ^DROP.*$port
+}
+logcmd() {
+	logger -p local7.info "$*"
+	eval $*
+}
+
+case "$action" in
+start)
+logcmd iptables -D INPUT -p udp --dport $port -j DROP
+logcmd iptables -D OUTPUT -p udp --dport $port -j DROP
+logcmd iptables -D INPUT -p udp --sport $port -j DROP
+logcmd iptables -D OUTPUT -p udp --sport $port -j DROP
+;;
+stop)
+testip INPUT && {
+	echo "packets from/to $port already being dropped!"
+	exit
+}
+logcmd iptables -A INPUT -p udp --dport $port -j DROP
+logcmd iptables -A OUTPUT -p udp --dport $port -j DROP
+logcmd iptables -A INPUT -p udp --sport $port -j DROP
+logcmd iptables -A OUTPUT -p udp --sport $port -j DROP
+;;
+esac
