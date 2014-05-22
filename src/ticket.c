@@ -584,7 +584,13 @@ static void handle_resends(struct ticket_config *tk)
 {
 	int ack_cnt;
 
-	tk->retry_number ++;
+	if (++tk->retry_number > tk->retries) {
+		tk_log_debug("giving up on sending retries");
+		no_resends(tk);
+		set_ticket_wakeup(tk);
+		return;
+	}
+
 	if (!majority_of_bits(tk, tk->acks_received)) {
 		ack_cnt = count_bits(tk->acks_received) - 1;
 		if (!ack_cnt) {
@@ -606,14 +612,8 @@ static void handle_resends(struct ticket_config *tk)
 		leader_update_ticket(tk);
 	}
 
-	if (tk->retry_number <= tk->retries) {
-		resend_msg(tk);
-		ticket_activate_timeout(tk);
-	} else {
-		tk_log_debug("giving up on sending retries");
-		no_resends(tk);
-		set_ticket_wakeup(tk);
-	}
+	resend_msg(tk);
+	ticket_activate_timeout(tk);
 }
 
 int postpone_ticket_processing(struct ticket_config *tk)
