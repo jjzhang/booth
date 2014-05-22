@@ -635,8 +635,8 @@ int new_election(struct ticket_config *tk,
 	tk->term_expires = 0;
 	tk->election_end = now + tk->timeout;
 
-	tk_log_info("starting new election (term=%d, until %s)",
-			tk->current_term, ctime(&tk->election_end));
+	tk_log_info("starting new election (term=%d)",
+			tk->current_term);
 	clear_election(tk);
 
 	if(preference)
