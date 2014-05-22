@@ -270,9 +270,9 @@ void reacquire_ticket(struct ticket_config *tk)
 
 	valid = (tk->term_expires >= time(NULL));
 
-	if (tk->is_granted) {
+	if (tk->is_granted || tk->leader == local) {
 		where_granted = "granted here";
-	} else if (!valid) {
+	} else {
 		snprintf(buff, sizeof(buff), "granted to %s",
 			site_string(tk->leader));
 		where_granted = buff;
@@ -280,20 +280,19 @@ void reacquire_ticket(struct ticket_config *tk)
 
 	if (!valid) {
 		tk_log_warn("%s, but not valid "
-			"anymore, will try to reacquire", where_granted);
+			"anymore (will try to reacquire)", where_granted);
 	}
-	if (tk->leader != local) {
+	if (tk->is_granted && tk->leader != local) {
 		if (tk->leader && tk->leader != no_leader) {
-			tk_log_error("%s, but belongs to site %s, "
+			tk_log_error("granted here, but also %s, "
 				"that's really too bad (will try to reacquire)",
-				where_granted, site_string(tk->leader));
-		} else {
-			tk_log_warn("%s here, but we're "
-				"not recorded as a grantee (will try to reacquire)",
 				where_granted);
+		} else {
+			tk_log_warn("granted here, but we're "
+				"not recorded as the grantee (will try to reacquire)");
 		}
-		tk->leader = local;
 	}
+
 	if (!test_external_prog(tk, 1)) {
 		/* try to acquire the
 		 * ticket through new elections
