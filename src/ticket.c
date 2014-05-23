@@ -464,8 +464,12 @@ static int ticket_dangerous(struct ticket_config *tk)
 
 	if (tk->delay_commit <= time(NULL) ||
 			all_sites_replied(tk)) {
+		tk_log_debug("ticket delay commit expired");
 		tk->delay_commit = 0;
 		return 0;
+	} else {
+		tk_log_debug("delay ticket commit for %ds",
+				(int)(tk->delay_commit - time(NULL)));
 	}
 
 	return 1;
