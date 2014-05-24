@@ -289,7 +289,7 @@ static int parse_weights(const char *input, int weights[MAX_NODES])
 }
 
 
-int read_config(const char *path)
+int read_config(const char *path, int type)
 {
 	char line[1024];
 	FILE *fp;
@@ -468,6 +468,12 @@ no_value:
 		if (strcmp(key, "arbitrator") == 0) {
 			if (add_site(val, ARBITRATOR))
 				goto out;
+			continue;
+		}
+
+		if (strcmp(key, "debug") == 0) {
+			if (type != CLIENT)
+				debug_level = max(debug_level, atoi(val));
 			continue;
 		}
 

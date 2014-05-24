@@ -206,7 +206,7 @@ struct booth_config {
 extern struct booth_config *booth_conf;
 
 
-int read_config(const char *path);
+int read_config(const char *path, int type);
 
 int check_config(int type);
 

@@ -57,6 +57,7 @@
 #define CLIENT_NALLOC		32
 
 int daemonize = 0;
+int enable_stderr = 0;
 time_t start_time;
 
 
@@ -313,7 +314,7 @@ static int setup_config(int type)
 {
 	int rv;
 
-	rv = read_config(cl.configfile);
+	rv = read_config(cl.configfile, type);
 	if (rv < 0)
 		goto out;
 
@@ -950,6 +951,7 @@ static int read_arguments(int argc, char **argv)
 			break;
 		case 'D':
 			debug_level++;
+			enable_stderr = 1;
 			/* Fall through */
 		case 'S':
 			daemonize = 1;
@@ -1234,7 +1236,7 @@ static int do_server(int type)
 
 	strcat(log_ent, type_to_string(local->type));
 	cl_log_set_entity(log_ent);
-	cl_log_enable_stderr(debug_level ? TRUE : FALSE);
+	cl_log_enable_stderr(enable_stderr ? TRUE : FALSE);
 	cl_log_set_facility(HA_LOG_FACILITY);
 	cl_inherit_logging_environment(0);
 
