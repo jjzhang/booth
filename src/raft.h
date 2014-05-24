@@ -30,8 +30,6 @@ typedef enum {
 
 struct ticket_config;
 
-struct booth_site *majority_votes(struct ticket_config *tk);
-
 int raft_answer(struct ticket_config *tk,
 		struct booth_site *from,
 		struct booth_site *leader,
@@ -40,7 +38,7 @@ int raft_answer(struct ticket_config *tk,
 int new_election(struct ticket_config *tk,
 		struct booth_site *new_leader, int update_term, cmd_reason_t reason);
 int new_round(struct ticket_config *tk, cmd_reason_t reason);
-void become_follower(struct ticket_config *tk, struct boothc_ticket_msg *msg);
+void elections_end(struct ticket_config *tk);
 
 
 #endif /* _RAFT_H */

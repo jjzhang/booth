@@ -514,32 +514,6 @@ int leader_update_ticket(struct ticket_config *tk)
 }
 
 
-void leader_elected(
-		struct ticket_config *tk,
-		struct booth_site *new_leader
-		)
-{
-	if (new_leader == local) {
-		tk->leader = new_leader;
-
-		tk->term_expires = time(NULL) + tk->term_duration;
-		tk->election_end = 0;
-		tk->voted_for = NULL;
-
-		tk_log_info("granted successfully here");
-		tk->commit_index++;
-		tk->state = ST_LEADER;
-		send_heartbeat(tk);
-		ticket_activate_timeout(tk);
-	} else if (new_leader && new_leader != no_leader) {
-		tk_log_info("ticket granted at %s",
-				site_string(new_leader));
-		become_follower(tk, NULL);
-		set_ticket_wakeup(tk);
-	}
-}
-
-
 static void log_lost_servers(struct ticket_config *tk)
 {
 	struct booth_site *n;
@@ -631,7 +605,6 @@ int postpone_ticket_processing(struct ticket_config *tk)
 static void ticket_cron(struct ticket_config *tk)
 {
 	time_t now;
-	struct booth_site *new_leader;
 
 	now = time(NULL);
 
@@ -691,15 +664,7 @@ static void ticket_cron(struct ticket_config *tk)
 
 	case ST_CANDIDATE:
 		/* §5.2 */
-		/* not everybody answered, but if we have majority... */
-		new_leader = majority_votes(tk);
-		if (new_leader) {
-			leader_elected(tk, new_leader);
-		} else if (now > tk->election_end) {
-			/* This is previous election timed out */
-			tk_log_info("election timed out");
-			new_election(tk, NULL, 0, OR_AGAIN);
-		}
+		elections_end(tk);
 		break;
 
 	case ST_LEADER:

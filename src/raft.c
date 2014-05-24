@@ -127,7 +127,7 @@ static void copy_ticket_from_msg(struct ticket_config *tk,
 	tk->commit_index = ntohl(msg->ticket.leader_commit);
 }
 
-void become_follower(struct ticket_config *tk,
+static void become_follower(struct ticket_config *tk,
 		struct boothc_ticket_msg *msg)
 {
 	copy_ticket_from_msg(tk, msg);
@@ -143,7 +143,45 @@ void become_follower(struct ticket_config *tk,
 }
 
 
-struct booth_site *majority_votes(struct ticket_config *tk)
+static void won_elections(struct ticket_config *tk)
+{
+	tk->leader = local;
+	tk->state = ST_LEADER;
+
+	tk->term_expires = time(NULL) + tk->term_duration;
+	tk->election_end = 0;
+	tk->voted_for = NULL;
+
+	tk->commit_index++;
+	send_heartbeat(tk);
+	ticket_activate_timeout(tk);
+}
+
+
+static int is_tie(struct ticket_config *tk)
+{
+	int i;
+	struct booth_site *v;
+	int count[MAX_NODES] = { 0, };
+	int max_votes = 0, max_cnt = 0;
+
+	for(i=0; i<booth_conf->site_count; i++) {
+		v = tk->votes_for[i];
+		if (!v)
+			continue;
+		count[v->index]++;
+		max_votes = max(max_votes, count[v->index]);
+	}
+
+	for(i=0; i<booth_conf->site_count; i++) {
+		if (count[i] == max_votes)
+			max_cnt++;
+	}
+
+	return max_cnt > 1;
+}
+
+static struct booth_site *majority_votes(struct ticket_config *tk)
 {
 	int i, n;
 	struct booth_site *v;
@@ -173,6 +211,33 @@ struct booth_site *majority_votes(struct ticket_config *tk)
 	}
 
 	return NULL;
+}
+
+
+void elections_end(struct ticket_config *tk)
+{
+	time_t now;
+	struct booth_site *new_leader;
+
+	now = time(NULL);
+	if (now > tk->election_end) {
+		/* This is previous election timed out */
+		tk_log_info("election timed out");
+	}
+
+	new_leader = majority_votes(tk);
+	if (new_leader == local) {
+		tk_log_info("granted successfully here");
+		won_elections(tk);
+	} else if (new_leader) {
+		tk_log_info("ticket granted at %s",
+				site_string(new_leader));
+		become_follower(tk, NULL);
+		set_ticket_wakeup(tk);
+	} else {
+		tk_log_info("nobody won elections, new elections");
+		new_election(tk, NULL, is_tie(tk), OR_AGAIN);
+	}
 }
 
 
@@ -422,7 +487,7 @@ static int process_VOTE_FOR(
 	 * wait for timeout in ticket_cron */
 	if (!tk->acks_expected) {
 		/* §5.2 */
-		leader_elected(tk, majority_votes(tk));
+		elections_end(tk);
 	}
 
 	return 0;
