@@ -105,7 +105,7 @@ static inline void ticket_next_cron_in(struct ticket_config *tk, float seconds)
 static inline void ticket_activate_timeout(struct ticket_config *tk)
 {
 	/* TODO: increase timeout when no answers */
-	tk_log_debug("activate ticket timeout");
+	tk_log_debug("activate ticket timeout in %d", tk->timeout);
 	ticket_next_cron_in(tk, tk->timeout);
 }
 

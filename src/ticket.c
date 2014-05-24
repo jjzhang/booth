@@ -729,7 +729,7 @@ void process_tickets(void)
 {
 	struct ticket_config *tk;
 	int i;
-	struct timeval now;
+	struct timeval now, last_cron;
 	float sec_until;
 
 	gettimeofday(&now, NULL);
@@ -748,13 +748,12 @@ void process_tickets(void)
 		tk_log_debug("ticket cron");
 
 
-		/* Set next value, handler may override.
-		 * This should already be handled via the state logic;
-		 * but to be on the safe side the renew repetition is
-		 * duplicated here, too.  */
-		set_ticket_wakeup(tk);
-
+		last_cron = tk->next_cron;
 		ticket_cron(tk);
+		if (!timercmp(&last_cron, &tk->next_cron, !=)) {
+			tk_log_debug("nobody set ticket wakeup");
+			set_ticket_wakeup(tk);
+		}
 	}
 }
 
@@ -869,8 +868,11 @@ void set_ticket_wakeup(struct ticket_config *tk)
 		tv.tv_sec = next_vote_starts_at(tk);
 
 		/* If timestamp is in the past, look again in one second. */
-		if (timeval_compare(tv, now) <= 0)
+		if (timeval_compare(tv, now) <= 0) {
+			tk_log_debug("next ts in the past (%f)",
+				timeval_to_float(tv) - timeval_to_float(now));
 			tv.tv_sec = now.tv_sec + 1;
+		}
 
 		ticket_next_cron_at(tk, tv);
 		break;
