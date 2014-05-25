@@ -262,7 +262,7 @@ void reset_ticket(struct ticket_config *tk)
 }
 
 
-void reacquire_ticket(struct ticket_config *tk)
+static void reacquire_ticket(struct ticket_config *tk)
 {
 	int valid;
 	const char *where_granted = "\0";
@@ -293,12 +293,10 @@ void reacquire_ticket(struct ticket_config *tk)
 		}
 	}
 
-	if (!test_external_prog(tk, 1)) {
-		/* try to acquire the
-		 * ticket through new elections
-		 */
-		acquire_ticket(tk, OR_REACQUIRE);
-	}
+	/* try to acquire the
+	 * ticket through new elections
+	 */
+	acquire_ticket(tk, OR_REACQUIRE);
 }
 
 void update_ticket_state(struct ticket_config *tk, struct booth_site *sender)
