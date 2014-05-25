@@ -842,11 +842,12 @@ void set_ticket_wakeup(struct ticket_config *tk)
 		tv = now;
 		tv.tv_sec = next_vote_starts_at(tk);
 
-		/* If timestamp is in the past, look again in one second. */
+		/* If timestamp is in the past, wakeup at the expiry
+		 * time. */
 		if (timeval_compare(tv, now) <= 0) {
 			tk_log_debug("next ts in the past (%f)",
 				timeval_to_float(tv) - timeval_to_float(now));
-			tv.tv_sec = now.tv_sec + 1;
+			tv.tv_sec = tk->term_expires;
 		}
 
 		ticket_next_cron_at(tk, tv);
