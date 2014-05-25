@@ -304,7 +304,17 @@ void reacquire_ticket(struct ticket_config *tk)
 void update_ticket_state(struct ticket_config *tk, struct booth_site *sender)
 {
 	if (tk->leader == local || tk->is_granted) {
-		tk->next_state = ST_LEADER;
+		/* message from a live leader with valid ticket? */
+		if (sender == tk->leader && term_time_left(tk)) {
+			tk_log_info("ticket was granted here, "
+					"but it's live at %s (revoking here)",
+					site_string(sender));
+			ticket_write(tk);
+			tk->state = ST_FOLLOWER;
+			tk->next_state = ST_FOLLOWER;
+		} else {
+			tk->next_state = ST_LEADER;
+		}
 	} else {
 		if (!tk->leader || tk->leader == no_leader) {
 			if (sender)
