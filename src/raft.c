@@ -249,6 +249,10 @@ static int newer_term(struct ticket_config *tk,
 {
 	uint32_t term;
 
+	/* it may happen that we hear about our newer term */
+	if (leader == local)
+		return 0;
+
 	term = ntohl(msg->ticket.term);
 	/* §5.1 */
 	if (term > tk->current_term) {
