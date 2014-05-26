@@ -78,6 +78,9 @@ struct ticket_config {
 	/** Current leader. This is effectively the log[] in Raft. */
 	struct booth_site *leader;
 
+	/** Leader that got lost. */
+	struct booth_site *lost_leader;
+
 	/** Is the ticket granted? */
 	int is_granted;
 	/** Timestamp of leadership expiration */
@@ -115,6 +118,10 @@ struct ticket_config {
 	uint32_t next_index[MAX_NODES];
 	uint32_t match_index[MAX_NODES];
 
+
+	/* Why did we start the elections?
+	*/
+	cmd_reason_t election_reason;
 
 	/* if it is potentially dangerous to grant the ticket
 	 * immediately, then this is set to some point in time,

@@ -534,9 +534,20 @@ static int process_REJECTED(
 
 	if (tk->state == ST_CANDIDATE &&
 			rv == RLT_TERM_STILL_VALID) {
-		tk_log_warn("ticket was granted to %s "
-				"(and we didn't know)",
-				site_string(leader));
+		if (tk->lost_leader == leader) {
+			if (tk->election_reason == OR_TKT_LOST) {
+				tk_log_warn("%s still has the ticket valid, "
+						"we'll backup a bit",
+						site_string(sender));
+			} else {
+				tk_log_warn("%s unexpecetedly rejects elections",
+						site_string(sender));
+			}
+		} else {
+			tk_log_warn("ticket was granted to %s "
+					"(and we didn't know)",
+					site_string(leader));
+		}
 		tk->leader = leader;
 		become_follower(tk, msg);
 		tk->expect_more_rejects = 1;
@@ -682,7 +693,6 @@ int new_election(struct ticket_config *tk,
 {
 	struct booth_site *new_leader;
 	time_t now;
-	static cmd_reason_t last_reason;
 
 
 	time(&now);
@@ -719,9 +729,9 @@ int new_election(struct ticket_config *tk,
 
 	/* some callers may want just to repeat on timeout */
 	if (reason == OR_AGAIN) {
-		reason = last_reason;
+		reason = tk->election_reason;
 	} else {
-		last_reason = reason;
+		tk->election_reason = reason;
 	}
 
 	expect_replies(tk, OP_VOTE_FOR);

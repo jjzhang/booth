@@ -654,6 +654,7 @@ static void ticket_cron(struct ticket_config *tk)
 			tk_log_warn("lost majority (revoking locally)");
 		}
 
+		tk->lost_leader = tk->leader;
 		tk->next_state = 0;
 		/* Couldn't renew in time - ticket lost. */
 		new_round(tk, OR_TKT_LOST);
