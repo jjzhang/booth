@@ -46,7 +46,7 @@ static int ticket_realloc(void)
 
 	p = realloc(booth_conf->ticket,
 			sizeof(struct ticket_config) * want);
-	if (!booth_conf) {
+	if (!p) {
 		log_error("can't alloc more tickets");
 		return -ENOMEM;
 	}
