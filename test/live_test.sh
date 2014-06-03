@@ -251,7 +251,7 @@ test_booth_status() {
 }
 
 runtest() {
-	local start_ts end_ts rc
+	local start_ts end_ts rc booth_status
 	local start_time end_time
 	start_time=`date`
 	start_ts=`date +%s`
@@ -261,10 +261,14 @@ runtest() {
 	end_time=`date`
 	end_ts=`date +%s`
 	is_function recover_$1 && recover_$1
-	if [ $rc -eq 0 ]; then
+	test_booth_status
+	booth_status=$?
+	if [ $rc -eq 0 -a $booth_status -eq 0 ]; then
 		echo OK
 	else
 		echo "FAIL (running hb_report ... $1.tar.bz2; see also $logf)"
+		[ $booth_status -ne 0 ] &&
+			echo "unexpected: some booth daemons not running"
 		echo "running hb_report" >&2
 		hb_report -f "`date -d @$((start_ts-5))`" \
 			-t "`date -d @$((end_ts+60))`" \
