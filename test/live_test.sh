@@ -217,6 +217,7 @@ booth_where_granted() {
 	ticket_line=`run_arbitrator 1 booth list | grep $tkt`
 	grantee=`echo "$ticket_line" | sed 's/.*leader: //;s/,.*//'`
 	echo $grantee
+	[ "$grantee" = "none" ] && return
 	! ssh $grantee booth list | grep -q "$tkt.*pending"
 }
 check_booth_consistency() {
