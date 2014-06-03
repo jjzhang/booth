@@ -437,6 +437,10 @@ static int process_HEARTBEAT(
 		return 0;
 	}
 
+	/* if the ticket is to be revoked, further processing is not
+	 * interesting */
+	if (tk->next_state == ST_INIT)
+		return 0;
 
 	if (term == tk->current_term &&
 			leader == tk->leader) {

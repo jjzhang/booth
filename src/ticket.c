@@ -180,9 +180,7 @@ int do_grant_ticket(struct ticket_config *tk, int options)
 }
 
 
-/** Ticket revoke.
- * Only to be started from the leader. */
-int do_revoke_ticket(struct ticket_config *tk)
+static int start_revoke_ticket(struct ticket_config *tk)
 {
 	tk_log_info("revoking ticket");
 
@@ -190,6 +188,19 @@ int do_revoke_ticket(struct ticket_config *tk)
 	tk->leader = no_leader;
 	ticket_write(tk);
 	return ticket_broadcast(tk, OP_REVOKE, RLT_SUCCESS, OR_ADMIN);
+}
+
+/** Ticket revoke.
+ * Only to be started from the leader. */
+int do_revoke_ticket(struct ticket_config *tk)
+{
+	if (tk->acks_expected) {
+		tk_log_info("delay ticket revoke until the current operation finishes");
+		tk->next_state = ST_INIT;
+		return 0;
+	} else {
+		return start_revoke_ticket(tk);
+	}
 }
 
 
@@ -636,12 +647,20 @@ static void ticket_cron(struct ticket_config *tk)
 	}
 
 	if (tk->next_state) {
-		if (tk->next_state == ST_LEADER) {
+		switch(tk->next_state) {
+		case ST_LEADER:
 			if (tk->state == ST_LEADER) {
 				new_round(tk, OR_SPLIT);
 			} else {
 				reacquire_ticket(tk);
 			}
+			break;
+		case ST_INIT:
+			no_resends(tk);
+			start_revoke_ticket(tk);
+			break;
+		default:
+			break;
 		}
 		tk->next_state = 0;
 		tk->start_postpone = 0;
