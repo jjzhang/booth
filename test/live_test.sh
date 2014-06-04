@@ -411,6 +411,8 @@ test_failover() {
 }
 check_failover() {
 	check_consistency any
+}
+recover_failover() {
 	start_site `get_site 1`
 }
 
@@ -476,8 +478,7 @@ TESTS="$@"
 
 : ${TESTS:="grant grant_elsewhere grant_site_lost revoke
 restart_granted restart_granted_nocib restart_notgranted
-failover
-split_leader split_follower split_edge"}
+failover split_leader split_follower split_edge"}
 
 for t in $TESTS; do
 	runtest $t
