@@ -270,7 +270,7 @@ static void reacquire_ticket(struct ticket_config *tk)
 
 	valid = (tk->term_expires >= time(NULL));
 
-	if (tk->is_granted || tk->leader == local) {
+	if (tk->leader == local) {
 		where_granted = "granted here";
 	} else {
 		snprintf(buff, sizeof(buff), "granted to %s",
@@ -304,9 +304,15 @@ void update_ticket_state(struct ticket_config *tk, struct booth_site *sender)
 	if (tk->leader == local || tk->is_granted) {
 		/* message from a live leader with valid ticket? */
 		if (sender == tk->leader && term_time_left(tk)) {
-			tk_log_info("ticket was granted here, "
-					"but it's live at %s (revoking here)",
-					site_string(sender));
+			if (tk->is_granted) {
+				tk_log_warn("ticket was granted here, "
+						"but it's live at %s (revoking here)",
+						site_string(sender));
+			} else {
+				tk_log_info("ticket live at %s",
+						site_string(sender));
+			}
+			disown_ticket(tk);
 			ticket_write(tk);
 			tk->state = ST_FOLLOWER;
 			tk->next_state = ST_FOLLOWER;
@@ -770,6 +776,7 @@ static void update_acks(
 	/* got an ack! */
 	tk->acks_received |= sender->bitmask;
 
+	if (0)
 	tk_log_debug("got ACK from %s, %d/%d agree.",
 			site_string(sender),
 			count_bits(tk->acks_received),
