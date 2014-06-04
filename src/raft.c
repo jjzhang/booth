@@ -232,8 +232,6 @@ void elections_end(struct ticket_config *tk)
 	} else if (new_leader) {
 		tk_log_info("ticket granted at %s",
 				site_string(new_leader));
-		become_follower(tk, NULL);
-		set_ticket_wakeup(tk);
 	} else {
 		tk_log_info("nobody won elections, new elections");
 		new_election(tk, NULL, is_tie(tk), OR_AGAIN);
