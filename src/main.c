@@ -34,6 +34,8 @@
 #include <sys/poll.h>
 #include <pacemaker/crm/services.h>
 #include <clplumbing/setproctitle.h>
+#include <sys/prctl.h>
+#include <clplumbing/coredumps.h>
 #include <fcntl.h>
 #include <string.h>
 #include <assert.h>
@@ -1240,7 +1242,6 @@ static int do_server(int type)
 	cl_log_set_facility(HA_LOG_FACILITY);
 	cl_inherit_logging_environment(0);
 
-
 	log_info("BOOTH %s daemon is starting, node id is 0x%08X (%d).",
 			type_to_string(local->type),
 			local->site_id, local->site_id);
@@ -1259,6 +1260,11 @@ static int do_server(int type)
 	if (rv)
 		return rv;
 
+	if (cl_enable_coredumps(TRUE) < 0){
+		cl_log(LOG_ERR, "enabling core dump failed");
+	}
+	cl_cdtocoredir();
+	prctl(PR_SET_DUMPABLE, (unsigned long)TRUE, 0UL, 0UL, 0UL);
 
 	rv = loop(lock_fd);
 
