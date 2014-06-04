@@ -376,7 +376,9 @@ test_restart_granted_nocib() {
 	wait_timeout
 	run_site 1 booth grant $tkt >/dev/null
 	wait_timeout
-	restart_site `get_site 1`
+	stop_site_clean `get_site 1` || return 1
+	wait_timeout
+	start_site `get_site 1`
 	wait_timeout
 }
 check_restart_granted_nocib() {
