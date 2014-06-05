@@ -117,8 +117,7 @@ run_arbitrator() {
 	ssh $h $@
 }
 get_site() {
-	local n=$1 h
-	shift 1
+	local n=$1
 	echo $sites | awk '{print $'$n'}'
 }
 
@@ -127,6 +126,14 @@ get_servers() {
 		sed -n 's/.*="//;s/"//p'
 }
 
+break_external_prog() {
+	local rsc
+	rsc=`awk '/before-acquire-handler/{print $NF}' $cnf`
+	echo "location __pref_booth_live_test $rsc rule -inf: defined #uname" | run_site 1 crm configure
+}
+repair_external_prog() {
+	run_site $1 crm configure delete __pref_booth_live_test
+}
 get_tkt_settings() {
 awk '
 n && /^	/ && /expire|timeout/ {
@@ -206,7 +213,7 @@ check_cib() {
 CIB check failed
 CIB grantee: $cib_grantee
 booth grantee: $booth_grantee
-expected grantee: $booth_grantee
+expected grantee: $exp_grantee
 EOF
 	fi
 	return $rc
@@ -469,6 +476,24 @@ check_split_edge() {
 	check_consistency any
 }
 
+# external test prog failed
+test_external_prog_failed() {
+	run_site 1 booth revoke $tkt >/dev/null
+	wait_timeout
+	run_site 1 booth grant $tkt >/dev/null
+	sleep 1
+	break_external_prog 1
+	wait_half_exp
+	wait_timeout
+}
+check_external_prog_failed() {
+	check_consistency any &&
+	[ `booth_where_granted` != `get_site 1` ]
+}
+recover_external_prog_failed() {
+	repair_external_prog 1
+}
+
 sync_conf || exit
 restart_booth
 test_booth_status || {
@@ -480,7 +505,7 @@ TESTS="$@"
 
 : ${TESTS:="grant grant_elsewhere grant_site_lost revoke
 restart_granted restart_granted_nocib restart_notgranted
-failover split_leader split_follower split_edge"}
+failover split_leader split_follower split_edge external_prog_failed"}
 
 for t in $TESTS; do
 	runtest $t
