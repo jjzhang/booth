@@ -56,6 +56,16 @@ get_stat_fld() {
 booth_status() {
 	test "`get_stat_fld $1 booth_state`" = "started"
 }
+stop_booth() {
+	local h
+	for h in $sites; do
+		stop_site $h
+	done >/dev/null 2>&1
+	for h in $arbitrators; do
+		stop_arbitrator $h
+	done >/dev/null 2>&1
+	wait_timeout
+}
 start_booth() {
 	local h
 	for h in $sites; do
@@ -371,6 +381,29 @@ recover_grant_site_lost() {
 	start_site `get_site 2`
 }
 
+# grant with one site lost
+test_simultaneous_start_even() {
+	local serv
+	run_site 1 booth revoke $tkt >/dev/null
+	wait_timeout
+	run_site 2 booth grant $tkt >/dev/null
+	wait_timeout
+	stop_booth
+	wait_timeout
+	for serv in $(echo $sites | sed "s/`get_site 1` //"); do
+		start_site $serv &
+	done
+	for serv in $arbitrators; do
+		start_arbitrator $serv &
+	done
+	wait_timeout
+	start_site `get_site 1`
+	wait_timeout
+}
+check_simultaneous_start_even() {
+	check_consistency `get_site 2`
+}
+
 # restart with ticket granted
 test_restart_granted() {
 	run_site 1 booth revoke $tkt >/dev/null
@@ -514,8 +547,10 @@ test_booth_status || {
 TESTS="$@"
 
 : ${TESTS:="grant grant_elsewhere grant_site_lost revoke
+simultaneous_start_even
 restart_granted restart_granted_nocib restart_notgranted
-failover split_leader split_follower split_edge external_prog_failed"}
+failover split_leader split_follower split_edge
+external_prog_failed"}
 
 for t in $TESTS; do
 	runtest $t
