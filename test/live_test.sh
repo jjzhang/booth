@@ -125,11 +125,12 @@ get_servers() {
 	grep "^$1" | 
 		sed -n 's/.*="//;s/"//p'
 }
+get_rsc() {
+	awk '/before-acquire-handler/{print $NF}' $cnf
+}
 
 break_external_prog() {
-	local rsc
-	rsc=`awk '/before-acquire-handler/{print $NF}' $cnf`
-	echo "location __pref_booth_live_test $rsc rule -inf: defined #uname" | run_site 1 crm configure
+	echo "location __pref_booth_live_test `get_rsc` rule -inf: defined #uname" | run_site 1 crm configure
 }
 repair_external_prog() {
 	run_site $1 crm configure delete __pref_booth_live_test
@@ -258,6 +259,12 @@ test_booth_status() {
 }
 
 runtest() {
+	if is_function applicable_$1; then
+		if ! applicable_$1; then
+			echo "not applicable, skipping"
+			return 0
+		fi
+	fi
 	local start_ts end_ts rc booth_status
 	local start_time end_time
 	start_time=`date`
@@ -492,6 +499,9 @@ check_external_prog_failed() {
 }
 recover_external_prog_failed() {
 	repair_external_prog 1
+}
+applicable_external_prog_failed() {
+	[ -n `get_rsc` ]
 }
 
 sync_conf || exit
