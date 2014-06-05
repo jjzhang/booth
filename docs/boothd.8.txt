@@ -167,6 +167,13 @@ will always bind and listen to both UDP and TCP ports.
 Booth needs at least three members for normal operation. Odd
 number of members provides more redundancy.
 
+*'site-user'*, *'site-group'*, *'arbitrator-user'*, *'arbitrator-group'*::
+	These define the credentials 'boothd' will be running with.
++
+On a (Pacemaker) site the booth process will have to call 'crm_ticket', so the 
+default is to use 'hacluster':'haclient'; for an arbitrator this user and group 
+might not exists, so there we default to 'nobody':'nobody'.
+
 *'ticket'*::
 	Registers a ticket. Multiple tickets can be handled by single
 	Booth instance.
@@ -217,15 +224,6 @@ This counts only for a single broadcast; if ticket *renewal* runs
 into this limit (because the network was temporarily down), but
 the ticket is still valid afterwards, a new renewal run will be
 started automatically.
-
-
-*'site-user'*, *'site-group'*, *'arbitrator-user'*, *'arbitrator-group'*::
-	These define the credentials 'boothd' will be running with.
-+
-On a (Pacemaker) site the booth process will have to call 'crm_ticket', so the 
-default is to use 'hacluster':'haclient'; for an arbitrator this user and group 
-might not exists, so there we default to 'nobody':'nobody'.
-
 
 *'before-acquire-handler'*::
 	If set, this command will be called before 'boothd' tries to
