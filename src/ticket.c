@@ -796,7 +796,7 @@ static void update_acks(
 	/* got an ack! */
 	tk->acks_received |= sender->bitmask;
 
-	if (0)
+	if (cmd == OP_HEARTBEAT)
 	tk_log_debug("got ACK from %s, %d/%d agree.",
 			site_string(sender),
 			count_bits(tk->acks_received),
