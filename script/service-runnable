@@ -7,12 +7,14 @@
 set -e
 
 service="${1:?Need a resource name as first argument.}"
+tmpshadow=`mktemp booth-check.XXXXXX`
+trap "rm -f $tmpshadow" EXIT
 
 
 # We expect an output like
 #   p_dummy        (ocf::pacemaker:Dummy): Started geo-rz2-a 
 
-if crm_simulate --ticket-grant "$BOOTH_TICKET" --simulate --live-check |
+if crm_simulate -O $tmpshadow --ticket-grant "$BOOTH_TICKET" --simulate --live-check |
 	sed -n '/^Revised cluster status:/,$p' |
 	egrep "^[[:space:]]+$service[[:space:]]+\(.*\):[[:space:]]+Started ([^[:space:]]+) *$" >/dev/null
 then
