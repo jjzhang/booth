@@ -297,7 +297,6 @@ static inline void no_resends(struct ticket_config *tk)
 {
 	tk->retry_number = 0;
 	tk->acks_expected = 0;
-	tk->acks_received = 0;
 }
 
 static inline int send_heartbeat(struct ticket_config *tk)
