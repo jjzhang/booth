@@ -127,7 +127,8 @@ int test_external_prog(struct ticket_config *tk,
 		 * Just send a VOTE_FOR message, so the
 		 * others can start elections. */
 		if (leader_and_valid(tk)) {
-			disown_ticket(tk);
+			reset_ticket(tk);
+			ticket_write(tk);
 			if (start_election) {
 				ticket_broadcast(tk, OP_VOTE_FOR, RLT_SUCCESS, OR_LOCAL_FAIL);
 			}
