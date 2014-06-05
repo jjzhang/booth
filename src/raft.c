@@ -477,6 +477,7 @@ static int process_VOTE_FOR(
 			(tk->state == ST_FOLLOWER || tk->state == ST_CANDIDATE)) {
 		tk_log_info("%s wants to give the ticket away",
 			site_string(tk->leader));
+		time(&tk->term_expires);
 		return new_round(tk, OR_STEPDOWN);
 	}
 
