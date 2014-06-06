@@ -407,7 +407,7 @@ test_simultaneous_start_even() {
 	for serv in $arbitrators; do
 		start_arbitrator $serv &
 	done
-	wait_timeout
+	wait_half_exp
 	start_site `get_site 1`
 	wait_timeout
 }
