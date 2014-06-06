@@ -641,7 +641,6 @@ static int answer_REQ_VOTE(
 		struct boothc_ticket_msg *msg
 		)
 {
-	uint32_t term;
 	int valid;
 	struct boothc_ticket_msg omsg;
 	cmd_result_t inappr_reason;
@@ -650,15 +649,7 @@ static int answer_REQ_VOTE(
 	if (inappr_reason)
 		return send_reject(sender, tk, inappr_reason);
 
-	term = ntohl(msg->ticket.term);
-	/* Important: Ignore duplicated packets! */
 	valid = term_time_left(tk);
-	if (valid &&
-			term == tk->current_term &&
-			sender == tk->leader) {
-		tk_log_debug("Duplicate OP_VOTE_FOR ignored.");
-		return 0;
-	}
 
 	/* allow the leader to start new elections on valid tickets */
 	if (sender != tk->leader && valid) {
