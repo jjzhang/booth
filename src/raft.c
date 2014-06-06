@@ -653,7 +653,9 @@ static int answer_REQ_VOTE(
 
 	/* allow the leader to start new elections on valid tickets */
 	if (sender != tk->leader && valid) {
-		tk_log_warn("election rejected, term still valid for %ds", valid);
+		tk_log_warn("election from %s rejected "
+			"(we have %s as ticket owner), ticket still valid for %ds",
+			site_string(sender), site_string(tk->leader), valid);
 		return send_reject(sender, tk, RLT_TERM_STILL_VALID);
 	}
 
