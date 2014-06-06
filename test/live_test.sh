@@ -16,6 +16,7 @@ cnf=$1
 shift 1
 logf=test_booth.log
 iprules=/usr/share/booth/tests/test/booth_path
+: ${HA_LOGFACILITY:="syslog"}
 
 is_function() {
     test z"`command -v $1`" = z"$1"
@@ -264,28 +265,38 @@ reset_booth() {
 	run_site 1 booth revoke $tkt >/dev/null
 	wait_timeout
 }
-test_booth_status() {
+all_booth_status() {
 	forall_fun booth_status
 }
 
-runtest() {
+can_run_test() {
 	if is_function applicable_$1; then
 		if ! applicable_$1; then
-			echo "not applicable, skipping"
-			return 0
+			echo "(not applicable, skipping)"
+			return 1
 		fi
 	fi
+	if ! is_function test_$1 || ! is_function check_$1; then
+		echo "(test missing)"
+		return 1
+	fi
+}
+runtest() {
 	local start_ts end_ts rc booth_status
 	local start_time end_time
+	TEST=$1
 	start_time=`date`
 	start_ts=`date +%s`
 	echo -n "Testing: $1... "
+	can_run_test $1 || return 0
+	logger -p $HA_LOGFACILITY.info "starting booth test $1 ..."
 	test_$1 && check_$1
 	rc=$?
 	end_time=`date`
 	end_ts=`date +%s`
+	logger -p $HA_LOGFACILITY.info "finished booth test $1 (exit code $rc)"
 	is_function recover_$1 && recover_$1
-	test_booth_status
+	all_booth_status
 	booth_status=$?
 	if [ $rc -eq 0 -a $booth_status -eq 0 ]; then
 		echo OK
@@ -539,9 +550,9 @@ applicable_external_prog_failed() {
 
 sync_conf || exit
 restart_booth
-test_booth_status || {
+all_booth_status || {
 	reset_booth
-	test_booth_status || exit
+	all_booth_status || exit
 }
 
 TESTS="$@"
