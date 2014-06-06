@@ -392,7 +392,7 @@ recover_grant_site_lost() {
 	start_site `get_site 2`
 }
 
-# grant with one site lost
+# simultaneous start of even number of members
 test_simultaneous_start_even() {
 	local serv
 	run_site 1 booth revoke $tkt >/dev/null
@@ -413,6 +413,27 @@ test_simultaneous_start_even() {
 }
 check_simultaneous_start_even() {
 	check_consistency `get_site 2`
+}
+
+# slow start
+test_slow_start_granted() {
+	run_site 1 booth revoke $tkt >/dev/null
+	wait_timeout
+	run_site 1 booth grant $tkt >/dev/null
+	wait_timeout
+	stop_booth
+	wait_timeout
+	for serv in $sites; do
+		start_site $serv
+		wait_timeout
+	done
+	for serv in $arbitrators; do
+		start_arbitrator $serv
+		wait_timeout
+	done
+}
+check_slow_start_granted() {
+	check_consistency `get_site 1`
 }
 
 # restart with ticket granted
@@ -558,7 +579,7 @@ all_booth_status || {
 TESTS="$@"
 
 : ${TESTS:="grant grant_elsewhere grant_site_lost revoke
-simultaneous_start_even
+simultaneous_start_even slow_start_granted
 restart_granted restart_granted_nocib restart_notgranted
 failover split_leader split_follower split_edge
 external_prog_failed"}
