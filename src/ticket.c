@@ -647,7 +647,8 @@ static void ticket_cron(struct ticket_config *tk)
 		no_resends(tk);
 	}
 
-	if (tk->next_state) {
+	/* wanting to be follower is not much of an ambition */
+	if (tk->next_state && tk->next_state != ST_FOLLOWER) {
 		switch(tk->next_state) {
 		case ST_LEADER:
 			if (tk->state == ST_LEADER) {
@@ -663,7 +664,6 @@ static void ticket_cron(struct ticket_config *tk)
 		default:
 			break;
 		}
-		tk->next_state = 0;
 		tk->start_postpone = 0;
 		goto out;
 	}
@@ -681,10 +681,9 @@ static void ticket_cron(struct ticket_config *tk)
 		}
 
 		tk->lost_leader = tk->leader;
-		tk->next_state = 0;
 		/* Couldn't renew in time - ticket lost. */
 		new_round(tk, OR_TKT_LOST);
-		return;
+		goto out;
 	}
 
 	switch(tk->state) {
@@ -720,6 +719,7 @@ static void ticket_cron(struct ticket_config *tk)
 	}
 
 out:
+	tk->next_state = 0;
 	if (tk->update_cib)
 		ticket_write(tk);
 }
