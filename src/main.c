@@ -1206,16 +1206,36 @@ static int limit_this_process(void)
 	return 0;
 }
 
+static int lock_fd = -1;
+
+static void server_exit(void)
+{
+	int rv;
+
+	if (lock_fd >= 0) {
+		/* We might not be able to delete it, but at least
+		 * make it empty. */
+		rv = ftruncate(lock_fd, 0);
+		(void)rv;
+		unlink_lockfile(lock_fd);
+	}
+	log_info("exiting");
+}
+
+static void sig_exit_handler(int sig)
+{
+	log_info("caught signal %d", sig);
+	exit(0);
+}
 
 static int do_server(int type)
 {
-	int lock_fd = -1;
 	int rv = -1;
 	static char log_ent[128] = DAEMON_NAME "-";
 
 	rv = setup_config(type);
 	if (rv < 0)
-		goto out;
+		return rv;
 
 
 	if (!local) {
@@ -1236,6 +1256,8 @@ static int do_server(int type)
 	if (lock_fd < 0)
 		return lock_fd;
 
+	atexit(server_exit);
+
 	strcat(log_ent, type_to_string(local->type));
 	cl_log_set_entity(log_ent);
 	cl_log_enable_stderr(enable_stderr ? TRUE : FALSE);
@@ -1247,6 +1269,8 @@ static int do_server(int type)
 			local->site_id, local->site_id);
 
 	signal(SIGUSR1, (__sighandler_t)tickets_log_info);
+	signal(SIGTERM, (__sighandler_t)sig_exit_handler);
+	signal(SIGINT, (__sighandler_t)sig_exit_handler);
 
 	set_scheduler();
 	set_oom_adj(-16);
@@ -1267,15 +1291,6 @@ static int do_server(int type)
 	prctl(PR_SET_DUMPABLE, (unsigned long)TRUE, 0UL, 0UL, 0UL);
 
 	rv = loop(lock_fd);
-
-out:
-	if (lock_fd >= 0) {
-		/* We might not be able to delete it, but at least
-		 * make it empty. */
-		rv = ftruncate(lock_fd, 0);
-		(void)rv;
-		unlink_lockfile(lock_fd);
-	}
 
 	return rv;
 }
