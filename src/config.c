@@ -154,10 +154,6 @@ int add_site(char *addr_string, int type)
 			exit(1);
 		}
 
-	log_debug("configured %s: %s, id=%d",
-		(site->type == ARBITRATOR ? "arbitrator" : "site"),
-		site->addr_string, site->site_id);
-
 out:
 	return rv;
 }
