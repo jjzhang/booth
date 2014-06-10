@@ -221,10 +221,11 @@ The default is '5' seconds.
 +
 Default is 10. Values lower than 3 are illegal.
 +
-This counts only for a single broadcast; if ticket *renewal* runs
-into this limit (because the network was temporarily down), but
-the ticket is still valid afterwards, a new renewal run will be
-started automatically.
+Ticket *renewal*, which occurs every half expire time, cannot
+must happen after packet resending. Hence, the total retry time
+must be shorter than half the expire time:
+
+	timeout*(retries+1) < expire/2
 
 *'before-acquire-handler'*::
 	If set, this command will be called before 'boothd' tries to

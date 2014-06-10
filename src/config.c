@@ -237,6 +237,18 @@ static int add_ticket(const char *name, struct ticket_config **tkp,
 	return 0;
 }
 
+static int validate_ticket(struct ticket_config *tk)
+{
+	if (tk->timeout*(tk->retries+1) >= tk->term_duration/2) {
+		tk_log_error("total amount of time to "
+			"retry sending packets cannot exceed "
+			"half of the expiry time "
+			"(%d*(%d+1) >= %d/2)",
+			tk->timeout, tk->retries, tk->term_duration);
+		return 0;
+	}
+	return 1;
+}
 
 /* returns number of weights, or -1 on bad input. */
 static int parse_weights(const char *input, int weights[MAX_NODES])
@@ -495,6 +507,11 @@ no_value:
 		}
 
 		if (strcmp(key, "ticket") == 0) {
+			if (current_tk && strcmp(current_tk->name, "__defaults__")) {
+				if (!validate_ticket(current_tk)) {
+					goto out;
+				}
+			}
 			if (!strcmp(val, "__defaults__")) {
 				current_tk = &defaults;
 			} else if (add_ticket(val, &current_tk, &defaults)) {
