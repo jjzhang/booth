@@ -301,9 +301,7 @@ static inline void no_resends(struct ticket_config *tk)
 
 static inline int send_heartbeat(struct ticket_config *tk)
 {
-	expect_replies(tk, OP_HEARTBEAT);
-
-	return ticket_broadcast(tk, OP_HEARTBEAT, RLT_SUCCESS, 0);
+	return ticket_broadcast(tk, OP_HEARTBEAT, OP_ACK, RLT_SUCCESS, 0);
 }
 
 static inline struct booth_site *my_vote(struct ticket_config *tk)

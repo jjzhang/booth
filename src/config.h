@@ -129,6 +129,9 @@ struct ticket_config {
 	 */
 	time_t delay_commit;
 
+	/* the last request RPC we sent
+	 */
+	uint32_t last_request;
 	/* if we expect some acks, then set this to the id of
 	 * the RPC which others will send us; it is cleared once all
 	 * replies were received

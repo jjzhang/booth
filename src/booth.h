@@ -149,6 +149,7 @@ typedef enum {
 	OP_REQ_VOTE = CHAR2CONST('R', 'V', 'o', 't'), /* start election */
 	OP_VOTE_FOR = CHAR2CONST('V', 't', 'F', 'r'), /* reply to REQ_VOTE */
 	OP_HEARTBEAT= CHAR2CONST('H', 'r', 't', 'B'), /* Heartbeat */
+	OP_ACK      = CHAR2CONST('A', 'c', 'k', '.'), /* Ack for heartbeats and revokes */
 	OP_UPDATE   = CHAR2CONST('U', 'p', 'd', 'E'), /* Update ticket */
 	OP_REVOKE   = CHAR2CONST('R', 'e', 'v', 'k'), /* Revoke ticket */
 	OP_REJECTED = CHAR2CONST('R', 'J', 'C', '!'),

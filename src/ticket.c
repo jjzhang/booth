@@ -130,7 +130,7 @@ int test_external_prog(struct ticket_config *tk,
 			reset_ticket(tk);
 			ticket_write(tk);
 			if (start_election) {
-				ticket_broadcast(tk, OP_VOTE_FOR, RLT_SUCCESS, OR_LOCAL_FAIL);
+				ticket_broadcast(tk, OP_VOTE_FOR, 0, RLT_SUCCESS, OR_LOCAL_FAIL);
 			}
 		}
 	}
@@ -188,7 +188,8 @@ static int start_revoke_ticket(struct ticket_config *tk)
 	reset_ticket(tk);
 	tk->leader = no_leader;
 	ticket_write(tk);
-	return ticket_broadcast(tk, OP_REVOKE, RLT_SUCCESS, OR_ADMIN);
+	ticket_activate_timeout(tk);
+	return ticket_broadcast(tk, OP_REVOKE, OP_ACK, RLT_SUCCESS, OR_ADMIN);
 }
 
 /** Ticket revoke.
@@ -372,8 +373,7 @@ int setup_ticket(void)
 		/* wait until all send their status (or the first
 		 * timeout) */
 		tk->start_postpone = 1;
-		expect_replies(tk, OP_MY_INDEX);
-		ticket_broadcast(tk, OP_STATUS, RLT_SUCCESS, 0);
+		ticket_broadcast(tk, OP_STATUS, OP_MY_INDEX, RLT_SUCCESS, 0);
 	}
 
 	return 0;
@@ -462,7 +462,8 @@ reply:
 
 
 int ticket_broadcast(struct ticket_config *tk,
-		cmd_request_t cmd, cmd_result_t res, cmd_reason_t reason)
+		cmd_request_t cmd, cmd_request_t expected_reply,
+		cmd_result_t res, cmd_reason_t reason)
 {
 	struct boothc_ticket_msg msg;
 
@@ -472,6 +473,10 @@ int ticket_broadcast(struct ticket_config *tk,
 			ntohl(msg.ticket.term),
 			ntohl(msg.ticket.term_valid_for));
 
+	tk->last_request = cmd;
+	if (expected_reply) {
+		expect_replies(tk, expected_reply);
+	}
 	return transport()->broadcast(&msg, sizeof(msg));
 }
 
@@ -569,16 +574,16 @@ static void resend_msg(struct ticket_config *tk)
 	int i;
 
 	if (!(tk->acks_received ^ local->bitmask)) {
-		ticket_broadcast(tk, tk->acks_expected, RLT_SUCCESS, 0);
+		ticket_broadcast(tk, tk->last_request, tk->acks_expected, RLT_SUCCESS, 0);
 	} else {
 		for (i = 0; i < booth_conf->site_count; i++) {
 			n = booth_conf->site + i;
 			if (!(tk->acks_received & n->bitmask)) {
 				tk_log_debug("resending %s to %s",
-						state_to_string(tk->acks_expected),
+						state_to_string(tk->last_request),
 						site_string(n)
 						);
-				send_msg(tk->acks_expected, tk, n);
+				send_msg(tk->last_request, tk, n);
 			}
 		}
 	}
@@ -598,22 +603,24 @@ static void handle_resends(struct ticket_config *tk)
 	if (!majority_of_bits(tk, tk->acks_received)) {
 		ack_cnt = count_bits(tk->acks_received) - 1;
 		if (!ack_cnt) {
-			tk_log_warn("no answers to heartbeat (try #%d), "
+			tk_log_warn("no answers to our request (try #%d), "
 			"we are alone",
 			tk->retry_number);
 		} else {
-			tk_log_warn("not enough answers to heartbeat (try #%d): "
+			tk_log_warn("not enough answers to our request (try #%d): "
 			"only got %d answers",
 			tk->retry_number,
 			ack_cnt);
 		}
 	} else {
 		log_lost_servers(tk);
-		/* we have the majority, update the ticket, at
-		 * least the local copy if we're still not
-		 * allowed to commit
-		 */
-		leader_update_ticket(tk);
+		if (is_owned(tk)) {
+			/* we have the majority, update the ticket, at
+			 * least the local copy if we're still not
+			 * allowed to commit
+			 */
+			leader_update_ticket(tk);
+		}
 	}
 
 	resend_msg(tk);
@@ -688,7 +695,10 @@ static void ticket_cron(struct ticket_config *tk)
 
 	switch(tk->state) {
 	case ST_INIT:
-		/* init state, nothing to do */
+		/* init state, handle resends for ticket revoke */
+		if (tk->acks_expected) {
+			handle_resends(tk);
+		}
 		break;
 
 	case ST_FOLLOWER:

@@ -308,8 +308,6 @@ static int answer_HEARTBEAT (
 	       )
 {
 	uint32_t term;
-	struct boothc_ticket_msg omsg;
-
 
 	term = ntohl(msg->ticket.term);
 	tk_log_debug("leader: %s, have %s; term %d vs %d",
@@ -339,8 +337,7 @@ static int answer_HEARTBEAT (
 	tk->leader = leader;
 
 	/* Ack the heartbeat (we comply). */
-	init_ticket_msg(&omsg, OP_HEARTBEAT, RLT_SUCCESS, 0, tk);
-	return booth_udp_send(sender, &omsg, sizeof(omsg));
+	return send_msg(OP_ACK, tk, sender);
 }
 
 
@@ -383,7 +380,12 @@ static int process_REVOKE (
 		struct boothc_ticket_msg *msg
 	       )
 {
-	if (tk->leader != sender) {
+	int rv;
+
+	if (tk->state == ST_INIT && tk->leader == no_leader) {
+		/* assume that our ack got lost */
+		rv = send_msg(OP_ACK, tk, sender);
+	} else if (tk->leader != sender) {
 		tk_log_error("%s wants to revoke ticket, "
 				"but it is not granted there (ignoring)",
 				site_string(sender));
@@ -400,14 +402,15 @@ static int process_REVOKE (
 		reset_ticket(tk);
 		tk->leader = no_leader;
 		ticket_write(tk);
+		rv = send_msg(OP_ACK, tk, sender);
 	}
 
-	return 0;
+	return rv;
 }
 
 
 /* For leader. */
-static int process_HEARTBEAT(
+static int process_ACK(
 		struct ticket_config *tk,
 		struct booth_site *sender,
 		struct booth_site *leader,
@@ -438,8 +441,8 @@ static int process_HEARTBEAT(
 	}
 
 	/* if the ticket is to be revoked, further processing is not
-	 * interesting */
-	if (tk->next_state == ST_INIT)
+	 * interesting (and dangerous) */
+	if (tk->next_state == ST_INIT || tk->state == ST_INIT)
 		return 0;
 
 	if (term == tk->current_term &&
@@ -730,8 +733,7 @@ int new_election(struct ticket_config *tk,
 		tk->election_reason = reason;
 	}
 
-	expect_replies(tk, OP_VOTE_FOR);
-	ticket_broadcast(tk, OP_REQ_VOTE, RLT_SUCCESS, reason);
+	ticket_broadcast(tk, OP_REQ_VOTE, OP_VOTE_FOR, RLT_SUCCESS, reason);
 	ticket_activate_timeout(tk);
 	return 0;
 }
@@ -881,11 +883,13 @@ int raft_answer(
 	case OP_VOTE_FOR:
 		rv = process_VOTE_FOR(tk, from, leader, msg);
 		break;
-	case OP_HEARTBEAT:
+	case OP_ACK:
 		if (tk->leader == local &&
 				tk->state == ST_LEADER)
-			rv = process_HEARTBEAT(tk, from, leader, msg);
-		else if (tk->leader != local &&
+			rv = process_ACK(tk, from, leader, msg);
+		break;
+	case OP_HEARTBEAT:
+		if (tk->leader != local &&
 				(tk->state == ST_INIT ||tk->state == ST_FOLLOWER ||
 				tk->state == ST_CANDIDATE))
 			rv = answer_HEARTBEAT(tk, from, leader, msg);
