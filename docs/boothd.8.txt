@@ -177,9 +177,10 @@ might not exists, so there we default to 'nobody':'nobody'.
 *'ticket'*::
 	Registers a ticket. Multiple tickets can be handled by single
 	Booth instance.
-
-The next items modify per-ticket defaults. Modifications are
-inherited by tickets which follow in the configuration file.
++
+Use the special ticket name '__defaults__' to modify the
+defaults. The '__defaults__' stanza must precede all the other
+ticket specifications.
 
 All times are in seconds.
 

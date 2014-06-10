@@ -295,7 +295,7 @@ int read_config(const char *path, int type)
 	int lineno = 0;
 	int got_transport = 0;
 	struct ticket_config defaults = { { 0 } };
-	struct ticket_config *last_ticket = NULL;
+	struct ticket_config *current_tk = NULL;
 
 
 	fp = fopen(path, "r");
@@ -467,34 +467,6 @@ no_value:
 			continue;
 		}
 
-		if (strcmp(key, "debug") == 0) {
-			if (type != CLIENT)
-				debug_level = max(debug_level, atoi(val));
-			continue;
-		}
-
-		if (strcmp(key, "ticket") == 0) {
-			if (add_ticket(val, &last_ticket, &defaults))
-				goto out;
-
-			/* last_ticket is valid until another one is needed -
-			 * and then it already has the new address and
-			 * is valid again. */
-			continue;
-		}
-
-		if (strcmp(key, "expire") == 0) {
-			defaults.term_duration = strtol(val, &s, 0);
-			if (*s || s == val || defaults.term_duration<10) {
-				error = "Expected plain integer value >=10 for expire";
-				goto err;
-			}
-
-			if (last_ticket)
-				last_ticket->term_duration = defaults.term_duration;
-			continue;
-		}
-
 		if (strcmp(key, "site-user") == 0) {
 			safe_copy(booth_conf->site_user, optarg, BOOTH_NAME_LEN,
 					"site-user");
@@ -516,66 +488,79 @@ no_value:
 			continue;
 		}
 
+		if (strcmp(key, "debug") == 0) {
+			if (type != CLIENT)
+				debug_level = max(debug_level, atoi(val));
+			continue;
+		}
+
+		if (strcmp(key, "ticket") == 0) {
+			if (!strcmp(val, "__defaults__")) {
+				current_tk = &defaults;
+			} else if (add_ticket(val, &current_tk, &defaults)) {
+				goto out;
+			}
+
+			/* current_tk is valid until another one is needed -
+			 * and then it already has the new address and
+			 * is valid again. */
+			continue;
+		}
+
+		if (strcmp(key, "expire") == 0) {
+			current_tk->term_duration = strtol(val, &s, 0);
+			if (*s || s == val || current_tk->term_duration<10) {
+				error = "Expected plain integer value >=10 for expire";
+				goto err;
+			}
+			continue;
+		}
 
 		if (strcmp(key, "timeout") == 0) {
-			defaults.timeout = strtol(val, &s, 0);
-			if (*s || s == val || defaults.timeout<1) {
+			current_tk->timeout = strtol(val, &s, 0);
+			if (*s || s == val || current_tk->timeout<1) {
 				error = "Expected plain integer value >=1 for timeout";
 				goto err;
 			}
-
-			if (last_ticket)
-				last_ticket->timeout = defaults.timeout;
 			continue;
 		}
 
 		if (strcmp(key, "retries") == 0) {
-			defaults.retries = strtol(val, &s, 0);
-			if (*s || s == val || defaults.retries<3 || defaults.retries > 100) {
+			current_tk->retries = strtol(val, &s, 0);
+			if (*s || s == val ||
+					current_tk->retries<3 || current_tk->retries > 100) {
 				error = "Expected plain integer value in the range [3, 100] for retries";
 				goto err;
 			}
-
-			if (last_ticket)
-				last_ticket->retries = defaults.retries;
 			continue;
 		}
 
 		if (strcmp(key, "acquire-after") == 0) {
-			defaults.acquire_after = strtol(val, &s, 0);
-			if (*s || s == val || defaults.acquire_after<0) {
+			current_tk->acquire_after = strtol(val, &s, 0);
+			if (*s || s == val || current_tk->acquire_after<0) {
 				error = "Expected plain integer value >=1 for acquire-after";
 				goto err;
 			}
-
-			if (last_ticket)
-				last_ticket->acquire_after = defaults.acquire_after;
 			continue;
 		}
 
 		if (strcmp(key, "before-acquire-handler") == 0) {
-			defaults.ext_verifier = strdup(val);
-			if (*s || s == val || defaults.timeout<1) {
-				error = "Expected plain integer value >=1 for timeout";
+			if (current_tk->ext_verifier) {
+				free(current_tk->ext_verifier);
+			}
+			current_tk->ext_verifier = strdup(val);
+			if (!current_tk->ext_verifier) {
+				error = "Out of memory";
 				goto err;
 			}
-
-			if (last_ticket)
-				last_ticket->ext_verifier = defaults.ext_verifier;
 			continue;
 		}
-
 
 		if (strcmp(key, "weights") == 0) {
-			if (parse_weights(val, defaults.weight) < 0)
+			if (parse_weights(val, current_tk->weight) < 0)
 				goto out;
-
-			if (last_ticket)
-				memcpy(last_ticket->weight, defaults.weight,
-						sizeof(last_ticket->weight));
 			continue;
 		}
-
 
 		error = "Unknown item";
 		goto out;
