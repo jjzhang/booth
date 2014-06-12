@@ -262,7 +262,6 @@ static int newer_term(struct ticket_config *tk,
 					term, tk->current_term,
 					ticket_leader_string(tk));
 		} else {
-			tk->leader = no_leader;
 			tk_log_debug("from %s: higher term %d vs. %d (election)",
 					site_string(sender),
 					term, tk->current_term);
