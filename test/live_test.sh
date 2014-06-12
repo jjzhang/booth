@@ -233,7 +233,8 @@ EOF
 
 booth_where_granted() {
 	local grantee ticket_line
-	ticket_line=`run_arbitrator 1 booth list | grep $tkt`
+	# assume that the last site is never stopped
+	ticket_line=`run_site $site_cnt booth list | grep $tkt`
 	grantee=`echo "$ticket_line" | sed 's/.*leader: //;s/,.*//'`
 	echo $grantee
 	[ "$grantee" = "none" ] && return
@@ -318,6 +319,8 @@ runtest() {
 
 sites=`get_servers site < $cnf`
 arbitrators=`get_servers arbitrator < $cnf`
+site_cnt=`echo $sites | wc -w`
+arbitrator_cnt=`echo $arbitrators | wc -w`
 eval `get_tkt_settings`
 
 [ -z "$sites" ] && {
@@ -348,6 +351,28 @@ test_grant() {
 }
 check_grant() {
 	check_consistency `get_site 1`
+}
+
+# just a grant with no arbitrators
+test_grant_noarb() {
+	run_site 1 booth revoke $tkt >/dev/null
+	wait_timeout
+	local h
+	for h in $arbitrators; do
+		stop_arbitrator $h
+	done >/dev/null 2>&1
+	sleep 1
+	run_site 1 booth grant $tkt >/dev/null
+	wait_timeout
+}
+check_grant_noarb() {
+	check_consistency `get_site 1`
+}
+recover_grant_noarb() {
+	local h
+	for h in $arbitrators; do
+		start_arbitrator $h
+	done >/dev/null 2>&1
 }
 
 # just a revoke
@@ -578,7 +603,7 @@ all_booth_status || {
 
 TESTS="$@"
 
-: ${TESTS:="grant grant_elsewhere grant_site_lost revoke
+: ${TESTS:="grant grant_noarb grant_elsewhere grant_site_lost revoke
 simultaneous_start_even slow_start_granted
 restart_granted restart_granted_nocib restart_notgranted
 failover split_leader split_follower split_edge
