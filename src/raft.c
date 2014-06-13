@@ -104,10 +104,14 @@ static void update_term_from_msg(struct ticket_config *tk,
 
 
 static void update_ticket_from_msg(struct ticket_config *tk,
+		struct booth_site *sender,
 		struct boothc_ticket_msg *msg)
 {
 	int duration;
 
+	tk_log_debug("updating from %s (%d/%d)",
+		site_string(sender),
+		ntohl(msg->ticket.term), ntohl(msg->ticket.term_valid_for));
 	duration = min(tk->term_duration, ntohl(msg->ticket.term_valid_for));
 	tk->term_expires = time(NULL) + duration;
 	update_term_from_msg(tk, msg);
@@ -564,7 +568,7 @@ static int process_REJECTED(
 			become_follower(tk, msg);
 		} else {
 			tk_log_warn("our ticket is outdated and revoked");
-			update_ticket_from_msg(tk, msg);
+			update_ticket_from_msg(tk, sender, msg);
 			tk->state = ST_INIT;
 		}
 		return 0;
@@ -844,7 +848,7 @@ static int process_MY_INDEX (
 
 	/* their ticket is either newer or not expired, don't
 	 * ignore it */
-	update_ticket_from_msg(tk, msg);
+	update_ticket_from_msg(tk, sender, msg);
 	tk->leader = leader;
 	update_ticket_state(tk, sender);
 	set_ticket_wakeup(tk);
