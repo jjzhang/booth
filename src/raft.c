@@ -308,22 +308,24 @@ static int answer_HEARTBEAT (
 	uint32_t term;
 
 	term = ntohl(msg->ticket.term);
-	tk_log_debug("leader: %s, have %s; term %d vs %d",
+	tk_log_debug("heartbeat from leader: %s, have %s; term %d vs %d",
 			site_string(leader), ticket_leader_string(tk),
 			term, tk->current_term);
 
+	if (term < tk->current_term) {
+		if (sender == tk->leader) {
+			tk_log_info("trusting leader %s with a lower term (%d vs %d)",
+				site_string(leader), term, tk->current_term);
+		} else if (is_owned(tk)) {
+			tk_log_warn("different leader %s with a lower term "
+					"(%d vs %d), sending reject",
+				site_string(leader), term, tk->current_term);
+			return send_reject(sender, tk, RLT_TERM_OUTDATED);
+		}
+	}
+
 	/* got heartbeat, no rejects expected anymore */
 	tk->expect_more_rejects = 0;
-
-	/* if we're candidate, it may be that we got a heartbeat from
-	 * a legitimate leader, so don't ignore a lower term
-	 */
-	if (tk->state != ST_CANDIDATE && term < tk->current_term) {
-		tk_log_info("ignoring lower term %d vs. %d, from %s",
-				term, tk->current_term,
-				ticket_leader_string(tk));
-		return 0;
-	}
 
 	/* Needed? */
 	newer_term(tk, sender, leader, msg, 0);
@@ -346,23 +348,17 @@ static int process_UPDATE (
 		struct boothc_ticket_msg *msg
 	       )
 {
-	uint32_t term;
-
-
-	term = ntohl(msg->ticket.term);
-	tk_log_debug("leader: %s, have %s; term %d vs %d",
-			site_string(leader), ticket_leader_string(tk),
-			term, tk->current_term);
-
-	/* No reject. (?) */
-	if (term < tk->current_term) {
-		tk_log_info("ignoring lower term %d vs. %d, from %s",
-				term, tk->current_term,
-				ticket_leader_string(tk));
-		return 0;
+	if (is_owned(tk) && sender != tk->leader) {
+		tk_log_warn("different leader %s wants to update "
+				"our ticket, sending reject",
+			site_string(leader));
+		return send_reject(sender, tk, RLT_TERM_OUTDATED);
 	}
 
-	update_ticket_from_msg(tk, msg);
+	tk_log_debug("leader %s wants to update our ticket",
+			site_string(leader));
+
+	copy_ticket_from_msg(tk, msg);
 	ticket_write(tk);
 
 	/* run ticket_cron if the ticket expires */
@@ -899,7 +895,8 @@ int raft_answer(
 		}
 		break;
 	case OP_UPDATE:
-		if (tk->leader != local && tk->state == ST_FOLLOWER) {
+		if (tk->leader != local && tk->leader == leader &&
+				tk->state == ST_FOLLOWER) {
 			rv = process_UPDATE(tk, from, leader, msg);
 		} else {
 			tk_log_warn("unexpected message %s, from %s",
