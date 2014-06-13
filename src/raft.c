@@ -108,14 +108,9 @@ static void update_ticket_from_msg(struct ticket_config *tk,
 {
 	int duration;
 
-	duration = tk->term_duration;
-	if (msg)
-		duration = min(duration, ntohl(msg->ticket.term_valid_for));
+	duration = min(tk->term_duration, ntohl(msg->ticket.term_valid_for));
 	tk->term_expires = time(NULL) + duration;
-
-	if (msg) {
-		update_term_from_msg(tk, msg);
-	}
+	update_term_from_msg(tk, msg);
 }
 
 
