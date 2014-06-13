@@ -16,6 +16,7 @@ cnf=$1
 shift 1
 logf=test_booth.log
 iprules=/usr/share/booth/tests/test/booth_path
+netif=eth0
 : ${HA_LOGFACILITY:="syslog"}
 
 is_function() {
@@ -174,6 +175,17 @@ wait_half_exp() {
 }
 wait_timeout() {
 	sleep $T_timeout
+}
+
+# tc netem, simulate packet loss, wan, etc
+netem_delay() {
+	tc qdisc add dev $netif root netem delay $1ms $(($1/10))ms
+}
+netem_loss() {
+	tc qdisc add dev $netif root netem loss $1%
+}
+netem_reset() {
+	tc qdisc del dev $netif root netem
 }
 
 cib_status() {
@@ -602,6 +614,25 @@ recover_external_prog_failed() {
 }
 applicable_external_prog_failed() {
 	[ -n `get_rsc` ]
+}
+
+# packet loss 80%
+test_loss_80() {
+	run_site 1 booth revoke $tkt >/dev/null
+	wait_timeout
+	run_site 1 booth grant $tkt >/dev/null
+	sleep 1
+	netem_loss 80
+	wait_exp
+	wait_exp
+	wait_exp
+	netem_reset
+}
+check_loss_80() {
+	check_consistency `get_site 1`
+}
+applicable_loss_80() {
+	which tc > /dev/null 2>&1
 }
 
 sync_conf || exit
