@@ -104,6 +104,14 @@ forall() {
 	done
 	return $rc
 }
+forall_sites() {
+	local h rc=0
+	for h in $sites; do
+		ssh $h $@
+		rc=$((rc|$?))
+	done
+	return $rc
+}
 forall_fun() {
 	local h rc=0 f=$1
 	for h in $sites $arbitrators; do
@@ -233,8 +241,10 @@ EOF
 
 booth_where_granted() {
 	local grantee ticket_line
-	# assume that the last site is never stopped
-	ticket_line=`run_site $site_cnt booth list | grep $tkt`
+	# we don't know which sites could be stopped, so run booth
+	# list on all of them (at least one should have booth
+	# running)
+	ticket_line=`forall_sites booth list | grep $tkt | sort -u | head -1`
 	grantee=`echo "$ticket_line" | sed 's/.*leader: //;s/,.*//'`
 	echo $grantee
 	[ "$grantee" = "none" ] && return
