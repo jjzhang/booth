@@ -461,14 +461,6 @@ static int process_VOTE_FOR(
 		struct boothc_ticket_msg *msg
 		)
 {
-	if (term_too_low(tk, sender, leader, msg))
-		return 0;
-
-	if (newer_term(tk, sender, leader, msg, 0)) {
-		clear_election(tk);
-	}
-
-
 	/* leader wants to step down? */
 	if (leader == no_leader && sender == tk->leader &&
 			(tk->state == ST_FOLLOWER || tk->state == ST_CANDIDATE)) {
@@ -478,14 +470,21 @@ static int process_VOTE_FOR(
 		return new_round(tk, OR_STEPDOWN);
 	}
 
-	record_vote(tk, sender, leader);
-
-
 	if (tk->state != ST_CANDIDATE) {
 		/* lost candidate status, somebody rejected our proposal */
+		tk_log_debug("candidate status lost, ignoring vote_for from %s",
+			site_string(sender));
 		return 0;
 	}
 
+	if (term_too_low(tk, sender, leader, msg))
+		return 0;
+
+	if (newer_term(tk, sender, leader, msg, 0)) {
+		clear_election(tk);
+	}
+
+	record_vote(tk, sender, leader);
 
 	/* only if all voted can we take the ticket now, otherwise
 	 * wait for timeout in ticket_cron */
