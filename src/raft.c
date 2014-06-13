@@ -153,7 +153,7 @@ static void won_elections(struct ticket_config *tk)
 	tk->voted_for = NULL;
 
 	tk->commit_index++;
-	send_heartbeat(tk);
+	ticket_broadcast(tk, OP_HEARTBEAT, OP_ACK, RLT_SUCCESS, 0);
 	ticket_activate_timeout(tk);
 }
 

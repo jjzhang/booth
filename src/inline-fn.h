@@ -24,7 +24,6 @@
 #include <assert.h>
 #include <string.h>
 #include "config.h"
-#include "ticket.h"
 #include "transport.h"
 
 
@@ -297,11 +296,6 @@ static inline void no_resends(struct ticket_config *tk)
 {
 	tk->retry_number = 0;
 	tk->acks_expected = 0;
-}
-
-static inline int send_heartbeat(struct ticket_config *tk)
-{
-	return ticket_broadcast(tk, OP_HEARTBEAT, OP_ACK, RLT_SUCCESS, 0);
 }
 
 static inline struct booth_site *my_vote(struct ticket_config *tk)

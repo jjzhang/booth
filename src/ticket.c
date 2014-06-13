@@ -718,7 +718,7 @@ static void ticket_cron(struct ticket_config *tk)
 		} else {
 			/* this is ticket renewal, run local test */
 			if (!test_external_prog(tk, 1)) {
-				send_heartbeat(tk);
+				ticket_broadcast(tk, OP_HEARTBEAT, OP_ACK, RLT_SUCCESS, 0);
 				ticket_activate_timeout(tk);
 			}
 		}
