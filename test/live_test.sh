@@ -461,6 +461,7 @@ test_simultaneous_start_even() {
 	wait_half_exp
 	start_site `get_site 1`
 	wait_timeout
+	wait_timeout
 }
 check_simultaneous_start_even() {
 	check_consistency `get_site 2`
