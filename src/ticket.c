@@ -314,6 +314,12 @@ static void reacquire_ticket(struct ticket_config *tk)
 
 void update_ticket_state(struct ticket_config *tk, struct booth_site *sender)
 {
+	if (tk->state == ST_CANDIDATE) {
+		tk_log_info("learned from %s about "
+				"newer ticket, stopping elections",
+				site_string(sender));
+	}
+
 	if (tk->leader == local || tk->is_granted) {
 		/* message from a live leader with valid ticket? */
 		if (sender == tk->leader && term_time_left(tk)) {
@@ -330,6 +336,9 @@ void update_ticket_state(struct ticket_config *tk, struct booth_site *sender)
 			tk->state = ST_FOLLOWER;
 			tk->next_state = ST_FOLLOWER;
 		} else {
+			if (tk->state == ST_CANDIDATE) {
+				tk->state = ST_FOLLOWER;
+			}
 			tk->next_state = ST_LEADER;
 		}
 	} else {
@@ -956,13 +965,18 @@ int send_reject(struct booth_site *dest, struct ticket_config *tk, cmd_result_t 
 
 int send_msg (
 		int cmd,
-		struct ticket_config *tk,
+		struct ticket_config *current_tk,
 		struct booth_site *dest
 	       )
 {
+	struct ticket_config *tk = current_tk;
 	struct boothc_ticket_msg msg;
 
 	if (cmd == OP_MY_INDEX) {
+		if (current_tk->state == ST_CANDIDATE &&
+				current_tk->last_valid_tk->current_term) {
+			tk = current_tk->last_valid_tk;
+		}
 		tk_log_info("sending status to %s",
 				site_string(dest));
 	}

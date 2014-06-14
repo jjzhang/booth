@@ -71,8 +71,8 @@ static int cmp_msg_ticket(struct ticket_config *tk,
 		struct booth_site *leader,
 		struct boothc_ticket_msg *msg)
 {
-	if (tk->current_term != ntohl(msg->ticket.term)) {
-		return tk->current_term - ntohl(msg->ticket.term);
+	if (my_last_term(tk) != ntohl(msg->ticket.term)) {
+		return my_last_term(tk) - ntohl(msg->ticket.term);
 	}
 	/* compare commit_index only from the leader */
 	if (sender == leader) {
@@ -326,6 +326,9 @@ static int answer_HEARTBEAT (
 
 	/* got heartbeat, no rejects expected anymore */
 	tk->expect_more_rejects = 0;
+
+	/* and certainly not in election */
+	tk->in_election = 0;
 
 	/* Needed? */
 	newer_term(tk, sender, leader, msg, 0);
@@ -658,6 +661,10 @@ static int answer_REQ_VOTE(
 	if (term_too_low(tk, sender, leader, msg))
 		return 0;
 
+	/* set this, so that we know not to send status for the
+	 * ticket */
+	tk->in_election = 1;
+
 	/* if it's a newer term or ... */
 	if (newer_term(tk, sender, leader, msg, 1)) {
 		clear_election(tk);
@@ -693,15 +700,20 @@ int new_election(struct ticket_config *tk,
 	if (now <= tk->election_end)
 		return 0;
 
-
 	/* §5.2 */
 	/* If there was _no_ answer, don't keep incrementing the term number
 	 * indefinitely. If there was no peer, there'll probably be no one
 	 * listening now either. However, we don't know if we were
 	 * invoked due to a timeout (caller does).
 	 */
-	if (update_term)
+	if (update_term) {
+		/* save the previous term, we may need to send out the
+		 * MY_INDEX message */
+		if (tk->state != ST_CANDIDATE) {
+			memcpy(tk->last_valid_tk, tk, sizeof(struct ticket_config));
+		}
 		tk->current_term++;
+	}
 
 	tk->term_expires = 0;
 	tk->election_end = now + tk->timeout;
@@ -806,7 +818,10 @@ static int process_MY_INDEX (
 
 	if (i > 0) {
 		/* let them know about our newer ticket */
-		send_msg(OP_MY_INDEX, tk, sender);
+		/* but if we're voting in elections, our ticket is not
+		 * valid yet, don't send it */
+		if (!tk->in_election)
+			send_msg(OP_MY_INDEX, tk, sender);
 		if (tk->state == ST_LEADER) {
 			tk_log_info("sending ticket update to %s",
 					site_string(sender));
@@ -914,7 +929,8 @@ int raft_answer(
 		rv = process_MY_INDEX(tk, from, leader, msg);
 		break;
 	case OP_STATUS:
-		rv = send_msg(OP_MY_INDEX, tk, from);
+		if (!tk->in_election)
+			rv = send_msg(OP_MY_INDEX, tk, from);
 		break;
 	default:
 		tk_log_error("unknown message %s, from %s",

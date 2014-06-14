@@ -154,11 +154,21 @@ struct ticket_config {
 	*/
 	int update_cib;
 
+	/* Is this ticket in election?
+	*/
+	int in_election;
+
 	/* don't log warnings unnecessarily
 	 */
 	int expect_more_rejects;
 	/** \name Needed while proposals are being done.
 	 * @{ */
+	/* Need to keep the previous valid ticket in case we moved to
+	 * start new elections and another server asks for the ticket
+	 * status. It would be wrong to send our candidate ticket.
+	*/
+	struct ticket_config *last_valid_tk;
+
 	/** Whom to vote for the next time.
 	 * Needed to push a ticket to someone else. */
 
@@ -184,7 +194,6 @@ struct ticket_config {
 	int retry_number;
 	/** @} */
 };
-
 
 struct booth_config {
     char name[BOOTH_NAME_LEN];

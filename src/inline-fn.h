@@ -92,6 +92,10 @@ static inline void init_ticket_site_header(struct boothc_ticket_msg *msg, int cm
 	init_header(&msg->header, cmd, 0, 0, 0, sizeof(*msg));
 }
 
+#define my_last_term(tk) \
+	(((tk)->state == ST_CANDIDATE && (tk)->last_valid_tk->current_term) ? \
+	(tk)->last_valid_tk->current_term : (tk)->current_term)
+
 static inline void init_ticket_msg(struct boothc_ticket_msg *msg,
 		int cmd, int rv, int reason,
 		struct ticket_config *tk)
