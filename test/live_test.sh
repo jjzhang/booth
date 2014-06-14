@@ -97,6 +97,10 @@ sync_conf() {
 	done
 	return $rc
 }
+dump_conf() {
+	echo "test configuration file $cnf:"
+	grep -v '^#' $cnf | grep -v '^[[:space:]]*$' | sed "s/^/$cnf: /"
+}
 forall() {
 	local h rc=0
 	for h in $sites $arbitrators; do
@@ -641,6 +645,8 @@ all_booth_status || {
 	reset_booth
 	all_booth_status || exit
 }
+
+dump_conf >&2
 
 TESTS="$@"
 
