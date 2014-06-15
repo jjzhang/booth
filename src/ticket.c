@@ -583,7 +583,7 @@ static void resend_msg(struct ticket_config *tk)
 	int i;
 
 	if (!(tk->acks_received ^ local->bitmask)) {
-		ticket_broadcast(tk, tk->last_request, tk->acks_expected, RLT_SUCCESS, 0);
+		ticket_broadcast(tk, tk->last_request, 0, RLT_SUCCESS, 0);
 	} else {
 		for (i = 0; i < booth_conf->site_count; i++) {
 			n = booth_conf->site + i;
