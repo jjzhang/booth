@@ -368,6 +368,8 @@ set -x
 # the tests
 #
 
+## TEST: grant ##
+
 # just a grant
 test_grant() {
 	run_site 1 booth revoke $tkt >/dev/null
@@ -378,6 +380,8 @@ test_grant() {
 check_grant() {
 	check_consistency `get_site 1`
 }
+
+## TEST: grant_noarb ##
 
 # just a grant with no arbitrators
 test_grant_noarb() {
@@ -401,6 +405,8 @@ recover_grant_noarb() {
 	done >/dev/null 2>&1
 }
 
+## TEST: revoke ##
+
 # just a revoke
 test_revoke() {
 	run_site 1 booth revoke $tkt >/dev/null
@@ -414,6 +420,8 @@ check_revoke() {
 	check_consistency
 }
 
+## TEST: grant_elsewhere ##
+
 # just a grant to another site
 test_grant_elsewhere() {
 	run_site 1 booth revoke $tkt >/dev/null
@@ -424,6 +432,8 @@ test_grant_elsewhere() {
 check_grant_elsewhere() {
 	check_consistency `get_site 2`
 }
+
+## TEST: grant_site_lost ##
 
 # grant with one site lost
 test_grant_site_lost() {
@@ -442,6 +452,8 @@ check_grant_site_lost() {
 recover_grant_site_lost() {
 	start_site `get_site 2`
 }
+
+## TEST: simultaneous_start_even ##
 
 # simultaneous start of even number of members
 test_simultaneous_start_even() {
@@ -467,6 +479,8 @@ check_simultaneous_start_even() {
 	check_consistency `get_site 2`
 }
 
+## TEST: slow_start_granted ##
+
 # slow start
 test_slow_start_granted() {
 	run_site 1 booth revoke $tkt >/dev/null
@@ -488,6 +502,8 @@ check_slow_start_granted() {
 	check_consistency `get_site 1`
 }
 
+## TEST: restart_granted ##
+
 # restart with ticket granted
 test_restart_granted() {
 	run_site 1 booth revoke $tkt >/dev/null
@@ -500,6 +516,8 @@ test_restart_granted() {
 check_restart_granted() {
 	check_consistency `get_site 1`
 }
+
+## TEST: restart_granted_nocib ##
 
 # restart with ticket granted (but cib empty)
 test_restart_granted_nocib() {
@@ -516,6 +534,8 @@ check_restart_granted_nocib() {
 	check_consistency `get_site 1`
 }
 
+## TEST: notgranted ##
+
 # restart with ticket not granted
 test_restart_notgranted() {
 	run_site 1 booth revoke $tkt >/dev/null
@@ -530,6 +550,8 @@ test_restart_notgranted() {
 check_restart_notgranted() {
 	check_consistency `get_site 1`
 }
+
+## TEST: failover ##
 
 # ticket failover
 test_failover() {
@@ -548,6 +570,8 @@ check_failover() {
 recover_failover() {
 	start_site `get_site 1`
 }
+
+## TEST: split_leader ##
 
 # split brain (leader alone)
 test_split_leader() {
@@ -569,6 +593,8 @@ recover_split_leader() {
 	run_site 1 $iprules start  >/dev/null
 }
 
+## TEST: split_follower ##
+
 # split brain (follower alone)
 test_split_follower() {
 	run_site 1 booth revoke $tkt >/dev/null
@@ -585,6 +611,8 @@ check_split_follower() {
 	check_consistency `get_site 1`
 }
 
+## TEST: split_edge ##
+
 # split brain (leader alone)
 test_split_edge() {
 	run_site 1 booth revoke $tkt >/dev/null
@@ -599,6 +627,8 @@ test_split_edge() {
 check_split_edge() {
 	check_consistency any
 }
+
+## TEST: external_prog_failed ##
 
 # external test prog failed
 test_external_prog_failed() {
