@@ -868,7 +868,7 @@ static int process_MY_INDEX (
 
 int raft_answer(
 		struct ticket_config *tk,
-		struct booth_site *from,
+		struct booth_site *sender,
 		struct booth_site *leader,
 		struct boothc_ticket_msg *msg
 	       )
@@ -881,60 +881,64 @@ int raft_answer(
 
 	tk_log_debug("got message %s from %s",
 			state_to_string(cmd),
-			site_string(from));
+			site_string(sender));
 
 
 	switch (cmd) {
 	case OP_REQ_VOTE:
-		rv = answer_REQ_VOTE(tk, from, leader, msg);
+		rv = answer_REQ_VOTE(tk, sender, leader, msg);
 		break;
 	case OP_VOTE_FOR:
-		rv = process_VOTE_FOR(tk, from, leader, msg);
+		rv = process_VOTE_FOR(tk, sender, leader, msg);
 		break;
 	case OP_ACK:
 		if (tk->leader == local &&
 				tk->state == ST_LEADER)
-			rv = process_ACK(tk, from, leader, msg);
+			rv = process_ACK(tk, sender, leader, msg);
 		break;
 	case OP_HEARTBEAT:
 		if (tk->leader != local &&
 				(tk->state == ST_INIT ||tk->state == ST_FOLLOWER ||
 				tk->state == ST_CANDIDATE))
-			rv = answer_HEARTBEAT(tk, from, leader, msg);
+			rv = answer_HEARTBEAT(tk, sender, leader, msg);
 		else {
 			tk_log_warn("unexpected message %s, from %s",
 				state_to_string(cmd),
-				site_string(from));
+				site_string(sender));
+			if (ticket_seems_ok(tk))
+				send_reject(sender, tk, RLT_TERM_STILL_VALID);
 			rv = -EINVAL;
 		}
 		break;
 	case OP_UPDATE:
 		if (tk->leader != local && tk->leader == leader &&
 				tk->state == ST_FOLLOWER) {
-			rv = process_UPDATE(tk, from, leader, msg);
+			rv = process_UPDATE(tk, sender, leader, msg);
 		} else {
 			tk_log_warn("unexpected message %s, from %s",
 				state_to_string(cmd),
-				site_string(from));
+				site_string(sender));
+			if (ticket_seems_ok(tk))
+				send_reject(sender, tk, RLT_TERM_STILL_VALID);
 			rv = -EINVAL;
 		}
 		break;
 	case OP_REJECTED:
-		rv = process_REJECTED(tk, from, leader, msg);
+		rv = process_REJECTED(tk, sender, leader, msg);
 		break;
 	case OP_REVOKE:
-		rv = process_REVOKE(tk, from, leader, msg);
+		rv = process_REVOKE(tk, sender, leader, msg);
 		break;
 	case OP_MY_INDEX:
-		rv = process_MY_INDEX(tk, from, leader, msg);
+		rv = process_MY_INDEX(tk, sender, leader, msg);
 		break;
 	case OP_STATUS:
 		if (!tk->in_election)
-			rv = send_msg(OP_MY_INDEX, tk, from);
+			rv = send_msg(OP_MY_INDEX, tk, sender);
 		break;
 	default:
 		tk_log_error("unknown message %s, from %s",
-			state_to_string(cmd), site_string(from));
+			state_to_string(cmd), site_string(sender));
 		rv = -EINVAL;
 	}
 	return rv;
