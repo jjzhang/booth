@@ -959,6 +959,8 @@ int send_reject(struct booth_site *dest, struct ticket_config *tk, cmd_result_t 
 {
 	struct boothc_ticket_msg msg;
 
+	tk_log_debug("sending reject to %s",
+			site_string(dest));
 	init_ticket_msg(&msg, OP_REJECTED, code, 0, tk);
 	return booth_udp_send(dest, &msg, sizeof(msg));
 }
