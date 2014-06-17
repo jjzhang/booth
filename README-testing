@@ -36,13 +36,32 @@ A split brain condition is also tested. For that to work, all
 sites need `iptables` installed. The supplied script `booth_path`
 is used to manipulate iptables rules.
 
+==== Network environment emulation
+
+To introduce packet loss or network delays, set the NETEM_ENV
+environment variable. There are currently three netem network
+emulation settings supported:
+
+- loss: all servers emulate packet loss (30% by default)
+
+- single_loss: the first site in the configuration emulates
+  packet loss (30% by default)
+
+- net_delay: all servers emulate packet delay (100ms by default
+  with random variation of 10%)
+
+The settings can be supplied by adding ':' to the emulator name.
+For instance:
+
+	# NETEM_ENV=loss:50 /usr/share/booth/tests/test/live_test.sh booth.conf
+
 It is not necessary to run the test script on one of the sites.
 Just copy the script and make the test `booth.conf` available
 locally:
 
-$ scp testsite:/usr/share/booth/tests/test/live_test.sh .
-$ scp testsite:/etc/booth/booth.conf .
-$ sh live_test.sh booth.conf
+	$ scp testsite:/usr/share/booth/tests/test/live_test.sh .
+	$ scp testsite:/etc/booth/booth.conf .
+	$ sh live_test.sh booth.conf
 
 You need at least two sites and one arbitrator.
 

@@ -126,6 +126,18 @@ forall_fun() {
 	done
 	return $rc
 }
+# run on all hosts whatever function produced on stdout
+forall_fun2() {
+	local h rc=0 f
+	f=$1
+	shift 1
+	for h in $sites $arbitrators; do
+		$f $@ | ssh $h
+		rc=$((rc|$?))
+		[ $rc -ne 0 ] && break
+	done
+	return $rc
+}
 run_site() {
 	local n=$1 h
 	shift 1
@@ -181,15 +193,22 @@ wait_timeout() {
 	sleep $T_timeout
 }
 
+ext_prog_log() {
+	local cmd="$@"
+	echo "run: $cmd" >&2
+	logger -p $HA_LOGFACILITY.info "$cmd"
+	$cmd
+}
+
 # tc netem, simulate packet loss, wan, etc
 netem_delay() {
-	tc qdisc add dev $netif root netem delay $1ms $(($1/10))ms
+	echo "tc qdisc add dev $netif root netem delay $1ms $(($1/10))ms"
 }
 netem_loss() {
-	tc qdisc add dev $netif root netem loss $1%
+	echo "tc qdisc add dev $netif root netem loss $1%"
 }
 netem_reset() {
-	tc qdisc del dev $netif root netem
+	echo "tc qdisc del dev $netif root netem"
 }
 
 cib_status() {
@@ -651,23 +670,38 @@ applicable_external_prog_failed() {
 	[ -n `get_rsc` ]
 }
 
-# packet loss 80%
-test_loss_80() {
-	run_site 1 booth revoke $tkt >/dev/null
-	wait_timeout
-	run_site 1 booth grant $tkt >/dev/null
-	sleep 1
-	netem_loss 80
-	wait_exp
-	wait_exp
-	wait_exp
-	netem_reset
+#
+# environment modifications
+#
+
+# packet loss at one site 30%
+ENV_single_loss() {
+	run_site 1 netem_loss ${1:-30}
 }
-check_loss_80() {
-	check_consistency `get_site 1`
+
+# packet loss everywhere 30%
+ENV_loss() {
+	forall_fun2 netem_loss ${1:-30}
 }
-applicable_loss_80() {
-	which tc > /dev/null 2>&1
+
+# network delay 100ms
+ENV_net_delay() {
+	forall_fun2 netem_delay ${1:-100}
+}
+
+set_env() {
+	local modfun args
+	modfun=`echo $1 | sed 's/:.*//'`
+	args=`echo $1 | sed 's/[^:]*://;s/:/ /g'`
+	if ! is_function ENV_$modfun; then
+		echo "ENV_$modfun: doesn't exist"
+		exit 1
+	fi
+	echo running $modfun $args
+	ENV_$modfun $args
+}
+reset_env() {
+	trap "forall_fun2 netem_reset" EXIT
 }
 
 sync_conf || exit
@@ -686,6 +720,13 @@ simultaneous_start_even slow_start_granted
 restart_granted restart_granted_nocib restart_notgranted
 failover split_leader split_follower split_edge
 external_prog_failed"}
+
+if [ -n "$NETEM_ENV" ]; then
+	for env in $NETEM_ENV; do
+		set_env $env
+	done
+	reset_env
+fi
 
 for t in $TESTS; do
 	runtest $t
