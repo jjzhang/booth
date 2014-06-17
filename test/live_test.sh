@@ -11,7 +11,6 @@ usage() {
 
 [ $# -eq 0 ] && usage
 
-tkt=ticket-A
 cnf=$1
 shift 1
 logf=test_booth.log
@@ -170,6 +169,9 @@ break_external_prog() {
 }
 repair_external_prog() {
 	run_site $1 crm configure delete __pref_booth_live_test
+}
+get_tkt() {
+	grep "^ticket=" | head -1 | sed 's/ticket=//;s/"//g'
 }
 get_tkt_settings() {
 awk '
@@ -366,6 +368,7 @@ sites=`get_servers site < $cnf`
 arbitrators=`get_servers arbitrator < $cnf`
 site_cnt=`echo $sites | wc -w`
 arbitrator_cnt=`echo $arbitrators | wc -w`
+tkt=`get_tkt < $cnf`
 eval `get_tkt_settings`
 
 [ -z "$sites" ] && {

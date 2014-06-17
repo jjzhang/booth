@@ -65,7 +65,7 @@ locally:
 
 You need at least two sites and one arbitrator.
 
-The ticket must be named `ticket-A`.
+The configuration can contain just one ticket.
 
 It is not necessary to configure the `before-acquire-handler`.
 
