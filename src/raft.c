@@ -74,10 +74,6 @@ static int cmp_msg_ticket(struct ticket_config *tk,
 	if (my_last_term(tk) != ntohl(msg->ticket.term)) {
 		return my_last_term(tk) - ntohl(msg->ticket.term);
 	}
-	/* compare commit_index only from the leader */
-	if (sender == leader) {
-		return tk->commit_index - ntohl(msg->ticket.leader_commit);
-	}
 	return 0;
 }
 
@@ -96,10 +92,6 @@ static void update_term_from_msg(struct ticket_config *tk,
 	} else {
 		tk->current_term = max(i, tk->current_term);
 	}
-
-	/* § 5.3 */
-	i = ntohl(msg->ticket.leader_commit);
-	tk->commit_index = max(i, tk->commit_index);
 }
 
 
@@ -123,7 +115,6 @@ static void copy_ticket_from_msg(struct ticket_config *tk,
 {
 	tk->term_expires = time(NULL) + ntohl(msg->ticket.term_valid_for);
 	tk->current_term = ntohl(msg->ticket.term);
-	tk->commit_index = ntohl(msg->ticket.leader_commit);
 }
 
 static void become_follower(struct ticket_config *tk,
@@ -151,7 +142,6 @@ static void won_elections(struct ticket_config *tk)
 	tk->election_end = 0;
 	tk->voted_for = NULL;
 
-	tk->commit_index++;
 	ticket_broadcast(tk, OP_HEARTBEAT, OP_ACK, RLT_SUCCESS, 0);
 	ticket_activate_timeout(tk);
 }

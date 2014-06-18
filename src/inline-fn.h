@@ -113,8 +113,6 @@ static inline void init_ticket_msg(struct boothc_ticket_msg *msg,
 			(tk->leader && tk->leader != no_leader) ? tk->leader : tk->voted_for));
 		msg->ticket.term           = htonl(tk->current_term);
 		msg->ticket.term_valid_for = htonl(term_time_left(tk));
-
-		msg->ticket.leader_commit  = htonl(tk->commit_index);
 	}
 }
 

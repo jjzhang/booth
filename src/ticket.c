@@ -249,9 +249,8 @@ int list_ticket(char **pdata, unsigned int *len)
 		if (is_owned(tk)) {
 			cp += snprintf(cp,
 					alloc - (cp - data),
-					", expires: %s, commit: %d%s\n",
+					", expires: %s%s\n",
 					timeout_str,
-					tk->commit_index,
 					pending_str);
 		} else {
 			cp += snprintf(cp, alloc - (cp - data), "\n");
@@ -786,12 +785,10 @@ void tickets_log_info(void)
 	foreach_ticket(i, tk) {
 		tk_log_info("state '%s' "
 				"term %d "
-				"commit index %d "
 				"leader %s "
 				"expires %-24.24s",
 				state_to_string(tk->state),
 				tk->current_term,
-				tk->commit_index,
 				ticket_leader_string(tk),
 				ctime(&tk->term_expires));
 	}

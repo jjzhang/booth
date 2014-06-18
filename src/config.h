@@ -111,9 +111,6 @@ struct ticket_config {
 
 
 	/** */
-	uint32_t commit_index;
-
-	/** */
 	uint32_t last_applied;
 	uint32_t next_index[MAX_NODES];
 	uint32_t match_index[MAX_NODES];
@@ -236,10 +233,10 @@ const char *type_to_string(int type);
 
 
 #include <stdio.h>
-#define R(tk_) do { if (ANYDEBUG) printf("## %12s:%3d state %s, %d:%d, " \
+#define R(tk_) do { if (ANYDEBUG) printf("## %12s:%3d state %s, %d, " \
 	"leader %s, exp %s", __FILE__, __LINE__, \
 	state_to_string(tk_->state), tk_->current_term, \
-	tk_->commit_index, site_string(tk_->leader), ctime(&tk_->term_expires)); } while(0)
+	site_string(tk_->leader), ctime(&tk_->term_expires)); } while(0)
 
 
 #endif /* _CONFIG_H */

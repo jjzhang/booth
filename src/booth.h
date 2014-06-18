@@ -118,8 +118,6 @@ struct ticket_msg {
 
 	/* Perhaps we need to send a status along, too - like
 	 *  starting, running, stopping, error, ...? */
-
-	uint32_t leader_commit; // TODO: NEEDED?
 } __attribute__((packed));
 
 
