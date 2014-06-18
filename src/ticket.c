@@ -229,7 +229,7 @@ int list_ticket(char **pdata, unsigned int *len)
 			strftime(timeout_str, sizeof(timeout_str), "%F %T",
 					localtime(&tk->term_expires));
 		else
-			strcpy(timeout_str, "INF");
+			strcpy(timeout_str, "N/A");
 
 		if (tk->leader == local && tk->delay_commit > time(NULL)) {
 			strcpy(pending_str, " (commit pending until ");
