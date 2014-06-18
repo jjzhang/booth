@@ -317,6 +317,9 @@ void update_ticket_state(struct ticket_config *tk, struct booth_site *sender)
 		tk_log_info("learned from %s about "
 				"newer ticket, stopping elections",
 				site_string(sender));
+		/* there could be rejects coming from others; don't log
+		 * warnings unnecessarily */
+		tk->expect_more_rejects = 1;
 	}
 
 	if (tk->leader == local || tk->is_granted) {
