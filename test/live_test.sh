@@ -346,6 +346,7 @@ runtest() {
 	end_ts=`date +%s`
 	logger -p $HA_LOGFACILITY.info "finished booth test $1 (exit code $rc)"
 	is_function recover_$1 && recover_$1
+	sleep 3
 	all_booth_status
 	booth_status=$?
 	if [ $rc -eq 0 -a $booth_status -eq 0 ]; then
