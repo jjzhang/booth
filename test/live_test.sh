@@ -192,7 +192,9 @@ wait_half_exp() {
 	sleep $((T_expire/2))
 }
 wait_timeout() {
-	sleep $T_timeout
+	local t=2
+	[ "$T_timeout" -gt $t ] && t=$T_timeout
+	sleep $t
 }
 
 ext_prog_log() {
