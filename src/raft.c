@@ -729,6 +729,7 @@ int new_election(struct ticket_config *tk,
 	record_vote(tk, local, new_leader);
 	tk->voted_for = new_leader;
 
+	tk->leader = no_leader;
 	tk->state = ST_CANDIDATE;
 
 	/* some callers may want just to repeat on timeout */
@@ -898,7 +899,7 @@ int raft_answer(
 		break;
 	case OP_HEARTBEAT:
 		if (tk->leader != local &&
-				(tk->state == ST_INIT ||tk->state == ST_FOLLOWER ||
+				(tk->state == ST_INIT || tk->state == ST_FOLLOWER ||
 				tk->state == ST_CANDIDATE))
 			rv = answer_HEARTBEAT(tk, sender, leader, msg);
 		else {
