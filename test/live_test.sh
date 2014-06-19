@@ -585,6 +585,8 @@ test_restart_granted_nocib() {
 	wait_timeout
 	start_site `get_site 1`
 	wait_timeout
+	wait_timeout
+	wait_timeout
 }
 check_restart_granted_nocib() {
 	check_consistency `get_site 1`
