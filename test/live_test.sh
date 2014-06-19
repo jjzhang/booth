@@ -4,12 +4,41 @@
 # do some basic booth operation tests for the given config
 #
 
+PROG=`basename $0`
 usage() {
-	echo "$0: {booth.conf}"
+	cat<<EOF
+usage:
+
+	[NETEM_ENV=<envfun>[:<val>]] $PROG <booth.conf> [<test> ...]
+
+EOF
+	if [ $1 -eq 0 ]; then
+		list_all
+		examples
+	fi
 	exit
 }
 
-[ $# -eq 0 ] && usage
+list_all() {
+	echo "Tests:"
+	grep "^test_.*{$" $0 | sed 's/test_//;s/(.*//;s/^/	/'
+	echo
+	echo "Netem functions:"
+	grep "^NETEM_ENV_.*{$" $0 | sed 's/NETEM_ENV_//;s/(.*//;s/^/	/'
+}
+examples() {
+	cat<<EOF
+
+Examples:
+
+	$0 booth.conf
+	$0 booth-5node.conf grant revoke
+	NETEM_ENV=net_delay:150 $0 mybooth.conf
+
+EOF
+}
+
+[ $# -eq 0 ] && usage 0
 
 cnf=$1
 shift 1
@@ -395,7 +424,7 @@ runtest() {
 
 [ -f "$cnf" ] || {
 	ls $cnf
-	usage
+	usage 1
 }
 
 sites=`get_servers site < $cnf`
@@ -407,12 +436,12 @@ eval `get_tkt_settings`
 
 [ -z "$sites" ] && {
 	echo no sites in $cnf
-	usage
+	usage 1
 }
 
 [ -z "$T_expire" ] && {
 	echo set $tkt expire time in $cnf
-	usage
+	usage 1
 }
 
 exec 2>$logf
@@ -714,17 +743,17 @@ applicable_external_prog_failed() {
 #
 
 # packet loss at one site 30%
-ENV_single_loss() {
+NETEM_ENV_single_loss() {
 	run_site 1 netem_loss ${1:-30}
 }
 
 # packet loss everywhere 30%
-ENV_loss() {
+NETEM_ENV_loss() {
 	forall_fun2 netem_loss ${1:-30}
 }
 
 # network delay 100ms
-ENV_net_delay() {
+NETEM_ENV_net_delay() {
 	forall_fun2 netem_delay ${1:-100}
 }
 
@@ -732,12 +761,12 @@ set_env() {
 	local modfun args
 	modfun=`echo $1 | sed 's/:.*//'`
 	args=`echo $1 | sed 's/[^:]*://;s/:/ /g'`
-	if ! is_function ENV_$modfun; then
-		echo "ENV_$modfun: doesn't exist"
+	if ! is_function NETEM_ENV_$modfun; then
+		echo "NETEM_ENV_$modfun: doesn't exist"
 		exit 1
 	fi
 	echo running $modfun $args
-	ENV_$modfun $args
+	NETEM_ENV_$modfun $args
 }
 reset_env() {
 	trap "forall_fun2 netem_reset" EXIT

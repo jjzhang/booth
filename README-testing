@@ -11,8 +11,9 @@ The live testing utility tests booth operation using the given
 
 	$ /usr/share/booth/tests/test/live_test.sh booth.conf
 
-It is possible to run only specific tests. See tail of the script
-for the list of tests which are currently available.
+It is possible to run only specific tests. Run the script without
+arguments to see usage and the list of tests and netem network
+emulation functions.
 
 Example booth.conf:
 
