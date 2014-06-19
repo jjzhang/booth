@@ -289,19 +289,50 @@ booth_where_granted() {
 	[ "$grantee" = "none" ] && return
 	! ssh $grantee booth list | grep -q "$tkt.*pending"
 }
+booth_list_fld() {
+	cut -d, -f $1 | sed 's/[^:]*://'
+}
+max_booth_time_diff() {
+	local l
+	booth_list_fld 3 |
+	while read l; do
+		date -d "$l" "+%s"
+	done |
+	awk '
+	{t[n++]=$0}
+	END{
+		for (i=0; i<n; i++)
+			for (j=i+1; j<n; j++) {
+				x=t[i]-t[j];
+				print x >= 0 ? x : -x;
+			}
+	}
+	' | sort -n | tail -1
+}
+booth_leader_consistency() {
+	test `booth_list_fld 2 | sort -u | wc -l` -eq 1
+}
 check_booth_consistency() {
-	local cnt tlist
+	local tlist rc maxdiff
 	tlist=`forall booth list 2>/dev/null | grep $tkt |
 		sed 's/commit:.*//;s/NONE/none/'`
-	cnt=`echo "$tlist" | sort -u | wc -l`
-	test $cnt -eq 1 && return
+	maxdiff=`echo "$tlist" | max_booth_time_diff`
+	test "$maxdiff" -eq 0
+	rc=$?
+	echo "$tlist" | booth_leader_consistency
+	rc=$(($rc | $?<<1))
+	test $rc -eq 0 && return
 	cat<<EOF >&2
-booth list consistency test failed:
+`if [ $rc -gt 1 ]; then
+	echo "booth list consistency failed (more than one leader!):"
+else
+	echo "booth list consistency failed (max valid time diff: $maxdiff):"
+fi`
 ===========
 "$tlist"
 ===========
 EOF
-	return 1
+	test $rc -le 1
 }
 
 check_consistency() {
