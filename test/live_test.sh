@@ -280,6 +280,7 @@ wait_half_exp() {
 wait_timeout() {
 	local t=2
 	[ "$T_timeout" -gt $t ] && t=$T_timeout
+	[ "$PKT_LOSS" ] && t=$((t+PKT_LOSS/6))
 	sleep $t
 }
 
@@ -808,11 +809,13 @@ applicable_external_prog_failed() {
 # packet loss at one site 30%
 NETEM_ENV_single_loss() {
 	run_site 1 $0 $cnf __netem__ netem_loss ${1:-30}
+	PKT_LOSS=${1:-30}
 }
 
 # packet loss everywhere 30%
 NETEM_ENV_loss() {
 	forall $0 $cnf __netem__ netem_loss ${1:-30}
+	PKT_LOSS=${1:-30}
 }
 
 # network delay 100ms
