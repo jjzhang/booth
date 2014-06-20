@@ -130,7 +130,7 @@ int test_external_prog(struct ticket_config *tk,
 			reset_ticket(tk);
 			ticket_write(tk);
 			if (start_election) {
-				ticket_broadcast(tk, OP_VOTE_FOR, 0, RLT_SUCCESS, OR_LOCAL_FAIL);
+				ticket_broadcast(tk, OP_VOTE_FOR, OP_REQ_VOTE, RLT_SUCCESS, OR_LOCAL_FAIL);
 			}
 		}
 	}
@@ -611,6 +611,14 @@ static void handle_resends(struct ticket_config *tk)
 		return;
 	}
 
+	/* try to reach some sites again if we just stepped down */
+	if (tk->last_request == OP_VOTE_FOR) {
+		tk_log_warn("no answers to our request (try #%d), "
+		"we are alone",
+		tk->retry_number);
+		goto just_resend;
+	}
+
 	if (!majority_of_bits(tk, tk->acks_received)) {
 		ack_cnt = count_bits(tk->acks_received) - 1;
 		if (!ack_cnt) {
@@ -634,6 +642,7 @@ static void handle_resends(struct ticket_config *tk)
 		}
 	}
 
+just_resend:
 	resend_msg(tk);
 	ticket_activate_timeout(tk);
 }
@@ -707,6 +716,7 @@ static void ticket_cron(struct ticket_config *tk)
 	switch(tk->state) {
 	case ST_INIT:
 		/* init state, handle resends for ticket revoke */
+		/* and rebroadcast if stepping down */
 		if (tk->acks_expected) {
 			handle_resends(tk);
 		}
@@ -825,7 +835,10 @@ static void update_acks(
 		tk->delay_commit = 0;
 	}
 
-	if (all_replied(tk)) {
+	if (all_replied(tk) ||
+			/* we just stepped down, need only one site to start
+			 * elections */
+			(cmd == OP_REQ_VOTE && tk->last_request == OP_VOTE_FOR)) {
 		no_resends(tk);
 		tk->start_postpone = 0;
 		set_ticket_wakeup(tk);
