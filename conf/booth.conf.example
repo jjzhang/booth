@@ -8,7 +8,7 @@
 transport="UDP"
 
 # The port that booth daemons will use to talk to each other.
-port="6666"
+port="9929"
 
 # The arbitrator IP. If you want to configure several arbitrators,
 # you need to configure each arbitrator with a separate line.

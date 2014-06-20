@@ -19,7 +19,7 @@ Example booth.conf:
 
 ------------
 transport="UDP"
-port="6666"
+port="9929"
 arbitrator="10.2.12.53"
 arbitrator="10.2.13.82"
 site="10.2.12.101"
