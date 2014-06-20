@@ -920,7 +920,11 @@ void set_ticket_wakeup(struct ticket_config *tk)
 
 	if (tk->next_state) {
 		/* we need to do something soon here */
-		ticket_activate_timeout(tk);
+		if (!tk->acks_expected) {
+			ticket_next_cron_at(tk, now);
+		} else {
+			ticket_activate_timeout(tk);
+		}
 	}
 
 	if (ANYDEBUG) {
