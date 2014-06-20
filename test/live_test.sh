@@ -244,6 +244,28 @@ netem_reset() {
 	echo "tc qdisc del dev $netif root netem"
 }
 
+set_netem_env() {
+	local modfun args
+	modfun=`echo $1 | sed 's/:.*//'`
+	args=`echo $1 | sed 's/[^:]*://;s/:/ /g'`
+	if ! is_function NETEM_ENV_$modfun; then
+		echo "NETEM_ENV_$modfun: doesn't exist"
+		exit 1
+	fi
+	NETEM_ENV_$modfun $args
+}
+reset_netem_env() {
+	[ -z "$NETEM_ENV" ] && return
+	forall_fun2 netem_reset
+}
+setup_netem() {
+	[ -z "$NETEM_ENV" ] && return
+	for env in $NETEM_ENV; do
+		set_netem_env $env
+	done
+	trap "reset_netem_env" EXIT
+}
+
 cib_status() {
 	local h=$1 stat
 	stat=`ssh $h crm_ticket -L |
@@ -400,10 +422,12 @@ runtest() {
 	echo -n "Testing: $1... "
 	can_run_test $1 || return 0
 	logger -p $HA_LOGFACILITY.info "starting booth test $1 ..."
+	setup_netem
 	test_$1 && check_$1
 	rc=$?
 	end_time=`date`
 	end_ts=`date +%s`
+	reset_netem_env
 	logger -p $HA_LOGFACILITY.info "finished booth test $1 (exit code $rc)"
 	is_function recover_$1 && recover_$1
 	sleep 3
@@ -757,21 +781,6 @@ NETEM_ENV_net_delay() {
 	forall_fun2 netem_delay ${1:-100}
 }
 
-set_env() {
-	local modfun args
-	modfun=`echo $1 | sed 's/:.*//'`
-	args=`echo $1 | sed 's/[^:]*://;s/:/ /g'`
-	if ! is_function NETEM_ENV_$modfun; then
-		echo "NETEM_ENV_$modfun: doesn't exist"
-		exit 1
-	fi
-	echo running $modfun $args
-	NETEM_ENV_$modfun $args
-}
-reset_env() {
-	trap "forall_fun2 netem_reset" EXIT
-}
-
 sync_conf || exit
 restart_booth
 all_booth_status || {
@@ -788,13 +797,6 @@ simultaneous_start_even slow_start_granted
 restart_granted restart_granted_nocib restart_notgranted
 failover split_leader split_follower split_edge
 external_prog_failed"}
-
-if [ -n "$NETEM_ENV" ]; then
-	for env in $NETEM_ENV; do
-		set_env $env
-	done
-	reset_env
-fi
 
 for t in $TESTS; do
 	runtest $t
