@@ -44,8 +44,57 @@ cnf=$1
 shift 1
 logf=test_booth.log
 iprules=/usr/share/booth/tests/test/booth_path
-netif=eth0
 : ${HA_LOGFACILITY:="syslog"}
+
+ext_prog_log() {
+	local cmd="$@"
+	echo "run: $cmd" >&2
+	logger -p $HA_LOGFACILITY.info "$cmd"
+	$cmd
+}
+get_stat_fld() {
+	local fld=$1
+	sed "s/.* $fld=//;s/ .*//;s/'//g"
+}
+
+# tc netem, simulate packet loss, wan, etc
+netem_delay() {
+	ext_prog_log tc qdisc add dev $1 root netem delay $2ms $(($2/10))ms
+}
+netem_loss() {
+	ext_prog_log tc qdisc add dev $1 root netem loss $2%
+}
+netem_reset() {
+	ext_prog_log tc qdisc del dev $1 root netem
+}
+local_netem_env() {
+	local fun=$1 arg=$2
+	local t netif=""
+	local my_addr
+	my_addr=`booth status | get_stat_fld booth_addr_string`
+	if [ -z "$my_addr" ]; then
+		echo "cannot find my address, booth running?" >&2
+		return 1
+	fi
+	for t in `ip link | grep '^[1-9]:' | sed 's/.: //;s/: .*//'`
+	do
+		if ip a l $t | fgrep -wq $my_addr; then
+			netif=$t
+			break
+		fi
+	done
+	if [ -n "$netif" ]; then
+		$fun $netif $arg
+	else
+		echo "cannot find netif for $my_addr, netem not set" >&2
+	fi
+}
+
+if [ "$1" = "__netem__" ]; then
+	shift 1
+	local_netem_env $@
+	exit
+fi
 
 is_function() {
     test z"`command -v $1`" = z"$1"
@@ -79,12 +128,8 @@ restart_site() {
 restart_arbitrator() {
 	manage_arbitrator $1 restart
 }
-get_stat_fld() {
-	local h=$1 fld=$2
-	ssh $h booth status | sed "s/.* $fld=//;s/ .*//;s/'//g"
-}
 booth_status() {
-	test "`get_stat_fld $1 booth_state`" = "started"
+	test "`ssh $1 booth status | get_stat_fld booth_state`" = "started"
 }
 stop_booth() {
 	local h
@@ -226,24 +271,6 @@ wait_timeout() {
 	sleep $t
 }
 
-ext_prog_log() {
-	local cmd="$@"
-	echo "run: $cmd" >&2
-	logger -p $HA_LOGFACILITY.info "$cmd"
-	$cmd
-}
-
-# tc netem, simulate packet loss, wan, etc
-netem_delay() {
-	echo "tc qdisc add dev $netif root netem delay $1ms $(($1/10))ms"
-}
-netem_loss() {
-	echo "tc qdisc add dev $netif root netem loss $1%"
-}
-netem_reset() {
-	echo "tc qdisc del dev $netif root netem"
-}
-
 set_netem_env() {
 	local modfun args
 	modfun=`echo $1 | sed 's/:.*//'`
@@ -256,7 +283,7 @@ set_netem_env() {
 }
 reset_netem_env() {
 	[ -z "$NETEM_ENV" ] && return
-	forall_fun2 netem_reset
+	forall $0 $cnf __netem__ netem_reset
 }
 setup_netem() {
 	[ -z "$NETEM_ENV" ] && return
@@ -768,17 +795,17 @@ applicable_external_prog_failed() {
 
 # packet loss at one site 30%
 NETEM_ENV_single_loss() {
-	run_site 1 netem_loss ${1:-30}
+	run_site 1 $0 $cnf __netem__ netem_loss ${1:-30}
 }
 
 # packet loss everywhere 30%
 NETEM_ENV_loss() {
-	forall_fun2 netem_loss ${1:-30}
+	forall $0 $cnf __netem__ netem_loss ${1:-30}
 }
 
 # network delay 100ms
 NETEM_ENV_net_delay() {
-	forall_fun2 netem_delay ${1:-100}
+	forall $0 $cnf __netem__ netem_delay ${1:-100}
 }
 
 sync_conf || exit
