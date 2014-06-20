@@ -46,10 +46,14 @@ logf=test_booth.log
 iprules=/usr/share/booth/tests/test/booth_path
 : ${HA_LOGFACILITY:="syslog"}
 
+logmsg() {
+	logger -t "BOOTHTEST" -p $HA_LOGFACILITY.info "$@"
+}
+
 ext_prog_log() {
 	local cmd="$@"
 	echo "run: $cmd" >&2
-	logger -p $HA_LOGFACILITY.info "$cmd"
+	logmsg "$cmd"
 	$cmd
 }
 get_stat_fld() {
@@ -102,6 +106,7 @@ is_function() {
 runcmd() {
 	local h=$1 rc
 	shift 1
+	logmsg "$h: running '$@'"
 	if ip a l | fgrep -wq $h; then
 		$@
 	else
@@ -109,7 +114,8 @@ runcmd() {
 	fi
 	rc=$?
 	if [ $rc -ne 0 ]; then
-		echo "$h: '$@' failed (exit code $?)" >&2
+		echo "$h: '$@' failed (exit code $rc)" >&2
+		logmsg "$h: '$@' failed (exit code $rc)"
 	fi
 	return $rc
 }
@@ -468,14 +474,14 @@ runtest() {
 	start_ts=`date +%s`
 	echo -n "Testing: $1... "
 	can_run_test $1 || return 0
-	logger -p $HA_LOGFACILITY.info "starting booth test $1 ..."
+	logmsg "starting booth test $1 ..."
 	setup_netem
 	test_$1 && check_$1
 	rc=$?
 	end_time=`date`
 	end_ts=`date +%s`
 	reset_netem_env
-	logger -p $HA_LOGFACILITY.info "finished booth test $1 (exit code $rc)"
+	logmsg "finished booth test $1 (exit code $rc)"
 	is_function recover_$1 && recover_$1
 	sleep 3
 	all_booth_status
