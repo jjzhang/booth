@@ -99,11 +99,25 @@ fi
 is_function() {
     test z"`command -v $1`" = z"$1"
 }
+runcmd() {
+	local h=$1 rc
+	shift 1
+	if ip a l | fgrep -wq $h; then
+		$@
+	else
+		ssh $h $@
+	fi
+	rc=$?
+	if [ $rc -ne 0 ]; then
+		echo "$h: '$@' failed (exit code $?)" >&2
+	fi
+	return $rc
+}
 manage_site() {
-	ssh $1 crm resource $2 booth
+	runcmd $1 crm resource $2 booth
 }
 manage_arbitrator() {
-	ssh $1 systemctl $2 booth@booth.service
+	runcmd $1 systemctl $2 booth@booth.service
 }
 start_site() {
 	manage_site $1 start
@@ -114,7 +128,7 @@ start_arbitrator() {
 stop_site_clean() {
 	manage_site $1 stop &&
 	sleep 1 &&
-	ssh $1 crm --force site ticket revoke $tkt
+	runcmd $1 crm --force site ticket revoke $tkt
 }
 stop_site() {
 	manage_site $1 stop
@@ -129,7 +143,7 @@ restart_arbitrator() {
 	manage_arbitrator $1 restart
 }
 booth_status() {
-	test "`ssh $1 booth status | get_stat_fld booth_state`" = "started"
+	test "`runcmd $1 booth status | get_stat_fld booth_state`" = "started"
 }
 stop_booth() {
 	local h
@@ -177,7 +191,7 @@ dump_conf() {
 forall() {
 	local h rc=0
 	for h in $sites $arbitrators; do
-		ssh $h $@
+		runcmd $h $@
 		rc=$((rc|$?))
 	done
 	return $rc
@@ -185,7 +199,7 @@ forall() {
 forall_sites() {
 	local h rc=0
 	for h in $sites; do
-		ssh $h $@
+		runcmd $h $@
 		rc=$((rc|$?))
 	done
 	return $rc
@@ -215,15 +229,13 @@ run_site() {
 	local n=$1 h
 	shift 1
 	h=`echo $sites | awk '{print $'$n'}'`
-	ssh $h $@ || {
-		echo "$h: '$@' failed (exit code $?)" >&2
-	}
+	runcmd $h $@
 }
 run_arbitrator() {
 	local n=$1 h
 	shift 1
 	h=`echo $arbitrators | awk '{print $'$n'}'`
-	ssh $h $@
+	runcmd $h $@
 }
 get_site() {
 	local n=$1
@@ -295,13 +307,13 @@ setup_netem() {
 
 cib_status() {
 	local h=$1 stat
-	stat=`ssh $h crm_ticket -L |
+	stat=`runcmd $h crm_ticket -L |
 		grep "^$tkt" | awk '{print $2}'`
 	test "$stat" != "-1"
 }
 is_cib_granted() {
 	local stat h=$1
-	stat=`ssh $h crm_ticket -L |
+	stat=`runcmd $h crm_ticket -L |
 		grep "^$tkt" | awk '{print $2}'`
 	[ "$stat" = "granted" ]
 }
@@ -365,7 +377,7 @@ booth_where_granted() {
 	grantee=`echo "$ticket_line" | sed 's/.*leader: //;s/,.*//'`
 	echo $grantee
 	[ "$grantee" = "none" ] && return
-	! ssh $grantee booth list | grep -q "$tkt.*pending"
+	! runcmd $grantee booth list | grep -q "$tkt.*pending"
 }
 booth_list_fld() {
 	cut -d, -f $1 | sed 's/[^:]*://'
