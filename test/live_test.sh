@@ -453,6 +453,13 @@ can_run_test() {
 		return 1
 	fi
 }
+run_report() {
+	local start_ts=$1 end_ts=$2 name=$3
+	echo "running hb_report" >&2
+	hb_report -f "`date -d @$((start_ts-5))`" \
+		-t "`date -d @$((end_ts+60))`" \
+		-n "$sites $arbitrators" $name >&2
+}
 runtest() {
 	local start_ts end_ts rc booth_status
 	local start_time end_time
@@ -475,14 +482,12 @@ runtest() {
 	booth_status=$?
 	if [ $rc -eq 0 -a $booth_status -eq 0 ]; then
 		echo OK
+		[ "$GET_REPORT" ] && run_report $start_ts $end_ts $TEST
 	else
 		echo "FAIL (running hb_report ... $1.tar.bz2; see also $logf)"
 		[ $booth_status -ne 0 ] &&
 			echo "unexpected: some booth daemons not running"
-		echo "running hb_report" >&2
-		hb_report -f "`date -d @$((start_ts-5))`" \
-			-t "`date -d @$((end_ts+60))`" \
-			-n "$sites $arbitrators" $1 >&2
+		run_report $start_ts $end_ts $TEST
 	fi
 }
 
