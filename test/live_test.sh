@@ -731,6 +731,8 @@ test_failover() {
 	booth_status `get_site 1` && return 1
 	wait_exp
 	wait_timeout
+	wait_timeout
+	wait_timeout
 }
 check_failover() {
 	check_consistency any
@@ -752,6 +754,8 @@ test_split_leader() {
 	wait_timeout
 	check_cib any || return 1
 	run_site 1 $iprules start $port  >/dev/null
+	wait_timeout
+	wait_timeout
 	wait_timeout
 }
 check_split_leader() {
