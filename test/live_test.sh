@@ -47,7 +47,7 @@ iprules=/usr/share/booth/tests/test/booth_path
 : ${HA_LOGFACILITY:="syslog"}
 
 logmsg() {
-	logger -t "BOOTHTEST" -p $HA_LOGFACILITY.info "$@"
+	logger -t "BOOTHTEST" -p $HA_LOGFACILITY.info -- "$@"
 }
 
 ext_prog_log() {
