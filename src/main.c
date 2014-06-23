@@ -54,7 +54,7 @@
 #include "pacemaker.h"
 #include "ticket.h"
 
-#define RELEASE_VERSION		"1.0"
+#define RELEASE_VERSION		"0.2.0"
 
 #define CLIENT_NALLOC		32
 
