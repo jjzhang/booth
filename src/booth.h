@@ -51,7 +51,7 @@
 /** Timeout value for poll().
  * Determines frequency of periodic jobs, eg. when send-retries are done.
  * See process_tickets(). */
-#define POLL_TIMEOUT	1000
+#define POLL_TIMEOUT	100
 
 
 /** @{ */

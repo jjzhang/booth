@@ -21,7 +21,6 @@
 #include <string.h>
 #include <errno.h>
 #include <arpa/inet.h>
-#include <clplumbing/cl_random.h>
 #include "booth.h"
 #include "transport.h"
 #include "inline-fn.h"
@@ -459,8 +458,8 @@ static int process_VOTE_FOR(
 			(tk->state == ST_FOLLOWER || tk->state == ST_CANDIDATE)) {
 		tk_log_info("%s wants to give the ticket away",
 			site_string(tk->leader));
-		time(&tk->term_expires);
-		return new_round(tk, OR_STEPDOWN);
+		schedule_election(tk, OR_STEPDOWN);
+		return 0;
 	}
 
 	if (tk->state != ST_CANDIDATE) {
@@ -683,6 +682,8 @@ int new_election(struct ticket_config *tk,
 	struct booth_site *new_leader;
 	time_t now;
 
+	if (local->type != SITE)
+		return 0;
 
 	time(&now);
 	tk_log_debug("start new election?, now=%" PRIi64 ", end %" PRIi64,
@@ -731,33 +732,8 @@ int new_election(struct ticket_config *tk,
 
 	ticket_broadcast(tk, OP_REQ_VOTE, OP_VOTE_FOR, RLT_SUCCESS, reason);
 	ticket_activate_timeout(tk);
+	add_random_delay(tk);
 	return 0;
-}
-
-
-int new_round(struct ticket_config *tk, cmd_reason_t reason)
-{
-	int rv = 0;
-	struct timespec delay;
-
-	if (local->type == ARBITRATOR) {
-		/* we cannot really do anything, but keep the copy for
-		 * somebody else who perhaps can */
-		return 0;
-	}
-
-	disown_ticket(tk);
-	ticket_write(tk);
-
-	/* New vote round; §5.2 */
-	/* delay the next election start for up to 200ms */
-	delay.tv_sec = 0;
-	delay.tv_nsec = 1000000L * (long)cl_rand_from_interval(0, 200);
-	nanosleep(&delay, NULL);
-
-	rv = new_election(tk, NULL, 1, reason);
-
-	return rv;
 }
 
 

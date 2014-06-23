@@ -25,6 +25,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <time.h>
+#include <clplumbing/cl_random.h>
 #include "ticket.h"
 #include "config.h"
 #include "pacemaker.h"
@@ -679,7 +680,8 @@ static void ticket_cron(struct ticket_config *tk)
 		switch(tk->next_state) {
 		case ST_LEADER:
 			if (tk->state == ST_LEADER) {
-				new_round(tk, OR_SPLIT);
+				disown_ticket(tk);
+				new_election(tk, NULL, 1, OR_SPLIT);
 			} else {
 				reacquire_ticket(tk);
 			}
@@ -697,7 +699,8 @@ static void ticket_cron(struct ticket_config *tk)
 
 	/* Has an owner, has an expiry date, and expiry date in the past?
 	 * Losing the ticket must happen in _every_ state. */
-	if (tk->term_expires &&
+	if (!tk->in_election &&
+			tk->term_expires &&
 			is_owned(tk) &&
 			now >= tk->term_expires) {
 
@@ -708,8 +711,7 @@ static void ticket_cron(struct ticket_config *tk)
 		}
 
 		tk->lost_leader = tk->leader;
-		/* Couldn't renew in time - ticket lost. */
-		new_round(tk, OR_TKT_LOST);
+		schedule_election(tk, OR_TKT_LOST);
 		goto out;
 	}
 
@@ -723,8 +725,14 @@ static void ticket_cron(struct ticket_config *tk)
 		break;
 
 	case ST_FOLLOWER:
-		/* nothing here either, ticket loss is caught earlier
-		 * */
+		/* leader/ticket lost? and we didn't vote yet */
+		tk_log_debug("leader: %s, voted_for: %s",
+				site_string(tk->leader),
+				site_string(tk->voted_for));
+		if (!tk->leader && !tk->voted_for) {
+			disown_ticket(tk);
+			new_election(tk, NULL, 1, OR_AGAIN);
+		}
 		break;
 
 	case ST_CANDIDATE:
@@ -886,6 +894,31 @@ int message_recv(struct boothc_ticket_msg *msg, int msglen)
 }
 
 
+static void log_next_wakeup(struct ticket_config *tk)
+{
+	struct timeval now, res;
+
+	gettimeofday(&now, NULL);
+	timersub(&tk->next_cron, &now, &res);
+	tk_log_debug("set ticket wakeup in %d.%06d",
+		(int)res.tv_sec, (int)res.tv_usec);
+}
+
+/* New vote round; §5.2 */
+/* delay the next election start for up to 1s */
+void add_random_delay(struct ticket_config *tk)
+{
+	struct timeval delay, tv;
+
+	delay.tv_sec = 0;
+	delay.tv_usec = cl_rand_from_interval(0, 1000000);
+	timeradd(&tk->next_cron, &delay, &tv);
+	ticket_next_cron_at(tk, tv);
+	if (ANYDEBUG) {
+		log_next_wakeup(tk);
+	}
+}
+
 void set_ticket_wakeup(struct ticket_config *tk)
 {
 	struct timeval tv, now;
@@ -941,11 +974,23 @@ void set_ticket_wakeup(struct ticket_config *tk)
 	}
 
 	if (ANYDEBUG) {
-		float sec_until;
-		gettimeofday(&now, NULL);
-		sec_until = timeval_to_float(tk->next_cron) - timeval_to_float(now);
-		tk_log_debug("set ticket wakeup in %f", sec_until);
+		log_next_wakeup(tk);
 	}
+}
+
+
+void schedule_election(struct ticket_config *tk, cmd_reason_t reason)
+{
+	reset_ticket(tk);
+	tk->state = ST_FOLLOWER;
+	if (local->type != SITE)
+		return;
+
+	tk->election_reason = reason;
+	ticket_write(tk);
+	gettimeofday(&tk->next_cron, NULL);
+	/* introduce a short delay before starting election */
+	add_random_delay(tk);
 }
 
 

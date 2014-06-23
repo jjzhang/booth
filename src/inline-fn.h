@@ -241,15 +241,6 @@ static inline int timeval_compare(struct timeval tv1, struct timeval tv2)
 }
 
 
-static inline int timeval_in_past(struct timeval which)
-{
-	struct timeval tv;
-
-	gettimeofday(&tv, NULL);
-	return timeval_compare(tv, which) > 0;
-}
-
-
 static inline time_t next_vote_starts_at(struct ticket_config *tk)
 {
 	time_t half_exp, retries_needed, t;
