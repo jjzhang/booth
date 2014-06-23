@@ -1,11 +1,11 @@
 #!/bin/sh
 #
-# manage iptables rules for port 6666
+# manage iptables rules for the given port
 #
 
 [ $# -lt 1 ] && exit
 action=$1
-port=6666
+port=${2:-9929}
 testip() {
 	local chain=$1
 	iptables -L $chain | grep -wq ^DROP.*$port

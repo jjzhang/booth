@@ -20,7 +20,7 @@ class ServerTestEnvironment(BoothTestEnvironment):
     typical_config = """\
 # This is like the config in the manual
 transport="UDP"
-port="6666"
+port="9929"
 # Here's another comment
 #arbitrator="147.2.207.14"
 site="147.4.215.19"

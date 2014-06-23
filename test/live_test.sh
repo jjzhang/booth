@@ -248,6 +248,10 @@ get_site() {
 	echo $sites | awk '{print $'$n'}'
 }
 
+get_port() {
+	grep "^port" | 
+		sed -n 's/.*="//;s/"//p'
+}
 get_servers() {
 	grep "^$1" | 
 		sed -n 's/.*="//;s/"//p'
@@ -504,6 +508,8 @@ runtest() {
 
 sites=`get_servers site < $cnf`
 arbitrators=`get_servers arbitrator < $cnf`
+port=`get_port < $cnf`
+: ${port:=9929}
 site_cnt=`echo $sites | wc -w`
 arbitrator_cnt=`echo $arbitrators | wc -w`
 tkt=`get_tkt < $cnf`
@@ -741,18 +747,18 @@ test_split_leader() {
 	wait_timeout
 	run_site 1 booth grant $tkt >/dev/null
 	wait_timeout
-	run_site 1 $iprules stop  >/dev/null
+	run_site 1 $iprules stop $port  >/dev/null
 	wait_exp
 	wait_timeout
 	check_cib any || return 1
-	run_site 1 $iprules start  >/dev/null
+	run_site 1 $iprules start $port  >/dev/null
 	wait_timeout
 }
 check_split_leader() {
 	check_consistency any
 }
 recover_split_leader() {
-	run_site 1 $iprules start  >/dev/null
+	run_site 1 $iprules start $port  >/dev/null
 }
 
 ## TEST: split_follower ##
@@ -763,10 +769,10 @@ test_split_follower() {
 	wait_timeout
 	run_site 1 booth grant $tkt >/dev/null
 	wait_timeout
-	run_site 2 $iprules stop  >/dev/null
+	run_site 2 $iprules stop $port  >/dev/null
 	wait_exp
 	wait_timeout
-	run_site 2 $iprules start  >/dev/null
+	run_site 2 $iprules start $port  >/dev/null
 	wait_timeout
 }
 check_split_follower() {
@@ -781,9 +787,9 @@ test_split_edge() {
 	wait_timeout
 	run_site 1 booth grant $tkt >/dev/null
 	wait_timeout
-	run_site 1 $iprules stop  >/dev/null
+	run_site 1 $iprules stop $port  >/dev/null
 	wait_exp
-	run_site 1 $iprules start  >/dev/null
+	run_site 1 $iprules start $port  >/dev/null
 	wait_timeout
 }
 check_split_edge() {
