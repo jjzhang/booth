@@ -31,12 +31,14 @@ BOOTH_DAEMON_STARTING=1
 BOOTH_DAEMON_EXIST=2
 BOOTH_DAEMON_NOT_RUNNING=3
 BOOTH_ERROR_GENERIC=4
+DEFAULT_BIN="boothd"
+DEFAULT_CONF="/etc/booth/booth.conf"
 
 . ${OCF_ROOT}/resource.d/heartbeat/.ocf-shellfuncs
 
 #######################################################################
 
-meta_data() {
+booth_site_meta_data() {
 	cat <<END
 <?xml version="1.0"?>
 <!DOCTYPE resource-agent SYSTEM "ra-api-1.dtd">
@@ -58,7 +60,7 @@ In most cases, it should be run as a primitive resource.
 The configuration name (or configuration filename) to use.
 </longdesc>
 <shortdesc lang="en">BOOTH Options</shortdesc>
-<content type="string" default="/etc/booth/booth.conf" />
+<content type="string" default="$DEFAULT_CONF" />
 </parameter>
 
 <parameter name="args" unique="1">
@@ -74,7 +76,7 @@ Any additional options to start the BOOTH daemon with
 The daemon to start
 </longdesc>
 <shortdesc lang="en">The daemon to start</shortdesc>
-<content type="string" default="boothd" />
+<content type="string" default="$DEFAULT_BIN" />
 </parameter>
 
 </parameters>
@@ -92,7 +94,7 @@ END
 
 #######################################################################
 
-booth_usage() {
+booth_site_usage() {
 	cat <<END
 usage: $0 {start|stop|monitor|validate-all|meta-data}
 
@@ -118,7 +120,7 @@ booth_check_daemon_state(){
 	esac
 }
 
-booth_start() {
+booth_site_start() {
 	booth_check_daemon_state; rc=$?
 
 	case $rc in
@@ -145,7 +147,7 @@ booth_start() {
 	return $OCF_SUCCESS
 }
 
-booth_stop() {
+booth_site_stop() {
 	booth_check_daemon_state; rc=$?
 
 	case $rc in
@@ -159,9 +161,9 @@ booth_stop() {
 	if [ "$booth_lockpid" == "" ] ; then
 		return $OCF_ERR_GENERIC
 	fi
-	if pkill -TERM -s $booth_lockpid boothd ; then
+	if pkill -TERM -s $booth_lockpid $DEFAULT_BIN ; then
 	    sleep 1
-	    pkill -KILL -s $booth_lockpid boothd
+	    pkill -KILL -s $booth_lockpid $DEFAULT_BIN
 	fi
 
 	rc=$BOOTH_DAEMON_STARTED
@@ -179,7 +181,7 @@ booth_stop() {
 	return $rc
 }
 
-booth_monitor() {
+booth_site_monitor() {
 	booth_check_daemon_state; rc=$?
 
 	case $rc in
@@ -191,55 +193,22 @@ booth_monitor() {
 	esac
 }
 
-booth_validate() {
-    check_binary ${OCF_RESKEY_daemon}
+booth_site_validate_all() {
+    if ! test -f $OCF_RESKEY_config; then
+	    ocf_log err "$OCF_RESKEY_config does not exist"
+	    return $OCF_ERR_INSTALLED
+    fi
 
-    case ${OCF_RESKEY_CRM_meta_globally_unique} in
-	yes|Yes|true|True|1) 
+    if ocf_is_true $OCF_RESKEY_CRM_meta_globally_unique; then
 	    ocf_log err "$OCF_RESOURCE_INSTANCE must be configured with the globally_unique=false meta attribute"
-	    exit $OCF_ERR_CONFIGURED
-	    ;;
-    esac
+	    return $OCF_ERR_CONFIGURED
+    fi
 
     return $OCF_SUCCESS
 }
 
-# Set OCF_RESKEY_daemon to boothd as default if not set
-if [ ! ${OCF_RESKEY_daemon} ]; then
-    OCF_RESKEY_daemon=`which boothd`
-fi
+: ${OCF_RESKEY_daemon:=$DEFAULT_BIN}
+: ${OCF_RESKEY_config:=$DEFAULT_CONF}
+OCF_REQUIRED_BINARIES=${OCF_RESKEY_daemon}
 
-if ! test -x "$OCF_RESKEY_daemon" ; then
-    exit $OCF_ERR_INSTALLED
-fi
-
-if [ "$OCF_RESKEY_config" == "" ] ; then
-    OCF_RESKEY_config=/etc/booth/booth.conf
-fi
-
-
-# for testing:
-# ocf-tester -n p_booth -v /usr/lib/ocf/resource.d/pacemaker/booth-site
-
-case $__OCF_ACTION in
-meta-data)	meta_data
-		exit $OCF_SUCCESS
-		;;
-start)		booth_validate; booth_start;;
-stop)		booth_stop;;
-monitor)	booth_validate; booth_monitor;;
-validate-all)	booth_validate;;
-usage|help)	booth_usage
-		exit $OCF_SUCCESS
-		;;
-migrate_to|migrate_from|reload|demote|promote|notify)
-		exit $OCF_ERR_UNIMPLEMENTED
-		;;
-*)		booth_usage
-		exit $OCF_ERR_UNIMPLEMENTED
-		;;
-esac
-rc=$?
-
-exit $rc
-
+ocf_rarun $*
