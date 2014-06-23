@@ -888,7 +888,7 @@ int raft_answer(
 			rv = process_ACK(tk, sender, leader, msg);
 		break;
 	case OP_HEARTBEAT:
-		if (tk->leader != local &&
+		if ((tk->leader != local || !term_time_left(tk)) &&
 				(tk->state == ST_INIT || tk->state == ST_FOLLOWER ||
 				tk->state == ST_CANDIDATE))
 			rv = answer_HEARTBEAT(tk, sender, leader, msg);
