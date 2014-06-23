@@ -687,7 +687,7 @@ int new_election(struct ticket_config *tk,
 	time(&now);
 	tk_log_debug("start new election?, now=%" PRIi64 ", end %" PRIi64,
 			(int64_t)now, (int64_t)(tk->election_end));
-	if (now <= tk->election_end)
+	if (now < tk->election_end)
 		return 0;
 
 	/* §5.2 */
