@@ -47,13 +47,12 @@ iprules=/usr/share/booth/tests/test/booth_path
 : ${HA_LOGFACILITY:="syslog"}
 
 logmsg() {
-	logger -t "BOOTHTEST" -p $HA_LOGFACILITY.info -- "$@"
+	logger -t "BOOTHTEST" -p $HA_LOGFACILITY.info -- $@
 }
 
 ext_prog_log() {
 	local cmd="$@"
-	echo "run: $cmd" >&2
-	logmsg "$cmd"
+	echo "run: $cmd" | logmsg
 	$cmd
 }
 get_stat_fld() {
@@ -77,7 +76,7 @@ local_netem_env() {
 	local my_addr
 	my_addr=`booth status | get_stat_fld booth_addr_string`
 	if [ -z "$my_addr" ]; then
-		echo "cannot find my address, booth running?" >&2
+		logmsg "cannot find my address, booth running?"
 		return 1
 	fi
 	for t in `ip link | grep '^[1-9]:' | sed 's/.: //;s/: .*//'`
@@ -90,7 +89,7 @@ local_netem_env() {
 	if [ -n "$netif" ]; then
 		$fun $netif $arg
 	else
-		echo "cannot find netif for $my_addr, netem not set" >&2
+		logmsg "cannot find netif for $my_addr, netem not set"
 	fi
 }
 
@@ -114,8 +113,7 @@ runcmd() {
 	fi
 	rc=$?
 	if [ $rc -ne 0 ]; then
-		echo "$h: '$@' failed (exit code $rc)" >&2
-		logmsg "$h: '$@' failed (exit code $rc)"
+		echo "$h: '$@' failed (exit code $rc)" | logmsg
 	fi
 	return $rc
 }
@@ -341,7 +339,7 @@ check_cib_consistency() {
 		echo $gh
 		return $rc
 	fi
-	cat<<EOF >&2
+	cat<<EOF | logmsg
 CIB consistency test failed
 ticket granted to $gh
 EOF
@@ -369,7 +367,7 @@ check_cib() {
 	esac
 	rc=$((rc|$?))
 	if [ $rc -ne 0 ]; then
-		cat<<EOF >&2
+		cat<<EOF | logmsg
 CIB check failed
 CIB grantee: $cib_grantee
 booth grantee: $booth_grantee
@@ -423,7 +421,7 @@ check_booth_consistency() {
 	echo "$tlist" | booth_leader_consistency
 	rc=$(($rc | $?<<1))
 	test $rc -eq 0 && return
-	cat<<EOF >&2
+	cat<<EOF | logmsg
 `if [ $rc -gt 1 ]; then
 	echo "booth list consistency failed (more than one leader!):"
 else
@@ -465,10 +463,10 @@ can_run_test() {
 }
 run_report() {
 	local start_ts=$1 end_ts=$2 name=$3
-	echo "running hb_report" >&2
+	logmsg "running hb_report"
 	hb_report -f "`date -d @$((start_ts-5))`" \
 		-t "`date -d @$((end_ts+60))`" \
-		-n "$sites $arbitrators" $name >&2
+		-n "$sites $arbitrators" $name 2>&1 | logmsg
 }
 runtest() {
 	local start_ts end_ts rc booth_status
@@ -851,7 +849,7 @@ all_booth_status || {
 	all_booth_status || exit
 }
 
-dump_conf >&2
+dump_conf | logmsg
 
 TESTS="$@"
 
