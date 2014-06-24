@@ -558,6 +558,7 @@ test_grant_noarb() {
 	sleep 1
 	run_site 1 booth grant $tkt >/dev/null
 	wait_timeout
+	wait_timeout
 }
 check_grant_noarb() {
 	check_consistency `get_site 1`
