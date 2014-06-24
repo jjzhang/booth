@@ -22,6 +22,12 @@ then
 	exit 0
 fi
 
+# If target-role is Stopped, it judges with being stopped explicitly.
+output=$(crm_resource --meta --get-parameter="target-role" --resource=$service 2>/dev/null)
+rc=$?
+if [ $rc == 0 -a "$output" = "Stopped" ]; then
+	exit 0
+fi
 
 # Some error occured.
 # Try to help the admin with a bit of diagnostic.
