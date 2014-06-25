@@ -569,6 +569,9 @@ recover_grant_noarb() {
 		start_arbitrator $h
 	done >/dev/null 2>&1
 }
+applicable_grant_noarb() {
+	[ -n "$arbitrators" ]
+}
 
 ## TEST: revoke ##
 
