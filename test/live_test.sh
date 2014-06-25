@@ -279,6 +279,24 @@ n && /^$/ {exit}
 /^ticket.*'$tkt'/ {n=1}
 ' $cnf
 }
+wait_booth() {
+	local maxwait=$T_expire testcmd="$@"
+	while sleep 1; do
+		run_site 1 booth list | grep $tkt | booth_list_fld 2 |
+			$testcmd && break
+		maxwait=$((maxwait-1))
+		[ $maxwait -eq 0 ] && {
+			echo "booth wait failed"
+			return 1
+		}
+	done
+}
+wait_revoke() {
+	wait_booth grep -iq none
+}
+wait_grant() {
+	wait_booth grep -iqv none
+}
 wait_exp() {
 	sleep $T_expire
 }
@@ -443,7 +461,7 @@ check_consistency() {
 reset_booth() {
 	start_booth
 	run_site 1 booth revoke $tkt >/dev/null
-	wait_timeout
+	wait_revoke
 }
 all_booth_status() {
 	forall_fun booth_status
@@ -532,14 +550,21 @@ set -x
 # the tests
 #
 
+# most tests start like this
+grant2site_one() {
+	run_site 1 booth revoke $tkt >/dev/null
+	wait_revoke
+	wait_timeout
+	run_site 1 booth grant $tkt >/dev/null
+	wait_grant
+	wait_timeout
+}
+
 ## TEST: grant ##
 
 # just a grant
 test_grant() {
-	run_site 1 booth revoke $tkt >/dev/null
-	wait_timeout
-	run_site 1 booth grant $tkt >/dev/null
-	wait_timeout
+	grant2site_one
 }
 check_grant() {
 	check_consistency `get_site 1`
@@ -550,15 +575,14 @@ check_grant() {
 # just a grant with no arbitrators
 test_grant_noarb() {
 	run_site 1 booth revoke $tkt >/dev/null
-	wait_timeout
+	wait_revoke
 	local h
 	for h in $arbitrators; do
 		stop_arbitrator $h
 	done >/dev/null 2>&1
 	sleep 1
 	run_site 1 booth grant $tkt >/dev/null
-	wait_timeout
-	wait_timeout
+	wait_grant
 }
 check_grant_noarb() {
 	check_consistency `get_site 1`
@@ -577,12 +601,9 @@ applicable_grant_noarb() {
 
 # just a revoke
 test_revoke() {
+	grant2site_one
 	run_site 1 booth revoke $tkt >/dev/null
-	wait_timeout
-	run_site 1 booth grant $tkt >/dev/null
-	wait_timeout
-	run_site 1 booth revoke $tkt >/dev/null
-	wait_timeout
+	wait_revoke
 }
 check_revoke() {
 	check_consistency
@@ -593,9 +614,9 @@ check_revoke() {
 # just a grant to another site
 test_grant_elsewhere() {
 	run_site 1 booth revoke $tkt >/dev/null
-	wait_timeout
+	wait_revoke
 	run_site 1 booth grant -s `get_site 2` $tkt >/dev/null
-	wait_timeout
+	wait_grant
 }
 check_grant_elsewhere() {
 	check_consistency `get_site 2`
@@ -606,11 +627,11 @@ check_grant_elsewhere() {
 # grant with one site lost
 test_grant_site_lost() {
 	run_site 1 booth revoke $tkt >/dev/null
-	wait_timeout
+	wait_revoke
 	stop_site `get_site 2`
 	wait_timeout
 	run_site 1 booth grant $tkt >/dev/null
-	wait_timeout
+	wait_grant
 	check_cib `get_site 1` || return 1
 	wait_exp
 }
@@ -627,9 +648,9 @@ recover_grant_site_lost() {
 test_simultaneous_start_even() {
 	local serv
 	run_site 1 booth revoke $tkt >/dev/null
-	wait_timeout
+	wait_revoke
 	run_site 2 booth grant $tkt >/dev/null
-	wait_timeout
+	wait_grant
 	stop_booth
 	wait_timeout
 	for serv in $(echo $sites | sed "s/`get_site 1` //"); do
@@ -651,10 +672,7 @@ check_simultaneous_start_even() {
 
 # slow start
 test_slow_start_granted() {
-	run_site 1 booth revoke $tkt >/dev/null
-	wait_timeout
-	run_site 1 booth grant $tkt >/dev/null
-	wait_timeout
+	grant2site_one
 	stop_booth
 	wait_timeout
 	for serv in $sites; do
@@ -674,10 +692,7 @@ check_slow_start_granted() {
 
 # restart with ticket granted
 test_restart_granted() {
-	run_site 1 booth revoke $tkt >/dev/null
-	wait_timeout
-	run_site 1 booth grant $tkt >/dev/null
-	wait_timeout
+	grant2site_one
 	restart_site `get_site 1`
 	wait_timeout
 }
@@ -689,10 +704,7 @@ check_restart_granted() {
 
 # restart with ticket granted (but cib empty)
 test_restart_granted_nocib() {
-	run_site 1 booth revoke $tkt >/dev/null
-	wait_timeout
-	run_site 1 booth grant $tkt >/dev/null
-	wait_timeout
+	grant2site_one
 	stop_site_clean `get_site 1` || return 1
 	wait_timeout
 	start_site `get_site 1`
@@ -708,10 +720,7 @@ check_restart_granted_nocib() {
 
 # restart with ticket not granted
 test_restart_notgranted() {
-	run_site 1 booth revoke $tkt >/dev/null
-	wait_timeout
-	run_site 1 booth grant $tkt >/dev/null
-	wait_timeout
+	grant2site_one
 	stop_site `get_site 2`
 	sleep 1
 	start_site `get_site 2`
@@ -725,10 +734,7 @@ check_restart_notgranted() {
 
 # ticket failover
 test_failover() {
-	run_site 1 booth revoke $tkt >/dev/null
-	wait_timeout
-	run_site 1 booth grant $tkt >/dev/null
-	wait_timeout
+	grant2site_one
 	stop_site_clean `get_site 1` || return 1
 	booth_status `get_site 1` && return 1
 	wait_exp
@@ -747,11 +753,8 @@ recover_failover() {
 
 # split brain (leader alone)
 test_split_leader() {
-	run_site 1 booth revoke $tkt >/dev/null
-	wait_timeout
-	run_site 1 booth grant $tkt >/dev/null
-	wait_timeout
-	run_site 1 $iprules stop $port  >/dev/null
+	grant2site_one
+	run_site 1 $iprules stop $port   >/dev/null
 	wait_exp
 	wait_timeout
 	check_cib any || return 1
@@ -771,10 +774,7 @@ recover_split_leader() {
 
 # split brain (follower alone)
 test_split_follower() {
-	run_site 1 booth revoke $tkt >/dev/null
-	wait_timeout
-	run_site 1 booth grant $tkt >/dev/null
-	wait_timeout
+	grant2site_one
 	run_site 2 $iprules stop $port  >/dev/null
 	wait_exp
 	wait_timeout
@@ -789,10 +789,7 @@ check_split_follower() {
 
 # split brain (leader alone)
 test_split_edge() {
-	run_site 1 booth revoke $tkt >/dev/null
-	wait_timeout
-	run_site 1 booth grant $tkt >/dev/null
-	wait_timeout
+	grant2site_one
 	run_site 1 $iprules stop $port  >/dev/null
 	wait_exp
 	run_site 1 $iprules start $port  >/dev/null
@@ -806,10 +803,7 @@ check_split_edge() {
 
 # external test prog failed
 test_external_prog_failed() {
-	run_site 1 booth revoke $tkt >/dev/null
-	wait_timeout
-	run_site 1 booth grant $tkt >/dev/null
-	sleep 1
+	grant2site_one
 	break_external_prog 1
 	wait_half_exp
 	wait_timeout
