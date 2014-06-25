@@ -350,13 +350,14 @@ static int process_UPDATE (
 	tk_log_debug("leader %s wants to update our ticket",
 			site_string(leader));
 
+	tk->leader = leader;
 	copy_ticket_from_msg(tk, msg);
 	ticket_write(tk);
 
 	/* run ticket_cron if the ticket expires */
 	set_ticket_wakeup(tk);
 
-	return 0;
+	return send_msg(OP_ACK, tk, sender);
 }
 
 static int process_REVOKE (
@@ -431,7 +432,9 @@ static int process_ACK(
 	if (tk->next_state == ST_INIT || tk->state == ST_INIT)
 		return 0;
 
-	if (term == tk->current_term &&
+	/* for heartbeats we make do with the majority */
+	if (tk->last_request == OP_HEARTBEAT &&
+			term == tk->current_term &&
 			leader == tk->leader) {
 
 		if (majority_of_bits(tk, tk->acks_received)) {
@@ -878,7 +881,7 @@ int raft_answer(
 		}
 		break;
 	case OP_UPDATE:
-		if (tk->leader != local && tk->leader == leader &&
+		if (((tk->leader != local && tk->leader == leader) || !is_owned(tk)) &&
 				tk->state == ST_FOLLOWER) {
 			rv = process_UPDATE(tk, sender, leader, msg);
 		} else {

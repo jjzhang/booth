@@ -525,7 +525,6 @@ static int ticket_dangerous(struct ticket_config *tk)
 */
 int leader_update_ticket(struct ticket_config *tk)
 {
-	struct boothc_ticket_msg msg;
 	int rv = 0;
 
 	if (tk->ticket_updated >= 2)
@@ -534,10 +533,7 @@ int leader_update_ticket(struct ticket_config *tk)
 	if (tk->ticket_updated < 1) {
 		tk->ticket_updated = 1;
 		tk->term_expires = time(NULL) + tk->term_duration;
-
-		tk_log_debug("broadcasting ticket update");
-		init_ticket_msg(&msg, OP_UPDATE, RLT_SUCCESS, 0, tk);
-		rv = transport()->broadcast(&msg, sizeof(msg));
+		rv = ticket_broadcast(tk, OP_UPDATE, OP_ACK, RLT_SUCCESS, 0);
 	}
 
 	if (tk->ticket_updated < 2) {
@@ -634,7 +630,8 @@ static void handle_resends(struct ticket_config *tk)
 		}
 	} else {
 		log_lost_servers(tk);
-		if (is_owned(tk)) {
+		if (tk->last_request == OP_HEARTBEAT &&
+				is_owned(tk)) {
 			/* we have the majority, update the ticket, at
 			 * least the local copy if we're still not
 			 * allowed to commit
