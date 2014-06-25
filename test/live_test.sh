@@ -458,11 +458,6 @@ check_consistency() {
 	check_cib $exp_grantee
 }
 
-reset_booth() {
-	start_booth
-	run_site 1 booth revoke $tkt >/dev/null
-	wait_revoke
-}
 all_booth_status() {
 	forall_fun booth_status
 }
@@ -478,6 +473,11 @@ can_run_test() {
 		echo "(test missing)"
 		return 1
 	fi
+}
+revoke_ticket() {
+	run_site 1 booth revoke $tkt >/dev/null
+	wait_revoke
+	wait_timeout
 }
 run_report() {
 	local start_ts=$1 end_ts=$2 name=$3
@@ -515,6 +515,7 @@ runtest() {
 			echo "unexpected: some booth daemons not running"
 		run_report $start_ts $end_ts $TEST
 	fi
+	revoke_ticket
 }
 
 [ -f "$cnf" ] || {
@@ -552,9 +553,6 @@ set -x
 
 # most tests start like this
 grant2site_one() {
-	run_site 1 booth revoke $tkt >/dev/null
-	wait_revoke
-	wait_timeout
 	run_site 1 booth grant $tkt >/dev/null
 	wait_grant
 	wait_timeout
@@ -574,8 +572,6 @@ check_grant() {
 
 # just a grant with no arbitrators
 test_grant_noarb() {
-	run_site 1 booth revoke $tkt >/dev/null
-	wait_revoke
 	local h
 	for h in $arbitrators; do
 		stop_arbitrator $h
@@ -602,8 +598,7 @@ applicable_grant_noarb() {
 # just a revoke
 test_revoke() {
 	grant2site_one
-	run_site 1 booth revoke $tkt >/dev/null
-	wait_revoke
+	revoke_ticket
 }
 check_revoke() {
 	check_consistency
@@ -613,8 +608,6 @@ check_revoke() {
 
 # just a grant to another site
 test_grant_elsewhere() {
-	run_site 1 booth revoke $tkt >/dev/null
-	wait_revoke
 	run_site 1 booth grant -s `get_site 2` $tkt >/dev/null
 	wait_grant
 }
@@ -626,8 +619,6 @@ check_grant_elsewhere() {
 
 # grant with one site lost
 test_grant_site_lost() {
-	run_site 1 booth revoke $tkt >/dev/null
-	wait_revoke
 	stop_site `get_site 2`
 	wait_timeout
 	run_site 1 booth grant $tkt >/dev/null
@@ -647,8 +638,6 @@ recover_grant_site_lost() {
 # simultaneous start of even number of members
 test_simultaneous_start_even() {
 	local serv
-	run_site 1 booth revoke $tkt >/dev/null
-	wait_revoke
 	run_site 2 booth grant $tkt >/dev/null
 	wait_grant
 	stop_booth
@@ -843,9 +832,10 @@ NETEM_ENV_net_delay() {
 sync_conf || exit
 restart_booth
 all_booth_status || {
-	reset_booth
+	start_booth
 	all_booth_status || exit
 }
+revoke_ticket
 
 dump_conf | logmsg
 
