@@ -402,7 +402,7 @@ int ticket_answer_list(int fd, struct boothc_ticket_msg *msg)
 	if (rv < 0)
 		return rv;
 
-	init_header(&hdr, CMR_LIST, 0, RLT_SUCCESS, 0, sizeof(hdr) + olen);
+	init_header(&hdr, CMR_LIST, 0, 0, RLT_SUCCESS, 0, sizeof(hdr) + olen);
 
 	return send_header_plus(fd, &hdr, data, olen);
 }
@@ -431,7 +431,7 @@ int ticket_answer_grant(int fd, struct boothc_ticket_msg *msg)
 	rv = do_grant_ticket(tk, ntohl(msg->header.options));
 
 reply:
-	init_header(&msg->header, CMR_GRANT, 0, rv ?: RLT_ASYNC, 0, sizeof(*msg));
+	init_header(&msg->header, CMR_GRANT, 0, 0, rv ?: RLT_ASYNC, 0, sizeof(*msg));
 	return send_ticket_msg(fd, msg);
 }
 
@@ -468,7 +468,7 @@ int ticket_answer_revoke(int fd, struct boothc_ticket_msg *msg)
 		rv = RLT_ASYNC;
 
 reply:
-	init_ticket_msg(msg, CMR_REVOKE, rv, 0, tk);
+	init_ticket_msg(msg, CMR_REVOKE, 0, rv, 0, tk);
 	return send_ticket_msg(fd, msg);
 }
 
@@ -479,7 +479,7 @@ int ticket_broadcast(struct ticket_config *tk,
 {
 	struct boothc_ticket_msg msg;
 
-	init_ticket_msg(&msg, cmd, res, reason, tk);
+	init_ticket_msg(&msg, cmd, 0, res, reason, tk);
 	tk_log_debug("broadcasting '%s' (term=%d, valid=%d)",
 			state_to_string(cmd),
 			ntohl(msg.ticket.term),
@@ -591,7 +591,7 @@ static void resend_msg(struct ticket_config *tk)
 						state_to_string(tk->last_request),
 						site_string(n)
 						);
-				send_msg(tk->last_request, tk, n);
+				send_msg(tk->last_request, tk, n, NULL);
 			}
 		}
 	}
@@ -1014,22 +1014,26 @@ char *state_to_string(uint32_t state_ho)
 }
 
 
-int send_reject(struct booth_site *dest, struct ticket_config *tk, cmd_result_t code)
+int send_reject(struct booth_site *dest, struct ticket_config *tk,
+		cmd_result_t code, struct boothc_ticket_msg *in_msg)
 {
+	int req = ntohl(in_msg->header.cmd);
 	struct boothc_ticket_msg msg;
 
 	tk_log_debug("sending reject to %s",
 			site_string(dest));
-	init_ticket_msg(&msg, OP_REJECTED, code, 0, tk);
+	init_ticket_msg(&msg, OP_REJECTED, req, code, 0, tk);
 	return booth_udp_send(dest, &msg, sizeof(msg));
 }
 
 int send_msg (
 		int cmd,
 		struct ticket_config *current_tk,
-		struct booth_site *dest
+		struct booth_site *dest,
+		struct boothc_ticket_msg *in_msg
 	       )
 {
+	int req = 0;
 	struct ticket_config *tk = current_tk;
 	struct boothc_ticket_msg msg;
 
@@ -1041,6 +1045,10 @@ int send_msg (
 		tk_log_info("sending status to %s",
 				site_string(dest));
 	}
-	init_ticket_msg(&msg, cmd, RLT_SUCCESS, 0, tk);
+
+	if (in_msg)
+		req = ntohl(in_msg->header.cmd);
+
+	init_ticket_msg(&msg, cmd, req, RLT_SUCCESS, 0, tk);
 	return booth_udp_send(dest, &msg, sizeof(msg));
 }

@@ -276,7 +276,7 @@ bad_len:
 	default:
 		log_error("connection %d cmd %x unknown",
 				ci, ntohl(msg.header.cmd));
-		init_header(&msg.header,CMR_GENERAL, 0, RLT_INVALID_ARG, 0, sizeof(msg.header));
+		init_header(&msg.header,CMR_GENERAL, 0, 0, RLT_INVALID_ARG, 0, sizeof(msg.header));
 		send_header_only(fd, &msg.header);
 		goto kill;
 	}
@@ -507,7 +507,7 @@ static int query_get_string_answer(cmd_request_t cmd)
 	struct booth_transport const *tpt;
 
 	data = NULL;
-	init_header(&cl.msg.header, cmd, cl.options, 0, 0, sizeof(cl.msg));
+	init_header(&cl.msg.header, cmd, 0, cl.options, 0, 0, sizeof(cl.msg));
 
 	if (!*cl.site)
 		site = local;
@@ -660,7 +660,7 @@ static int do_command(cmd_request_t cmd)
 	}
 
 redirect:
-	init_header(&cl.msg.header, cmd, cl.options, 0, 0, sizeof(cl.msg));
+	init_header(&cl.msg.header, cmd, 0, cl.options, 0, 0, sizeof(cl.msg));
 
 	/* Always use TCP for client - at least for now. */
 	tpt = booth_transport + TCP;

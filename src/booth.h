@@ -45,7 +45,7 @@
 #define BOOTH_PROTO_FAMILY	AF_INET
 
 #define BOOTHC_MAGIC		0x5F1BA08C
-#define BOOTHC_VERSION		0x00010002
+#define BOOTHC_VERSION		0x00010003
 
 
 /** Timeout value for poll().
@@ -93,6 +93,8 @@ struct boothc_header {
 
 	/** The command respectively protocol state. See cmd_request_t. */
 	uint32_t cmd;
+	/** The matching request (what do we reply to). See cmd_request_t. */
+	uint32_t request;
 	/** Command options. */
 	uint32_t options;
 	/** The reason for this RPC. */

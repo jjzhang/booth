@@ -276,7 +276,7 @@ static int term_too_low(struct ticket_config *tk,
 			"(%d vs. %d)", site_string(sender),
 			term, tk->current_term
 			);
-		send_reject(sender, tk, RLT_TERM_OUTDATED);
+		send_reject(sender, tk, RLT_TERM_OUTDATED, msg);
 		return 1;
 	}
 
@@ -309,7 +309,7 @@ static int answer_HEARTBEAT (
 			tk_log_warn("different leader %s with a lower term "
 					"(%d vs %d), sending reject",
 				site_string(leader), term, tk->current_term);
-			return send_reject(sender, tk, RLT_TERM_OUTDATED);
+			return send_reject(sender, tk, RLT_TERM_OUTDATED, msg);
 		}
 	}
 
@@ -329,7 +329,7 @@ static int answer_HEARTBEAT (
 	tk->leader = leader;
 
 	/* Ack the heartbeat (we comply). */
-	return send_msg(OP_ACK, tk, sender);
+	return send_msg(OP_ACK, tk, sender, msg);
 }
 
 
@@ -344,7 +344,7 @@ static int process_UPDATE (
 		tk_log_warn("different leader %s wants to update "
 				"our ticket, sending reject",
 			site_string(leader));
-		return send_reject(sender, tk, RLT_TERM_OUTDATED);
+		return send_reject(sender, tk, RLT_TERM_OUTDATED, msg);
 	}
 
 	tk_log_debug("leader %s wants to update our ticket",
@@ -357,7 +357,7 @@ static int process_UPDATE (
 	/* run ticket_cron if the ticket expires */
 	set_ticket_wakeup(tk);
 
-	return send_msg(OP_ACK, tk, sender);
+	return send_msg(OP_ACK, tk, sender, msg);
 }
 
 static int process_REVOKE (
@@ -371,7 +371,7 @@ static int process_REVOKE (
 
 	if (tk->state == ST_INIT && tk->leader == no_leader) {
 		/* assume that our ack got lost */
-		rv = send_msg(OP_ACK, tk, sender);
+		rv = send_msg(OP_ACK, tk, sender, msg);
 	} else if (tk->leader != sender) {
 		tk_log_error("%s wants to revoke ticket, "
 				"but it is not granted there (ignoring)",
@@ -389,7 +389,7 @@ static int process_REVOKE (
 		reset_ticket(tk);
 		tk->leader = no_leader;
 		ticket_write(tk);
-		rv = send_msg(OP_ACK, tk, sender);
+		rv = send_msg(OP_ACK, tk, sender, msg);
 	}
 
 	return rv;
@@ -638,7 +638,7 @@ static int answer_REQ_VOTE(
 
 	inappr_reason = test_reason(tk, sender, leader, msg);
 	if (inappr_reason)
-		return send_reject(sender, tk, inappr_reason);
+		return send_reject(sender, tk, inappr_reason, msg);
 
 	valid = term_time_left(tk);
 
@@ -647,7 +647,7 @@ static int answer_REQ_VOTE(
 		tk_log_warn("election from %s rejected "
 			"(we have %s as ticket owner), ticket still valid for %ds",
 			site_string(sender), site_string(tk->leader), valid);
-		return send_reject(sender, tk, RLT_TERM_STILL_VALID);
+		return send_reject(sender, tk, RLT_TERM_STILL_VALID, msg);
 	}
 
 	if (term_too_low(tk, sender, leader, msg))
@@ -673,7 +673,7 @@ vote_for_sender:
 	}
 
 
-	init_ticket_msg(&omsg, OP_VOTE_FOR, RLT_SUCCESS, 0, tk);
+	init_ticket_msg(&omsg, OP_VOTE_FOR, OP_REQ_VOTE, RLT_SUCCESS, 0, tk);
 	omsg.ticket.leader = htonl(get_node_id(tk->voted_for));
 	return booth_udp_send(sender, &omsg, sizeof(omsg));
 }
@@ -791,11 +791,11 @@ static int process_MY_INDEX (
 		/* but if we're voting in elections, our ticket is not
 		 * valid yet, don't send it */
 		if (!tk->in_election)
-			send_msg(OP_MY_INDEX, tk, sender);
+			send_msg(OP_MY_INDEX, tk, sender, msg);
 		if (tk->state == ST_LEADER) {
 			tk_log_info("sending ticket update to %s",
 					site_string(sender));
-			return send_msg(OP_UPDATE, tk, sender);
+			return send_msg(OP_UPDATE, tk, sender, msg);
 		}
 	}
 
@@ -876,7 +876,7 @@ int raft_answer(
 				state_to_string(cmd),
 				site_string(sender));
 			if (ticket_seems_ok(tk))
-				send_reject(sender, tk, RLT_TERM_STILL_VALID);
+				send_reject(sender, tk, RLT_TERM_STILL_VALID, msg);
 			rv = -EINVAL;
 		}
 		break;
@@ -889,7 +889,7 @@ int raft_answer(
 				state_to_string(cmd),
 				site_string(sender));
 			if (ticket_seems_ok(tk))
-				send_reject(sender, tk, RLT_TERM_STILL_VALID);
+				send_reject(sender, tk, RLT_TERM_STILL_VALID, msg);
 			rv = -EINVAL;
 		}
 		break;
@@ -904,7 +904,7 @@ int raft_answer(
 		break;
 	case OP_STATUS:
 		if (!tk->in_election)
-			rv = send_msg(OP_MY_INDEX, tk, sender);
+			rv = send_msg(OP_MY_INDEX, tk, sender, msg);
 		break;
 	default:
 		tk_log_error("unknown message %s, from %s",

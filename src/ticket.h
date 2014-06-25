@@ -70,8 +70,10 @@ int ticket_write(struct ticket_config *tk);
 void process_tickets(void);
 void tickets_log_info(void);
 char *state_to_string(uint32_t state_ho);
-int send_reject(struct booth_site *dest, struct ticket_config *tk, cmd_result_t code);
-int send_msg (int cmd, struct ticket_config *tk, struct booth_site *dest);
+int send_reject(struct booth_site *dest, struct ticket_config *tk,
+	cmd_result_t code, struct boothc_ticket_msg *in_msg);
+int send_msg (int cmd, struct ticket_config *tk,
+	struct booth_site *dest, struct boothc_ticket_msg *in_msg);
 int ticket_broadcast(struct ticket_config *tk, cmd_request_t cmd, cmd_request_t expected_reply, cmd_result_t res, cmd_reason_t reason);
 
 int leader_update_ticket(struct ticket_config *tk);
