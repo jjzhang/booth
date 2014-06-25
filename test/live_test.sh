@@ -568,6 +568,19 @@ check_grant() {
 	check_consistency `get_site 1`
 }
 
+## TEST: longgrant ##
+
+# just a grant followed by three expire times
+test_longgrant() {
+	grant2site_one
+	wait_exp
+	wait_exp
+	wait_exp
+}
+check_longgrant() {
+	check_consistency `get_site 1`
+}
+
 ## TEST: grant_noarb ##
 
 # just a grant with no arbitrators
@@ -841,7 +854,7 @@ dump_conf | logmsg
 
 TESTS="$@"
 
-: ${TESTS:="grant grant_noarb grant_elsewhere grant_site_lost revoke
+: ${TESTS:="grant longgrant grant_noarb grant_elsewhere grant_site_lost revoke
 simultaneous_start_even slow_start_granted
 restart_granted restart_granted_nocib restart_notgranted
 failover split_leader split_follower split_edge
