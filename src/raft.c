@@ -843,15 +843,22 @@ int raft_answer(
 		struct boothc_ticket_msg *msg
 	       )
 {
-	int cmd;
+	int cmd, req;
 	int rv;
 
 	rv = 0;
 	cmd = ntohl(msg->header.cmd);
+	req = ntohl(msg->header.request);
 
-	tk_log_debug("got message %s from %s",
-			state_to_string(cmd),
-			site_string(sender));
+	if (req)
+		tk_log_debug("got %s (req %s) from %s",
+				state_to_string(cmd),
+				state_to_string(req),
+				site_string(sender));
+	else
+		tk_log_debug("got %s from %s",
+				state_to_string(cmd),
+				site_string(sender));
 
 
 	switch (cmd) {

@@ -821,10 +821,13 @@ static void update_acks(
 	       )
 {
 	uint32_t cmd;
+	uint32_t req;
 
 	cmd = ntohl(msg->header.cmd);
-	if (tk->acks_expected != cmd &&
-			tk->acks_expected != OP_REJECTED)
+	req = ntohl(msg->header.request);
+	if (req != tk->last_request ||
+			(tk->acks_expected != cmd &&
+			tk->acks_expected != OP_REJECTED))
 		return;
 
 	/* got an ack! */
