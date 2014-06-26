@@ -796,6 +796,7 @@ test_split_edge() {
 	wait_exp
 	run_site 1 $iprules start $port  >/dev/null
 	wait_timeout
+	wait_timeout
 }
 check_split_edge() {
 	check_consistency any
