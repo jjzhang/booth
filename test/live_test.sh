@@ -861,7 +861,10 @@ sync_conf || exit
 restart_booth
 all_booth_status || {
 	start_booth
-	all_booth_status || exit
+	all_booth_status || {
+		echo "some booth servers couldn't be started"
+		exit 1
+	}
 }
 revoke_ticket
 
