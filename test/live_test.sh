@@ -47,7 +47,11 @@ iprules=/usr/share/booth/tests/test/booth_path
 : ${HA_LOGFACILITY:="syslog"}
 
 logmsg() {
-	logger -t "BOOTHTEST" -p $HA_LOGFACILITY.info -- $@
+	if [ "$WE_SERVER" ]; then
+		logger -t "BOOTHTEST" -p $HA_LOGFACILITY.info -- $@
+	else
+		ssh `get_site 1` logger -t "BOOTHTEST" -p $HA_LOGFACILITY.info -- $@
+	fi
 }
 
 ext_prog_log() {
@@ -179,6 +183,13 @@ restart_booth() {
 	done >/dev/null 2>&1
 	wait $procs
 	wait_timeout
+}
+is_we_server() {
+	local h
+	for h in $sites $arbitrators; do
+		ip a l | fgrep -wq $h && return
+	done
+	return 1
 }
 sync_conf() {
 	local h rc=0
@@ -546,6 +557,9 @@ exec 2>$logf
 BASH_XTRACEFD=2
 PS4='+ `date +"%T"`: '
 set -x
+
+WE_SERVER=""
+is_we_server && WE_SERVER=1
 
 #
 # the tests
