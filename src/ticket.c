@@ -653,65 +653,41 @@ int postpone_ticket_processing(struct ticket_config *tk)
 		((time(NULL) - start_time) < tk->timeout);
 }
 
-static void ticket_cron(struct ticket_config *tk)
+static void process_next_state(struct ticket_config *tk)
 {
-	time_t now;
-
-	now = time(NULL);
-
-	/* don't process the tickets too early */
-	if (postpone_ticket_processing(tk)) {
-		tk_log_debug("ticket processing postponed (start_postpone=%d)",
-				tk->start_postpone);
-		/* but run again soon */
-		ticket_activate_timeout(tk);
-		return;
-	}
-
-	if (tk->acks_expected == OP_MY_INDEX) {
+	switch(tk->next_state) {
+	case ST_LEADER:
+		reacquire_ticket(tk);
+		break;
+	case ST_INIT:
 		no_resends(tk);
+		start_revoke_ticket(tk);
+		break;
+	/* wanting to be follower is not much of an ambition; no
+	 * processing, just return; don't reset start_postpone until
+	 * we got some replies to status */
+	case ST_FOLLOWER:
+		return;
+	default:
+		break;
+	}
+	tk->start_postpone = 0;
+}
+
+static void ticket_lost(struct ticket_config *tk)
+{
+	if (tk->leader != local) {
+		tk_log_warn("lost at %s", site_string(tk->leader));
+	} else {
+		tk_log_warn("lost majority (revoking locally)");
 	}
 
-	/* wanting to be follower is not much of an ambition */
-	if (tk->next_state && tk->next_state != ST_FOLLOWER) {
-		switch(tk->next_state) {
-		case ST_LEADER:
-			if (tk->state == ST_LEADER) {
-				disown_ticket(tk);
-				new_election(tk, NULL, 1, OR_SPLIT);
-			} else {
-				reacquire_ticket(tk);
-			}
-			break;
-		case ST_INIT:
-			no_resends(tk);
-			start_revoke_ticket(tk);
-			break;
-		default:
-			break;
-		}
-		tk->start_postpone = 0;
-		goto out;
-	}
+	tk->lost_leader = tk->leader;
+	schedule_election(tk, OR_TKT_LOST);
+}
 
-	/* Has an owner, has an expiry date, and expiry date in the past?
-	 * Losing the ticket must happen in _every_ state. */
-	if (!tk->in_election &&
-			tk->term_expires &&
-			is_owned(tk) &&
-			now >= tk->term_expires) {
-
-		if (tk->leader != local) {
-			tk_log_warn("lost at %s", site_string(tk->leader));
-		} else {
-			tk_log_warn("lost majority (revoking locally)");
-		}
-
-		tk->lost_leader = tk->leader;
-		schedule_election(tk, OR_TKT_LOST);
-		goto out;
-	}
-
+static void next_action(struct ticket_config *tk)
+{
 	switch(tk->state) {
 	case ST_INIT:
 		/* init state, handle resends for ticket revoke */
@@ -733,7 +709,7 @@ static void ticket_cron(struct ticket_config *tk)
 		break;
 
 	case ST_CANDIDATE:
-		/* §5.2 */
+		/* elections timed out? */
 		elections_end(tk);
 		break;
 
@@ -753,6 +729,48 @@ static void ticket_cron(struct ticket_config *tk)
 	default:
 		break;
 	}
+}
+
+static void ticket_cron(struct ticket_config *tk)
+{
+	time_t now;
+
+	/* don't process the tickets too early after start */
+	if (postpone_ticket_processing(tk)) {
+		tk_log_debug("ticket processing postponed (start_postpone=%d)",
+				tk->start_postpone);
+		/* but run again soon */
+		ticket_activate_timeout(tk);
+		return;
+	}
+
+	/* no need for status resends, we hope we got at least one
+	 * my_index back */
+	if (tk->acks_expected == OP_MY_INDEX) {
+		no_resends(tk);
+	}
+
+	/* after startup, we need to decide what to do based on the
+	 * current ticket state; tk->next_state has a hint
+	 * also used for revokes which had to be delayed
+	 */
+	if (tk->next_state) {
+		process_next_state(tk);
+		goto out;
+	}
+
+	/* Has an owner, has an expiry date, and expiry date in the past?
+	 * Losing the ticket must happen in _every_ state. */
+	now = time(NULL);
+	if (!tk->in_election &&
+			tk->term_expires &&
+			is_owned(tk) &&
+			now >= tk->term_expires) {
+		ticket_lost(tk);
+		goto out;
+	}
+
+	next_action(tk);
 
 out:
 	tk->next_state = 0;
