@@ -896,7 +896,8 @@ int raft_answer(
 		break;
 	case OP_UPDATE:
 		if (((tk->leader != local && tk->leader == leader) || !is_owned(tk)) &&
-				tk->state == ST_FOLLOWER) {
+				(tk->state == ST_INIT || tk->state == ST_FOLLOWER ||
+				tk->state == ST_CANDIDATE)) {
 			rv = process_UPDATE(tk, sender, leader, msg);
 		} else {
 			tk_log_warn("unexpected message %s, from %s",
