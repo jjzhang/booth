@@ -779,7 +779,7 @@ static void ticket_cron(struct ticket_config *tk)
 
 out:
 	tk->next_state = 0;
-	if (tk->update_cib)
+	if (!tk->in_election && tk->update_cib)
 		ticket_write(tk);
 }
 

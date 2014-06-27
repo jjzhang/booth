@@ -213,6 +213,7 @@ void elections_end(struct ticket_config *tk)
 		tk_log_info("election timed out");
 	}
 
+	tk->in_election = 0;
 	new_leader = majority_votes(tk);
 	if (new_leader == local) {
 		tk_log_info("granted successfully here");
@@ -716,6 +717,7 @@ int new_election(struct ticket_config *tk,
 
 	tk->term_expires = 0;
 	tk->election_end = now + tk->timeout;
+	tk->in_election = 1;
 
 	tk_log_info("starting new election (term=%d)",
 			tk->current_term);
