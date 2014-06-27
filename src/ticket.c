@@ -682,8 +682,13 @@ static void ticket_lost(struct ticket_config *tk)
 		tk_log_warn("lost majority (revoking locally)");
 	}
 
+	reset_ticket(tk);
+	tk->state = ST_FOLLOWER;
 	tk->lost_leader = tk->leader;
-	schedule_election(tk, OR_TKT_LOST);
+	if (local->type == SITE) {
+		ticket_write(tk);
+		schedule_election(tk, OR_TKT_LOST);
+	}
 }
 
 static void next_action(struct ticket_config *tk)
@@ -999,13 +1004,10 @@ void set_ticket_wakeup(struct ticket_config *tk)
 
 void schedule_election(struct ticket_config *tk, cmd_reason_t reason)
 {
-	reset_ticket(tk);
-	tk->state = ST_FOLLOWER;
 	if (local->type != SITE)
 		return;
 
 	tk->election_reason = reason;
-	ticket_write(tk);
 	gettimeofday(&tk->next_cron, NULL);
 	/* introduce a short delay before starting election */
 	add_random_delay(tk);

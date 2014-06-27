@@ -461,7 +461,12 @@ static int process_VOTE_FOR(
 			(tk->state == ST_FOLLOWER || tk->state == ST_CANDIDATE)) {
 		tk_log_info("%s wants to give the ticket away",
 			site_string(tk->leader));
-		schedule_election(tk, OR_STEPDOWN);
+		reset_ticket(tk);
+		tk->state = ST_FOLLOWER;
+		if (local->type == SITE) {
+			ticket_write(tk);
+			schedule_election(tk, OR_STEPDOWN);
+		}
 		return 0;
 	}
 
