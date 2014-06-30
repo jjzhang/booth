@@ -23,6 +23,7 @@
 #include <sys/time.h>
 #include <assert.h>
 #include <string.h>
+#include "timer.h"
 #include "config.h"
 #include "transport.h"
 
@@ -44,7 +45,7 @@ inline static int term_time_left(const struct ticket_config *tk)
 {
 	int left;
 
-	left = tk->term_expires - time(NULL);
+	left = tk->term_expires - get_secs(NULL);
 	return (left < 0) ? 0 : left;
 }
 
@@ -140,12 +141,12 @@ static inline void disown_ticket(struct ticket_config *tk)
 {
 	tk->leader = NULL;
 	tk->is_granted = 0;
-	time(&tk->term_expires);
+	get_secs(&tk->term_expires);
 }
 
 static inline int disown_if_expired(struct ticket_config *tk)
 {
-	if (time(NULL) >= tk->term_expires ||
+	if (get_secs(NULL) >= tk->term_expires ||
 			!tk->leader) {
 		disown_ticket(tk);
 		return 1;
@@ -212,36 +213,6 @@ static inline uint32_t index_max3(uint32_t a, uint32_t b, uint32_t c)
 }
 
 
-static inline double timeval_to_float(struct timeval tv)
-{
-	return tv.tv_sec + tv.tv_usec*(double)1.0e-6;
-}
-
-static inline int timeval_msec(struct timeval tv)
-{
-	int m;
-
-	m = tv.tv_usec / 1000;
-	if (m >= 1000)
-		m = 999;
-	return m;
-}
-
-
-static inline int timeval_compare(struct timeval tv1, struct timeval tv2)
-{
-	if (tv1.tv_sec < tv2.tv_sec)
-		return -1;
-	if (tv1.tv_sec > tv2.tv_sec)
-		return +1;
-	if (tv1.tv_usec < tv2.tv_usec)
-		return -1;
-	if (tv1.tv_usec > tv2.tv_usec)
-		return +1;
-	return 0;
-}
-
-
 static inline time_t next_vote_starts_at(struct ticket_config *tk)
 {
 	time_t half_exp, retries_needed, t;
@@ -272,7 +243,7 @@ static inline int should_start_renewal(struct ticket_config *tk)
 	if (!when)
 		return 0;
 
-	time(&now);
+	get_secs(&now);
 	return when <= now;
 }
 
@@ -282,7 +253,7 @@ static inline void expect_replies(struct ticket_config *tk,
 	tk->retry_number = 0;
 	tk->acks_expected = reply_type;
 	tk->acks_received = local->bitmask;
-	tk->req_sent_at  = time(NULL);
+	tk->req_sent_at  = get_secs(NULL);
 	tk->ticket_updated = 0;
 }
 

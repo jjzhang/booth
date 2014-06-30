@@ -281,6 +281,16 @@ else
 	GDB_FLAGS="-g"
 fi
 
+dnl Check for POSIX clock_gettime
+dnl
+AC_CACHE_CHECK([have clock_gettime],ac_cv_HAVE_CLOCK_GETTIME,[
+AC_TRY_COMPILE([
+#include <time.h>
+],
+[ struct timespec tv; clock_gettime(CLOCK_REALTIME, &tv); return 0;],
+ac_cv_HAVE_CLOCK_GETTIME=yes,ac_cv_HAVE_CLOCK_GETTIME=no,ac_cv_HAVE_CLOCK_GETTIME=cross)])
+AM_CONDITIONAL(BUILD_TIMER_C, test x"$ac_cv_HAVE_CLOCK_GETTIME" = x"yes")
+
 # extra warnings
 EXTRA_WARNINGS=""
 

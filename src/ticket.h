@@ -24,6 +24,7 @@
 #include <sys/time.h>
 #include <math.h>
 
+#include "timer.h"
 #include "config.h"
 #include "log.h"
 
@@ -80,24 +81,23 @@ int leader_update_ticket(struct ticket_config *tk);
 void add_random_delay(struct ticket_config *tk);
 void schedule_election(struct ticket_config *tk, cmd_reason_t reason);
 
-static inline void ticket_next_cron_at(struct ticket_config *tk, struct timeval when)
+static inline void ticket_next_cron_at(struct ticket_config *tk, timetype when)
 {
 	tk->next_cron = when;
 }
 
 static inline void ticket_next_cron_at_coarse(struct ticket_config *tk, time_t when)
 {
+	memset(&tk->next_cron, 0, sizeof(tk->next_cron));
 	tk->next_cron.tv_sec  = when;
-	tk->next_cron.tv_usec = 0;
 }
 
-static inline void ticket_next_cron_in(struct ticket_config *tk, float seconds)
+static inline void ticket_next_cron_in(struct ticket_config *tk, time_t seconds)
 {
-	struct timeval tv;
+	timetype tv;
 
-	gettimeofday(&tv, NULL);
-	tv.tv_sec += trunc(seconds);
-	tv.tv_usec += (seconds - trunc(seconds)) * 1e6;
+	get_time(&tv);
+	tv.tv_sec += seconds;
 
 	ticket_next_cron_at(tk, tv);
 }

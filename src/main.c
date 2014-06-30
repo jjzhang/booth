@@ -1328,7 +1328,7 @@ int main(int argc, char *argv[], char *envp[])
 	int rv;
 
 	init_set_proc_title(argc, argv, envp);
-	time(&start_time);
+	get_secs(&start_time);
 
 	memset(&cl, 0, sizeof(cl));
 	strncpy(cl.configfile,

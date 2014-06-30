@@ -22,6 +22,7 @@
 
 #include <stdint.h>
 #include "booth.h"
+#include "timer.h"
 #include "raft.h"
 #include "transport.h"
 
@@ -73,7 +74,7 @@ struct ticket_config {
 	server_state_e next_state;
 
 	/** When something has to be done */
-	struct timeval next_cron;
+	timetype next_cron;
 
 	/** Current leader. This is effectively the log[] in Raft. */
 	struct booth_site *leader;
@@ -230,13 +231,5 @@ int find_site_by_name(unsigned char *site, struct booth_site **node, int any_typ
 int find_site_by_id(uint32_t site_id, struct booth_site **node);
 
 const char *type_to_string(int type);
-
-
-#include <stdio.h>
-#define R(tk_) do { if (ANYDEBUG) printf("## %12s:%3d state %s, %d, " \
-	"leader %s, exp %s", __FILE__, __LINE__, \
-	state_to_string(tk_->state), tk_->current_term, \
-	site_string(tk_->leader), ctime(&tk_->term_expires)); } while(0)
-
 
 #endif /* _CONFIG_H */

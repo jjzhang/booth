@@ -10,6 +10,10 @@ sbin_PROGRAMS		= boothd
 boothd_SOURCES	 	= config.c main.c raft.c ticket.c  transport.c \
 			  pacemaker.c handler.c
 
+if BUILD_TIMER_C
+boothd_SOURCES += timer.c
+endif
+
 boothd_LDFLAGS		= $(OS_DYFLAGS) -L./
 boothd_LDADD		= -lplumb -lplumbgpl -lz -lm
 boothd_CPPFLAGS		= $(GLIB_CFLAGS)

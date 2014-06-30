@@ -22,6 +22,7 @@
 #include <errno.h>
 #include <arpa/inet.h>
 #include "booth.h"
+#include "timer.h"
 #include "transport.h"
 #include "inline-fn.h"
 #include "config.h"
@@ -104,7 +105,7 @@ static void update_ticket_from_msg(struct ticket_config *tk,
 		site_string(sender),
 		ntohl(msg->ticket.term), ntohl(msg->ticket.term_valid_for));
 	duration = min(tk->term_duration, ntohl(msg->ticket.term_valid_for));
-	tk->term_expires = time(NULL) + duration;
+	tk->term_expires = get_secs(NULL) + duration;
 	update_term_from_msg(tk, msg);
 }
 
@@ -112,7 +113,7 @@ static void update_ticket_from_msg(struct ticket_config *tk,
 static void copy_ticket_from_msg(struct ticket_config *tk,
 		struct boothc_ticket_msg *msg)
 {
-	tk->term_expires = time(NULL) + ntohl(msg->ticket.term_valid_for);
+	tk->term_expires = get_secs(NULL) + ntohl(msg->ticket.term_valid_for);
 	tk->current_term = ntohl(msg->ticket.term);
 }
 
@@ -138,7 +139,7 @@ static void won_elections(struct ticket_config *tk)
 	tk->leader = local;
 	tk->state = ST_LEADER;
 
-	tk->term_expires = time(NULL) + tk->term_duration;
+	tk->term_expires = get_secs(NULL) + tk->term_duration;
 	tk->election_end = 0;
 	tk->voted_for = NULL;
 
@@ -208,7 +209,7 @@ void elections_end(struct ticket_config *tk)
 	time_t now;
 	struct booth_site *new_leader;
 
-	now = time(NULL);
+	now = get_secs(NULL);
 	if (now > tk->election_end) {
 		/* This is previous election timed out */
 		tk_log_info("elections finished");
@@ -694,9 +695,9 @@ int new_election(struct ticket_config *tk,
 	if (local->type != SITE)
 		return 0;
 
-	time(&now);
+	get_secs(&now);
 	tk_log_debug("start new election?, now=%" PRIi64 ", end %" PRIi64,
-			(int64_t)now, (int64_t)(tk->election_end));
+			(int64_t)wall_ts(now), (int64_t)(wall_ts(tk->election_end)));
 	if (now < tk->election_end)
 		return 1;
 
