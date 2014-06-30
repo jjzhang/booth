@@ -682,9 +682,9 @@ static void ticket_lost(struct ticket_config *tk)
 		tk_log_warn("lost majority (revoking locally)");
 	}
 
+	tk->lost_leader = tk->leader;
 	reset_ticket(tk);
 	tk->state = ST_FOLLOWER;
-	tk->lost_leader = tk->leader;
 	if (local->type == SITE) {
 		ticket_write(tk);
 		schedule_election(tk, OR_TKT_LOST);
