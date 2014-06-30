@@ -122,6 +122,7 @@ static void become_follower(struct ticket_config *tk,
 	copy_ticket_from_msg(tk, msg);
 	tk->state = ST_FOLLOWER;
 	tk->delay_commit = 0;
+	tk->in_election = 0;
 	/* if we're following and the ticket was granted here
 	 * then commit to CIB right away (we're probably restarting)
 	 */
@@ -316,9 +317,6 @@ static int answer_HEARTBEAT (
 
 	/* got heartbeat, no rejects expected anymore */
 	tk->expect_more_rejects = 0;
-
-	/* and certainly not in election */
-	tk->in_election = 0;
 
 	/* Needed? */
 	newer_term(tk, sender, leader, msg, 0);
@@ -540,7 +538,7 @@ static int process_REJECTED(
 						"we'll backup a bit",
 						site_string(sender));
 			} else {
-				tk_log_warn("%s unexpecetedly rejects elections",
+				tk_log_warn("%s unexpectedly rejects elections",
 						site_string(sender));
 			}
 		} else {
