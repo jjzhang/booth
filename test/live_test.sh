@@ -109,7 +109,7 @@ is_function() {
 runcmd() {
 	local h=$1 rc
 	shift 1
-	logmsg "$h: running '$@'"
+	echo "$h: running '$@'" | logmsg
 	if ip a l | fgrep -wq $h; then
 		$@
 	else
@@ -508,14 +508,14 @@ runtest() {
 	start_ts=`date +%s`
 	echo -n "Testing: $1... "
 	can_run_test $1 || return 0
-	logmsg "starting booth test $1 ..."
+	echo "starting booth test $1 ..." | logmsg
 	setup_netem
 	test_$1 && check_$1
 	rc=$?
 	end_time=`date`
 	end_ts=`date +%s`
 	reset_netem_env
-	logmsg "finished booth test $1 (exit code $rc)"
+	echo "finished booth test $1 (exit code $rc)" | logmsg
 	is_function recover_$1 && recover_$1
 	sleep 3
 	all_booth_status
