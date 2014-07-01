@@ -270,7 +270,7 @@ get_rsc() {
 }
 
 break_external_prog() {
-	echo "location $PREFNAME `get_rsc` rule -inf: defined #uname" | run_site $1 crm configure
+	run_site $1 crm configure "location $PREFNAME `get_rsc` rule -inf: defined \#uname"
 }
 show_pref() {
 	run_site $1 crm configure show $PREFNAME > /dev/null
