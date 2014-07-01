@@ -709,7 +709,9 @@ static void next_action(struct ticket_config *tk)
 				site_string(tk->voted_for));
 		if (!tk->leader && !tk->voted_for) {
 			disown_ticket(tk);
-			new_election(tk, NULL, 1, OR_AGAIN);
+			if (!new_election(tk, NULL, 1, OR_AGAIN)) {
+				ticket_activate_timeout(tk);
+			}
 		}
 		break;
 

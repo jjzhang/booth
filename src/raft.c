@@ -224,7 +224,9 @@ void elections_end(struct ticket_config *tk)
 				site_string(new_leader));
 	} else {
 		tk_log_info("nobody won elections, new elections");
-		new_election(tk, NULL, is_tie(tk), OR_AGAIN);
+		if (!new_election(tk, NULL, is_tie(tk), OR_AGAIN)) {
+			ticket_activate_timeout(tk);
+		}
 	}
 }
 
@@ -696,7 +698,7 @@ int new_election(struct ticket_config *tk,
 	tk_log_debug("start new election?, now=%" PRIi64 ", end %" PRIi64,
 			(int64_t)now, (int64_t)(tk->election_end));
 	if (now < tk->election_end)
-		return 0;
+		return 1;
 
 	/* §5.2 */
 	/* If there was _no_ answer, don't keep incrementing the term number
