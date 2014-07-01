@@ -270,7 +270,10 @@ get_rsc() {
 }
 
 break_external_prog() {
-	echo "location __pref_booth_live_test `get_rsc` rule -inf: defined #uname" | run_site 1 crm configure
+	echo "location $PREFNAME `get_rsc` rule -inf: defined #uname" | run_site $1 crm configure
+}
+show_pref() {
+	run_site $1 crm configure show $PREFNAME > /dev/null
 }
 repair_external_prog() {
 	run_site $1 crm configure delete __pref_booth_live_test
@@ -822,6 +825,7 @@ check_split_edge() {
 test_external_prog_failed() {
 	grant2site_one
 	break_external_prog 1
+	show_pref 1 || return 1
 	wait_half_exp
 	wait_timeout
 }
@@ -856,6 +860,8 @@ NETEM_ENV_loss() {
 NETEM_ENV_net_delay() {
 	forall $0 $cnf __netem__ netem_delay ${1:-100}
 }
+
+PREFNAME=__pref_booth_live_test
 
 sync_conf || exit
 restart_booth
