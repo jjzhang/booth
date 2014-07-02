@@ -710,9 +710,16 @@ static void next_action(struct ticket_config *tk)
 		tk_log_debug("leader: %s, voted_for: %s",
 				site_string(tk->leader),
 				site_string(tk->voted_for));
-		if (!tk->leader && !tk->voted_for) {
-			disown_ticket(tk);
-			if (!new_election(tk, NULL, 1, OR_AGAIN)) {
+		if (!tk->leader) {
+			if (!tk->voted_for) {
+				disown_ticket(tk);
+				if (!new_election(tk, NULL, 1, OR_AGAIN)) {
+					ticket_activate_timeout(tk);
+				}
+			} else {
+				/* we should restart elections in case nothing
+				 * happens in the meantime */
+				tk->in_election = 0;
 				ticket_activate_timeout(tk);
 			}
 		}
