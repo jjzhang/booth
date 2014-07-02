@@ -211,7 +211,7 @@ void elections_end(struct ticket_config *tk)
 	now = time(NULL);
 	if (now > tk->election_end) {
 		/* This is previous election timed out */
-		tk_log_info("election timed out");
+		tk_log_info("elections finished");
 	}
 
 	tk->in_election = 0;
