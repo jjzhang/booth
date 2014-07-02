@@ -46,6 +46,11 @@ logf=test_booth.log
 iprules=/usr/share/booth/tests/test/booth_path
 : ${HA_LOGFACILITY:="syslog"}
 
+get_site() {
+	local n=$1
+	echo $sites | awk '{print $'$n'}'
+}
+
 logmsg() {
 	if [ "$WE_SERVER" ]; then
 		logger -t "BOOTHTEST" -p $HA_LOGFACILITY.info -- $@
@@ -251,10 +256,6 @@ run_arbitrator() {
 	shift 1
 	h=`echo $arbitrators | awk '{print $'$n'}'`
 	runcmd $h $@
-}
-get_site() {
-	local n=$1
-	echo $sites | awk '{print $'$n'}'
 }
 
 get_port() {
