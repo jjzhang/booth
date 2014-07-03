@@ -46,6 +46,7 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <sys/types.h>
+#include "b_config.h"
 #include "log.h"
 #include "booth.h"
 #include "config.h"
@@ -55,6 +56,7 @@
 #include "ticket.h"
 
 #define RELEASE_VERSION		"0.2.0"
+#define RELEASE_STR 	RELEASE_VERSION " (build " BOOTH_BUILD_VERSION ")"
 
 #define CLIENT_NALLOC		32
 
@@ -456,10 +458,9 @@ static int loop(int fd)
 		goto fail;
 	}
 
-	if (cl.type == ARBITRATOR)
-		log_info("BOOTH arbitrator daemon started");
-	else if (cl.type == SITE)
-		log_info("BOOTH cluster site daemon started");
+	log_info("BOOTH %s daemon started, node id is 0x%08X (%d).",
+		type_to_string(local->type),
+			local->site_id, local->site_id);
 
 	while (1) {
 		rv = poll(pollfds, client_maxi + 1, poll_timeout);
@@ -828,7 +829,6 @@ static void print_usage(void)
 
 #define OPTION_STRING		"c:Dl:t:s:FhS"
 
-
 void safe_copy(char *dest, char *value, size_t buflen, const char *description) {
 	int content_len = buflen - 1;
 
@@ -881,8 +881,7 @@ static int read_arguments(int argc, char **argv)
 
 	if (!strcmp(arg1, "version") || !strcmp(arg1, "--version") ||
 			!strcmp(arg1, "-V")) {
-		printf("%s %s (built %s %s)\n",
-				argv[0], RELEASE_VERSION, __DATE__, __TIME__);
+		printf("%s %s\n", argv[0], RELEASE_STR);
 		exit(EXIT_SUCCESS);
 	}
 
@@ -1264,9 +1263,8 @@ static int do_server(int type)
 	cl_log_set_facility(HA_LOG_FACILITY);
 	cl_inherit_logging_environment(0);
 
-	log_info("BOOTH %s daemon is starting, node id is 0x%08X (%d).",
-			type_to_string(local->type),
-			local->site_id, local->site_id);
+	log_info("BOOTH %s %s daemon is starting",
+			type_to_string(local->type), RELEASE_STR);
 
 	signal(SIGUSR1, (__sighandler_t)tickets_log_info);
 	signal(SIGTERM, (__sighandler_t)sig_exit_handler);

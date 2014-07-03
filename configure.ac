@@ -180,6 +180,14 @@ AC_ARG_WITH([initddir],
 	[ INITDDIR="$withval" ],
 	[ INITDDIR="$sysconfdir/init.d" ])
 
+test -s .git_info &&
+	BOOTH_BUILD_VERSION="`cat .git_info`"
+
+AC_ARG_WITH([build-version],
+	[  --with-build-version=STR     : build version ],
+	[ BOOTH_BUILD_VERSION="$withval" ],
+	[ ])
+
 AC_ARG_ENABLE([resource-monitor],
 	[  --enable-resource-monitor       : Enabling Resource Monitor ],
 	[ default="no" ])
@@ -397,15 +405,18 @@ BOOTHSYSCONFDIR=${sysconfdir}/booth
 AC_SUBST([HAVE_LOG_CIB_DIFF])
 AC_SUBST([HAVE_XML_LOG_PATCHSET])
 AC_SUBST([BOOTHSYSCONFDIR])
+AC_SUBST([BOOTH_BUILD_VERSION])
 AC_DEFINE_UNQUOTED([BOOTHSYSCONFDIR], "$(eval echo ${BOOTHSYSCONFDIR})", [booth config directory])
 
 AC_DEFINE_UNQUOTED([PACKAGE_FEATURES], "${PACKAGE_FEATURES}", [booth built-in features])
+
+AC_DEFINE_UNQUOTED([BOOTH_BUILD_VERSION], "${BOOTH_BUILD_VERSION}", [booth build version])
 
 AC_OUTPUT
 
 AC_MSG_RESULT([])
 AC_MSG_RESULT([$PACKAGE configuration:])
-AC_MSG_RESULT([  Version                  = ${VERSION}])
+AC_MSG_RESULT([  Version                  = ${VERSION} (Build: ${BOOTH_BUILD_VERSION})])
 AC_MSG_RESULT([  Prefix                   = ${prefix}])
 AC_MSG_RESULT([  Executables              = ${sbindir}])
 AC_MSG_RESULT([  Man pages                = ${mandir}])

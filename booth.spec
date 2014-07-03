@@ -17,7 +17,7 @@ Name:           booth
 Summary:        Ticket Manager for Multi-site Clusters
 License:        GPL-2.0+
 Group:          %{pkg_group}
-Version:        @version@
+Version:        0.2.0
 Release:        0
 Source:         booth.tar.bz2
 Source1:        %name-rpmlintrc

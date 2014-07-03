@@ -9,6 +9,9 @@ configure
 depcomp
 install-sh
 missing
+booth.tar.bz2
+*.rpm
+Doxyfile
 src/.deps
 src/Makefile.in
 src/b_config.h.in
