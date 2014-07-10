@@ -308,7 +308,8 @@ int read_config(const char *path, int type)
 	char line[1024];
 	FILE *fp;
 	char *s, *key, *val, *end_of_key;
-	const char *cp, *error;
+	const char *error;
+	char *cp, *cp2;
 	int i;
 	int lineno = 0;
 	int got_transport = 0;
@@ -596,17 +597,16 @@ no_value:
 	/* Default: make config name match config filename. */
 	if (!booth_conf->name[0]) {
 		cp = strrchr(path, '/');
-		if (!cp)
-			cp = path;
-
-		/* TODO: locale? */
-		/* NUL-termination by memset. */
-		for(i=0; i<BOOTH_NAME_LEN-1 && isalnum(*cp); i++)
-			booth_conf->name[i] = *(cp++);
-
-		/* Last resort. */
-		if (!booth_conf->name[0])
-			strcpy(booth_conf->name, "booth");
+		cp = cp ? cp+1 : (char *)path;
+		cp2 = strrchr(cp, '.');
+		if (!cp2)
+			cp2 = cp + strlen(cp);
+		if (cp2-cp >= BOOTH_NAME_LEN) {
+			log_error("booth config file name too long");
+			goto err;
+		}
+		strncpy(booth_conf->name, cp, cp2-cp);
+		*(booth_conf->name+(cp2-cp)) = '\0';
 	}
 
 	return 0;
