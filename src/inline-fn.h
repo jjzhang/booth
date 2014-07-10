@@ -68,6 +68,7 @@ inline static int is_owned(const struct ticket_config *tk)
 
 
 static inline void init_header_bare(struct boothc_header *h) {
+	assert(local && local->site_id);
 	h->magic   = htonl(BOOTHC_MAGIC);
 	h->version = htonl(BOOTHC_VERSION);
 	h->from    = htonl(local->site_id);
