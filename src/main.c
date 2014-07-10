@@ -532,6 +532,11 @@ static int query_get_string_answer(cmd_request_t cmd)
 		goto out_free;
 
 	data_len = ntohl(reply.length) - sizeof(reply);
+	/* no tickets? */
+	if (!data_len) {
+		rv = 0;
+		goto out_close;
+	}
 
 	data = malloc(data_len);
 	if (!data) {
@@ -547,6 +552,7 @@ static int query_get_string_answer(cmd_request_t cmd)
 
 out_free:
 	free(data);
+out_close:
 	tpt->close(site);
 out:
 	return rv;
