@@ -7,7 +7,7 @@
 %define with_extra_warnings   	0
 %define with_debugging  	0
 %define without_fatal_warnings 	1
-%if 0%{?fedora_version} || 0%{?centos_version} || 0%{?rhel_version}
+%if 0%{?fedora} || 0%{?centos} || 0%{?rhel}
 %define pkg_group System Environment/Daemons
 %else
 %define pkg_group Productivity/Clustering/HA
@@ -26,12 +26,20 @@ BuildRequires:  asciidoc
 BuildRequires:  autoconf
 BuildRequires:  automake
 BuildRequires:  glib2-devel
+%if 0%{?fedora} || 0%{?centos} || 0%{?rhel}
+BuildRequires:  cluster-glue-libs-devel
+BuildRequires:  pacemaker-libs-devel
+%else
 BuildRequires:  libglue-devel
 BuildRequires:  libpacemaker-devel
+%endif
 BuildRequires:  libxml2-devel
 BuildRequires:  pkgconfig
-# the following is probably SUSE specific
+%if 0%{?fedora} || 0%{?centos} || 0%{?rhel}
+Requires:       pacemaker >= 1.1.8
+%else
 Requires:       pacemaker-ticket-support >= 2.0
+%endif
 
 %description
 Booth manages the ticket which authorizes one of the cluster sites located in
