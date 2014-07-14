@@ -245,12 +245,12 @@ static int add_ticket(const char *name, struct ticket_config **tkp,
 
 static int validate_ticket(struct ticket_config *tk)
 {
-	if (tk->timeout*(tk->retries+1) >= tk->term_duration/2) {
+	if (tk->timeout*(tk->retries+1) >= tk->renewal_freq) {
 		tk_log_error("total amount of time to "
 			"retry sending packets cannot exceed "
-			"half of the expiry time "
-			"(%d*(%d+1) >= %d/2)",
-			tk->timeout, tk->retries, tk->term_duration);
+			"renewal frequency "
+			"(%d*(%d+1) >= %d)",
+			tk->timeout, tk->retries, tk->renewal_freq);
 		return 0;
 	}
 	return 1;
@@ -559,6 +559,15 @@ no_value:
 			continue;
 		}
 
+		if (strcmp(key, "renewal-freq") == 0) {
+			current_tk->renewal_freq = strtol(val, &s, 0);
+			if (*s || s == val || current_tk->renewal_freq<1) {
+				error = "Expected plain integer value >=1 for renewal-freq";
+				goto err;
+			}
+			continue;
+		}
+
 		if (strcmp(key, "acquire-after") == 0) {
 			current_tk->acquire_after = strtol(val, &s, 0);
 			if (*s || s == val || current_tk->acquire_after<0) {
@@ -608,6 +617,9 @@ no_value:
 		strncpy(booth_conf->name, cp, cp2-cp);
 		*(booth_conf->name+(cp2-cp)) = '\0';
 	}
+
+	if (!current_tk->renewal_freq)
+		current_tk->renewal_freq = current_tk->term_duration/2;
 
 	return 0;
 

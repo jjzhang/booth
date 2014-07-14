@@ -55,6 +55,10 @@ struct ticket_config {
 	 * another site. */
 	int acquire_after; /* TODO: needed? */
 
+	/* How often to renew the ticket
+	 */
+	int renewal_freq;
+
 
 	/* Program to ask whether it makes sense to
 	 * acquire the ticket */
@@ -144,6 +148,9 @@ struct ticket_config {
 	 * hold the ticket processing for a while until they reply
 	 */
 	int start_postpone;
+
+	/** Last renewal time */
+	time_t last_renewal;
 
 	/* Do we need to update the copy in the CIB?
 	 * Normally, the ticket is written only when it changes via

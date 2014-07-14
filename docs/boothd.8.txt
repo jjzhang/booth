@@ -221,7 +221,7 @@ The default is '5' seconds.
 +
 Default is 10. Values lower than 3 are illegal.
 +
-Ticket *renewal*, which occurs every half expire time, cannot
+Ticket *renewal*, which by default occurs every half expire time,
 must happen after packet resending. Hence, the total retry time
 must be shorter than half the expire time:
 
@@ -243,6 +243,17 @@ sure that the program returns quickly.
 +
 See below for details about booth specific environment variables
 and the distributed 'service-runnable' script.
+
+*'renewal-freq'*::
+	Set the ticket renewal frequency period. By default, it is
+	set to half the ticket expire time.
++
+If the network reliability is often reduced over prolonged
+periods, it may help to reduce the renewal frequency.
++
+Before every renewal, if set, the 'before-acquire-handler' is
+run. This parameter then may be used to set the local cluster
+monitor interval.
 
 
 A more verbose example of a configuration file might be

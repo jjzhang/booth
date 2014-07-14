@@ -529,13 +529,15 @@ static int ticket_dangerous(struct ticket_config *tk)
 int leader_update_ticket(struct ticket_config *tk)
 {
 	int rv = 0;
+	time_t now = get_secs(NULL);
 
 	if (tk->ticket_updated >= 2)
 		return 0;
 
 	if (tk->ticket_updated < 1) {
 		tk->ticket_updated = 1;
-		tk->term_expires = get_secs(NULL) + tk->term_duration;
+		tk->last_renewal = now;
+		tk->term_expires = now + tk->term_duration;
 		rv = ticket_broadcast(tk, OP_UPDATE, OP_ACK, RLT_SUCCESS, 0);
 	}
 

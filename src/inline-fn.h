@@ -216,23 +216,11 @@ static inline uint32_t index_max3(uint32_t a, uint32_t b, uint32_t c)
 
 static inline time_t next_vote_starts_at(struct ticket_config *tk)
 {
-	time_t half_exp, retries_needed, t;
-
 	/* If not owner, don't renew. */
 	if (tk->leader != local)
 		return 0;
 
-	/* Try to renew at half of expiry time. */
-	half_exp = tk->term_expires - tk->term_duration/2;
-	/* Also start renewal if we couldn't get
-	 * a few message retransmission in the alloted
-	 * expiry time. */
-	retries_needed = tk->term_expires - tk->timeout * tk->retries/2;
-
-	/* Return earlier timestamp. */
-	t = min(half_exp, retries_needed);
-
-	return t;
+	return tk->last_renewal + tk->renewal_freq;
 }
 
 
