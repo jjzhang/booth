@@ -95,10 +95,39 @@ int check_site(char *site, int *is_local)
 }
 
 
+/* is it safe to commit the grant?
+ * if we didn't hear from all sites on the initial grant, we may
+ * need to delay the commit
+ *
+ * TODO: investigate possibility to devise from history whether a
+ * missing site could be holding a ticket or not
+ */
+static int ticket_dangerous(struct ticket_config *tk)
+{
+	if (!tk->delay_commit)
+		return 0;
+
+	if (tk->delay_commit <= get_secs(NULL) ||
+			all_sites_replied(tk)) {
+		tk_log_info("ticket delay commit expired");
+		tk->delay_commit = 0;
+		return 0;
+	} else {
+		tk_log_debug("delay ticket commit for %ds",
+				(int)(tk->delay_commit - get_secs(NULL)));
+	}
+
+	return 1;
+}
+
+
 int ticket_write(struct ticket_config *tk)
 {
 	if (local->type != SITE)
 		return -EINVAL;
+
+	if (ticket_dangerous(tk))
+		return 1;
 
 	if (tk->leader == local) {
 		pcmk_handler.grant_ticket(tk);
@@ -496,39 +525,13 @@ int ticket_broadcast(struct ticket_config *tk,
 }
 
 
-/* is it safe to commit the grant?
- * if we didn't hear from all sites on the initial grant, we may
- * need to delay the commit
- *
- * TODO: investigate possibility to devise from history whether a
- * missing site could be holding a ticket or not
- */
-static int ticket_dangerous(struct ticket_config *tk)
-{
-	if (!tk->delay_commit)
-		return 0;
-
-	if (tk->delay_commit <= get_secs(NULL) ||
-			all_sites_replied(tk)) {
-		tk_log_debug("ticket delay commit expired");
-		tk->delay_commit = 0;
-		return 0;
-	} else {
-		tk_log_debug("delay ticket commit for %ds",
-				(int)(tk->delay_commit - get_secs(NULL)));
-	}
-
-	return 1;
-}
-
-
 /* update the ticket on the leader, write it to the CIB, and
    send out the update message to others with the new expiry
    time
 */
 int leader_update_ticket(struct ticket_config *tk)
 {
-	int rv = 0;
+	int rv = 0, rv2;
 	time_t now = get_secs(NULL);
 
 	if (tk->ticket_updated >= 2)
@@ -542,15 +545,18 @@ int leader_update_ticket(struct ticket_config *tk)
 	}
 
 	if (tk->ticket_updated < 2) {
-		if (!ticket_dangerous(tk)) {
+		rv2 = ticket_write(tk);
+		switch(rv2) {
+		case 0:
 			tk->ticket_updated = 2;
-			ticket_write(tk);
-		} else {
-			/* log just once, on the first retry */
-			if (tk->retry_number == 1)
-				tk_log_info("delaying ticket commit to CIB for %ds "
-					"(or all sites are reached)",
-					(int)(tk->delay_commit - get_secs(NULL)));
+			break;
+		case 1:
+			tk_log_info("delaying ticket commit to CIB for %ds "
+				"(or all sites are reached)",
+				(int)(tk->delay_commit - now));
+			break;
+		default:
+			break;
 		}
 	}
 
