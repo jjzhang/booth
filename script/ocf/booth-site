@@ -26,11 +26,6 @@
 #######################################################################
 # Initialization:
 
-BOOTH_DAEMON_STARTED=0
-BOOTH_DAEMON_STARTING=1
-BOOTH_DAEMON_EXIST=2
-BOOTH_DAEMON_NOT_RUNNING=3
-BOOTH_ERROR_GENERIC=4
 DEFAULT_BIN="boothd"
 DEFAULT_CONF="/etc/booth/booth.conf"
 
@@ -103,108 +98,82 @@ END
 }
 
 
-booth_check_daemon_state(){
-	rc=$BOOTH_ERROR_GENERIC
-	eval `"$OCF_RESKEY_daemon" status "-c$OCF_RESKEY_config" ; echo rc=$?`
-	case $rc in 
-	0)
-		case  "$booth_state" in 
-		started)  return $BOOTH_DAEMON_STARTED;;
-		starting) return $BOOTH_DAEMON_STARTING;;
-		*) return $BOOTH_ERROR_GENERIC;;	
-		esac
-	;;
-	$OCF_NOT_RUNNING) return $BOOTH_DAEMON_NOT_RUNNING;;
-	$OCF_ERR_GENERIC) return $BOOTH_ERROR_GENERIC;;
-	*) return $BOOTH_ERROR_GENERIC;;
-	esac
+get_booth_pid() {
+	ps -o pid,cmd -e |
+		grep -w "[b]oothd.*$OCF_RESKEY_config" |
+		awk '{print $1}'
+}
+is_booth_running() {
+	[ -n "`get_booth_pid`" ]
+}
+
+booth_site_status() {
+	is_booth_running ||
+		return $OCF_NOT_RUNNING
+
+	booth list -c $OCF_RESKEY_config > /dev/null
 }
 
 booth_site_start() {
-	booth_check_daemon_state; rc=$?
+	local rc
+
+	booth_site_status
+	rc=$?
 
 	case $rc in
-	$BOOTH_DAEMON_STARTED)     return $OCF_SUCCESS;;
-	$BOOTH_DAEMON_STARTING) 
-		while [ $rc != $BOOTH_DAEMON_STARTED ]; do
-			sleep .7
-			booth_check_daemon_state ; rc=$?
-		done
-		return $OCF_SUCCESS;;
-	$BOOTH_DAEMON_NOT_RUNNING) ;;
-	*) return $OCF_ERR_GENERIC;;
+	0)
+		ocf_log info "boothd already running"
+		return $OCF_SUCCESS
+	;;
+	$OCF_NOT_RUNNING) ;;
+	*) booth_site_stop ;;
 	esac
 
-	"$OCF_RESKEY_daemon" daemon "-c$OCF_RESKEY_config" $OCF_RESKEY_args
-
-	sleep 1.1
-	rc=$BOOTH_DAEMON_STARTING
-	while [ $rc != $BOOTH_DAEMON_STARTED ]; do
-		booth_check_daemon_state; rc=$?
-		sleep .8
+	$OCF_RESKEY_daemon daemon -c $OCF_RESKEY_config $OCF_RESKEY_args
+	sleep 1
+	while ! booth_site_status; do
+		sleep 1
 	done
-	
+
 	return $OCF_SUCCESS
 }
 
 booth_site_stop() {
-	booth_check_daemon_state; rc=$?
-
-	case $rc in
-	$BOOTH_DAEMON_STARTED) ;;
-	$BOOTH_DAEMON_STARTING) ;;
-	$BOOTH_DAEMON_NOT_RUNNING) return $OCF_SUCCESS;;
-	*) return $OCF_ERR_GENERIC;;
-	esac
-
-
-	if [ "$booth_lockpid" == "" ] ; then
-		return $OCF_ERR_GENERIC
-	fi
-	if pkill -TERM -s $booth_lockpid $DEFAULT_BIN ; then
-	    sleep 1
-	    pkill -KILL -s $booth_lockpid $DEFAULT_BIN
+	local pid
+	pid=`get_booth_pid`
+	if [ -z "$pid" ]; then
+		ocf_log info "boothd already stopped"
+		return $OCF_SUCCESS
 	fi
 
-	rc=$BOOTH_DAEMON_STARTED
-	while [ $rc != $BOOTH_DAEMON_NOT_RUNNING ]; do
-		booth_check_daemon_state; rc=$?
-		sleep 0.9
+	ocf_stop_processes TERM 5 $pid
+	while is_booth_running; do
+		sleep 1
 	done
-
-	if [ $rc = $BOOTH_DAEMON_NOT_RUNNING ]; then
-		rc=$OCF_SUCCESS
-	else
-		rc=$OCF_ERR_GENERIC
-	fi
-
-	return $rc
+	return $OCF_SUCCESS
 }
 
 booth_site_monitor() {
-	booth_check_daemon_state; rc=$?
-
-	case $rc in
-	$BOOTH_DAEMON_STARTED) return $OCF_SUCCESS;;
-	$BOOTH_DAEMON_STARTING) return $OCF_NOT_RUNNING;;
-	$BOOTH_DAEMON_EXIST) return $OCF_NOT_RUNNING;;
-	$BOOTH_DAEMON_NOT_RUNNING) return $OCF_NOT_RUNNING;;
-	*) return $OCF_ERR_GENERIC;;
+	booth_site_status
+	case $? in
+	0) return $OCF_SUCCESS ;;
+	$OCF_NOT_RUNNING) return $OCF_NOT_RUNNING ;;
+	*) return $OCF_ERR_GENERIC ;;
 	esac
 }
 
 booth_site_validate_all() {
-    if ! test -f $OCF_RESKEY_config; then
-	    ocf_log err "$OCF_RESKEY_config does not exist"
-	    return $OCF_ERR_INSTALLED
-    fi
+	if ! test -f $OCF_RESKEY_config; then
+		ocf_log err "$OCF_RESKEY_config does not exist"
+		return $OCF_ERR_INSTALLED
+	fi
 
-    if ocf_is_true $OCF_RESKEY_CRM_meta_globally_unique; then
-	    ocf_log err "$OCF_RESOURCE_INSTANCE must be configured with the globally_unique=false meta attribute"
-	    return $OCF_ERR_CONFIGURED
-    fi
+	if ocf_is_true $OCF_RESKEY_CRM_meta_globally_unique; then
+		ocf_log err "$OCF_RESOURCE_INSTANCE must be configured with the globally_unique=false meta attribute"
+		return $OCF_ERR_CONFIGURED
+	fi
 
-    return $OCF_SUCCESS
+	return $OCF_SUCCESS
 }
 
 : ${OCF_RESKEY_daemon:=$DEFAULT_BIN}

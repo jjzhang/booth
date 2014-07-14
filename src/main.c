@@ -1278,8 +1278,9 @@ static int do_server(int type)
 
 	set_scheduler();
 	set_oom_adj(-16);
-	set_proc_title("%s %s for [%s]:%d",
+	set_proc_title("%s %s %s for [%s]:%d",
 			DAEMON_NAME,
+			cl.configfile,
 			type_to_string(local->type),
 			local->addr_string,
 			booth_conf->port);
