@@ -642,14 +642,6 @@ static void handle_resends(struct ticket_config *tk)
 		}
 	} else {
 		log_lost_servers(tk);
-		if (tk->last_request == OP_HEARTBEAT &&
-				is_owned(tk)) {
-			/* we have the majority, update the ticket, at
-			 * least the local copy if we're still not
-			 * allowed to commit
-			 */
-			leader_update_ticket(tk);
-		}
 	}
 
 just_resend:
