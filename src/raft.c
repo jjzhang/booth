@@ -144,7 +144,6 @@ static void won_elections(struct ticket_config *tk)
 	tk->voted_for = NULL;
 
 	ticket_broadcast(tk, OP_HEARTBEAT, OP_ACK, RLT_SUCCESS, 0);
-	ticket_activate_timeout(tk);
 }
 
 
@@ -746,7 +745,6 @@ int new_election(struct ticket_config *tk,
 	}
 
 	ticket_broadcast(tk, OP_REQ_VOTE, OP_VOTE_FOR, RLT_SUCCESS, reason);
-	ticket_activate_timeout(tk);
 	add_random_delay(tk);
 	return 0;
 }

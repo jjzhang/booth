@@ -218,7 +218,6 @@ static int start_revoke_ticket(struct ticket_config *tk)
 	reset_ticket(tk);
 	tk->leader = no_leader;
 	ticket_write(tk);
-	ticket_activate_timeout(tk);
 	return ticket_broadcast(tk, OP_REVOKE, OP_ACK, RLT_SUCCESS, OR_ADMIN);
 }
 
@@ -521,6 +520,7 @@ int ticket_broadcast(struct ticket_config *tk,
 	if (expected_reply) {
 		expect_replies(tk, expected_reply);
 	}
+	ticket_activate_timeout(tk);
 	return transport()->broadcast(&msg, sizeof(msg));
 }
 
@@ -606,6 +606,7 @@ static void resend_msg(struct ticket_config *tk)
 				send_msg(tk->last_request, tk, n, NULL);
 			}
 		}
+		ticket_activate_timeout(tk);
 	}
 }
 
@@ -646,7 +647,6 @@ static void handle_resends(struct ticket_config *tk)
 
 just_resend:
 	resend_msg(tk);
-	ticket_activate_timeout(tk);
 }
 
 int postpone_ticket_processing(struct ticket_config *tk)
@@ -739,7 +739,6 @@ static void next_action(struct ticket_config *tk)
 			/* this is ticket renewal, run local test */
 			if (!test_external_prog(tk, 1)) {
 				ticket_broadcast(tk, OP_HEARTBEAT, OP_ACK, RLT_SUCCESS, 0);
-				ticket_activate_timeout(tk);
 			}
 		}
 		break;
