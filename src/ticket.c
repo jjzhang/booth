@@ -109,7 +109,7 @@ static int ticket_dangerous(struct ticket_config *tk)
 
 	if (tk->delay_commit <= get_secs(NULL) ||
 			all_sites_replied(tk)) {
-		tk_log_info("ticket delay commit expired");
+		tk_log_info("ticket delay expired, committing to CIB");
 		tk->delay_commit = 0;
 		return 0;
 	} else {
@@ -578,10 +578,11 @@ static void log_lost_servers(struct ticket_config *tk)
 	for (i = 0; i < booth_conf->site_count; i++) {
 		n = booth_conf->site + i;
 		if (!(tk->acks_received & n->bitmask)) {
-			tk_log_warn("%s %s didn't acknowledge our request, "
+			tk_log_warn("%s %s didn't acknowledge our %s, "
 			"will retry %d times",
 			(n->type == ARBITRATOR ? "arbitrator" : "site"),
 			site_string(n),
+			state_to_string(tk->last_request),
 			tk->retries);
 		}
 	}

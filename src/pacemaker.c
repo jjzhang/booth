@@ -321,9 +321,11 @@ static int pcmk_load_ticket(struct ticket_config *tk)
 			 * Assume that the ticket belonged to us if it was
 			 * granted here!
 			 */
-			tk_log_warn("no site matches; site got reconfigured?");
+			log_warn("%s: no site matches; site got reconfigured?",
+				tk->name);
 			if (tk->is_granted) {
-				tk_log_warn("granted here, assume it belonged to us");
+				log_warn("%s: granted here, assume it belonged to us",
+					tk->name);
 				tk->leader = local;
 			}
 		}

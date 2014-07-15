@@ -35,14 +35,13 @@
 /* all tk_* macros prepend "%(tk->name): " (the caller needs to
  * have the ticket named tk!)
  */
-#define tk_cl_log(sev, fmt, args...)		cl_log(sev, "%s: " fmt, tk->name, ##args)
-#define tk_detailed_cl_log(sev, fmt, args...) \
+#define tk_cl_log(sev, fmt, args...) \
 	cl_log(sev, "%s (%s/%d/%d): " fmt, \
 	tk->name, state_to_string(tk->state), tk->current_term, term_time_left(tk), \
 	##args)
 
 #define tk_log_debug(fmt, args...)		do { \
-	if (ANYDEBUG) tk_detailed_cl_log(LOG_DEBUG, fmt, ##args); } \
+	if (ANYDEBUG) tk_cl_log(LOG_DEBUG, fmt, ##args); } \
 	while (0)
 #define tk_log_info(fmt, args...)		tk_cl_log(LOG_INFO, fmt, ##args)
 #define tk_log_warn(fmt, args...)		tk_cl_log(LOG_WARNING, fmt, ##args)
