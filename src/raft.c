@@ -664,6 +664,10 @@ static int answer_REQ_VOTE(
 	 * ticket */
 	tk->in_election = 1;
 
+	/* reset ticket's leader on not valid tickets */
+	if (!valid)
+		tk->leader = NULL;
+
 	/* if it's a newer term or ... */
 	if (newer_term(tk, sender, leader, msg, 1)) {
 		clear_election(tk);
