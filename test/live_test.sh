@@ -496,8 +496,11 @@ revoke_ticket() {
 }
 run_report() {
 	local start_ts=$1 end_ts=$2 name=$3
+	local quick_opt=""
 	logmsg "running hb_report"
-	hb_report -f "`date -d @$((start_ts-5))`" \
+	hb_report -Q 2>&1 | grep -sq "illegal.option" ||
+		quick_opt="-Q"
+	hb_report $hb_report_opts -f "`date -d @$((start_ts-5))`" \
 		-t "`date -d @$((end_ts+60))`" \
 		-n "$sites $arbitrators" $name 2>&1 | logmsg
 }
