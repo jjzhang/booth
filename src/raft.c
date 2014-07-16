@@ -224,6 +224,7 @@ void elections_end(struct ticket_config *tk)
 				site_string(new_leader));
 	} else {
 		tk_log_info("nobody won elections, new elections");
+		notify_client(tk, RLT_MORE);
 		if (!new_election(tk, NULL, is_tie(tk), OR_AGAIN)) {
 			ticket_activate_timeout(tk);
 		}

@@ -80,6 +80,9 @@ struct ticket_config {
 	/** When something has to be done */
 	timetype next_cron;
 
+	/** The client which sent a request */
+	struct client *req_client;
+
 	/** Current leader. This is effectively the log[] in Raft. */
 	struct booth_site *leader;
 

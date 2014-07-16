@@ -136,10 +136,10 @@ typedef enum {
 	CMD_REVOKE  = CHAR2CONST('C', 'R', 'v', 'k'),
 
 	/* Replies */
-	CMR_GENERAL = CHAR2CONST('G', 'n', 'l', 'R'), // Increase distance to CMR_GRANT
-	CMR_LIST    = CHAR2CONST('R', 'L', 's', 't'),
-	CMR_GRANT   = CHAR2CONST('R', 'G', 'n', 't'),
-	CMR_REVOKE  = CHAR2CONST('R', 'R', 'v', 'k'),
+	CL_RESULT  = CHAR2CONST('R', 's', 'l', 't'),
+	CL_LIST    = CHAR2CONST('R', 'L', 's', 't'),
+	CL_GRANT   = CHAR2CONST('R', 'G', 'n', 't'),
+	CL_REVOKE  = CHAR2CONST('R', 'R', 'v', 'k'),
 
 	/* get status from another server */
 	OP_STATUS   = CHAR2CONST('S', 't', 'a', 't'),
@@ -160,9 +160,11 @@ typedef enum {
 	/* for compatibility with other functions */
 	RLT_SUCCESS             = 0,
 	RLT_ASYNC               = CHAR2CONST('A', 's', 'y', 'n'),
+	RLT_MORE                = CHAR2CONST('M', 'o', 'r', 'e'),
 	RLT_SYNC_SUCC           = CHAR2CONST('S', 'c', 'c', 's'),
 	RLT_SYNC_FAIL           = CHAR2CONST('F', 'a', 'i', 'l'),
 	RLT_INVALID_ARG         = CHAR2CONST('I', 'A', 'r', 'g'),
+	RLT_CIB_PENDING         = CHAR2CONST('P', 'e', 'n', 'd'),
 	RLT_EXT_FAILED          = CHAR2CONST('X', 'P', 'r', 'g'),
 	RLT_TICKET_IDLE         = CHAR2CONST('T', 'i', 'd', 'l'),
 	RLT_OVERGRANT           = CHAR2CONST('O', 'v', 'e', 'r'),
@@ -191,6 +193,7 @@ typedef enum {
  * grant */
 typedef enum {
 	OPT_IMMEDIATE = 1,
+	OPT_WAIT = 2,
 } cmd_options_t;
 
 /** @} */
@@ -246,6 +249,7 @@ extern struct pollfd *pollfds;
 
 int client_add(int fd, const struct booth_transport *tpt,
 		void (*workfn)(int ci), void (*deadfn)(int ci));
+int find_client_by_fd(int fd);
 int do_read(int fd, void *buf, size_t count);
 int do_write(int fd, void *buf, size_t count);
 void process_connection(int ci);

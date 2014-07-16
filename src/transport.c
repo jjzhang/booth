@@ -477,8 +477,10 @@ static int booth_tcp_recv(struct booth_site *from, void *buf, int len)
 	int got;
 	/* Needs timeouts! */
 	got = do_read(from->tcp_fd, buf, len);
-	if (got < 0)
+	if (got < 0) {
+		log_error("read failed (%d): %s", errno, strerror(errno));
 		return got;
+	}
 	return len;
 }
 
@@ -597,13 +599,12 @@ int booth_udp_send(struct booth_site *to, void *buf, int len)
 	if (rv == len) {
 		rv = 0;
 	} else if (rv < 0) {
-		rv = errno;
 		log_error("Cannot send to %s: %d %s",
 				site_string(to),
 				errno,
 				strerror(errno));
 	} else {
-		rv = EBUSY;
+		rv = -1;
 		log_error("Packet sent to %s got truncated",
 				site_string(to));
 	}

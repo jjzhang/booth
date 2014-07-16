@@ -61,10 +61,8 @@ int test_external_prog(struct ticket_config *tk, int start_election);
 int acquire_ticket(struct ticket_config *tk, cmd_reason_t reason);
 
 int ticket_answer_list(int fd, struct boothc_ticket_msg *msg);
-int ticket_answer_grant(int fd, struct boothc_ticket_msg *msg);
-int ticket_answer_revoke(int fd, struct boothc_ticket_msg *msg);
-
-int ticket_broadcast_proposed_state(struct ticket_config *tk, cmd_request_t state);
+int process_client_request(struct client *req_client,
+	struct boothc_ticket_msg *msg);
 
 int ticket_write(struct ticket_config *tk);
 
@@ -75,6 +73,7 @@ int send_reject(struct booth_site *dest, struct ticket_config *tk,
 	cmd_result_t code, struct boothc_ticket_msg *in_msg);
 int send_msg (int cmd, struct ticket_config *tk,
 	struct booth_site *dest, struct boothc_ticket_msg *in_msg);
+void notify_client(struct ticket_config *tk, int rv);
 int ticket_broadcast(struct ticket_config *tk, cmd_request_t cmd, cmd_request_t expected_reply, cmd_result_t res, cmd_reason_t reason);
 
 int leader_update_ticket(struct ticket_config *tk);

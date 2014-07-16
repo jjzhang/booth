@@ -174,10 +174,13 @@ int test_external_prog(struct ticket_config *tk,
  */
 int acquire_ticket(struct ticket_config *tk, cmd_reason_t reason)
 {
+	int rc;
+
 	if (test_external_prog(tk, 0))
 		return RLT_EXT_FAILED;
 
-	return new_election(tk, local, 1, reason);
+	rc = new_election(tk, local, 1, reason);
+	return rc ? RLT_SYNC_FAIL : 0;
 }
 
 
@@ -205,20 +208,23 @@ int do_grant_ticket(struct ticket_config *tk, int options)
 	}
 
 	rv = acquire_ticket(tk, OR_ADMIN);
-	if (rv)
+	if (rv) {
 		tk->delay_commit = 0;
-	return rv;
+		return rv;
+	} else {
+		return RLT_MORE;
+	}
 }
 
 
-static int start_revoke_ticket(struct ticket_config *tk)
+static void start_revoke_ticket(struct ticket_config *tk)
 {
 	tk_log_info("revoking ticket");
 
 	reset_ticket(tk);
 	tk->leader = no_leader;
 	ticket_write(tk);
-	return ticket_broadcast(tk, OP_REVOKE, OP_ACK, RLT_SUCCESS, OR_ADMIN);
+	ticket_broadcast(tk, OP_REVOKE, OP_ACK, RLT_SUCCESS, OR_ADMIN);
 }
 
 /** Ticket revoke.
@@ -228,9 +234,10 @@ int do_revoke_ticket(struct ticket_config *tk)
 	if (tk->acks_expected) {
 		tk_log_info("delay ticket revoke until the current operation finishes");
 		tk->next_state = ST_INIT;
-		return 0;
+		return RLT_MORE;
 	} else {
-		return start_revoke_ticket(tk);
+		start_revoke_ticket(tk);
+		return RLT_SUCCESS;
 	}
 }
 
@@ -433,60 +440,41 @@ int ticket_answer_list(int fd, struct boothc_ticket_msg *msg)
 	if (rv < 0)
 		return rv;
 
-	init_header(&hdr, CMR_LIST, 0, 0, RLT_SUCCESS, 0, sizeof(hdr) + olen);
+	init_header(&hdr, CL_LIST, 0, 0, RLT_SUCCESS, 0, sizeof(hdr) + olen);
 
 	return send_header_plus(fd, &hdr, data, olen);
 }
 
 
-int ticket_answer_grant(int fd, struct boothc_ticket_msg *msg)
+int process_client_request(struct client *req_client, struct boothc_ticket_msg *msg)
 {
 	int rv;
 	struct ticket_config *tk;
+	int cmd;
 
-
+	cmd = ntohl(msg->header.cmd);
 	if (!check_ticket(msg->ticket.id, &tk)) {
-		log_warn("client asked to grant unknown ticket %s",
+		log_warn("client referenced unknown ticket %s",
 				msg->ticket.id);
 		rv = RLT_INVALID_ARG;
 		goto reply;
 	}
 
-	if (is_owned(tk)) {
+	if ((cmd == CMD_GRANT) && is_owned(tk)) {
 		log_warn("client wants to grant an (already granted!) ticket %s",
 				msg->ticket.id);
 		rv = RLT_OVERGRANT;
 		goto reply;
 	}
 
-	rv = do_grant_ticket(tk, ntohl(msg->header.options));
-
-reply:
-	init_header(&msg->header, CMR_GRANT, 0, 0, rv ?: RLT_ASYNC, 0, sizeof(*msg));
-	return send_ticket_msg(fd, msg);
-}
-
-
-int ticket_answer_revoke(int fd, struct boothc_ticket_msg *msg)
-{
-	int rv;
-	struct ticket_config *tk;
-
-	if (!check_ticket(msg->ticket.id, &tk)) {
-		log_warn("client wants to revoke an unknown ticket %s",
-				msg->ticket.id);
-		rv = RLT_INVALID_ARG;
-		goto reply;
-	}
-
-	if (!is_owned(tk)) {
+	if ((cmd == CMD_REVOKE) && !is_owned(tk)) {
 		log_info("client wants to revoke a free ticket %s",
 				msg->ticket.id);
 		rv = RLT_TICKET_IDLE;
 		goto reply;
 	}
 
-	if (tk->leader != local) {
+	if ((cmd == CMD_REVOKE) && tk->leader != local) {
 		log_info("the ticket %s is not granted here, "
 				"redirect to %s",
 				msg->ticket.id, ticket_leader_string(tk));
@@ -494,15 +482,45 @@ int ticket_answer_revoke(int fd, struct boothc_ticket_msg *msg)
 		goto reply;
 	}
 
-	rv = do_revoke_ticket(tk);
-	if (rv == 0)
-		rv = RLT_ASYNC;
+	if (cmd == CMD_REVOKE)
+		rv = do_revoke_ticket(tk);
+	else
+		rv = do_grant_ticket(tk, ntohl(msg->header.options));
+
+	if (rv == RLT_MORE) {
+		/* client may receive further notifications */
+		tk->req_client = req_client;
+	}
 
 reply:
-	init_ticket_msg(msg, CMR_REVOKE, 0, rv, 0, tk);
-	return send_ticket_msg(fd, msg);
+	init_ticket_msg(msg, CL_RESULT, 0, rv, 0, tk);
+	return send_ticket_msg(req_client->fd, msg);
 }
 
+void notify_client(struct ticket_config *tk, int rv)
+{
+	struct boothc_ticket_msg omsg;
+	void (*deadfn) (int ci);
+	int rc, ci;
+
+	if (!tk->req_client)
+		return;
+
+	init_ticket_msg(&omsg, CL_RESULT, 0, rv, 0, tk);
+	rc = send_ticket_msg(tk->req_client->fd, &omsg);
+
+	/* we sent a definite answer or there was a write error, drop
+	 * the client */
+	if (rv != RLT_MORE || rc) {
+		deadfn = tk->req_client->deadfn;
+		if(deadfn) {
+			ci = find_client_by_fd(tk->req_client->fd);
+			if (ci >= 0)
+				deadfn(ci);
+		}
+		tk->req_client = NULL;
+	}
+}
 
 int ticket_broadcast(struct ticket_config *tk,
 		cmd_request_t cmd, cmd_request_t expected_reply,
@@ -549,11 +567,13 @@ int leader_update_ticket(struct ticket_config *tk)
 		switch(rv2) {
 		case 0:
 			tk->ticket_updated = 2;
+			notify_client(tk, RLT_SUCCESS);
 			break;
 		case 1:
 			tk_log_info("delaying ticket commit to CIB for %ds "
 				"(or all sites are reached)",
 				(int)(tk->delay_commit - now));
+			notify_client(tk, RLT_CIB_PENDING);
 			break;
 		default:
 			break;
@@ -666,6 +686,7 @@ static void process_next_state(struct ticket_config *tk)
 	case ST_INIT:
 		no_resends(tk);
 		start_revoke_ticket(tk);
+		notify_client(tk, RLT_SUCCESS);
 		break;
 	/* wanting to be follower is not much of an ambition; no
 	 * processing, just return; don't reset start_postpone until

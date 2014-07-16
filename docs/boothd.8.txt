@@ -86,6 +86,9 @@ The configuration name also determines the name of the PID file - for the defaul
 	relinquish the ticket. See the 'Booth ticket management'
 	section below for more details. Use with caution!
 
+*-w*::
+	'wait indefinitely': The client will wait forever for the
+	server result for grant and revoke requests.
 
 
 COMMANDS
@@ -105,13 +108,20 @@ argument determines the mode of operation.
 	Booth clients can list the ticket information (see also 'crm_ticket -L'),
 	and revoke or grant tickets to a site.
 +
+The grant and, under certain circumstances, revoke operations may
+take a while to return a definite operation's outcome. The client
+will wait up to the network timeout value (by default 5 seconds)
+for the result. Unless the '-w' option was set, in which case the
+client waits indefinitely.
++
 In this mode the configuration file is searched for an IP address that is 
 locally reachable, ie. matches a configured subnet.
 This allows to run the client commands on another node in the same cluster, as
 long as the config file and the service IP is locally reachable.
 +
-Example: If the booth service IP is 192.168.55.200, and the local node has
-192.168.55.15 configured on an interface, it knows which site it belongs to.
+For instance, if the booth service IP is 192.168.55.200, and the
+local node has 192.168.55.15 configured on one of its network
+interfaces, it knows which site it belongs to.
 +
 Use '-s' to direct client to connect to a different site.
 
@@ -315,11 +325,11 @@ This delay is disabled if the '-F' option is specified. In that
 case, it is up to the administrator to make sure that the
 unreachable site is not holding the ticket.
 
-While the ticket is managed by 'booth', it is dangerous to manage
+When the ticket is managed by 'booth', it is dangerous to modify
 it manually using either `crm_ticket` command or `crm site
 ticket`. Neither of these tools is aware of 'booth' and,
-consequently, 'booth' itself may not notice any ticket status
-changes.
+consequently, 'booth' itself may not be aware of any ticket
+status changes.
 
 
 NOTES

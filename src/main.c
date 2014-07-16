@@ -211,6 +211,17 @@ int client_add(int fd, const struct booth_transport *tpt,
 	assert(!"no client");
 }
 
+int find_client_by_fd(int fd)
+{
+	int i;
+
+	for (i = 0; i < client_size; i++) {
+		if (clients[i].fd == fd)
+			return i;
+	}
+	return -1;
+}
+
 
 /* Only used for client requests, TCP ???*/
 void process_connection(int ci)
@@ -261,24 +272,17 @@ bad_len:
 		goto kill;
 
 	case CMD_GRANT:
-		/* Expect boothc_ticket_site_msg. */
-		if (len != sizeof(msg))
-			goto bad_len;
-		ticket_answer_grant(fd, &msg);
-		goto kill;
-
 	case CMD_REVOKE:
 		/* Expect boothc_ticket_site_msg. */
 		if (len != sizeof(msg))
 			goto bad_len;
-
-		ticket_answer_revoke(fd, &msg);
-		goto kill;
+		process_client_request(&clients[ci], &msg);
+		return;
 
 	default:
 		log_error("connection %d cmd %x unknown",
 				ci, ntohl(msg.header.cmd));
-		init_header(&msg.header,CMR_GENERAL, 0, 0, RLT_INVALID_ARG, 0, sizeof(msg.header));
+		init_header(&msg.header, CL_RESULT, 0, 0, RLT_INVALID_ARG, 0, sizeof(msg.header));
 		send_header_only(fd, &msg.header);
 		goto kill;
 	}
@@ -562,7 +566,7 @@ out:
 static int test_reply(int reply_code, cmd_request_t cmd)
 {
 	int rv = 0;
-	const char *op_str;
+	const char *op_str = "";
 
 	if (cmd == CMD_GRANT)
 		op_str = "grant";
@@ -591,6 +595,15 @@ static int test_reply(int reply_code, cmd_request_t cmd)
 			 "asynchronously. Please use \"booth list\" to "
 			 "see the outcome.", op_str);
 		rv = 0;
+		break;
+
+	case RLT_CIB_PENDING:
+		log_info("%s succeeded (CIB commit pending)", op_str);
+		rv = 0;
+		break;
+
+	case RLT_MORE:
+		rv = 2;
 		break;
 
 	case RLT_SYNC_SUCC:
@@ -633,6 +646,13 @@ static int do_command(cmd_request_t cmd)
 	struct booth_transport const *tpt;
 	uint32_t leader_id;
 	int rv;
+	int reply_cnt = 0;
+	const char *op_str = "";
+
+	if (cmd == CMD_GRANT)
+		op_str = "grant";
+	else if (cmd == CMD_REVOKE)
+		op_str = "revoke";
 
 	rv = 0;
 	site = NULL;
@@ -679,19 +699,39 @@ redirect:
 	if (rv < 0)
 		goto out_close;
 
+read_more:
 	rv = tpt->recv(site, &reply, sizeof(reply));
 	if (rv < 0)
 		goto out_close;
 
 	rv = test_reply(ntohl(reply.header.result), cmd);
-	if (rv == 1) {
+	switch(rv) {
+	case 1:
 		local_transport->close(site);
 		leader_id = ntohl(reply.ticket.leader);
 		if (!find_site_by_id(leader_id, &site)) {
 			log_error("Message with unknown redirect site %x received", leader_id);
-			return rv;
+			rv = -1;
+			goto out_close;
 		}
 		goto redirect;
+	case 2: /* the server has more to say */
+		/* don't wait too long */
+		if (reply_cnt > 1 && !(cl.options & OPT_WAIT)) {
+			rv = 0;
+			log_info("Giving up on waiting for the definite result. "
+				 "Please use \"booth list\" later to "
+				 "see the outcome.");
+			goto out_close;
+		}
+		if (reply_cnt == 0) {
+			log_info("%s request sent, "
+				"waiting for the result ...", op_str);
+		}
+		reply_cnt++;
+		goto read_more;
+	default:
+		break;
 	}
 
 out_close:
@@ -828,6 +868,7 @@ static void print_usage(void)
 	printf("  -s            site name\n");
 	printf("  -l LOCKFILE   Specify lock file path (daemon only)\n");
 	printf("  -F            Try to grant the ticket immediately (client only)\n");
+	printf("  -w            Wait forever for the result (client only)\n");
 	printf("  -h            Print this help, then exit\n");
 	printf("\n");
 	printf("Please see the man page for details.\n");
@@ -1003,6 +1044,15 @@ static int read_arguments(int argc, char **argv)
 				exit(EXIT_FAILURE);
 			}
 			cl.options |= OPT_IMMEDIATE;
+			break;
+
+		case 'w':
+			if (cl.type != CLIENT ||
+					(cl.op != CMD_GRANT && cl.op != CMD_REVOKE)) {
+				log_error("use \"-w\" only for grant and revoke");
+				exit(EXIT_FAILURE);
+			}
+			cl.options |= OPT_WAIT;
 			break;
 
 		case 'h':
