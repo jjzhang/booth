@@ -294,24 +294,6 @@ n && /^$/ {exit}
 /^ticket.*'$tkt'/ {n=1}
 ' $cnf
 }
-wait_booth() {
-	local maxwait=$T_expire testcmd="$@"
-	while sleep 1; do
-		run_site 1 booth list | grep $tkt | booth_list_fld 2 |
-			$testcmd && break
-		maxwait=$((maxwait-1))
-		[ $maxwait -eq 0 ] && {
-			echo "booth wait failed"
-			return 1
-		}
-	done
-}
-wait_revoke() {
-	wait_booth grep -iq none
-}
-wait_grant() {
-	wait_booth grep -iqv none
-}
 wait_exp() {
 	sleep $T_expire
 }
@@ -491,7 +473,6 @@ can_run_test() {
 }
 revoke_ticket() {
 	run_site 1 booth revoke $tkt >/dev/null
-	wait_revoke
 	wait_timeout
 }
 run_report() {
@@ -575,7 +556,6 @@ is_we_server && WE_SERVER=1
 # most tests start like this
 grant2site_one() {
 	run_site 1 booth grant $tkt >/dev/null
-	wait_grant
 	wait_timeout
 }
 
@@ -612,7 +592,6 @@ test_grant_noarb() {
 	done >/dev/null 2>&1
 	sleep 1
 	run_site 1 booth grant $tkt >/dev/null
-	wait_grant
 }
 check_grant_noarb() {
 	check_consistency `get_site 1`
@@ -643,7 +622,6 @@ check_revoke() {
 # just a grant to another site
 test_grant_elsewhere() {
 	run_site 1 booth grant -s `get_site 2` $tkt >/dev/null
-	wait_grant
 }
 check_grant_elsewhere() {
 	check_consistency `get_site 2`
@@ -656,7 +634,6 @@ test_grant_site_lost() {
 	stop_site `get_site 2`
 	wait_timeout
 	run_site 1 booth grant $tkt >/dev/null
-	wait_grant
 	check_cib `get_site 1` || return 1
 	wait_exp
 }
@@ -673,7 +650,6 @@ recover_grant_site_lost() {
 test_simultaneous_start_even() {
 	local serv
 	run_site 2 booth grant $tkt >/dev/null
-	wait_grant
 	stop_booth
 	wait_timeout
 	for serv in $(echo $sites | sed "s/`get_site 1` //"); do
