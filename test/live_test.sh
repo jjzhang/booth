@@ -284,8 +284,9 @@ get_tkt() {
 }
 get_tkt_settings() {
 awk '
-n && /^	/ && /expire|timeout/ {
+n && /^	/ && /expire|timeout|renewal-freq/ {
 	sub(" = ", "=", $0);
+	gsub("-", "_", $0);
 	sub("^	", "T_", $0);
 	print
 	next
@@ -297,8 +298,8 @@ n && /^$/ {exit}
 wait_exp() {
 	sleep $T_expire
 }
-wait_half_exp() {
-	sleep $((T_expire/2))
+wait_renewal() {
+	sleep $T_renewal_freq
 }
 wait_timeout() {
 	local t=2
@@ -541,6 +542,10 @@ eval `get_tkt_settings`
 	usage 1
 }
 
+if [ -z "$T_renewal_freq" ]; then
+	T_renewal_freq=$((T_expire/2))
+fi
+
 exec 2>$logf
 BASH_XTRACEFD=2
 PS4='+ `date +"%T"`: '
@@ -658,7 +663,7 @@ test_simultaneous_start_even() {
 	for serv in $arbitrators; do
 		start_arbitrator $serv &
 	done
-	wait_half_exp
+	wait_renewal
 	start_site `get_site 1`
 	wait_timeout
 	wait_timeout
@@ -806,7 +811,7 @@ test_external_prog_failed() {
 	grant2site_one
 	break_external_prog 1
 	show_pref 1 || return 1
-	wait_half_exp
+	wait_renewal
 	wait_timeout
 }
 check_external_prog_failed() {
