@@ -186,7 +186,7 @@ test -s .git_info &&
 AC_ARG_WITH([build-version],
 	[  --with-build-version=STR     : build version ],
 	[ BOOTH_BUILD_VERSION="$withval" ],
-	[ ])
+	[ BOOTH_BUILD_VERSION="$PACKAGE_VERSION" ])
 
 AC_ARG_ENABLE([resource-monitor],
 	[  --enable-resource-monitor       : Enabling Resource Monitor ],
