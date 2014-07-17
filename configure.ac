@@ -181,12 +181,12 @@ AC_ARG_WITH([initddir],
 	[ INITDDIR="$sysconfdir/init.d" ])
 
 test -s .git_info &&
-	BOOTH_BUILD_VERSION="`cat .git_info`"
+	GIT_VER="`cat .git_info`"
 
 AC_ARG_WITH([build-version],
 	[  --with-build-version=STR     : build version ],
 	[ BOOTH_BUILD_VERSION="$withval" ],
-	[ BOOTH_BUILD_VERSION="$PACKAGE_VERSION" ])
+	[ BOOTH_BUILD_VERSION="${GIT_VER:-$PACKAGE_VERSION}" ])
 
 AC_ARG_ENABLE([resource-monitor],
 	[  --enable-resource-monitor       : Enabling Resource Monitor ],
