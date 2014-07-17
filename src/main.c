@@ -874,7 +874,7 @@ static void print_usage(void)
 	printf("Please see the man page for details.\n");
 }
 
-#define OPTION_STRING		"c:Dl:t:s:FhS"
+#define OPTION_STRING		"c:Dl:t:s:FhSw"
 
 void safe_copy(char *dest, char *value, size_t buflen, const char *description) {
 	int content_len = buflen - 1;
