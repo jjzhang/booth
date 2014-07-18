@@ -66,6 +66,11 @@ inline static int is_owned(const struct ticket_config *tk)
 	return (tk->leader && tk->leader != no_leader);
 }
 
+inline static int is_resend(struct ticket_config *tk)
+{
+	return (get_secs(NULL) - tk->req_sent_at) >= tk->timeout;
+}
+
 
 static inline void init_header_bare(struct boothc_header *h) {
 	assert(local && local->site_id);
@@ -216,11 +221,17 @@ static inline uint32_t index_max3(uint32_t a, uint32_t b, uint32_t c)
 
 static inline time_t next_vote_starts_at(struct ticket_config *tk)
 {
+	time_t next_t;
+
 	/* If not owner, don't renew. */
 	if (tk->leader != local)
 		return 0;
 
-	return tk->last_renewal + tk->renewal_freq;
+	next_t = tk->last_renewal + tk->renewal_freq;
+	if (tk->delay_commit && next_t > tk->delay_commit)
+		next_t = tk->delay_commit;
+
+	return next_t;
 }
 
 
@@ -243,7 +254,6 @@ static inline void expect_replies(struct ticket_config *tk,
 	tk->acks_expected = reply_type;
 	tk->acks_received = local->bitmask;
 	tk->req_sent_at  = get_secs(NULL);
-	tk->ticket_updated = 0;
 }
 
 static inline void no_resends(struct ticket_config *tk)

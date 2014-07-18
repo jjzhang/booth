@@ -143,7 +143,13 @@ static void won_elections(struct ticket_config *tk)
 	tk->election_end = 0;
 	tk->voted_for = NULL;
 
+	if (tk->delay_commit && all_sites_replied(tk)) {
+		tk->delay_commit = 0;
+		tk_log_debug("reset delay commit as all sites replied");
+	}
+
 	ticket_broadcast(tk, OP_HEARTBEAT, OP_ACK, RLT_SUCCESS, 0);
+	tk->ticket_updated = 0;
 }
 
 
@@ -407,6 +413,7 @@ static int process_ACK(
 	       )
 {
 	uint32_t term;
+	int req;
 
 	term = ntohl(msg->ticket.term);
 
@@ -434,8 +441,8 @@ static int process_ACK(
 	if (tk->next_state == ST_INIT || tk->state == ST_INIT)
 		return 0;
 
-	/* for heartbeats we make do with the majority */
-	if (tk->last_request == OP_HEARTBEAT &&
+	req = ntohl(msg->header.request);
+	if ((req == OP_UPDATE || req == OP_HEARTBEAT) &&
 			term == tk->current_term &&
 			leader == tk->leader) {
 

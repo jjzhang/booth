@@ -145,7 +145,7 @@ struct ticket_config {
 	/* bitmask of servers which sent acks
 	 */
 	uint64_t acks_received;
-	/* timestamp of the request, currently unused */
+	/* timestamp of the request */
 	time_t req_sent_at;
 	/* we need to wait for MY_INDEX from other servers,
 	 * hold the ticket processing for a while until they reply

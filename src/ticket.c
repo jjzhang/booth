@@ -104,17 +104,32 @@ int check_site(char *site, int *is_local)
  */
 static int ticket_dangerous(struct ticket_config *tk)
 {
+	time_t now = get_secs(NULL);
+	/* we may be invoked often, don't spam the log unnecessarily
+	 */
+	static int no_log_delay_msg;
+
 	if (!tk->delay_commit)
 		return 0;
 
-	if (tk->delay_commit <= get_secs(NULL) ||
-			all_sites_replied(tk)) {
-		tk_log_info("ticket delay expired, committing to CIB");
+	if (tk->delay_commit <= now || all_sites_replied(tk)) {
+		if (tk->leader == local) {
+			tk_log_info("%s, committing to CIB",
+				tk->delay_commit <= now ?
+				"ticket delay expired" : "all sites replied");
+		}
 		tk->delay_commit = 0;
+		no_log_delay_msg = 0;
 		return 0;
-	} else {
-		tk_log_debug("delay ticket commit for %ds",
-				(int)(tk->delay_commit - get_secs(NULL)));
+	}
+
+	tk_log_debug("delay ticket commit for %ds",
+			(int)(tk->delay_commit - now));
+	if (!no_log_delay_msg) {
+		tk_log_info("delaying ticket commit to CIB for %ds "
+			"(or all sites are reached)",
+			(int)(tk->delay_commit - now));
+		no_log_delay_msg = 1;
 	}
 
 	return 1;
@@ -550,11 +565,12 @@ int ticket_broadcast(struct ticket_config *tk,
 int leader_update_ticket(struct ticket_config *tk)
 {
 	int rv = 0, rv2;
-	time_t now = get_secs(NULL);
+	time_t now;
 
 	if (tk->ticket_updated >= 2)
 		return 0;
 
+	now = get_secs(NULL);
 	if (tk->ticket_updated < 1) {
 		tk->ticket_updated = 1;
 		tk->last_renewal = now;
@@ -570,9 +586,6 @@ int leader_update_ticket(struct ticket_config *tk)
 			notify_client(tk, RLT_SUCCESS);
 			break;
 		case 1:
-			tk_log_info("delaying ticket commit to CIB for %ds "
-				"(or all sites are reached)",
-				(int)(tk->delay_commit - now));
 			notify_client(tk, RLT_CIB_PENDING);
 			break;
 		default:
@@ -756,10 +769,14 @@ static void next_action(struct ticket_config *tk)
 		/* timeout or ticket renewal? */
 		if (tk->acks_expected) {
 			handle_resends(tk);
+			if (majority_of_bits(tk, tk->acks_received)) {
+				leader_update_ticket(tk);
+			}
 		} else {
 			/* this is ticket renewal, run local test */
 			if (!test_external_prog(tk, 1)) {
 				ticket_broadcast(tk, OP_HEARTBEAT, OP_ACK, RLT_SUCCESS, 0);
+				tk->ticket_updated = 0;
 			}
 		}
 		break;
@@ -882,16 +899,6 @@ static void update_acks(
 
 	/* got an ack! */
 	tk->acks_received |= sender->bitmask;
-
-	if (cmd == OP_HEARTBEAT)
-	tk_log_debug("got ACK from %s, %d/%d agree.",
-			site_string(sender),
-			count_bits(tk->acks_received),
-			booth_conf->site_count);
-
-	if (tk->delay_commit && all_sites_replied(tk)) {
-		tk->delay_commit = 0;
-	}
 
 	if (all_replied(tk) ||
 			/* we just stepped down, need only one site to start
