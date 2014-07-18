@@ -87,8 +87,8 @@ cp -a conf/booth@.service %{buildroot}/usr/lib/systemd/system/booth@.service
 
 mkdir -p %{buildroot}/%{test_path}
 cp -a unit-tests/ script/unit-test.py test conf %{buildroot}/%{test_path}/
-chmod +x %{buildroot}/%{test_path}/booth_path
-chmod +x %{buildroot}/%{test_path}/live_test.sh
+chmod +x %{buildroot}/%{test_path}/test/booth_path
+chmod +x %{buildroot}/%{test_path}/test/live_test.sh
 
 mkdir -p %{buildroot}/%{test_path}/src/
 ln -s %{_sbindir}/boothd %{buildroot}/%{test_path}/src/
