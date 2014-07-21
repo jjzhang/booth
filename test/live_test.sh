@@ -482,7 +482,7 @@ run_report() {
 	logmsg "running hb_report"
 	hb_report -Q 2>&1 | grep -sq "illegal.option" ||
 		quick_opt="-Q"
-	hb_report $hb_report_opts -f "`date -d @$((start_ts-5))`" \
+	hb_report $hb_report_opts $quick_opt -f "`date -d @$((start_ts-5))`" \
 		-t "`date -d @$((end_ts+60))`" \
 		-n "$sites $arbitrators" $name 2>&1 | logmsg
 }
