@@ -648,6 +648,24 @@ recover_grant_site_lost() {
 	start_site `get_site 2`
 }
 
+## TEST: grant_site_reappear ##
+
+# grant with one site lost then reappearing
+test_grant_site_reappear() {
+	stop_site `get_site 2`
+	sleep 1
+	grant_ticket 1
+	check_cib `get_site 1` || return 1
+	wait_timeout
+	start_site `get_site 2`
+	wait_timeout
+	wait_timeout
+}
+check_grant_site_reappear() {
+	check_consistency `get_site 1` &&
+	is_cib_granted `get_site 1`
+}
+
 ## TEST: simultaneous_start_even ##
 
 # simultaneous start of even number of members
@@ -862,7 +880,8 @@ dump_conf | logmsg
 
 TESTS="$@"
 
-: ${TESTS:="grant longgrant grant_noarb grant_elsewhere grant_site_lost revoke
+: ${TESTS:="grant longgrant grant_noarb grant_elsewhere
+grant_site_lost grant_site_reappear revoke
 simultaneous_start_even slow_start_granted
 restart_granted restart_granted_nocib restart_notgranted
 failover split_leader split_follower split_edge
