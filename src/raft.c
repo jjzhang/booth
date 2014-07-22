@@ -642,15 +642,18 @@ static int answer_REQ_VOTE(
 	int valid;
 	struct boothc_ticket_msg omsg;
 	cmd_result_t inappr_reason;
+	int reason;
 
 	inappr_reason = test_reason(tk, sender, leader, msg);
 	if (inappr_reason)
 		return send_reject(sender, tk, inappr_reason, msg);
 
 	valid = term_time_left(tk);
+	reason = ntohl(msg->header.reason);
 
-	/* allow the leader to start new elections on valid tickets */
-	if (sender != tk->leader && valid) {
+	/* valid tickets are not allowed only if the sender thinks
+	 * the ticket got lost */
+	if (sender != tk->leader && valid && reason == OR_TKT_LOST) {
 		tk_log_warn("election from %s rejected "
 			"(we have %s as ticket owner), ticket still valid for %ds",
 			site_string(sender), site_string(tk->leader), valid);
