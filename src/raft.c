@@ -358,8 +358,8 @@ static int process_UPDATE (
 	tk_log_debug("leader %s wants to update our ticket",
 			site_string(leader));
 
+	become_follower(tk, msg);
 	tk->leader = leader;
-	copy_ticket_from_msg(tk, msg);
 	ticket_write(tk);
 
 	/* run ticket_cron if the ticket expires */
