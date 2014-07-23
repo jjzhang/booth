@@ -304,7 +304,7 @@ wait_renewal() {
 wait_timeout() {
 	local t=2
 	[ "$T_timeout" -gt $t ] && t=$T_timeout
-	[ "$PKT_LOSS" ] && t=$((t+PKT_LOSS/6))
+	[ "$PKT_LOSS" ] && t=$((t + 2*T_timeout + PKT_LOSS/6))
 	sleep $t
 }
 
