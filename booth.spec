@@ -1,3 +1,12 @@
+%if 0%{?suse_version}
+%global booth_docdir %{_defaultdocdir}/%{name}
+%else
+# newer fedora distros have _pkgdocdir, rely on that when
+# available
+%{!?_pkgdocdir: %global _pkgdocdir %%{_docdir}/%{name}-%{version}}
+# Directory where we install documentation
+%global booth_docdir %{_pkgdocdir}
+%endif
 
 %global test_path   	%{_datadir}/booth/tests
 
@@ -54,7 +63,8 @@ distributed clustering.
 %build
 ./autogen.sh
 %configure \
-	--with-initddir=%{_initrddir}
+	--with-initddir=%{_initrddir} \
+	--docdir=%{booth_docdir}
 
 make
 
@@ -63,7 +73,7 @@ make
 #make check
 
 %install
-make DESTDIR=$RPM_BUILD_ROOT install docdir=%{_defaultdocdir}/%{name}
+make DESTDIR=$RPM_BUILD_ROOT install docdir=%{booth_docdir}
 
 mkdir -p %{buildroot}/%{_mandir}/man8/
 gzip < docs/boothd.8 > %{buildroot}/%{_mandir}/man8/booth.8.gz
