@@ -42,6 +42,7 @@ EOF
 
 cnf=$1
 shift 1
+ERR_SETUP_FAILED=52
 logf=test_booth.log
 iprules=/usr/share/booth/tests/test/booth_path
 : ${HA_LOGFACILITY:="syslog"}
@@ -159,24 +160,30 @@ booth_status() {
 	test "`runcmd $1 booth status | get_stat_fld booth_state`" = "started"
 }
 stop_booth() {
-	local h
+	local h rc
 	for h in $sites; do
 		stop_site $h
+		rc=$((rc|$?))
 	done >/dev/null 2>&1
 	for h in $arbitrators; do
 		stop_arbitrator $h
+		rc=$((rc|$?))
 	done >/dev/null 2>&1
 	wait_timeout
+	return $rc
 }
 start_booth() {
-	local h
+	local h rc
 	for h in $sites; do
 		start_site $h
+		rc=$((rc|$?))
 	done >/dev/null 2>&1
 	for h in $arbitrators; do
 		start_arbitrator $h
+		rc=$((rc|$?))
 	done >/dev/null 2>&1
 	wait_timeout
+	return $rc
 }
 restart_booth() {
 	local h procs
@@ -489,6 +496,7 @@ run_report() {
 runtest() {
 	local start_ts end_ts rc booth_status
 	local start_time end_time
+	local usrmsg
 	TEST=$1
 	start_time=`date`
 	start_ts=`date +%s`
@@ -496,12 +504,29 @@ runtest() {
 	can_run_test $1 || return 0
 	echo "starting booth test $1 ..." | logmsg
 	setup_netem
-	test_$1 && check_$1
+	test_$1
 	rc=$?
+	case $rc in
+	0)
+		check_$1
+		rc=$?
+		if [ $rc -eq 0 ]; then
+			usrmsg="SUCCESS"
+		else
+			usrmsg="check FAIL: $rc"
+		fi
+		;;
+	$ERR_SETUP_FAILED)
+		usrmsg="setup FAIL"
+		;;
+	*)
+		usrmsg="test FAIL: $rc"
+		;;
+	esac
 	end_time=`date`
 	end_ts=`date +%s`
 	reset_netem_env
-	echo "finished booth test $1 (exit code $rc)" | logmsg
+	echo "finished booth test $1 ($usrmsg)" | logmsg
 	is_function recover_$1 && recover_$1
 	sleep 3
 	all_booth_status
@@ -510,7 +535,7 @@ runtest() {
 		echo OK
 		[ "$GET_REPORT" ] && run_report $start_ts $end_ts $TEST
 	else
-		echo "FAIL (running hb_report ... $1.tar.bz2; see also $logf)"
+		echo "$usrmsg (running hb_report ... $1.tar.bz2; see also $logf)"
 		[ $booth_status -ne 0 ] &&
 			echo "unexpected: some booth daemons not running"
 		run_report $start_ts $end_ts $TEST
@@ -577,7 +602,7 @@ check_grant() {
 
 # just a grant followed by three expire times
 test_longgrant() {
-	grant_ticket 1
+	grant_ticket 1 || return $ERR_SETUP_FAILED
 	wait_exp
 	wait_exp
 	wait_exp
@@ -592,10 +617,10 @@ check_longgrant() {
 test_grant_noarb() {
 	local h
 	for h in $arbitrators; do
-		stop_arbitrator $h
+		stop_arbitrator $h || return $ERR_SETUP_FAILED
 	done >/dev/null 2>&1
 	sleep 1
-	grant_ticket 1
+	grant_ticket 1 || return $ERR_SETUP_FAILED
 }
 check_grant_noarb() {
 	check_consistency `get_site 1`
@@ -614,7 +639,7 @@ applicable_grant_noarb() {
 
 # just a revoke
 test_revoke() {
-	grant_ticket 1
+	grant_ticket 1 || return $ERR_SETUP_FAILED
 	revoke_ticket
 }
 check_revoke() {
@@ -635,9 +660,9 @@ check_grant_elsewhere() {
 
 # grant with one site lost
 test_grant_site_lost() {
-	stop_site `get_site 2`
+	stop_site `get_site 2` || return $ERR_SETUP_FAILED
 	wait_timeout
-	grant_ticket 1
+	grant_ticket 1 || return $ERR_SETUP_FAILED
 	check_cib `get_site 1` || return 1
 	wait_exp
 }
@@ -652,12 +677,12 @@ recover_grant_site_lost() {
 
 # grant with one site lost then reappearing
 test_grant_site_reappear() {
-	stop_site `get_site 2`
+	stop_site `get_site 2` || return $ERR_SETUP_FAILED
 	sleep 1
-	grant_ticket 1
+	grant_ticket 1 || return $ERR_SETUP_FAILED
 	check_cib `get_site 1` || return 1
 	wait_timeout
-	start_site `get_site 2`
+	start_site `get_site 2` || return $ERR_SETUP_FAILED
 	wait_timeout
 	wait_timeout
 }
@@ -674,8 +699,8 @@ recover_grant_site_reappear() {
 # simultaneous start of even number of members
 test_simultaneous_start_even() {
 	local serv
-	grant_ticket 2
-	stop_booth
+	grant_ticket 2 || return $ERR_SETUP_FAILED
+	stop_booth || return $ERR_SETUP_FAILED
 	wait_timeout
 	for serv in $(echo $sites | sed "s/`get_site 1` //"); do
 		start_site $serv &
@@ -696,8 +721,8 @@ check_simultaneous_start_even() {
 
 # slow start
 test_slow_start_granted() {
-	grant_ticket 1
-	stop_booth
+	grant_ticket 1 || return $ERR_SETUP_FAILED
+	stop_booth || return $ERR_SETUP_FAILED
 	wait_timeout
 	for serv in $sites; do
 		start_site $serv
@@ -716,8 +741,8 @@ check_slow_start_granted() {
 
 # restart with ticket granted
 test_restart_granted() {
-	grant_ticket 1
-	restart_site `get_site 1`
+	grant_ticket 1 || return $ERR_SETUP_FAILED
+	restart_site `get_site 1` || return $ERR_SETUP_FAILED
 	wait_timeout
 }
 check_restart_granted() {
@@ -728,10 +753,10 @@ check_restart_granted() {
 
 # restart with ticket granted (but cib empty)
 test_restart_granted_nocib() {
-	grant_ticket 1
-	stop_site_clean `get_site 1` || return 1
+	grant_ticket 1 || return $ERR_SETUP_FAILED
+	stop_site_clean `get_site 1` || return $ERR_SETUP_FAILED
 	wait_timeout
-	start_site `get_site 1`
+	start_site `get_site 1` || return $ERR_SETUP_FAILED
 	wait_timeout
 	wait_timeout
 	wait_timeout
@@ -744,10 +769,10 @@ check_restart_granted_nocib() {
 
 # restart with ticket not granted
 test_restart_notgranted() {
-	grant_ticket 1
-	stop_site `get_site 2`
+	grant_ticket 1 || return $ERR_SETUP_FAILED
+	stop_site `get_site 2` || return $ERR_SETUP_FAILED
 	sleep 1
-	start_site `get_site 2`
+	start_site `get_site 2` || return $ERR_SETUP_FAILED
 	wait_timeout
 }
 check_restart_notgranted() {
@@ -758,9 +783,9 @@ check_restart_notgranted() {
 
 # ticket failover
 test_failover() {
-	grant_ticket 1
-	stop_site_clean `get_site 1` || return 1
-	booth_status `get_site 1` && return 1
+	grant_ticket 1 || return $ERR_SETUP_FAILED
+	stop_site_clean `get_site 1` || return $ERR_SETUP_FAILED
+	booth_status `get_site 1` && return $ERR_SETUP_FAILED
 	wait_exp
 	wait_timeout
 	wait_timeout
@@ -777,7 +802,7 @@ recover_failover() {
 
 # split brain (leader alone)
 test_split_leader() {
-	grant_ticket 1
+	grant_ticket 1 || return $ERR_SETUP_FAILED
 	run_site 1 $iprules stop $port   >/dev/null
 	wait_exp
 	wait_timeout
@@ -798,7 +823,7 @@ recover_split_leader() {
 
 # split brain (follower alone)
 test_split_follower() {
-	grant_ticket 1
+	grant_ticket 1 || return $ERR_SETUP_FAILED
 	run_site 2 $iprules stop $port  >/dev/null
 	wait_exp
 	wait_timeout
@@ -813,7 +838,7 @@ check_split_follower() {
 
 # split brain (leader alone)
 test_split_edge() {
-	grant_ticket 1
+	grant_ticket 1 || return $ERR_SETUP_FAILED
 	run_site 1 $iprules stop $port  >/dev/null
 	wait_exp
 	run_site 1 $iprules start $port  >/dev/null
@@ -828,9 +853,9 @@ check_split_edge() {
 
 # external test prog failed
 test_external_prog_failed() {
-	grant_ticket 1
+	grant_ticket 1 || return $ERR_SETUP_FAILED
 	break_external_prog 1
-	show_pref 1 || return 1
+	show_pref 1 || return $ERR_SETUP_FAILED
 	wait_renewal
 	wait_timeout
 }
