@@ -665,6 +665,9 @@ check_grant_site_reappear() {
 	check_consistency `get_site 1` &&
 	is_cib_granted `get_site 1`
 }
+recover_grant_site_reappear() {
+	start_site `get_site 2`
+}
 
 ## TEST: simultaneous_start_even ##
 
