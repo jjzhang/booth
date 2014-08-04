@@ -243,8 +243,15 @@ static int add_ticket(const char *name, struct ticket_config **tkp,
 	return 0;
 }
 
-static int validate_ticket(struct ticket_config *tk)
+static int postproc_ticket(struct ticket_config *tk)
 {
+	if (!tk)
+		return 1;
+
+	if (!tk->renewal_freq) {
+		tk->renewal_freq = tk->term_duration/2;
+	}
+
 	if (tk->timeout*(tk->retries+1) >= tk->renewal_freq) {
 		tk_log_error("total amount of time to "
 			"retry sending packets cannot exceed "
@@ -515,7 +522,7 @@ no_value:
 
 		if (strcmp(key, "ticket") == 0) {
 			if (current_tk && strcmp(current_tk->name, "__defaults__")) {
-				if (!validate_ticket(current_tk)) {
+				if (!postproc_ticket(current_tk)) {
 					goto out;
 				}
 			}
@@ -618,8 +625,9 @@ no_value:
 		*(booth_conf->name+(cp2-cp)) = '\0';
 	}
 
-	if (!current_tk->renewal_freq)
-		current_tk->renewal_freq = current_tk->term_duration/2;
+	if (!postproc_ticket(current_tk)) {
+		goto out;
+	}
 
 	return 0;
 
