@@ -253,11 +253,11 @@ static int postproc_ticket(struct ticket_config *tk)
 	}
 
 	if (tk->timeout*(tk->retries+1) >= tk->renewal_freq) {
-		tk_log_error("total amount of time to "
+		log_error("%s: total amount of time to "
 			"retry sending packets cannot exceed "
 			"renewal frequency "
 			"(%d*(%d+1) >= %d)",
-			tk->timeout, tk->retries, tk->renewal_freq);
+			tk->name, tk->timeout, tk->retries, tk->renewal_freq);
 		return 0;
 	}
 	return 1;
@@ -531,11 +531,15 @@ no_value:
 			} else if (add_ticket(val, &current_tk, &defaults)) {
 				goto out;
 			}
-
-			/* current_tk is valid until another one is needed -
-			 * and then it already has the new address and
-			 * is valid again. */
 			continue;
+		}
+
+		/* current_tk must be allocated at this point, otherwise
+		 * we don't know to which ticket the key refers
+		 */
+		if (!current_tk) {
+			error = "Unexpected keyword";
+			goto err;
 		}
 
 		if (strcmp(key, "expire") == 0) {
@@ -602,12 +606,12 @@ no_value:
 			continue;
 		}
 
-		error = "Unknown item";
-		goto out;
+		error = "Unknown keyword";
+		goto err;
 	}
 
 	if ((booth_conf->site_count % 2) == 0) {
-		log_warn("An odd number of nodes is strongly recommended!");
+		log_warn("Odd number of nodes is strongly recommended!");
 	}
 
 	/* Default: make config name match config filename. */
