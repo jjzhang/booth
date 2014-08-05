@@ -282,7 +282,7 @@ int list_ticket(char **pdata, unsigned int *len)
 			strftime(timeout_str, sizeof(timeout_str), "%F %T",
 					localtime(&ts));
 		} else
-			strcpy(timeout_str, "N/A");
+			strcpy(timeout_str, "INF");
 
 		if (tk->leader == local && tk->delay_commit > get_secs(NULL)) {
 			ts = wall_ts(tk->delay_commit);
