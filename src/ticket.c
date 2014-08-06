@@ -818,9 +818,8 @@ static void ticket_cron(struct ticket_config *tk)
 	/* Has an owner, has an expiry date, and expiry date in the past?
 	 * Losing the ticket must happen in _every_ state. */
 	now = get_secs(NULL);
-	if (!tk->in_election &&
+	if (is_owned(tk) &&
 			tk->term_expires &&
-			is_owned(tk) &&
 			now >= tk->term_expires) {
 		ticket_lost(tk);
 		goto out;

@@ -730,7 +730,6 @@ int new_election(struct ticket_config *tk,
 		tk->current_term++;
 	}
 
-	tk->term_expires = 0;
 	tk->election_end = now + tk->timeout;
 	tk->in_election = 1;
 
@@ -745,7 +744,6 @@ int new_election(struct ticket_config *tk,
 	record_vote(tk, local, new_leader);
 	tk->voted_for = new_leader;
 
-	tk->leader = no_leader;
 	tk->state = ST_CANDIDATE;
 
 	/* some callers may want just to repeat on timeout */
