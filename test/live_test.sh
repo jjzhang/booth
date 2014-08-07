@@ -327,10 +327,13 @@ set_netem_env() {
 }
 reset_netem_env() {
 	[ -z "$NETEM_ENV" ] && return
+	[ -n "$__NETEM_RESET" ] && return
+	__NETEM_RESET=1
 	forall $0 $cnf __netem__ netem_reset
 }
 setup_netem() {
 	[ -z "$NETEM_ENV" ] && return
+	__NETEM_RESET=
 	for env in $NETEM_ENV; do
 		set_netem_env $env
 	done
