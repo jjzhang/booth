@@ -806,6 +806,7 @@ test_split_leader() {
 	run_site 1 $iprules stop $port   >/dev/null
 	wait_exp
 	wait_timeout
+	wait_timeout
 	check_cib any || return 1
 	run_site 1 $iprules start $port  >/dev/null
 	wait_timeout
