@@ -318,7 +318,7 @@ wait_timeout() {
 set_netem_env() {
 	local modfun args
 	modfun=`echo $1 | sed 's/:.*//'`
-	args=`echo $1 | sed 's/[^:]*://;s/:/ /g'`
+	args=`echo $1 | sed 's/[^:]*//;s/:/ /g'`
 	if ! is_function NETEM_ENV_$modfun; then
 		echo "NETEM_ENV_$modfun: doesn't exist"
 		exit 1
