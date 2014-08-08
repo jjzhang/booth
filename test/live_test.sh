@@ -56,7 +56,7 @@ get_site() {
 }
 
 logmsg() {
-	if [ "$WE_SERVER" ]; then
+	if [ "$WE_SERVER" -o "$_JUST_NETEM" ]; then
 		logger -t "BOOTHTEST" -p $HA_LOGFACILITY.info -- $@
 	else
 		ssh $SSH_OPTS `get_site 1` logger -t "BOOTHTEST" -p $HA_LOGFACILITY.info -- $@
@@ -872,6 +872,7 @@ eval `get_tkt_settings`
 
 if [ "$1" = "__netem__" ]; then
 	shift 1
+	_JUST_NETEM=1
 	local_netem_env $@
 	exit
 fi
