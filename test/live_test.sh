@@ -41,6 +41,8 @@ EOF
 [ $# -eq 0 ] && usage 0
 
 cnf=$1
+run_cnf="/etc/booth/booth.conf"
+
 shift 1
 ERR_SETUP_FAILED=52
 logf=test_booth.log
@@ -102,12 +104,6 @@ local_netem_env() {
 		logmsg "cannot find netif for $my_addr, netem not set"
 	fi
 }
-
-if [ "$1" = "__netem__" ]; then
-	shift 1
-	local_netem_env $@
-	exit
-fi
 
 is_function() {
     test z"`command -v $1`" = z"$1"
@@ -206,7 +202,7 @@ is_we_server() {
 sync_conf() {
 	local h rc=0
 	for h in $sites $arbitrators; do
-		rsync -q $cnf $h:/etc/booth/booth.conf
+		rsync -q $cnf $h:$run_cnf
 		rc=$((rc|$?))
 	done
 	return $rc
@@ -329,7 +325,7 @@ reset_netem_env() {
 	[ -z "$NETEM_ENV" ] && return
 	[ -n "$__NETEM_RESET" ] && return
 	__NETEM_RESET=1
-	forall $0 $cnf __netem__ netem_reset
+	forall $0 $run_cnf __netem__ netem_reset
 }
 setup_netem() {
 	[ -z "$NETEM_ENV" ] && return
@@ -545,42 +541,6 @@ runtest() {
 	fi
 	revoke_ticket
 }
-
-[ -f "$cnf" ] || {
-	ls $cnf
-	usage 1
-}
-
-sites=`get_servers site < $cnf`
-arbitrators=`get_servers arbitrator < $cnf`
-port=`get_port < $cnf`
-: ${port:=9929}
-site_cnt=`echo $sites | wc -w`
-arbitrator_cnt=`echo $arbitrators | wc -w`
-tkt=`get_tkt < $cnf`
-eval `get_tkt_settings`
-
-[ -z "$sites" ] && {
-	echo no sites in $cnf
-	usage 1
-}
-
-[ -z "$T_expire" ] && {
-	echo set $tkt expire time in $cnf
-	usage 1
-}
-
-if [ -z "$T_renewal_freq" ]; then
-	T_renewal_freq=$((T_expire/2))
-fi
-
-exec 2>$logf
-BASH_XTRACEFD=2
-PS4='+ `date +"%T"`: '
-set -x
-
-WE_SERVER=""
-is_we_server && WE_SERVER=1
 
 #
 # the tests
@@ -880,20 +840,62 @@ applicable_external_prog_failed() {
 
 # packet loss at one site 30%
 NETEM_ENV_single_loss() {
-	run_site 1 $0 $cnf __netem__ netem_loss ${1:-30}
+	run_site 1 $0 $run_cnf __netem__ netem_loss ${1:-30}
 	PKT_LOSS=${1:-30}
 }
 
 # packet loss everywhere 30%
 NETEM_ENV_loss() {
-	forall $0 $cnf __netem__ netem_loss ${1:-30}
+	forall $0 $run_cnf __netem__ netem_loss ${1:-30}
 	PKT_LOSS=${1:-30}
 }
 
 # network delay 100ms
 NETEM_ENV_net_delay() {
-	forall $0 $cnf __netem__ netem_delay ${1:-100}
+	forall $0 $run_cnf __netem__ netem_delay ${1:-100}
 }
+
+[ -f "$cnf" ] || {
+	ls $cnf
+	usage 1
+}
+
+sites=`get_servers site < $cnf`
+arbitrators=`get_servers arbitrator < $cnf`
+port=`get_port < $cnf`
+: ${port:=9929}
+site_cnt=`echo $sites | wc -w`
+arbitrator_cnt=`echo $arbitrators | wc -w`
+tkt=`get_tkt < $cnf`
+eval `get_tkt_settings`
+
+if [ "$1" = "__netem__" ]; then
+	shift 1
+	local_netem_env $@
+	exit
+fi
+
+[ -z "$sites" ] && {
+	echo no sites in $cnf
+	usage 1
+}
+
+[ -z "$T_expire" ] && {
+	echo set $tkt expire time in $cnf
+	usage 1
+}
+
+if [ -z "$T_renewal_freq" ]; then
+	T_renewal_freq=$((T_expire/2))
+fi
+
+exec 2>$logf
+BASH_XTRACEFD=2
+PS4='+ `date +"%T"`: '
+set -x
+
+WE_SERVER=""
+is_we_server && WE_SERVER=1
 
 PREFNAME=__pref_booth_live_test
 
