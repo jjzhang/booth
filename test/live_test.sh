@@ -74,11 +74,20 @@ get_stat_fld() {
 }
 
 # tc netem, simulate packet loss, wan, etc
+netem_parent() {
+	local p
+	p=`tc qdisc show dev $1 | head -1 | grep netem | awk '{print $3}'`
+	if [ -n "$p" ]; then
+		echo parent $p
+	else
+		echo root
+	fi
+}
 netem_delay() {
-	ext_prog_log tc qdisc add dev $1 root netem delay $2ms $(($2/10))ms
+	ext_prog_log tc qdisc add dev $1 `netem_parent $1` netem delay $2ms $(($2/10))ms
 }
 netem_loss() {
-	ext_prog_log tc qdisc add dev $1 root netem loss $2%
+	ext_prog_log tc qdisc add dev $1 `netem_parent $1` netem loss $2%
 }
 netem_reset() {
 	ext_prog_log tc qdisc del dev $1 root netem
