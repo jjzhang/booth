@@ -46,6 +46,7 @@ run_cnf="/etc/booth/booth.conf"
 shift 1
 ERR_SETUP_FAILED=52
 logf=test_booth.log
+SSH_OPTS="-o StrictHostKeyChecking=no"
 iprules=/usr/share/booth/tests/test/booth_path
 : ${HA_LOGFACILITY:="syslog"}
 
@@ -58,7 +59,7 @@ logmsg() {
 	if [ "$WE_SERVER" ]; then
 		logger -t "BOOTHTEST" -p $HA_LOGFACILITY.info -- $@
 	else
-		ssh `get_site 1` logger -t "BOOTHTEST" -p $HA_LOGFACILITY.info -- $@
+		ssh $SSH_OPTS `get_site 1` logger -t "BOOTHTEST" -p $HA_LOGFACILITY.info -- $@
 	fi
 }
 
@@ -115,7 +116,7 @@ runcmd() {
 	if ip a l | fgrep -wq $h; then
 		$@
 	else
-		ssh $h $@
+		ssh $SSH_OPTS $h $@
 	fi
 	rc=$?
 	if [ $rc -ne 0 ]; then
@@ -242,7 +243,7 @@ forall_fun2() {
 	f=$1
 	shift 1
 	for h in $sites $arbitrators; do
-		$f $@ | ssh $h
+		$f $@ | ssh $SSH_OPTS $h
 		rc=$((rc|$?))
 		[ $rc -ne 0 ] && break
 	done
