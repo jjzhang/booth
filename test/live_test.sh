@@ -418,7 +418,7 @@ booth_where_granted() {
 	grantee=`echo "$ticket_line" | sed 's/.*leader: //;s/,.*//'`
 	echo $grantee
 	[ "$grantee" = "none" ] && return
-	! runcmd $grantee booth list | grep -q "$tkt.*pending"
+	! echo "$ticket_line" | grep -q "$tkt.*pending"
 }
 booth_list_fld() {
 	cut -d, -f $1 | sed 's/[^:]*://'
