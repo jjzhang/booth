@@ -660,10 +660,11 @@ static int answer_REQ_VOTE(
 
 	/* valid tickets are not allowed only if the sender thinks
 	 * the ticket got lost */
-	if (sender != tk->leader && valid && reason == OR_TKT_LOST) {
-		tk_log_warn("election from %s rejected "
+	if (sender != tk->leader && valid && reason != OR_STEPDOWN) {
+		tk_log_warn("election from %s with reason %s rejected "
 			"(we have %s as ticket owner), ticket still valid for %ds",
-			site_string(sender), site_string(tk->leader), valid);
+			site_string(sender), state_to_string(reason),
+			site_string(tk->leader), valid);
 		return send_reject(sender, tk, RLT_TERM_STILL_VALID, msg);
 	}
 
