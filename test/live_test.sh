@@ -534,9 +534,9 @@ runtest() {
 	esac
 	end_time=`date`
 	end_ts=`date +%s`
-	reset_netem_env
 	echo "finished booth test $1 ($usrmsg)" | logmsg
 	is_function recover_$1 && recover_$1
+	reset_netem_env
 	sleep 3
 	all_booth_status
 	booth_status=$?
