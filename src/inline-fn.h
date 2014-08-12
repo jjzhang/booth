@@ -37,7 +37,7 @@ inline static uint32_t get_local_id(void)
 
 inline static uint32_t get_node_id(struct booth_site *node)
 {
-	return node ? node->site_id : NO_ONE;
+	return node ? node->site_id : 0;
 }
 
 
@@ -118,7 +118,8 @@ static inline void init_ticket_msg(struct boothc_ticket_msg *msg,
 		memcpy(msg->ticket.id, tk->name, sizeof(msg->ticket.id));
 
 		msg->ticket.leader         = htonl(get_node_id(
-			(tk->leader && tk->leader != no_leader) ? tk->leader : tk->voted_for));
+			(tk->leader && tk->leader != no_leader) ? tk->leader :
+				(tk->voted_for ? tk->voted_for : no_leader)));
 		msg->ticket.term           = htonl(tk->current_term);
 		msg->ticket.term_valid_for = htonl(term_time_left(tk));
 	}
