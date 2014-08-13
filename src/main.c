@@ -667,7 +667,11 @@ static int do_command(cmd_request_t cmd)
 	}
 
 	if (site->type == ARBITRATOR) {
-		log_error("Site \"%s\" is an arbitrator, cannot grant/revoke ticket there.", cl.site);
+		if (site == local) {
+			log_error("We're just an arbitrator, cannot grant/revoke tickets here.");
+		} else {
+			log_error("%s is just an arbitrator, cannot grant/revoke tickets there.", cl.site);
+		}
 		goto out_close;
 	}
 
