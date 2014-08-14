@@ -76,21 +76,28 @@ get_stat_fld() {
 # tc netem, simulate packet loss, wan, etc
 netem_parent() {
 	local p
-	p=`tc qdisc show dev $1 | head -1 | grep netem | awk '{print $3}'`
+	p=`tc qdisc show dev $1 | grep netem | head -1 | awk '{print $3}'`
 	if [ -n "$p" ]; then
-		echo parent $p
+		echo $p
 	else
-		echo root
+		echo 1:1
 	fi
 }
+tc_prio() {
+	ext_prog_log tc qdisc add dev $1 handle 1: root prio
+	ext_prog_log tc filter add dev $1 parent 1: prio 1 u32 \
+	        match ip dport $port 0xffff \
+			match ip protocol 17 0xff \
+			flowid 1:1
+}
 netem_delay() {
-	ext_prog_log tc qdisc add dev $1 `netem_parent $1` netem delay $2ms $(($2/10))ms
+	ext_prog_log tc qdisc add dev $1 parent `netem_parent $1` netem delay $2ms $(($2/10))ms
 }
 netem_loss() {
-	ext_prog_log tc qdisc add dev $1 `netem_parent $1` netem loss $2%
+	ext_prog_log tc qdisc add dev $1 parent `netem_parent $1` netem loss $2%
 }
 netem_reset() {
-	ext_prog_log tc qdisc del dev $1 root netem
+	ext_prog_log tc qdisc del dev $1 root
 }
 local_netem_env() {
 	local fun=$1 arg=$2
@@ -109,6 +116,9 @@ local_netem_env() {
 		fi
 	done
 	if [ -n "$netif" ]; then
+		# before first netem qdisc insert the prio qdisc and filter
+		tc qdisc show dev $netif | grep -qs netem ||
+			tc_prio $netif
 		$fun $netif $arg
 	else
 		logmsg "cannot find netif for $my_addr, netem not set"
@@ -317,7 +327,6 @@ wait_renewal() {
 wait_timeout() {
 	local t=2
 	[ "$T_timeout" -gt $t ] && t=$T_timeout
-	[ "$PKT_LOSS" ] && t=$((t + 2*T_timeout + PKT_LOSS/6))
 	sleep $t
 }
 
@@ -517,6 +526,8 @@ runtest() {
 	rc=$?
 	case $rc in
 	0)
+		# wait a bit more if we're losing packets
+		[ -n "$PKT_LOSS" ] && wait_timeout
 		check_$1
 		rc=$?
 		if [ $rc -eq 0 ]; then
