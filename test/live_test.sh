@@ -877,7 +877,7 @@ NETEM_ENV_net_delay() {
 }
 
 [ -f "$cnf" ] || {
-	ls $cnf
+	echo "ERROR: configuration file $cnf doesn't exist"
 	usage 1
 }
 
