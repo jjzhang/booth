@@ -498,7 +498,7 @@ can_run_test() {
 	fi
 }
 revoke_ticket() {
-	run_site 1 booth revoke $tkt >/dev/null
+	run_site 1 booth revoke -w $tkt >/dev/null
 	wait_timeout
 }
 run_report() {
@@ -569,7 +569,7 @@ runtest() {
 
 # most tests start by granting ticket
 grant_ticket() {
-	run_site $1 booth grant $tkt >/dev/null
+	run_site $1 booth grant -w $tkt >/dev/null
 }
 
 ## TEST: grant ##
@@ -634,7 +634,7 @@ check_revoke() {
 
 # just a grant to another site
 test_grant_elsewhere() {
-	run_site 1 booth grant -s `get_site 2` $tkt >/dev/null
+	run_site 1 booth grant -w -s `get_site 2` $tkt >/dev/null
 }
 check_grant_elsewhere() {
 	check_consistency `get_site 2`
