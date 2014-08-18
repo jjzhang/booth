@@ -4,8 +4,6 @@
 # to run on the local cluster, so that booth knows whether to
 # acquire the ticket here.
 
-set -e
-
 service="${1:?Need a resource name as first argument.}"
 tmpshadow=`mktemp booth-check.XXXXXX`
 trap "rm -f $tmpshadow" EXIT
