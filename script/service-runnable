@@ -23,7 +23,14 @@ fi
 # If target-role is Stopped, it judges with being stopped explicitly.
 output=$(crm_resource --meta --get-parameter="target-role" --resource=$service 2>/dev/null)
 rc=$?
-if [ $rc == 0 -a "$output" = "Stopped" ]; then
+if [ $rc -eq 0 -a "$output" = "Stopped" ]; then
+	exit 0
+fi
+
+# is ticket in standby?
+output=$(crm_ticket --ticket "$BOOTH_TICKET" --get-attr standby)
+rc=$?
+if [ $rc -eq 0 -a "$output" = true ]; then
 	exit 0
 fi
 
