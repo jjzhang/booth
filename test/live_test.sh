@@ -521,6 +521,12 @@ runtest() {
 	echo -n "Testing: $1... "
 	can_run_test $1 || return 0
 	echo "starting booth test $1 ..." | logmsg
+	if is_function setup_$1; then
+		if ! setup_$1; then
+			echo "setup test $1 failed" | logmsg
+			return 1
+		fi
+	fi
 	setup_netem
 	test_$1
 	rc=$?
@@ -592,6 +598,22 @@ test_longgrant() {
 	wait_exp
 }
 check_longgrant() {
+	check_consistency `get_site 1`
+}
+
+## TEST: longgrant2 ##
+
+# just a grant followed by three expire times
+setup_longgrant2() {
+	grant_ticket 1 || return $ERR_SETUP_FAILED
+}
+test_longgrant2() {
+	local i
+	for i in `seq 10`; do
+		wait_exp
+	done
+}
+check_longgrant2() {
 	check_consistency `get_site 1`
 }
 
