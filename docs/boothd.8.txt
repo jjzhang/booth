@@ -199,7 +199,47 @@ All times are in seconds.
 	acquired by another site if the ticket holder is not
 	reachable.
 +
-'booth' renews a ticket after half the lease time.
+The default is '600'.
+
+*'acquire-after'*::
+	Once a ticket is lost, wait this time in addition before
+	acquiring the ticket.
++
+This is to allow for the site that lost the ticket to relinquish
+the resources, by either stopping them or fencing a node.
++
+A typical delay might be 60 seconds, but ultimately it depends on
+the protected resources and the fencing configuration.
++
+The default is '0'.
+
+*'renewal-freq'*::
+	Set the ticket renewal frequency period.
++
+If the network reliability is often reduced over prolonged
+periods, it is advisable to try to renew more often.
++
+Before every renewal the 'before-acquire-handler' is run. This
+parameter then doubles as a local cluster monitor interval.
+
+*'timeout'*::
+	After that time 'booth' will re-send packets if there was an
+	insufficient number of replies. This should be long enough to
+	allow packets to reach other members.
++
+The default is '5'.
+
+*'retries'*::
+	Defines how many times to retry sending packets before giving
+	up waiting for acks from other members.
++
+Default is '10'. Values lower than 3 are illegal.
++
+Ticket renewals should allow for this number of retries. Hence,
+the total retry time must be shorter than the renewal time
+(either half the expire time or *'renewal-freq'*):
+
+	timeout*(retries+1) < renewal
 
 *'weights'*::
 	A comma-separated list of integers that define the weight of individual 
@@ -208,65 +248,26 @@ All times are in seconds.
 Default is '0' for all; this means that the order in the configuration 
 file defines priority for conflicting requests.
 
-*'acquire-after'*::
-	Try to acquire a lost ticket _after_ this period passed.
-+
-This is to allow for some time for the site that lost the ticket
-to relinquish the resources, by either stopping them or fencing a
-node.
-+
-A typical delay might be 60 seconds, but ultimately it depends on
-the protected resources and the fencing configuration.
-
-*'timeout'*::
-	After that time 'booth' will re-send packets if there was an insufficient 
-	number of replies. This should be long enough to allow
-	packets to reach other members.
-+
-The default is '5' seconds.
-
-*'retries'*::
-	Defines how many times to retry sending packets before giving
-	up waiting for acks from other members.
-+
-Default is 10. Values lower than 3 are illegal.
-+
-Ticket *renewal*, which by default occurs every half expire time,
-must happen after packet resending. Hence, the total retry time
-must be shorter than half the expire time:
-
-	timeout*(retries+1) < expire/2
-
 *'before-acquire-handler'*::
 	If set, this command will be called before 'boothd' tries to
 	acquire or renew a ticket. On exit code other than 0,
-	'boothd' cancels the operation.
+	'boothd' relinquishes the ticket.
 +
-This makes it possible to check whether it is appropriate
-to acquire the ticket. For instance, if a service in the
-dependency-chain has a failcount of 'INFINITY' on all
-available nodes, the service will be unable to run. In that case,
-it is of no use to claim the ticket.
+Thus it is possible to ensure whether the services and its
+dependencies protected by the ticket are in good shape at this
+site. For instance, if a service in the dependency-chain has a
+failcount of 'INFINITY' on all available nodes, the service will
+be unable to run. In that case, it is of no use to claim the
+ticket.
 +
 'boothd' waits synchronously for the result of the handler, so make
 sure that the program returns quickly.
 +
-See below for details about booth specific environment variables
-and the distributed 'service-runnable' script.
+See below for details about booth specific environment variables.
+The distributed 'service-runnable' script is an example which may
+be used to test whether a pacemaker resource can be started.
 
-*'renewal-freq'*::
-	Set the ticket renewal frequency period. By default, it is
-	set to half the ticket expire time.
-+
-If the network reliability is often reduced over prolonged
-periods, it may help to reduce the renewal frequency.
-+
-Before every renewal, if set, the 'before-acquire-handler' is
-run. This parameter then may be used to set the local cluster
-monitor interval.
-
-
-A more verbose example of a configuration file might be
+One example of a booth configuration file:
 
 -----------------------
 transport = udp
@@ -284,6 +285,8 @@ ticket="ticket-db8"
     acquire-after = 60
     timeout       = 10
     retries       = 5
+    renewal-freq  = 60
+    before-acquire-handler = /usr/share/booth/service-runnable db8
 -----------------------
 
 
@@ -293,11 +296,9 @@ BOOTH TICKET MANAGEMENT
 The booth cluster guarantees that every ticket is owned by only
 one site at the time.
 
-Only granted tickets are managed by 'booth'.
-
 Tickets must be initially granted with the 'booth client grant'
 command. Once it gets granted, the ticket is managed by the booth
-cluster.
+cluster. Hence, only granted tickets are managed by 'booth'.
 
 If the ticket gets lost, i.e. that the other members of the booth
 cluster do not hear from the ticket owner in a sufficiently long
@@ -317,11 +318,11 @@ managing the ticket again, it must be again granted to a site.
 
 The grant operation, in case not all sites are reachable, may get
 delayed for the ticket expire time (and, if defined, the
-'acquire-after' time). Under certain circumstances, the rest of
-the booth members may not know if the ticket is currently granted
-at the unreachable site.
+'acquire-after' time). The reason is that the other booth members
+may not know if the ticket is currently granted at the
+unreachable site.
 
-This delay is disabled if the '-F' option is specified. In that
+This delay may be disabled with the '-F' option. In that
 case, it is up to the administrator to make sure that the
 unreachable site is not holding the ticket.
 
@@ -329,33 +330,30 @@ When the ticket is managed by 'booth', it is dangerous to modify
 it manually using either `crm_ticket` command or `crm site
 ticket`. Neither of these tools is aware of 'booth' and,
 consequently, 'booth' itself may not be aware of any ticket
-status changes.
+status changes. A notable exception is setting the ticket to
+standby which is typically done before a planned failover.
 
 
 NOTES
 -----
 
-Tickets are not meant to be moved around quickly--a reasonable
-'expire' time might be 300 seconds (5 minutes).
+Tickets are not meant to be moved around quickly, the default
+'expire' time is 600 seconds (10 minutes).
 
 'booth' works with both IPv4 and IPv6 addresses.
 
 'booth' renews a ticket before it expires, to account for
-possible transmission delays.
-
-The renewal time is calculated as larger of half the 'expire'
-time and 'timeout'*'retries'/2. Hence, with small 'expire' values
-(eg. 60 seconds) the ticket renewal process will be started just
-after the ticket got acquired.
+possible transmission delays. The renewal time, unless explicitly
+set, is set to half the 'expire' time.
 
 
 HANDLERS
 --------
 
-Currently, there's only one external handler defined (see the 'before-acquire-handler'
-configuration item above).
+Currently, there's only one external handler defined (see the
+'before-acquire-handler' configuration item above).
 
-The following data is available as environment variables:
+The following environment variables are exported to the handler:
 
 *'BOOTH_TICKET'::
 	The ticket name, as given in the configuration file. (See 'ticket' item above.)
@@ -372,6 +370,8 @@ The following data is available as environment variables:
 *'BOOTH_TICKET_EXPIRES'::
 	When the ticket expires (in seconds since 1.1.1970), or '0'.
 
+The handler is invoked with positional arguments specified after
+it.
 
 FILES
 -----
@@ -388,25 +388,30 @@ RAFT IMPLEMENTATION
 
 In essence, every ticket corresponds to a separate Raft cluster.
 
-A ticket is granted _only_ to the Raft _Leader_, but a Leader
-needs not grant the ticket to Pacemaker.
+A ticket is granted to the Raft _Leader_ which then owns (or
+keeps) the ticket.
 
+ARBITRATOR MANAGEMENT
+---------------------
 
-SYSTEMD INTEGRATION
--------------------
+The booth daemon for an arbitrator which typically doesn't run
+the cluster stack, may be started through systemd or with
+'/etc/init.d/booth-arbitrator', depending on which init system
+the platform supports.
 
-The 'boothd' 'systemd' unit file should be distributed with booth.
+The SysV init script starts a booth arbitrator for every
+configuration file found in '/etc/booth'.
 
-The booth daemon for a site or an arbitrator may be started
-through systemd:
+Platforms running systemd can enable and start every
+configuration separately using 'systemctl':
 
 -----------
-# systemctl enable booth@{configurationname}.service
-# systemctl start  booth@{configurationname}.service
+# systemctl enable booth@<configurationname>
+# systemctl start  booth@<configurationname>
 -----------
 
-The configuration name is required for 'systemctl', even in case
-of the default name 'booth'.
+'systemctl' requires the configuration name, even for the default
+name 'booth'.
 
 
 EXIT STATUS
