@@ -853,29 +853,34 @@ static void unlink_lockfile(int fd)
 
 static void print_usage(void)
 {
-	printf("Usages:\n");
-	printf("  booth daemon [-c config] [-D]\n");
-	printf("  booth [client] {list|grant|revoke} [options]\n");
-	printf("  booth status [-c config] [-D]\n");
-	printf("\n");
-	printf("Client operations:\n");
-	printf("  list:	        List all the tickets\n");
-	printf("  grant:        Grant ticket to site\n");
-	printf("  revoke:       Revoke ticket from site\n");
-	printf("\n");
-	printf("Options:\n");
-	printf("  -c FILE       Specify config file [default " BOOTH_DEFAULT_CONF "]\n");
-	printf("                Can be a path or a name without \".conf\" suffix\n");
-	printf("  -D            Enable debugging to stderr and don't fork\n");
-	printf("  -S            Systemd mode (no forking)\n");
-	printf("  -t            ticket name\n");
-	printf("  -s            site name\n");
-	printf("  -l LOCKFILE   Specify lock file path (daemon only)\n");
-	printf("  -F            Try to grant the ticket immediately (client only)\n");
-	printf("  -w            Wait forever for the result (client only)\n");
-	printf("  -h            Print this help, then exit\n");
-	printf("\n");
-	printf("Please see the man page for details.\n");
+	printf(
+	"Usage:\n"
+	"  booth list [options]\n"
+	"  booth {grant|revoke} [options] <ticket>\n"
+	"  booth status [options]\n"
+	"\n"
+	"  list:	     List all tickets\n"
+	"  grant:        Grant ticket to site\n"
+	"  revoke:       Revoke ticket\n"
+	"\n"
+	"Options:\n"
+	"  -c FILE       Specify config file [default " BOOTH_DEFAULT_CONF "]\n"
+	"                Can be a path or just a name without \".conf\" suffix\n"
+	"  -s <site>     Connect/grant to a different site\n"
+	"  -F            Try to grant the ticket immediately\n"
+	"                even if not all sites are reachable\n"
+	"  -w            Wait forever for the outcome of the request\n"
+	"  -h            Print this help\n"
+	"\n"
+	"Examples:\n"
+	"\n"
+	"  # booth list (list tickets)\n"
+	"  # booth grant ticket-A (grant ticket here)\n"
+	"  # booth grant -s 10.121.8.183 ticket-A (grant ticket to site 10.121.8.183)\n"
+	"  # booth revoke ticket-A (revoke ticket)\n"
+	"\n"
+	"See the booth(8) man page for more details.\n"
+	);
 }
 
 #define OPTION_STRING		"c:Dl:t:s:FhSw"

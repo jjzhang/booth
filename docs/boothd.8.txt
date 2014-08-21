@@ -10,15 +10,15 @@ boothd - The Booth Cluster Ticket Manager.
 
 SYNOPSIS
 --------
-*boothd* 'daemon' ['-D'] [-c 'config']
+*boothd* 'daemon' [-SD] [-c 'config'] [-l 'lockfile']
 
-*booth* ['client'] 'list' [-s 'site'] ['-D'] [-c 'config']
+*booth* 'list' [-s 'site'] [-c 'config']
 
-*booth* ['client'] 'grant' [-F] [-s 'site'] ['-D'] [-t] 'ticket' [-c 'config']
+*booth* 'grant' [-s 'site'] [-c 'config'] [-Fw] 'ticket'
 
-*booth* ['client'] 'revoke' [-s 'site'] ['-D'] [-t] 'ticket'  [-c 'config']
+*booth* 'revoke' [-s 'site'] [-c 'config'] [-w] 'ticket'
 
-*booth* 'status' ['-D'] [-c 'config']
+*booth* 'status' [-D] [-c 'config']
 
 
 DESCRIPTION
@@ -38,20 +38,20 @@ SHORT EXAMPLES
 --------------
 
 ---------------------
-# boothd daemon
+# boothd daemon -D
 
 # booth list
 
-# booth grant -t ticket-nfs
+# booth grant ticket-nfs
 
-# booth revoke -t ticket-nfs
+# booth revoke ticket-nfs
 ---------------------
 
 
 
 OPTIONS
 -------
-*-c*::
+*-c* 'configfile'::
 	Configuration to use.
 +
 Can be a full path to a configuration file, or a short name; in the latter 
@@ -61,25 +61,8 @@ Per default 'booth' is used, which results in the path '/etc/booth/booth.conf'.
 The configuration name also determines the name of the PID file - for the defaults,
 '/var/run/booth/booth.pid'.
 
-*-D*::
-	Debug output/don't daemonize.
-	Increases the debug output level; for 'boothd daemon', keeps the process
-	in the foreground.
-
-*-h*, *--help*::
-	Give a short usage output.
-
 *-s*::
-	Site address.
-
-*-t*::
-	Ticket name.
-
-*-v*, *--version*::
-	Report version information.
-
-*-S*::
-	'systemd' mode: don't fork. This is like '-D' but without the debug output.
+	Site address or name.
 
 *-F*::
 	'immediate grant': Don't wait for unreachable sites to
@@ -89,6 +72,25 @@ The configuration name also determines the name of the PID file - for the defaul
 *-w*::
 	'wait indefinitely': The client will wait forever for the
 	server result for grant and revoke requests.
+
+*-h*, *--help*::
+	Give a short usage output.
+
+*--version*::
+	Report version information.
+
+*-S*::
+	'systemd' mode: don't fork. This is like '-D' but without the debug output.
+
+*-D*::
+	Debug output/don't daemonize.
+	Increases the debug output level; booth daemon remains
+	in the foreground.
+
+*-l* 'lockfile'::
+	Use another lock file. By default, the lock file name is
+	inferred from the configuration file name. Normally not
+	needed.
 
 
 COMMANDS
