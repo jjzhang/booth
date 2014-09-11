@@ -79,9 +79,15 @@ mkdir -p %{buildroot}/%{_mandir}/man8/
 gzip < docs/boothd.8 > %{buildroot}/%{_mandir}/man8/booth.8.gz
 ln %{buildroot}/%{_mandir}/man8/booth.8.gz %{buildroot}/%{_mandir}/man8/boothd.8.gz 
 
+%if %{defined _unitdir}
 # systemd
-mkdir -p %{buildroot}/usr/lib/systemd/system/
-cp -a conf/booth@.service %{buildroot}/usr/lib/systemd/system/booth@.service
+mkdir -p %{buildroot}/%{_unitdir}
+cp -a conf/booth@.service %{buildroot}/%{_unitdir}/booth@.service
+ln -s /usr/sbin/service %{buildroot}%{_sbindir}/rcbooth-arbitrator
+%else
+# sysV init
+ln -s ../../%{_initddir}/booth-arbitrator %{buildroot}%{_sbindir}/rcbooth-arbitrator
+%endif
 
 #install test-parts
 
@@ -101,17 +107,22 @@ rm -rf %{buildroot}
 %defattr(-,root,root,-)
 %{_sbindir}/booth
 %{_sbindir}/boothd
-%{_initrddir}/booth-arbitrator
 %{_mandir}/man8/booth.8.gz
 %{_mandir}/man8/boothd.8.gz
 %dir /usr/lib/ocf
 %dir /usr/lib/ocf/resource.d
 %dir /usr/lib/ocf/resource.d/pacemaker
 %dir %{_sysconfdir}/booth
+%{_sbindir}/rcbooth-arbitrator
 /usr/lib/ocf/resource.d/pacemaker/booth-site
 %config %{_sysconfdir}/booth/booth.conf.example
 
-/usr/lib/systemd/system/booth@.service
+%if %{defined _unitdir}
+%{_unitdir}/booth@.service
+%exclude %{_initddir}/booth-arbitrator
+%else
+%{_initddir}/booth-arbitrator
+%endif
 
 %dir %{_datadir}/booth
 %{_datadir}/booth/service-runnable
