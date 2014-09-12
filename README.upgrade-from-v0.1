@@ -1,0 +1,57 @@
+Notes on upgrade from PAXOS booth v0.1
+======================
+
+Booth v0.1 was a booth version based on the PAXOS algorithm. The
+current booth v0.2 is loosely based on raft and incompatible
+with the one running v0.1. Therefore, rolling upgrades are not
+possible.
+
+Due to the new multi-tenancy feature, the new arbitrator init
+script cannot stop or test status of the paxos v0.1 arbitrator.
+On upgrade to v0.2, the arbitrator, if running, will be stopped.
+
+The OCF resource-agent ocf:pacemaker:booth-site is capable of
+stopping and monitoring the booth v0.1 site daemon.
+
+Update procedure
+----------------
+
+The recommended procedure for update from the paxos booth to the
+new booth version is as follows:
+
+- convert the configuration file /etc/booth/booth.conf on all
+  nodes and arbitrators to the new syntax
+
+- update booth on all arbitrators and start them
+
+- update booth on all nodes and restart the resource:
+
+	# crm resource restart booth
+
+Configuration file syntax changes
+----------------
+
+.Note
+If you didn't specify expiry time or weights different from the
+defaults, then you can skip this section and use the old
+'booth.conf'.
+
+The new booth configuration has many more options for tickets
+and the syntax for 'ticket' got changed. Whereas previously the
+optional expiry time and weights could be specified by appending
+them to the ticket name with a ';' as a separator, the new syntax
+has separate tokens for all ticket options.
+
+For instance, this ticket specification:
+
+	ticket="tkt-A;600;1,2,2"
+
+looks in the new syntax like this:
+
+	ticket="tkt-A"
+		expire="600"
+		weights="1,2,2"
+
+See the 'booth(8)' man page for more details.
+
+# vim: set ft=asciidoc :

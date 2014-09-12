@@ -128,6 +128,7 @@ rm -rf %{buildroot}
 %{_datadir}/booth/service-runnable
 
 %doc README COPYING
+%doc README.upgrade-from-v0.1
 
 # this should be preun, but...
 %pre
