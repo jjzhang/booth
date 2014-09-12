@@ -1,5 +1,5 @@
 #!/bin/bash
-# vim: set sw=4 et :
+# vim: set sw=4 :
 #
 #	Resource Agent for BOOTH site daemon.
 #
@@ -98,11 +98,18 @@ Expects to have a fully populated OCF RA-compliant environment set.
 END
 }
 
-
-get_booth_pid() {
-	ps -o pid,cmd -e |
-		grep -w "[b]oothd.*$OCF_RESKEY_config" |
+grep_cmd_pid() {
+	ps -o pid,cmd -e | grep -w "$@" |
 		awk '{print $1}'
+}
+get_booth_pid() {
+	local pid
+	pid=`grep_cmd_pid "[b]oothd.*$OCF_RESKEY_config"`
+	if [ -z "$pid" ]; then
+		grep_cmd_pid "[b]oothd site$"
+	else
+		echo $pid
+	fi
 }
 is_booth_running() {
 	[ -n "`get_booth_pid`" ]
@@ -111,7 +118,9 @@ is_booth_running() {
 booth_site_status() {
 	is_booth_running ||
 		return $OCF_NOT_RUNNING
+}
 
+booth_monitor_basic() {
 	booth list -c $OCF_RESKEY_config > /dev/null
 }
 
@@ -127,12 +136,11 @@ booth_site_start() {
 		return $OCF_SUCCESS
 	;;
 	$OCF_NOT_RUNNING) ;;
-	*) booth_site_stop ;;
 	esac
 
 	$OCF_RESKEY_daemon daemon -c $OCF_RESKEY_config $OCF_RESKEY_args
 	sleep 1
-	while ! booth_site_status; do
+	while ! booth_monitor_basic; do
 		sleep 1
 	done
 
@@ -159,7 +167,6 @@ booth_site_monitor() {
 	case $? in
 	0) return $OCF_SUCCESS ;;
 	$OCF_NOT_RUNNING) return $OCF_NOT_RUNNING ;;
-	*) return $OCF_ERR_GENERIC ;;
 	esac
 }
 
