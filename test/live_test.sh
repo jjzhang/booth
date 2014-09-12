@@ -147,7 +147,7 @@ manage_site() {
 	runcmd $1 crm resource $2 booth
 }
 manage_arbitrator() {
-	runcmd $1 systemctl $2 booth@booth.service
+	runcmd $1 rcbooth-arbitrator $2
 }
 start_site() {
 	manage_site $1 start
