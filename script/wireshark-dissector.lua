@@ -2,6 +2,7 @@
 --
 do
 	booth_proto = Proto("Booth","Booth")
+	local hdr_len = 48
 
 	function T32(tree, buffer, start, format)
 		local b = buffer(start, 4)
@@ -12,13 +13,23 @@ do
 		local endbuf = buffer:len()
 		pinfo.cols.protocol = "Booth"
 
-		if (endbuf < 24) then
+		if (endbuf < hdr_len) then
 			pinfo.cols.info = "Booth - too small"
 		else
-			local hdr = tree:add(booth_proto, buffer(0, 24), "Booth header")
+			local hdr = tree:add(booth_proto, buffer(0, hdr_len), "Booth header")
 
 			local cmd = buffer(28, 4)
-			local tcmd = T32(hdr, cmd, 0,    "Cmd     %08x, \"" .. cmd:string() .. "\"");
+			local tcmd = T32(hdr, cmd, 0,    "Cmd     \"" .. cmd:string() .. "\"");
+
+			local req = buffer(32, 4)
+			if (req:uint() > 0) then
+				local treq = T32(hdr, req, 0,    "Req     \"" .. req:string() .. "\"");
+			end
+
+			local reason = buffer(40, 4)
+			if (reason:uint() > 0) then
+				local treason = T32(hdr, reason, 0,    "Reason  \"" .. reason:string() .. "\"");
+			end
 
 			local from = buffer(20, 4)
 			local tfrom = T32(hdr, from, 0,  "From    %08x");
@@ -32,7 +43,7 @@ do
 				tlen:add_expert_info(PI_PROTOCOL,  PI_WARN, "Length too big?")
 			end
 
-			T32(hdr, buffer, 32,             "Result  %08x");
+			T32(hdr, buffer, 44,             "Result  %08x");
 			T32(hdr, buffer, 12,             "Magic   %08x");
 			T32(hdr, buffer, 16,             "Version %08x");
 
@@ -42,15 +53,14 @@ do
 
 
 
-			if (endbuf > 36) then
-				local tick = tree:add(booth_proto, buffer(36, endbuf-36), "Booth data")
-				local name = buffer(36, 64)
+			if (endbuf > hdr_len) then
+				local tick = tree:add(booth_proto, buffer(hdr_len, endbuf-hdr_len), "Booth data")
+				local name = buffer(hdr_len, 64)
 				tick:add(name,                "Ticket name: ", name:string())
 
-				T32(tick, buffer, 36+64 +  0, "Leader:         %08x")
-				T32(tick, buffer, 36+64 +  4, "Term:           %08x")
-				T32(tick, buffer, 36+64 +  8, "Term valid for: %08x")
-				T32(tick, buffer, 36+64 + 12, "Leader commit:  %8d")
+				T32(tick, buffer, hdr_len+64 +  0, "Leader:         %08x")
+				T32(tick, buffer, hdr_len+64 +  4, "Term:           %08x")
+				T32(tick, buffer, hdr_len+64 +  8, "Term valid for: %08x")
 			end
 
 			pinfo.cols.info = "Booth, cmd " .. cmd:string()
