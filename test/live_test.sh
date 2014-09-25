@@ -93,6 +93,14 @@ tc_prio() {
 netem_delay() {
 	ext_prog_log tc qdisc add dev $1 parent `netem_parent $1` netem delay $2ms $(($2/10))ms
 }
+netem_duplicate() {
+	ext_prog_log tc qdisc add dev $1 parent `netem_parent $1` \
+		netem duplicate $2\%
+}
+netem_reorder() {
+	ext_prog_log tc qdisc add dev $1 parent `netem_parent $1` \
+		netem reorder $2\% $3\% delay 10ms
+}
 netem_loss() {
 	ext_prog_log tc qdisc add dev $1 parent `netem_parent $1` netem loss $2%
 }
@@ -100,7 +108,9 @@ netem_reset() {
 	ext_prog_log tc qdisc del dev $1 root
 }
 local_netem_env() {
-	local fun=$1 arg=$2
+	local fun=$1
+	shift 1
+	local args=$*
 	local t netif=""
 	local my_addr
 	my_addr=`booth status | get_stat_fld booth_addr_string`
@@ -119,7 +129,7 @@ local_netem_env() {
 		# before first netem qdisc insert the prio qdisc and filter
 		tc qdisc show dev $netif | grep -qs netem ||
 			tc_prio $netif
-		$fun $netif $arg
+		$fun $netif $args
 	else
 		logmsg "cannot find netif for $my_addr, netem not set"
 	fi
@@ -147,7 +157,11 @@ manage_site() {
 	runcmd $1 crm resource $2 booth
 }
 manage_arbitrator() {
-	runcmd $1 rcbooth-arbitrator $2
+	if ps 1 | grep -qws systemd; then
+		runcmd $1 systemctl $2 booth@booth.service
+	else
+		runcmd $1 rcbooth-arbitrator $2
+	fi
 }
 start_site() {
 	manage_site $1 start
@@ -896,6 +910,16 @@ NETEM_ENV_loss() {
 # network delay 100ms
 NETEM_ENV_net_delay() {
 	forall $0 $run_cnf __netem__ netem_delay ${1:-100}
+}
+
+# duplicate packets
+NETEM_ENV_duplicate() {
+	forall $0 $run_cnf __netem__ netem_duplicate ${1:-10}
+}
+
+# reorder packets
+NETEM_ENV_reorder() {
+	forall $0 $run_cnf __netem__ netem_reorder ${1:-25} ${2:-50}
 }
 
 [ -f "$cnf" ] || {
