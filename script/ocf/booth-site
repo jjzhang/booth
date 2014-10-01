@@ -80,6 +80,8 @@ The daemon to start
 <actions>
 <action name="start"        timeout="20" />
 <action name="stop"         timeout="20" />
+<action name="restart"      timeout="20" />
+<action name="reload"       timeout="20" />
 <action name="monitor"      timeout="20" interval="10" depth="0" start-delay="0" />
 <action name="meta-data"    timeout="5" />
 <action name="validate-all"   timeout="30" />
@@ -92,7 +94,7 @@ END
 
 booth_site_usage() {
 	cat <<END
-usage: $0 {start|stop|monitor|validate-all|meta-data}
+usage: $0 {start|stop|restart|reload|monitor|validate-all|meta-data}
 
 Expects to have a fully populated OCF RA-compliant environment set.
 END
@@ -160,6 +162,15 @@ booth_site_stop() {
 		sleep 1
 	done
 	return $OCF_SUCCESS
+}
+
+booth_site_restart() {
+	booth_site_stop
+	booth_site_start
+}
+
+booth_site_reload() {
+	booth_site_restart
 }
 
 booth_site_monitor() {
