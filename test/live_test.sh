@@ -143,7 +143,7 @@ runcmd() {
 	shift 1
 	echo "$h: running '$@'" | logmsg
 	if ip a l | fgrep -wq $h; then
-		$@
+		eval $@
 	else
 		ssh $SSH_OPTS $h $@
 	fi
@@ -182,6 +182,9 @@ stop_arbitrator() {
 }
 restart_site() {
 	manage_site $1 restart
+}
+reload_site() {
+	runcmd $1 OCF_ROOT=/usr/lib/ocf /usr/lib/ocf/resource.d/pacemaker/booth-site reload
 }
 restart_arbitrator() {
 	manage_arbitrator $1 restart
@@ -769,6 +772,18 @@ check_restart_granted() {
 	check_consistency `get_site 1`
 }
 
+## TEST: reload_granted ##
+
+# reload with ticket granted
+test_reload_granted() {
+	grant_ticket 1 || return $ERR_SETUP_FAILED
+	reload_site `get_site 1` || return $ERR_SETUP_FAILED
+	wait_timeout
+}
+check_reload_granted() {
+	check_consistency `get_site 1`
+}
+
 ## TEST: restart_granted_nocib ##
 
 # restart with ticket granted (but cib empty)
@@ -785,7 +800,7 @@ check_restart_granted_nocib() {
 	check_consistency `get_site 1`
 }
 
-## TEST: notgranted ##
+## TEST: restart_notgranted ##
 
 # restart with ticket not granted
 test_restart_notgranted() {
@@ -985,7 +1000,7 @@ TESTS="$@"
 : ${TESTS:="grant longgrant grant_noarb grant_elsewhere
 grant_site_lost grant_site_reappear revoke
 simultaneous_start_even slow_start_granted
-restart_granted restart_granted_nocib restart_notgranted
+restart_granted reload_granted restart_granted_nocib restart_notgranted
 failover split_leader split_follower split_edge
 external_prog_failed"}
 
