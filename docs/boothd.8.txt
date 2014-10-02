@@ -221,8 +221,10 @@ The default is '0'.
 If the network reliability is often reduced over prolonged
 periods, it is advisable to try to renew more often.
 +
-Before every renewal the 'before-acquire-handler' is run. This
-parameter then doubles as a local cluster monitor interval.
+Before every renewal, if defined, the command specified in
+'before-acquire-handler' is run. In that case the 'renewal-freq'
+parameter is effectively also the local cluster monitoring
+interval.
 
 *'timeout'*::
 	After that time 'booth' will re-send packets if there was an
