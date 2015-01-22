@@ -61,7 +61,7 @@ status() {
 		return 0
 	else
 		echo "stopped"
-		return 7
+		return 3
 	fi
 }
 
