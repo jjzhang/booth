@@ -123,6 +123,7 @@ stop() {
 
 foreach() {
 	local cnf cnf_base
+	local rc=0
 
 	for cnf in ${BOOTH_CONF_FILE:-$CONF_DIR/*.conf} ; do
 		if [ $# != 1 ] ; then
@@ -130,10 +131,12 @@ foreach() {
 		fi
 		cnf_base=`basename $cnf`
 		"$@"
+		rc=$((rc|$?))
 		if [ $# != 1 ] ; then
 			echo "== configuration file $cnf done"
 		fi
 	done
+	return $rc
 }
 
 restart() {
