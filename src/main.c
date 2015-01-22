@@ -1143,16 +1143,17 @@ static void set_scheduler(void)
 	}
 }
 
-static void set_oom_adj(int val)
+static int set_procfs_val(const char *path, const char *val)
 {
-        FILE *fp;
+	int rc = -1;
+	FILE *fp = fopen(path, "w");
 
-        fp = fopen("/proc/self/oom_adj", "w");
-        if (!fp)
-                return;
-
-        fprintf(fp, "%i", val);
-        fclose(fp);
+	if (fp) {
+		if (fprintf(fp, "%s", val) > 0)
+			rc = 0;
+		fclose(fp);
+	}
+	return rc;
 }
 
 static int do_status(int type)
@@ -1336,7 +1337,9 @@ static int do_server(int type)
 	signal(SIGINT, (__sighandler_t)sig_exit_handler);
 
 	set_scheduler();
-	set_oom_adj(-16);
+	/* we don't want to be killed by the OOM-killer */
+	if (set_procfs_val("/proc/self/oom_score_adj", "-999"))
+		(void)set_procfs_val("/proc/self/oom_adj", "-16");
 	set_proc_title("%s %s %s for [%s]:%d",
 			DAEMON_NAME,
 			cl.configfile,
