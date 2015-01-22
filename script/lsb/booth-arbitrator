@@ -36,6 +36,8 @@ OCF_NOT_RUNNING=7
 . /etc/rc.status
 
 check_status() {
+	local rc
+
 	rc=$BOOTH_ERROR_GENERIC
 	eval `"$exec" status "${cnf:+-c$cnf}" ; echo rc=$?`
 	case $rc in 
@@ -64,6 +66,8 @@ status() {
 }
 
 start() {
+	local rc
+
 	[ -x $exec ] || exit 5
 	check_status; rc=$?
 	case "$rc" in
@@ -118,6 +122,8 @@ stop() {
 }
 
 foreach() {
+	local cnf cnf_base
+
 	for cnf in ${BOOTH_CONF_FILE:-$CONF_DIR/*.conf} ; do
 		if [ $# != 1 ] ; then
 			echo "== For configuration file $cnf:"
