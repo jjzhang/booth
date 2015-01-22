@@ -81,6 +81,9 @@ start() {
 }
 
 stop() {
+	local rc wait_time
+
+	wait_time=5
 	check_status; rc=$?
 	case $rc in
 	$BOOTH_DAEMON_STARTED);;
@@ -96,26 +99,22 @@ stop() {
 	echo -n $"Stopping BOOTH arbitrator daemon: "
 #	$exec stop "${cnf:+-c$cnf}"
 #	sleep 1
-	if pkill -TERM -s $booth_lockpid boothd ; then
+	pkill -TERM -s $booth_lockpid boothd
+	sleep 0.1
+	check_status; rc=$?
+	while [ $rc -ne $BOOTH_DAEMON_NOT_RUNNING -a $wait_time -gt 0 ]
+	do
+		wait_time=$((wait_time-1))
 		sleep 1
-		pkill -KILL -s $booth_lockpid boothd
-	fi
-	rc_status -v
-}
-
-wait_for_stop() {
-#	while true ; do
-#		check_status ; rc=$?
-#		case $rc in
-#		$BOOTH_DAEMON_STARTED);;
-#                $BOOTH_DAEMON_STARTING);;
-#		*) return 0;;
-#		esac
-#	done
-		
-	while [ -e $booth_lockfile ]; do
-		sleep .5
+		check_status; rc=$?
 	done
+	if [ $rc -ne $BOOTH_DAEMON_NOT_RUNNING ]; then
+		pkill -KILL -s $booth_lockpid boothd
+		sleep 1
+		check_status; rc=$?
+	fi
+	test $rc -eq $BOOTH_DAEMON_NOT_RUNNING
+	rc_status -v
 }
 
 foreach() {
