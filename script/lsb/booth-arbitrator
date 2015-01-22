@@ -30,6 +30,8 @@ BOOTH_DAEMON_STARTING=1
 BOOTH_DAEMON_EXIST=2
 BOOTH_DAEMON_NOT_RUNNING=3
 BOOTH_ERROR_GENERIC=4
+OCF_ERR_GENERIC=1
+OCF_NOT_RUNNING=7
 
 . /etc/rc.status
 
@@ -74,7 +76,7 @@ start() {
 		startproc $exec start "${cnf:+-c$cnf}"
 		rc_status -v
 		;;
-	*) return $OCF_ERR_GENERIC;;
+	*) return 1;;
 	esac
 }
 
@@ -86,9 +88,9 @@ stop() {
 	$BOOTH_DAEMON_EXIST);;
 	$BOOTH_DAEMON_NOT_RUNNING)
 		echo "BOOTH arbitrator daemon is not running."
-		return $OCF_SUCCESS 
+		return 0
 	;;
-	*) return $OCF_ERR_GENERIC;;
+	*) return 1;;
 	esac
 	
 	echo -n $"Stopping BOOTH arbitrator daemon: "
