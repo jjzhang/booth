@@ -23,6 +23,7 @@
 %endif
 
 Name:           booth
+Url:            https://github.com/ClusterLabs/booth
 Summary:        Ticket Manager for Multi-site Clusters
 License:        GPL-2.0+
 Group:          %{pkg_group}
@@ -52,10 +53,10 @@ Requires:       pacemaker-ticket-support >= 2.0
 %endif
 
 %description
-Booth manages the ticket which authorizes one of the cluster sites located in
-geographically dispersed distances to run certain resources. It is designed to
-be an add-on of Pacemaker, which extends Pacemaker to support geographically
-distributed clustering.
+Booth manages tickets which authorize cluster sites located in
+geographically dispersed locations to run resources. It
+facilitates support of geographically distributed clustering in
+Pacemaker.
 
 %prep
 %setup -q -n %{name}
@@ -100,6 +101,14 @@ mkdir -p %{buildroot}/%{test_path}/src/
 ln -s %{_sbindir}/boothd %{buildroot}/%{test_path}/src/
 rm -f %{buildroot}/%{test_path}/test/*.pyc
 
+%check
+%if 0%{?run_build_tests}
+echo "%%run_build_tests set to %run_build_tests; including tests"
+make check
+%else
+echo "%%run_build_tests set to %run_build_tests; skipping tests"
+%endif
+
 %clean
 rm -rf %{buildroot}
 
@@ -127,7 +136,7 @@ rm -rf %{buildroot}
 %dir %{_datadir}/booth
 %{_datadir}/booth/service-runnable
 
-%doc README COPYING
+%doc AUTHORS README COPYING
 %doc README.upgrade-from-v0.1
 
 # this should be preun, but...

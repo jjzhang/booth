@@ -8,7 +8,7 @@ Pacemaker.
     
 Booth is based on the Raft consensus algorithm. Though the
 implementation is not complete (there is no log) and there are a
-few additions and modifications, booth guarantees that the ticket
+few additions and modifications, booth guarantees that a ticket
 is always available at just one site as long as it has exclusive
 control of the tickets.
 

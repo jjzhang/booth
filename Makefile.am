@@ -43,7 +43,7 @@ MAINTAINERCLEANFILES	= Makefile.in aclocal.m4 configure depcomp \
 			  config.guess config.sub missing install-sh \
 			  autoheader automake autoconf test_lense.sh
 
-dist_doc_DATA		= README COPYING README.upgrade-from-v0.1
+dist_doc_DATA		= AUTHORS README COPYING README.upgrade-from-v0.1
 
 notrans_dist_man8_MANS = docs/boothd.8
 
