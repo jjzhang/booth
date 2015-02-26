@@ -21,6 +21,8 @@
 
 #include <time.h>
 #include <unistd.h>
+#include <string.h>
+#include <assert.h>
 #include <sys/time.h>
 
 #if _POSIX_TIMERS > 0
@@ -30,6 +32,10 @@
 #else
 #	define BOOTH_CLOCK CLOCK_REALTIME
 #endif
+
+#define NSECS 1000000000L /* nanoseconds */
+#define TIME_FAC (NSECS/TIME_RES)
+#define SUBSEC tv_nsec
 
 typedef struct timespec timetype;
 
@@ -42,19 +48,15 @@ typedef struct timespec timetype;
 
 void time_sub(struct timespec *a, struct timespec *b, struct timespec *res);
 void time_add(struct timespec *a, struct timespec *b, struct timespec *res);
-time_t get_secs(time_t *p);
+time_t get_secs(struct timespec *p);
 time_t wall_ts(time_t t);
 time_t unwall_ts(time_t t);
 
-#define msecs(tv) ((tv).tv_nsec/1000000)
-
-/* random time from 0 to t milliseconds */
-#define rand_time_ms(tv, t) do { \
-	tv.tv_sec = 0; \
-	tv.tv_nsec = t * cl_rand_from_interval(0, 1000000); \
-	} while(0)
-
 #else
+
+#define MUSECS 1000000L /* microseconds */
+#define TIME_FAC (MUSECS/TIME_RES)
+#define SUBSEC tv_usec
 
 typedef struct timeval timetype;
 #define get_time(p) gettimeofday(p, NULL)
@@ -63,17 +65,23 @@ typedef struct timeval timetype;
 #define time_cmp timercmp
 #define get_secs time
 
-#define msecs(tv) ((tv).tv_usec/1000)
-
-/* random time from 0 to t milliseconds */
-#define rand_time_ms(tv, t) do { \
-	tv.tv_sec = 0; \
-	tv.tv_usec = t * cl_rand_from_interval(0, 1000); \
-	} while(0)
-
 #define wall_ts(t) (t)
 #define unwall_ts(t) (t)
 
 #endif
+
+int is_past(timetype *p);
+void secs2tv(time_t secs, timetype *p);
+void time_reset(timetype *p);
+int time_sub_int(timetype *a, timetype *b);
+void set_future_time(timetype *a, int b);
+int time_left(timetype *p);
+void copy_time(timetype *src, timetype *dst);
+void interval_add(timetype *p, int interval, timetype *res);
+int is_time_set(timetype *p);
+#define intfmt(t) "%d.%03d", (t)/TIME_RES, (t)%TIME_RES
+
+/* random time from 0 to t ms (1/TIME_RES) */
+#define rand_time(t) cl_rand_from_interval(0, t*(TIME_RES/1000))
 
 #endif

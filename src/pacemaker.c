@@ -134,7 +134,7 @@ static int pcmk_write_ticket_atomic(struct ticket_config *tk, int grant)
 			 grant < 0 ? "-r" :
 			 ""),
 			(int32_t)get_node_id(tk->leader),
-			(int64_t)wall_ts(tk->term_expires),
+			(int64_t)wall_ts(tk->term_expires.tv_sec),
 			(int64_t)tk->current_term);
 
 	rv = system(cmd);
@@ -225,7 +225,7 @@ static int pcmk_store_ticket_nonatomic(struct ticket_config *tk)
 	/* Always try to store *each* attribute, even if there's an error
 	 * for one of them. */
 	rv = crm_ticket_set(tk, "owner", (int32_t)get_node_id(tk->leader));
-	rv = crm_ticket_set(tk, "expires", wall_ts(tk->term_expires))  || rv;
+	rv = crm_ticket_set(tk, "expires", wall_ts(tk->term_expires.tv_sec))  || rv;
 	rv = crm_ticket_set(tk, "term", tk->current_term)     || rv;
 
 	if (rv)
@@ -299,7 +299,7 @@ static int pcmk_load_ticket(struct ticket_config *tk)
 
 	rv = crm_ticket_get(tk, "expires", &v);
 	if (!rv) {
-		tk->term_expires = unwall_ts(v);
+		secs2tv(unwall_ts(v), &tk->term_expires);
 	}
 
 	rv = crm_ticket_get(tk, "term", &v);

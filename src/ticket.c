@@ -37,6 +37,7 @@
 
 #define TK_LINE			256
 
+extern int TIME_RES;
 
 /* Untrusted input, must fit (incl. \0) in a buffer of max chars. */
 int check_max_len_valid(const char *s, int max)
@@ -104,31 +105,30 @@ int check_site(char *site, int *is_local)
  */
 static int ticket_dangerous(struct ticket_config *tk)
 {
-	time_t now = get_secs(NULL);
+	int tdiff;
 	/* we may be invoked often, don't spam the log unnecessarily
 	 */
 	static int no_log_delay_msg;
 
-	if (!tk->delay_commit)
+	if (!is_time_set(&tk->delay_commit))
 		return 0;
 
-	if (tk->delay_commit <= now || all_sites_replied(tk)) {
+	if (is_past(&tk->delay_commit) || all_sites_replied(tk)) {
 		if (tk->leader == local) {
 			tk_log_info("%s, committing to CIB",
-				tk->delay_commit <= now ?
+				is_past(&tk->delay_commit) ?
 				"ticket delay expired" : "all sites replied");
 		}
-		tk->delay_commit = 0;
+		time_reset(&tk->delay_commit);
 		no_log_delay_msg = 0;
 		return 0;
 	}
 
-	tk_log_debug("delay ticket commit for %ds",
-			(int)(tk->delay_commit - now));
+	tdiff = time_left(&tk->delay_commit);
+	tk_log_debug("delay ticket commit for another " intfmt(tdiff));
 	if (!no_log_delay_msg) {
-		tk_log_info("delaying ticket commit to CIB for %ds "
-			"(or all sites are reached)",
-			(int)(tk->delay_commit - now));
+		tk_log_info("delaying ticket commit to CIB for " intfmt(tdiff));
+		tk_log_info("(or all sites are reached)");
 		no_log_delay_msg = 1;
 	}
 
@@ -212,19 +212,18 @@ int do_grant_ticket(struct ticket_config *tk, int options)
 	if (is_owned(tk))
 		return RLT_OVERGRANT;
 
-	tk->delay_commit = get_secs(NULL) +
-			tk->term_duration + tk->acquire_after;
+	set_future_time(&tk->delay_commit, tk->term_duration + tk->acquire_after);
 
 	if (options & OPT_IMMEDIATE) {
 		tk_log_warn("granting ticket immediately! If there are "
 				"unreachable sites, _hope_ you are sure that they don't "
 				"have the ticket!");
-		tk->delay_commit = 0;
+		time_reset(&tk->delay_commit);
 	}
 
 	rv = acquire_ticket(tk, OR_ADMIN);
 	if (rv) {
-		tk->delay_commit = 0;
+		time_reset(&tk->delay_commit);
 		return rv;
 	} else {
 		return RLT_MORE;
@@ -277,15 +276,16 @@ int list_ticket(char **pdata, unsigned int *len)
 
 	cp = data;
 	foreach_ticket(i, tk) {
-		if (tk->term_expires != 0) {
-			ts = wall_ts(tk->term_expires);
+		if (is_time_set(&tk->term_expires)) {
+			ts = wall_ts(tk->term_expires.tv_sec);
 			strftime(timeout_str, sizeof(timeout_str), "%F %T",
 					localtime(&ts));
 		} else
 			strcpy(timeout_str, "INF");
 
-		if (tk->leader == local && tk->delay_commit > get_secs(NULL)) {
-			ts = wall_ts(tk->delay_commit);
+		if (tk->leader == local && is_time_set(&tk->delay_commit)
+				&& !is_past(&tk->delay_commit)) {
+			ts = wall_ts(tk->delay_commit.tv_sec);
 			strcpy(pending_str, " (commit pending until ");
 			strftime(pending_str + strlen(" (commit pending until "),
 					sizeof(pending_str) - strlen(" (commit pending until ") - 1,
@@ -335,7 +335,7 @@ static void reacquire_ticket(struct ticket_config *tk)
 	const char *where_granted = "\0";
 	char buff[64];
 
-	valid = (tk->term_expires >= get_secs(NULL));
+	valid = is_time_set(&tk->term_expires) && !is_past(&tk->term_expires);
 
 	if (tk->leader == local) {
 		where_granted = "granted here";
@@ -548,7 +548,7 @@ int ticket_broadcast(struct ticket_config *tk,
 	tk_log_debug("broadcasting '%s' (term=%d, valid=%d)",
 			state_to_string(cmd),
 			ntohl(msg.ticket.term),
-			ntohl(msg.ticket.term_valid_for));
+			msg_term_time(&msg));
 
 	tk->last_request = cmd;
 	if (expected_reply) {
@@ -566,16 +566,16 @@ int ticket_broadcast(struct ticket_config *tk,
 int leader_update_ticket(struct ticket_config *tk)
 {
 	int rv = 0, rv2;
-	time_t now;
+	timetype now;
 
 	if (tk->ticket_updated >= 2)
 		return 0;
 
-	now = get_secs(NULL);
 	if (tk->ticket_updated < 1) {
 		tk->ticket_updated = 1;
-		tk->last_renewal = now;
-		tk->term_expires = now + tk->term_duration;
+		get_time(&now);
+		copy_time(&now, &tk->last_renewal);
+		set_future_time(&tk->term_expires, tk->term_duration);
 		rv = ticket_broadcast(tk, OP_UPDATE, OP_ACK, RLT_SUCCESS, 0);
 	}
 
@@ -685,10 +685,10 @@ just_resend:
 
 int postpone_ticket_processing(struct ticket_config *tk)
 {
-	extern time_t start_time;
+	extern timetype start_time;
 
 	return tk->start_postpone &&
-		((get_secs(NULL) - start_time) < tk->timeout);
+		(-time_left(&start_time) < tk->timeout);
 }
 
 static void process_next_state(struct ticket_config *tk)
@@ -789,8 +789,6 @@ static void next_action(struct ticket_config *tk)
 
 static void ticket_cron(struct ticket_config *tk)
 {
-	time_t now;
-
 	/* don't process the tickets too early after start */
 	if (postpone_ticket_processing(tk)) {
 		tk_log_debug("ticket processing postponed (start_postpone=%d)",
@@ -817,10 +815,8 @@ static void ticket_cron(struct ticket_config *tk)
 
 	/* Has an owner, has an expiry date, and expiry date in the past?
 	 * Losing the ticket must happen in _every_ state. */
-	now = get_secs(NULL);
-	if (is_owned(tk) &&
-			tk->term_expires &&
-			now >= tk->term_expires) {
+	if (is_owned(tk) && is_time_set(&tk->term_expires)
+			&& is_past(&tk->term_expires)) {
 		ticket_lost(tk);
 		goto out;
 	}
@@ -838,20 +834,17 @@ void process_tickets(void)
 {
 	struct ticket_config *tk;
 	int i;
-	timetype now, last_cron;
-
-	get_time(&now);
+	timetype last_cron;
 
 	foreach_ticket(i, tk) {
-		if (time_cmp(&tk->next_cron, &now, >))
+		if (is_time_set(&tk->next_cron) && !is_past(&tk->next_cron))
 			continue;
 
 		tk_log_debug("ticket cron");
 
-
-		last_cron = tk->next_cron;
+		copy_time(&tk->next_cron, &last_cron);
 		ticket_cron(tk);
-		if (!time_cmp(&last_cron, &tk->next_cron, !=)) {
+		if (time_cmp(&last_cron, &tk->next_cron, ==)) {
 			tk_log_debug("nobody set ticket wakeup");
 			set_ticket_wakeup(tk);
 		}
@@ -867,7 +860,7 @@ void tickets_log_info(void)
 	time_t ts;
 
 	foreach_ticket(i, tk) {
-		ts = wall_ts(tk->term_expires);
+		ts = wall_ts(tk->term_expires.tv_sec);
 		tk_log_info("state '%s' "
 				"term %d "
 				"leader %s "
@@ -953,23 +946,22 @@ int message_recv(struct boothc_ticket_msg *msg, int msglen)
 
 static void log_next_wakeup(struct ticket_config *tk)
 {
-	timetype now, res;
+	int left;
 
-	get_time(&now);
-	time_sub(&tk->next_cron, &now, &res);
-	tk_log_debug("set ticket wakeup in %d.%03d",
-		(int)res.tv_sec, (int)msecs(res));
+	left = time_left(&tk->next_cron);
+	tk_log_debug("set ticket wakeup in " intfmt(left));
 }
 
 /* New vote round; §5.2 */
-/* delay the next election start for up to 1s */
+/* delay the next election start for some random time
+ * (up to 1 second)
+ */
 void add_random_delay(struct ticket_config *tk)
 {
-	timetype delay, tv;
+	timetype tv;
 
-	rand_time_ms(delay, 1000);
-	time_add(&tk->next_cron, &delay, &tv);
-	ticket_next_cron_at(tk, tv);
+	interval_add(&tk->next_cron, rand_time(min(1000, tk->timeout)), &tv);
+	ticket_next_cron_at(tk, &tv);
 	if (ANYDEBUG) {
 		log_next_wakeup(tk);
 	}
@@ -977,34 +969,32 @@ void add_random_delay(struct ticket_config *tk)
 
 void set_ticket_wakeup(struct ticket_config *tk)
 {
-	timetype tv, now, res;
+	timetype near_future, tv, next_vote;
 
-	/* At least every hour, perhaps sooner. */
-	ticket_next_cron_in(tk, 3600);
-	get_time(&now);
+	/* At least every hour, perhaps sooner (default) */
+	ticket_next_cron_in(tk, 3600*TIME_RES);
+	set_future_time(&near_future, 10);
 
 	switch (tk->state) {
 	case ST_LEADER:
 		assert(tk->leader == local);
 
-		tv = now;
-		tv.tv_sec = next_vote_starts_at(tk);
+		get_next_election_time(tk, &next_vote);
 
 		/* If timestamp is in the past, wakeup in
-		 * one second. */
-		if (time_cmp(&tv, &now, <)) {
-			time_sub(&tv, &now, &res);
-			tk_log_debug("next ts in the past (%d.%03d)",
-				(int)res.tv_sec, (int)msecs(res));
-			tv.tv_sec = now.tv_sec + 1;
+		 * near future */
+		if (is_past(&next_vote)) {
+			int tdiff = time_left(&next_vote);
+			tk_log_debug("next ts in the past " intfmt(tdiff));
+			ticket_next_cron_at(tk, &near_future);
+		} else {
+			ticket_next_cron_at(tk, &next_vote);
 		}
-
-		ticket_next_cron_at(tk, tv);
 		break;
 
 	case ST_CANDIDATE:
-		assert(tk->election_end);
-		ticket_next_cron_at_coarse(tk, tk->election_end);
+		assert(is_time_set(&tk->election_end));
+		ticket_next_cron_at(tk, &tk->election_end);
 		break;
 
 	case ST_INIT:
@@ -1012,9 +1002,10 @@ void set_ticket_wakeup(struct ticket_config *tk)
 		/* If there is (or should be) some owner, check on it later on.
 		 * If no one is interested - don't care. */
 		if (is_owned(tk) &&
-				(local->type == SITE))
-			ticket_next_cron_at_coarse(tk,
-					tk->term_expires + tk->acquire_after);
+				(local->type == SITE)) {
+			interval_add(&tk->term_expires, tk->acquire_after, &tv);
+			ticket_next_cron_at(tk, &tv);
+		}
 		break;
 
 	default:
@@ -1024,7 +1015,7 @@ void set_ticket_wakeup(struct ticket_config *tk)
 	if (tk->next_state) {
 		/* we need to do something soon here */
 		if (!tk->acks_expected) {
-			ticket_next_cron_at(tk, now);
+			ticket_next_cron_at(tk, &near_future);
 		} else {
 			ticket_activate_timeout(tk);
 		}

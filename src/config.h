@@ -41,10 +41,10 @@ struct ticket_config {
 	/** Name of ticket. */
 	boothc_ticket name;
 
-	/** How many seconds a term lasts (if not refreshed). */
+	/** How long a term lasts if not refreshed (in ms) */
 	int term_duration;
 
-	/** Network related timeouts. */
+	/** Network related timeouts (in ms) */
 	int timeout;
 
 	/** Retries before giving up. */
@@ -55,7 +55,7 @@ struct ticket_config {
 	 * another site. */
 	int acquire_after; /* TODO: needed? */
 
-	/* How often to renew the ticket
+	/* How often to renew the ticket (in ms)
 	 */
 	int renewal_freq;
 
@@ -92,9 +92,9 @@ struct ticket_config {
 	/** Is the ticket granted? */
 	int is_granted;
 	/** Timestamp of leadership expiration */
-	time_t term_expires;
+	timetype term_expires;
 	/** End of election period */
-	time_t election_end;
+	timetype election_end;
 	struct booth_site *voted_for;
 
 
@@ -132,7 +132,7 @@ struct ticket_config {
 	 * immediately, then this is set to some point in time,
 	 * usually (now + term_duration + acquire_after)
 	 */
-	time_t delay_commit;
+	timetype delay_commit;
 
 	/* the last request RPC we sent
 	 */
@@ -146,14 +146,14 @@ struct ticket_config {
 	 */
 	uint64_t acks_received;
 	/* timestamp of the request */
-	time_t req_sent_at;
+	timetype req_sent_at;
 	/* we need to wait for MY_INDEX from other servers,
 	 * hold the ticket processing for a while until they reply
 	 */
 	int start_postpone;
 
 	/** Last renewal time */
-	time_t last_renewal;
+	timetype last_renewal;
 
 	/* Do we need to update the copy in the CIB?
 	 * Normally, the ticket is written only when it changes via

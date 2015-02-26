@@ -62,7 +62,7 @@
 
 int daemonize = 0;
 int enable_stderr = 0;
-time_t start_time;
+timetype start_time;
 
 
 /** Structure for "clients".
@@ -88,7 +88,7 @@ typedef enum
 	BOOTHD_STARTING
 } BOOTH_DAEMON_STATE;
 
-int poll_timeout = POLL_TIMEOUT;
+int poll_timeout;
 
 
 
@@ -1395,7 +1395,7 @@ int main(int argc, char *argv[], char *envp[])
 	int rv;
 
 	init_set_proc_title(argc, argv, envp);
-	get_secs(&start_time);
+	get_time(&start_time);
 
 	memset(&cl, 0, sizeof(cl));
 	strncpy(cl.configfile,

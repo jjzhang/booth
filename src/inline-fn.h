@@ -41,17 +41,17 @@ inline static uint32_t get_node_id(struct booth_site *node)
 }
 
 
-inline static int term_time_left(const struct ticket_config *tk)
+inline static int term_time_left(struct ticket_config *tk)
 {
 	int left;
 
-	left = tk->term_expires - get_secs(NULL);
+	left = time_left(&tk->term_expires);
 	return (left < 0) ? 0 : left;
 }
 
 
 /** Returns number of seconds left, if any. */
-inline static int leader_and_valid(const struct ticket_config *tk)
+inline static int leader_and_valid(struct ticket_config *tk)
 {
 	if (tk->leader != local)
 		return 0;
@@ -68,7 +68,10 @@ inline static int is_owned(const struct ticket_config *tk)
 
 inline static int is_resend(struct ticket_config *tk)
 {
-	return (get_secs(NULL) - tk->req_sent_at) >= tk->timeout;
+	timetype now;
+
+	get_time(&now);
+	return time_sub_int(&now, &tk->req_sent_at) >= tk->timeout;
 }
 
 
@@ -104,6 +107,13 @@ static inline void init_ticket_site_header(struct boothc_ticket_msg *msg, int cm
 	(((tk)->state == ST_CANDIDATE && (tk)->last_valid_tk->current_term) ? \
 	(tk)->last_valid_tk->current_term : (tk)->current_term)
 
+extern int TIME_RES;
+
+#define msg_term_time(msg) \
+	ntohl((msg)->ticket.term_valid_for)*TIME_RES
+#define set_msg_term_time(msg, tk) \
+	(msg)->ticket.term_valid_for = htonl(term_time_left(tk)/TIME_RES)
+
 static inline void init_ticket_msg(struct boothc_ticket_msg *msg,
 		int cmd, int request, int rv, int reason,
 		struct ticket_config *tk)
@@ -121,7 +131,7 @@ static inline void init_ticket_msg(struct boothc_ticket_msg *msg,
 			(tk->leader && tk->leader != no_leader) ? tk->leader :
 				(tk->voted_for ? tk->voted_for : no_leader)));
 		msg->ticket.term           = htonl(tk->current_term);
-		msg->ticket.term_valid_for = htonl(term_time_left(tk));
+		set_msg_term_time(msg, tk);
 	}
 }
 
@@ -148,12 +158,12 @@ static inline void disown_ticket(struct ticket_config *tk)
 {
 	tk->leader = NULL;
 	tk->is_granted = 0;
-	get_secs(&tk->term_expires);
+	get_time(&tk->term_expires);
 }
 
 static inline int disown_if_expired(struct ticket_config *tk)
 {
-	if (get_secs(NULL) >= tk->term_expires ||
+	if (is_past(&tk->term_expires) ||
 			!tk->leader) {
 		disown_ticket(tk);
 		return 1;
@@ -220,32 +230,30 @@ static inline uint32_t index_max3(uint32_t a, uint32_t b, uint32_t c)
 }
 
 
-static inline time_t next_vote_starts_at(struct ticket_config *tk)
+/* only invoked when ticket leader */
+static inline int get_next_election_time(struct ticket_config *tk, timetype *next)
 {
-	time_t next_t;
-
-	/* If not owner, don't renew. */
-	if (tk->leader != local)
-		return 0;
-
-	next_t = tk->last_renewal + tk->renewal_freq;
-	if (tk->delay_commit && next_t > tk->delay_commit)
-		next_t = tk->delay_commit;
-
-	return next_t;
+	assert(tk->leader == local);
+	assert(is_time_set(&tk->last_renewal));
+	interval_add(&tk->last_renewal, tk->renewal_freq, next);
+	/* if delay_commit is earlier than next, then set next to
+	 * delay_commit */
+	if (is_time_set(&tk->delay_commit) &&
+			time_cmp(next, &tk->delay_commit, >)) {
+		copy_time(&tk->delay_commit, next);
+	}
+	return 1;
 }
 
 
 static inline int should_start_renewal(struct ticket_config *tk)
 {
-	time_t now, when;
+	timetype when;
 
-	when = next_vote_starts_at(tk);
-	if (!when)
+	if (!get_next_election_time(tk, &when))
 		return 0;
 
-	get_secs(&now);
-	return when <= now;
+	return is_past(&when);
 }
 
 static inline void expect_replies(struct ticket_config *tk,
@@ -254,7 +262,7 @@ static inline void expect_replies(struct ticket_config *tk,
 	tk->retry_number = 0;
 	tk->acks_expected = reply_type;
 	tk->acks_received = local->bitmask;
-	tk->req_sent_at  = get_secs(NULL);
+	get_time(&tk->req_sent_at);
 }
 
 static inline void no_resends(struct ticket_config *tk)

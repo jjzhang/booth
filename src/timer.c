@@ -18,34 +18,109 @@
 
 #include "timer.h"
 
+/* which time resolution makes most sense?
+ * the factors are clock resolution and network latency
+ */
+int TIME_RES = 1000;
+
+int time_sub_int(timetype *a, timetype *b)
+{
+	timetype res;
+
+	time_sub(a, b, &res);
+	return res.tv_sec*TIME_RES + res.SUBSEC/TIME_FAC;
+}
+
+/* interval (b) is in ms (1/TIME_RES) */
+void interval_add(timetype *a, int b, timetype *res)
+{
+	/* need this to allow interval_add(a, b, a); */
+	long tmp_subsec = a->SUBSEC + (long)b*TIME_FAC;
+
+	res->SUBSEC = tmp_subsec%NSECS;
+	res->tv_sec = a->tv_sec + tmp_subsec/NSECS;
+}
+
+int is_time_set(timetype *p)
+{
+	return (p->tv_sec != 0) || (p->SUBSEC != 0);
+}
+
+int is_past(timetype *p)
+{
+	timetype now;
+
+	/*if (!is_time_set(p))
+		return 1;*/
+	assert(p->tv_sec || p->SUBSEC);
+	get_time(&now);
+	return time_cmp(&now, p, >);
+}
+
+void secs2tv(time_t secs, timetype *p)
+{
+	memset(p, 0, sizeof(timetype));
+	p->tv_sec = secs;
+}
+
+int time_left(timetype *p)
+{
+	timetype now;
+
+	assert(p->tv_sec || p->SUBSEC);
+	get_time(&now);
+	return time_sub_int(p, &now);
+}
+
+void set_future_time(timetype *a, int b)
+{
+	timetype now;
+
+	get_time(&now);
+	interval_add(&now, b, a);
+}
+
+void time_reset(timetype *p)
+{
+	memset(p, 0, sizeof(timetype));
+}
+
+void copy_time(timetype *src, timetype *dst)
+{
+	dst->SUBSEC = src->SUBSEC;
+	dst->tv_sec = src->tv_sec;
+}
+
+#if _POSIX_TIMERS > 0
+
 void time_sub(struct timespec *a, struct timespec *b, struct timespec *res)
 {
 	if (a->tv_nsec < b->tv_nsec) {
-		res->tv_sec = a->tv_sec - b->tv_sec - 1;
-		res->tv_nsec = a->tv_nsec + (1000000000 - b->tv_nsec);
+		res->tv_sec = a->tv_sec - b->tv_sec - 1L;
+		res->tv_nsec = a->tv_nsec + (NSECS - b->tv_nsec);
 	} else {
 		res->tv_sec = a->tv_sec - b->tv_sec;
 		res->tv_nsec = a->tv_nsec - b->tv_nsec;
 	}
 }
 
-
 void time_add(struct timespec *a, struct timespec *b, struct timespec *res)
 {
-	res->tv_nsec = (a->tv_nsec + b->tv_nsec) % 1000000000;
-	res->tv_sec = a->tv_sec + b->tv_sec + ((a->tv_nsec + b->tv_nsec) / 1000000000);
+	res->tv_nsec = (a->tv_nsec + b->tv_nsec) % NSECS;
+	res->tv_sec = a->tv_sec + b->tv_sec + ((a->tv_nsec + b->tv_nsec) / NSECS);
 }
 
-time_t get_secs(time_t *p)
+time_t get_secs(struct timespec *p)
 {
-	struct timespec tv;
-	time_t secs;
 
-	get_time(&tv);
-	secs = tv.tv_sec;
-	if (p)
-		*p = secs;
-	return secs;
+	if (p) {
+		get_time(p);
+		return p->tv_sec;
+	} else {
+		struct timespec tv;
+		get_time(&tv);
+		return tv.tv_sec;
+	}
 }
 
 /* time booth_clk_t is a time since boot or similar, return
@@ -75,3 +150,5 @@ time_t unwall_ts(time_t t)
 	time_sub(&now_tv, &booth_clk_now, &res);
 	return t - res.tv_sec;
 }
+
+#endif

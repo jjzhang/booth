@@ -310,6 +310,28 @@ static int parse_weights(const char *input, int weights[MAX_NODES])
 }
 
 
+/* scan val for time; time is [0-9]+(ms)?, i.e. either in seconds
+ * or milliseconds
+ * returns -1 on failure, otherwise time in ms
+ */
+static long read_time(char *val)
+{
+	long t;
+	char *ep;
+
+	t = strtol(val, &ep, 10);
+	if (ep == val) { /* matched none */
+		t = -1L;
+	} else if (*ep == '\0') { /* matched all */
+		t = t*1000L; /* in seconds, convert to ms */
+	} else if (strcmp(ep, "ms")) { /* ms not exactly matched */
+		t = -1L;
+	} /* otherwise, time in ms */
+	return t;
+}
+
+extern int poll_timeout;
+
 int read_config(const char *path, int type)
 {
 	char line[1024];
@@ -320,6 +342,7 @@ int read_config(const char *path, int type)
 	int i;
 	int lineno = 0;
 	int got_transport = 0;
+	int min_timeout = 0;
 	struct ticket_config defaults = { { 0 } };
 	struct ticket_config *current_tk = NULL;
 
@@ -543,19 +566,24 @@ no_value:
 		}
 
 		if (strcmp(key, "expire") == 0) {
-			current_tk->term_duration = strtol(val, &s, 0);
-			if (*s || s == val || current_tk->term_duration<10) {
-				error = "Expected plain integer value >=10 for expire";
+			current_tk->term_duration = read_time(val);
+			if (current_tk->term_duration <= 0) {
+				error = "Expected time >0 for expire";
 				goto err;
 			}
 			continue;
 		}
 
 		if (strcmp(key, "timeout") == 0) {
-			current_tk->timeout = strtol(val, &s, 0);
-			if (*s || s == val || current_tk->timeout<1) {
-				error = "Expected plain integer value >=1 for timeout";
+			current_tk->timeout = read_time(val);
+			if (current_tk->timeout <= 0) {
+				error = "Expected time >0 for timeout";
 				goto err;
+			}
+			if (!min_timeout) {
+				min_timeout = current_tk->timeout;
+			} else {
+				min_timeout = min(min_timeout, current_tk->timeout);
 			}
 			continue;
 		}
@@ -571,18 +599,18 @@ no_value:
 		}
 
 		if (strcmp(key, "renewal-freq") == 0) {
-			current_tk->renewal_freq = strtol(val, &s, 0);
-			if (*s || s == val || current_tk->renewal_freq<1) {
-				error = "Expected plain integer value >=1 for renewal-freq";
+			current_tk->renewal_freq = read_time(val);
+			if (current_tk->renewal_freq <= 0) {
+				error = "Expected time >0 for renewal-freq";
 				goto err;
 			}
 			continue;
 		}
 
 		if (strcmp(key, "acquire-after") == 0) {
-			current_tk->acquire_after = strtol(val, &s, 0);
-			if (*s || s == val || current_tk->acquire_after<0) {
-				error = "Expected plain integer value >=1 for acquire-after";
+			current_tk->acquire_after = read_time(val);
+			if (current_tk->acquire_after < 0) {
+				error = "Expected time >=0 for acquire-after";
 				goto err;
 			}
 			continue;
@@ -633,6 +661,7 @@ no_value:
 		goto out;
 	}
 
+	poll_timeout = min(POLL_TIMEOUT, min_timeout/10);
 	return 0;
 
 

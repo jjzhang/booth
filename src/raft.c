@@ -31,6 +31,8 @@
 #include "log.h"
 
 
+extern int TIME_RES;
+
 
 inline static void clear_election(struct ticket_config *tk)
 {
@@ -95,6 +97,12 @@ static void update_term_from_msg(struct ticket_config *tk,
 }
 
 
+static void set_ticket_expiry(struct ticket_config *tk,
+		int duration)
+{
+	set_future_time(&tk->term_expires, duration);
+}
+
 static void update_ticket_from_msg(struct ticket_config *tk,
 		struct booth_site *sender,
 		struct boothc_ticket_msg *msg)
@@ -103,9 +111,9 @@ static void update_ticket_from_msg(struct ticket_config *tk,
 
 	tk_log_debug("updating from %s (%d/%d)",
 		site_string(sender),
-		ntohl(msg->ticket.term), ntohl(msg->ticket.term_valid_for));
-	duration = min(tk->term_duration, ntohl(msg->ticket.term_valid_for));
-	tk->term_expires = get_secs(NULL) + duration;
+		ntohl(msg->ticket.term), msg_term_time(msg));
+	duration = min(tk->term_duration, msg_term_time(msg));
+	set_ticket_expiry(tk, duration);
 	update_term_from_msg(tk, msg);
 }
 
@@ -113,7 +121,7 @@ static void update_ticket_from_msg(struct ticket_config *tk,
 static void copy_ticket_from_msg(struct ticket_config *tk,
 		struct boothc_ticket_msg *msg)
 {
-	tk->term_expires = get_secs(NULL) + ntohl(msg->ticket.term_valid_for);
+	set_ticket_expiry(tk, msg_term_time(msg));
 	tk->current_term = ntohl(msg->ticket.term);
 }
 
@@ -122,7 +130,7 @@ static void become_follower(struct ticket_config *tk,
 {
 	copy_ticket_from_msg(tk, msg);
 	tk->state = ST_FOLLOWER;
-	tk->delay_commit = 0;
+	time_reset(&tk->delay_commit);
 	tk->in_election = 0;
 	/* if we're following and the ticket was granted here
 	 * then commit to CIB right away (we're probably restarting)
@@ -139,12 +147,12 @@ static void won_elections(struct ticket_config *tk)
 	tk->leader = local;
 	tk->state = ST_LEADER;
 
-	tk->term_expires = get_secs(NULL) + tk->term_duration;
-	tk->election_end = 0;
+	set_ticket_expiry(tk, tk->term_duration);
+	time_reset(&tk->election_end);
 	tk->voted_for = NULL;
 
-	if (tk->delay_commit && all_sites_replied(tk)) {
-		tk->delay_commit = 0;
+	if (is_time_set(&tk->delay_commit) && all_sites_replied(tk)) {
+		time_reset(&tk->delay_commit);
 		tk_log_debug("reset delay commit as all sites replied");
 	}
 
@@ -211,11 +219,9 @@ static struct booth_site *majority_votes(struct ticket_config *tk)
 
 void elections_end(struct ticket_config *tk)
 {
-	time_t now;
 	struct booth_site *new_leader;
 
-	now = get_secs(NULL);
-	if (now > tk->election_end) {
+	if (is_past(&tk->election_end)) {
 		/* This is previous election timed out */
 		tk_log_info("elections finished");
 	}
@@ -591,17 +597,17 @@ static int process_REJECTED(
 
 static int ticket_seems_ok(struct ticket_config *tk)
 {
-	int time_left;
+	int left;
 
-	time_left = term_time_left(tk);
-	if (!time_left)
+	left = term_time_left(tk);
+	if (!left)
 		return 0; /* quite sure */
 	if (tk->state == ST_CANDIDATE)
 		return 0; /* in state of flux */
 	if (tk->state == ST_LEADER)
 		return 1; /* quite sure */
 	if (tk->state == ST_FOLLOWER &&
-			time_left >= tk->term_duration/3)
+			left >= tk->term_duration/3)
 		return 1; /* almost quite sure */
 	return 0;
 }
@@ -705,15 +711,23 @@ int new_election(struct ticket_config *tk,
 	struct booth_site *preference, int update_term, cmd_reason_t reason)
 {
 	struct booth_site *new_leader;
-	time_t now;
 
 	if (local->type != SITE)
 		return 0;
 
-	get_secs(&now);
-	tk_log_debug("start new election?, now=%" PRIi64 ", end %" PRIi64,
-			(int64_t)wall_ts(now), (int64_t)(wall_ts(tk->election_end)));
-	if (now < tk->election_end)
+	if (ANYDEBUG) {
+		int tdiff;
+
+		if (is_time_set(&tk->election_end)) {
+			tdiff = time_left(&tk->election_end);
+			tk_log_debug("start new election?, end-now=" intfmt(tdiff));
+		} else {
+			tk_log_debug("starting elections");
+		}
+	}
+
+	/* elections were already started, but not yet finished/timed out */
+	if (is_time_set(&tk->election_end) && !is_past(&tk->election_end))
 		return 1;
 
 	/* §5.2 */
@@ -731,7 +745,7 @@ int new_election(struct ticket_config *tk,
 		tk->current_term++;
 	}
 
-	tk->election_end = now + tk->timeout;
+	set_future_time(&tk->election_end, tk->timeout);
 	tk->in_election = 1;
 
 	tk_log_info("starting new election (term=%d)",
@@ -803,7 +817,7 @@ static int process_MY_INDEX (
 	int i;
 	int expired;
 
-	expired = !msg->ticket.term_valid_for;
+	expired = !msg_term_time(msg);
 	i = cmp_msg_ticket(tk, sender, leader, msg);
 
 	if (i > 0) {

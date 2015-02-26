@@ -28,8 +28,10 @@
 #include "config.h"
 #include "log.h"
 
-#define DEFAULT_TICKET_EXPIRY	600
-#define DEFAULT_TICKET_TIMEOUT	5
+extern int TIME_RES;
+
+#define DEFAULT_TICKET_EXPIRY	(600*TIME_RES)
+#define DEFAULT_TICKET_TIMEOUT	(5*TIME_RES)
 #define DEFAULT_RETRIES			10
 
 
@@ -80,25 +82,17 @@ int leader_update_ticket(struct ticket_config *tk);
 void add_random_delay(struct ticket_config *tk);
 void schedule_election(struct ticket_config *tk, cmd_reason_t reason);
 
-static inline void ticket_next_cron_at(struct ticket_config *tk, timetype when)
+static inline void ticket_next_cron_at(struct ticket_config *tk, timetype *when)
 {
-	tk->next_cron = when;
+	copy_time(when, &tk->next_cron);
 }
 
-static inline void ticket_next_cron_at_coarse(struct ticket_config *tk, time_t when)
-{
-	memset(&tk->next_cron, 0, sizeof(tk->next_cron));
-	tk->next_cron.tv_sec  = when;
-}
-
-static inline void ticket_next_cron_in(struct ticket_config *tk, time_t seconds)
+static inline void ticket_next_cron_in(struct ticket_config *tk, int interval)
 {
 	timetype tv;
 
-	get_time(&tv);
-	tv.tv_sec += seconds;
-
-	ticket_next_cron_at(tk, tv);
+	set_future_time(&tv, interval);
+	ticket_next_cron_at(tk, &tv);
 }
 
 
