@@ -141,6 +141,8 @@ rm -rf %{buildroot}
 
 # this should be preun, but...
 %pre
+# new installation?
+test -x %{_sbindir}/booth || exit 0
 # stop the arbitrator if it's the previous paxos version 1.0
 if [ "`booth version | awk '{print $2}'`" = "1.0" ]; then
 	echo "booth v0.1 found"
