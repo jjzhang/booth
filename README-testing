@@ -37,6 +37,16 @@ A split brain condition is also tested. For that to work, all
 sites need `iptables` installed. The supplied script `booth_path`
 is used to manipulate iptables rules.
 
+==== Pacemaker configuration
+
+This is a sample pacemaker configuration for a single-node
+cluster:
+
+primitive booth ocf:pacemaker:booth-site
+primitive d-src1 ocf:heartbeat:Dummy
+
+Please adjust to your environment.
+
 ==== Network environment emulation
 
 To introduce packet loss or network delays, set the NETEM_ENV
