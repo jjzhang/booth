@@ -15,6 +15,11 @@ It is possible to run only specific tests. Run the script without
 arguments to see usage and the list of tests and netem network
 emulation functions.
 
+There are some restrictions on how booth.conf is formatted.
+There could be several tickets defined, but only the first ticket
+is used for testing. This ticket must have expire and timeout
+parameters configured.
+
 Example booth.conf:
 
 ------------
@@ -44,6 +49,7 @@ cluster:
 
 primitive booth ocf:pacemaker:booth-site
 primitive d-src1 ocf:heartbeat:Dummy
+rsc_ticket global-d-src1 ticket-A: d-src1
 
 Please adjust to your environment.
 

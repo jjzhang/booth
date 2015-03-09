@@ -324,14 +324,14 @@ get_tkt() {
 }
 get_tkt_settings() {
 awk '
-n && /^	/ && /expire|timeout|renewal-freq/ {
+n && /^[[:space:]]*(expire|timeout|renewal-freq)/ {
 	sub(" = ", "=", $0);
 	gsub("-", "_", $0);
-	sub("^	", "T_", $0);
+	sub("^[[:space:]]*", "T_", $0);
 	print
 	next
 }
-n && /^$/ {exit}
+n && (/^$/ || /^ticket.*/) {exit}
 /^ticket.*'$tkt'/ {n=1}
 ' $cnf
 }
