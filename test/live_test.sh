@@ -154,7 +154,7 @@ runcmd() {
 	return $rc
 }
 manage_site() {
-	runcmd $1 crm resource $2 booth
+	runcmd $1 crm -w resource $2 booth
 }
 manage_arbitrator() {
 	if ps 1 | grep -qws systemd; then
@@ -328,7 +328,13 @@ n && /^[[:space:]]*(expire|timeout|renewal-freq)/ {
 	sub(" = ", "=", $0);
 	gsub("-", "_", $0);
 	sub("^[[:space:]]*", "T_", $0);
-	print
+	if ($0 ~ /ms$/) {
+		sub("ms$", "", $0);
+		eq = match($0, "=");
+		print substr($0, 1, eq)""substr($0, eq+1)/1000;
+	} else {
+		print;
+	}
 	next
 }
 n && (/^$/ || /^ticket.*/) {exit}
@@ -342,9 +348,7 @@ wait_renewal() {
 	sleep $T_renewal_freq
 }
 wait_timeout() {
-	local t=2
-	[ "$T_timeout" -gt $t ] && t=$T_timeout
-	sleep $t
+	sleep $MIN_TIMEOUT
 }
 
 set_netem_env() {
@@ -950,6 +954,10 @@ site_cnt=`echo $sites | wc -w`
 arbitrator_cnt=`echo $arbitrators | wc -w`
 tkt=`get_tkt < $cnf`
 eval `get_tkt_settings`
+MIN_TIMEOUT=`awk -v tm=$T_timeout 'BEGIN{
+		if (tm >= 2) print tm;
+		else print 2*tm;
+		}'`
 
 if [ "$1" = "__netem__" ]; then
 	shift 1
