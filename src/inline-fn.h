@@ -107,12 +107,12 @@ static inline void init_ticket_site_header(struct boothc_ticket_msg *msg, int cm
 	(((tk)->state == ST_CANDIDATE && (tk)->last_valid_tk->current_term) ? \
 	(tk)->last_valid_tk->current_term : (tk)->current_term)
 
-extern int TIME_RES;
+extern int TIME_RES, TIME_MULT;
 
 #define msg_term_time(msg) \
-	ntohl((msg)->ticket.term_valid_for)*TIME_RES
+	ntohl((msg)->ticket.term_valid_for)*TIME_RES/TIME_MULT
 #define set_msg_term_time(msg, tk) \
-	(msg)->ticket.term_valid_for = htonl(term_time_left(tk)/TIME_RES)
+	(msg)->ticket.term_valid_for = htonl(term_time_left(tk)*TIME_MULT/TIME_RES)
 
 static inline void init_ticket_msg(struct boothc_ticket_msg *msg,
 		int cmd, int request, int rv, int reason,

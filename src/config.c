@@ -327,6 +327,11 @@ static long read_time(char *val)
 	} else if (strcmp(ep, "ms")) { /* ms not exactly matched */
 		t = -1L;
 	} /* otherwise, time in ms */
+	/* if second fractions configured, send finer resolution
+	 * times (i.e. term_valid_for) */
+	if (t % 1000L) {
+		TIME_MULT = 1000;
+	}
 	return t;
 }
 

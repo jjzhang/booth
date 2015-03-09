@@ -22,6 +22,7 @@
  * the factors are clock resolution and network latency
  */
 int TIME_RES = 1000;
+int TIME_MULT = 1;
 
 int time_sub_int(timetype *a, timetype *b)
 {
