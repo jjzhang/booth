@@ -171,7 +171,7 @@ start_arbitrator() {
 }
 stop_site_clean() {
 	manage_site $1 stop &&
-	sleep 1 &&
+	#sleep 1 &&
 	runcmd $1 crm_ticket --force -t $tkt -r
 }
 stop_site() {
@@ -575,7 +575,7 @@ runtest() {
 	echo "finished booth test $1 ($usrmsg)" | logmsg
 	is_function recover_$1 && recover_$1
 	reset_netem_env
-	sleep 3
+	#sleep 3
 	all_booth_status
 	booth_status=$?
 	if [ $rc -eq 0 -a $booth_status -eq 0 ]; then
@@ -646,7 +646,7 @@ test_grant_noarb() {
 	for h in $arbitrators; do
 		stop_arbitrator $h || return $ERR_SETUP_FAILED
 	done >/dev/null 2>&1
-	sleep 1
+	#sleep 1
 	grant_ticket 1 || return $ERR_SETUP_FAILED
 }
 check_grant_noarb() {
@@ -688,7 +688,7 @@ check_grant_elsewhere() {
 # grant with one site lost
 test_grant_site_lost() {
 	stop_site `get_site 2` || return $ERR_SETUP_FAILED
-	wait_timeout
+	#wait_timeout
 	grant_ticket 1 || return $ERR_SETUP_FAILED
 	check_cib `get_site 1` || return 1
 	wait_exp
@@ -705,7 +705,7 @@ recover_grant_site_lost() {
 # grant with one site lost then reappearing
 test_grant_site_reappear() {
 	stop_site `get_site 2` || return $ERR_SETUP_FAILED
-	sleep 1
+	#sleep 1
 	grant_ticket 1 || return $ERR_SETUP_FAILED
 	check_cib `get_site 1` || return 1
 	wait_timeout
@@ -728,7 +728,7 @@ test_simultaneous_start_even() {
 	local serv
 	grant_ticket 2 || return $ERR_SETUP_FAILED
 	stop_booth || return $ERR_SETUP_FAILED
-	wait_timeout
+	#wait_timeout
 	for serv in $(echo $sites | sed "s/`get_site 1` //"); do
 		start_site $serv &
 	done
@@ -750,7 +750,7 @@ check_simultaneous_start_even() {
 test_slow_start_granted() {
 	grant_ticket 1 || return $ERR_SETUP_FAILED
 	stop_booth || return $ERR_SETUP_FAILED
-	wait_timeout
+	#wait_timeout
 	for serv in $sites; do
 		start_site $serv
 		wait_timeout
@@ -794,7 +794,7 @@ check_reload_granted() {
 test_restart_granted_nocib() {
 	grant_ticket 1 || return $ERR_SETUP_FAILED
 	stop_site_clean `get_site 1` || return $ERR_SETUP_FAILED
-	wait_timeout
+	#wait_timeout
 	start_site `get_site 1` || return $ERR_SETUP_FAILED
 	wait_timeout
 	wait_timeout
@@ -810,7 +810,7 @@ check_restart_granted_nocib() {
 test_restart_notgranted() {
 	grant_ticket 1 || return $ERR_SETUP_FAILED
 	stop_site `get_site 2` || return $ERR_SETUP_FAILED
-	sleep 1
+	#sleep 1
 	start_site `get_site 2` || return $ERR_SETUP_FAILED
 	wait_timeout
 }
