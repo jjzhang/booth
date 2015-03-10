@@ -52,8 +52,10 @@ boothconfdir		= ${BOOTHSYSCONFDIR}
 boothconf_DATA		= conf/booth.conf.example
 
 boothsitedir		= /usr/lib/ocf/resource.d/pacemaker
-
 boothsite_SCRIPTS	= script/ocf/booth-site
+
+boothocfdir		= /usr/lib/ocf/resource.d/booth
+boothocf_SCRIPTS	= script/ocf/sharedrsc
 
 bootharbitratordir	= ${INITDDIR}
 
@@ -76,6 +78,7 @@ install-exec-local:
 	$(INSTALL) -d $(DESTDIR)/${boothconfdir}
 	$(INSTALL) -d $(DESTDIR)/${bootharbitratordir}
 	$(INSTALL) -d $(DESTDIR)/${boothsitedir}
+	$(INSTALL) -d $(DESTDIR)/${boothocfdir}
 	$(INSTALL) -d $(DESTDIR)/${SOCKETDIR}
 
 install-exec-hook:

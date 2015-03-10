@@ -1,0 +1,187 @@
+#!/bin/sh
+#
+#
+#		sharedrsc OCF RA. Just keep some resource while running and
+#		release when stopped. The resource is a directory on a
+#		shared filesystem or on a filesystem which is remotely
+#		accessible over ssh. Used for booth testing, i.e. to make
+#		sure that no two sites keep the same ticket.
+#
+# Copyright (c) 2004 SUSE LINUX AG, Lars Marowsky-Brée
+#					 All Rights Reserved.
+# Copyright (c) 2015 SUSE Microfocus, Dejan Muhamedagic
+#					 All Rights Reserved.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of version 2 of the GNU General Public License as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it would be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#
+# Further, this software is distributed without any warranty that it is
+# free of the rightful claim of any third person regarding infringement
+# or the like.	Any license provided herein, whether implied or
+# otherwise, applies only to this software file.  Patent licenses, if
+# any, provided herein do not apply to combinations of this program with
+# other software, or any other product whatsoever.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write the Free Software Foundation,
+# Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
+#
+
+#######################################################################
+# Initialization:
+
+: ${OCF_FUNCTIONS_DIR=${OCF_ROOT}/lib/heartbeat}
+. ${OCF_FUNCTIONS_DIR}/ocf-shellfuncs
+
+#######################################################################
+
+sharedrsc_meta_data() {
+		cat <<END
+<?xml version="1.0"?>
+<!DOCTYPE resource-agent SYSTEM "ra-api-1.dtd">
+<resource-agent name="sharedrsc" version="1.0">
+<version>1.0</version>
+
+<longdesc lang="en">
+This is sharedrsc Resource Agent.
+It just keeps some resource while running and
+releases it when stopped. The resource is a directory on a
+shared filesystem or on a filesystem which is remotely
+accessible over ssh. Used for booth testing, i.e. to make
+sure that no two sites keep the same ticket.
+</longdesc>
+<shortdesc lang="en">shared resource (booth testing)</shortdesc>
+
+<parameters>
+<parameter name="dir" unique="1" required="1">
+<longdesc lang="en">
+Location of the shared directory. If it's of the form "[user@]host:path"
+then it is assumed that the directory is to be accessed over ssh
+on that host. Otherwise, it must be a directory on a shared
+filesystem (such as nfs or ocfs2).
+</longdesc>
+<shortdesc lang="en">shared directory location</shortdesc>
+<content type="string" default="" />
+</parameter>
+
+</parameters>
+
+<actions>
+<action name="start"		timeout="20" />
+<action name="stop"			timeout="20" />
+<action name="monitor"		timeout="20" interval="10" depth="0" />
+<action name="reload"		timeout="20" />
+<action name="migrate_to"	timeout="20" />
+<action name="migrate_from" timeout="20" />
+<action name="meta-data"	timeout="5" />
+<action name="validate-all"   timeout="20" />
+</actions>
+</resource-agent>
+END
+}
+
+#######################################################################
+
+sharedrsc_usage() {
+		cat <<END
+usage: $0 {start|stop|monitor|migrate_to|migrate_from|validate-all|meta-data}
+
+Expects to have a fully populated OCF RA-compliant environment set.
+END
+}
+
+runcmd() {
+	local func=$1
+	local dir=$2
+	$func $dir |
+	if [ -n "$SSH_HOST" ]; then
+		ssh -T -o Batchmode=yes $SSH_HOST
+	else
+		/bin/sh
+	fi
+}
+
+getowner() {
+	echo "test -d $1 && cat $1/owner"
+}
+testcmd() {
+	echo "test -d $1 && test \"\`cat $1/owner\`\" = `uname -n`"
+}
+makecmd() {
+	echo "mkdir $1 && echo `uname -n` > $1/owner"
+}
+removecmd() {
+	echo "test -d $1 && test \"\`cat $1/owner\`\" = `uname -n` && rm $1/owner && rmdir $1"
+}
+
+testdir() {
+	runcmd testcmd $1
+}
+makedir() {
+	runcmd makecmd $1
+}
+removedir() {
+	runcmd removecmd $1
+}
+
+sharedrsc_monitor() {
+	if testdir $DIR; then
+		return $OCF_SUCCESS
+	else
+		return $OCF_NOT_RUNNING
+	fi
+}
+
+sharedrsc_start() {
+	if sharedrsc_monitor; then
+		return $OCF_SUCCESS
+	fi
+	makedir $DIR &&
+		return $OCF_SUCCESS
+
+	local owner
+	if ! owner=`runcmd getowner $DIR`; then
+		owner="... nobody, it's only half-claimed"
+	fi
+	ocf_log err "eek, $OCF_RESKEY_dir already owned by $owner"
+	return $OCF_ERR_GENERIC
+}
+
+sharedrsc_stop() {
+	sharedrsc_monitor
+	if [ $? -eq $OCF_NOT_RUNNING ]; then
+		return $OCF_SUCCESS
+	fi
+	removedir $DIR
+}
+
+sharedrsc_getconfig() {
+	local colon_pos
+	colon_pos=`expr index "$OCF_RESKEY_dir" ":"`
+	if [ $colon_pos -gt 0 ]; then
+		SSH_HOST=`echo $OCF_RESKEY_dir | cut -d: -f 1`
+		DIR=`echo $OCF_RESKEY_dir | cut -d: -f 2`
+	else
+		SSH_HOST=
+		DIR=$OCF_RESKEY_dir
+	fi
+}
+
+sharedrsc_validate_all() {
+	if [ `expr index $DIR /` -ne 1 ]; then
+		ocf_log err "dir must be an absolute path"
+		return $OCF_ERR_INSTALLED
+	fi
+	return $OCF_SUCCESS
+}
+
+OCF_REQUIRED_PARAMS="dir"
+ocf_rarun $*
+
+#
+# vim:tabstop=4:shiftwidth=4:textwidth=0:wrapmargin=0

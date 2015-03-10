@@ -171,5 +171,6 @@ the Cluster Ticket Manager for Pacemaker.
 
 %doc README-testing
 %{test_path}
+/usr/lib/ocf/resource.d/booth/sharedrsc
 
 %changelog
