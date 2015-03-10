@@ -307,7 +307,11 @@ get_servers() {
 		sed -n 's/.*="//;s/"//p'
 }
 get_rsc() {
-	awk '/before-acquire-handler/{print $NF}' $cnf
+	awk '
+n && /^[[:space:]]*before-acquire-handler/ {print $NF; exit}
+n && (/^$/ || /^ticket.*/) {exit}
+/^ticket.*'$tkt'/ {n=1}
+' $cnf
 }
 
 break_external_prog() {
