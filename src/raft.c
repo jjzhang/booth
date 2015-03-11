@@ -715,20 +715,19 @@ int new_election(struct ticket_config *tk,
 	if (local->type != SITE)
 		return 0;
 
+	/* elections were already started, but not yet finished/timed out */
+	if (is_time_set(&tk->election_end) && !is_past(&tk->election_end))
+		return 1;
+
 	if (ANYDEBUG) {
 		int tdiff;
-
 		if (is_time_set(&tk->election_end)) {
-			tdiff = time_left(&tk->election_end);
-			tk_log_debug("start new election?, end-now=" intfmt(tdiff));
+			tdiff = -time_left(&tk->election_end);
+			tk_log_debug("starting elections, previous finished since " intfmt(tdiff));
 		} else {
 			tk_log_debug("starting elections");
 		}
 	}
-
-	/* elections were already started, but not yet finished/timed out */
-	if (is_time_set(&tk->election_end) && !is_past(&tk->election_end))
-		return 1;
 
 	/* §5.2 */
 	/* If there was _no_ answer, don't keep incrementing the term number

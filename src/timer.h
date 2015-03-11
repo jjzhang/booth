@@ -79,7 +79,7 @@ int time_left(timetype *p);
 void copy_time(timetype *src, timetype *dst);
 void interval_add(timetype *p, int interval, timetype *res);
 int is_time_set(timetype *p);
-#define intfmt(t) "%d.%03d", (t)/TIME_RES, (t)%TIME_RES
+#define intfmt(t) "%d.%03d", (t)/TIME_RES, ((t)<0?-(t):(t))%TIME_RES
 
 /* random time from 0 to t ms (1/TIME_RES) */
 #define rand_time(t) cl_rand_from_interval(0, t*(TIME_RES/1000))
