@@ -39,9 +39,14 @@
 	cl_log(sev, "%s (%s/%d/%d): " fmt, \
 	tk->name, state_to_string(tk->state), tk->current_term, term_time_left(tk), \
 	##args)
+#define tk_cl_log_src(sev, fmt, args...) \
+	cl_log(sev, "%s:%d: %s (%s/%d/%d): " fmt, \
+	__FUNCTION__, __LINE__, \
+	tk->name, state_to_string(tk->state), tk->current_term, term_time_left(tk), \
+	##args)
 
 #define tk_log_debug(fmt, args...)		do { \
-	if (ANYDEBUG) tk_cl_log(LOG_DEBUG, fmt, ##args); } \
+	if (ANYDEBUG) tk_cl_log_src(LOG_DEBUG, fmt, ##args); } \
 	while (0)
 #define tk_log_info(fmt, args...)		tk_cl_log(LOG_INFO, fmt, ##args)
 #define tk_log_warn(fmt, args...)		tk_cl_log(LOG_WARNING, fmt, ##args)
