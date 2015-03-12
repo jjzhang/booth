@@ -324,7 +324,7 @@ void reset_ticket(struct ticket_config *tk)
 {
 	disown_ticket(tk);
 	no_resends(tk);
-	tk->state = ST_INIT;
+	set_state(tk, ST_INIT);
 	tk->voted_for = NULL;
 }
 
@@ -390,11 +390,11 @@ void update_ticket_state(struct ticket_config *tk, struct booth_site *sender)
 			}
 			disown_ticket(tk);
 			ticket_write(tk);
-			tk->state = ST_FOLLOWER;
+			set_state(tk, ST_FOLLOWER);
 			tk->next_state = ST_FOLLOWER;
 		} else {
 			if (tk->state == ST_CANDIDATE) {
-				tk->state = ST_FOLLOWER;
+				set_state(tk, ST_FOLLOWER);
 			}
 			tk->next_state = ST_LEADER;
 		}
@@ -404,7 +404,7 @@ void update_ticket_state(struct ticket_config *tk, struct booth_site *sender)
 				tk_log_info("ticket is not granted");
 			else
 				tk_log_info("ticket is not granted (from CIB)");
-			tk->state = ST_INIT;
+			set_state(tk, ST_INIT);
 		} else {
 			if (sender)
 				tk_log_info("ticket granted to %s (says %s)",
@@ -413,7 +413,7 @@ void update_ticket_state(struct ticket_config *tk, struct booth_site *sender)
 			else
 				tk_log_info("ticket granted to %s (from CIB)",
 					site_string(tk->leader));
-			tk->state = ST_FOLLOWER;
+			set_state(tk, ST_FOLLOWER);
 			/* just make sure that we check the ticket soon */
 			tk->next_state = ST_FOLLOWER;
 		}
@@ -723,7 +723,7 @@ static void ticket_lost(struct ticket_config *tk)
 
 	tk->lost_leader = tk->leader;
 	reset_ticket(tk);
-	tk->state = ST_FOLLOWER;
+	set_state(tk, ST_FOLLOWER);
 	if (local->type == SITE) {
 		ticket_write(tk);
 		schedule_election(tk, OR_TKT_LOST);
@@ -1037,7 +1037,6 @@ void schedule_election(struct ticket_config *tk, cmd_reason_t reason)
 	/* introduce a short delay before starting election */
 	add_random_delay(tk);
 }
-
 
 
 /* Given a state (in host byte order), return a human-readable (char*).

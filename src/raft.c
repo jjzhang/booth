@@ -129,7 +129,7 @@ static void become_follower(struct ticket_config *tk,
 		struct boothc_ticket_msg *msg)
 {
 	copy_ticket_from_msg(tk, msg);
-	tk->state = ST_FOLLOWER;
+	set_state(tk, ST_FOLLOWER);
 	time_reset(&tk->delay_commit);
 	tk->in_election = 0;
 	/* if we're following and the ticket was granted here
@@ -145,7 +145,7 @@ static void become_follower(struct ticket_config *tk,
 static void won_elections(struct ticket_config *tk)
 {
 	tk->leader = local;
-	tk->state = ST_LEADER;
+	set_state(tk, ST_LEADER);
 
 	set_ticket_expiry(tk, tk->term_duration);
 	time_reset(&tk->election_end);
@@ -259,7 +259,7 @@ static int newer_term(struct ticket_config *tk,
 	term = ntohl(msg->ticket.term);
 	/* §5.1 */
 	if (term > tk->current_term) {
-		tk->state = ST_FOLLOWER;
+		set_state(tk, ST_FOLLOWER);
 		if (!in_election) {
 			tk->leader = leader;
 			tk_log_info("from %s: higher term %d vs. %d, following %s",
@@ -477,7 +477,7 @@ static int process_VOTE_FOR(
 		tk_log_info("%s wants to give the ticket away",
 			site_string(tk->leader));
 		reset_ticket(tk);
-		tk->state = ST_FOLLOWER;
+		set_state(tk, ST_FOLLOWER);
 		if (local->type == SITE) {
 			ticket_write(tk);
 			schedule_election(tk, OR_STEPDOWN);
@@ -579,7 +579,7 @@ static int process_REJECTED(
 		} else {
 			tk_log_warn("our ticket is outdated and revoked");
 			update_ticket_from_msg(tk, sender, msg);
-			tk->state = ST_INIT;
+			set_state(tk, ST_INIT);
 		}
 		return 0;
 	}
@@ -758,7 +758,7 @@ int new_election(struct ticket_config *tk,
 	record_vote(tk, local, new_leader);
 	tk->voted_for = new_leader;
 
-	tk->state = ST_CANDIDATE;
+	set_state(tk, ST_CANDIDATE);
 
 	/* some callers may want just to repeat on timeout */
 	if (reason == OR_AGAIN) {

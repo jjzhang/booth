@@ -38,6 +38,12 @@ extern int TIME_RES;
 #define foreach_ticket(i_,t_) for(i=0; (t_=booth_conf->ticket+i, i<booth_conf->ticket_count); i++)
 #define foreach_node(i_,n_) for(i=0; (n_=booth_conf->site+i, i<booth_conf->site_count); i++)
 
+#define set_state(tk, newst) do { \
+	tk_log_debug("state transition: %s -> %s", \
+		state_to_string(tk->state), state_to_string(newst)); \
+	tk->state = newst; \
+} while(0)
+
 
 int check_ticket(char *ticket, struct ticket_config **tc);
 int check_site(char *site, int *local);
