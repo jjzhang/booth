@@ -256,6 +256,15 @@ forall() {
 	done
 	return $rc
 }
+forall_withname() {
+	local h rc=0 output
+	for h in $sites $arbitrators; do
+		output=`runcmd $h $@`
+		rc=$((rc|$?))
+		echo $h: $output
+	done
+	return $rc
+}
 forall_sites() {
 	local h rc=0
 	for h in $sites; do
@@ -477,19 +486,36 @@ max_booth_time_diff() {
 booth_leader_consistency() {
 	test `booth_list_fld 2 | sort -u | wc -l` -eq 1
 }
+# are there two leaders or is it just that some booths are outdated
+booth_leader_consistency_2() {
+	test `booth_list_fld 2 | sort -u | grep -iv none | wc -l` -eq 1
+}
+# do all booths have the same info?
+# possible differences:
+# a) more than one leader
+# b) some booths not uptodate (have no leader for the ticket)
+# c) ticket expiry times differ
 check_booth_consistency() {
-	local tlist rc maxdiff
-	tlist=`forall booth list 2>/dev/null | grep $tkt |
-		sed 's/commit:.*//;s/NONE/none/'`
+	local tlist tlist_validate rc rc_lead maxdiff
+	tlist=`forall_withname booth list 2>/dev/null | grep $tkt`
+	tlist_validate=`echo "$tlist" |
+		sed 's/[^:]*: //;s/commit:.*//;s/NONE/none/'`
 	maxdiff=`echo "$tlist" | max_booth_time_diff`
 	test "$maxdiff" -eq 0
 	rc=$?
 	echo "$tlist" | booth_leader_consistency
-	rc=$(($rc | $?<<1))
+	rc_lead=$?
+	if [ $rc_lead -ne 0 ]; then
+		echo "$tlist" | booth_leader_consistency_2
+		rc_lead=$(($rc_lead + $?))  # rc_load=2 if the prev test failed
+	fi
+	rc=$(($rc | $rc_lead<<1))
 	test $rc -eq 0 && return
 	cat<<EOF | logmsg
-`if [ $rc -gt 1 ]; then
+`if [ $rc -ge 4 ]; then
 	echo "booth list consistency failed (more than one leader!):"
+elif [ $rc -ge 2 ]; then
+	echo "booth list consistency failed (some boots not uptodate):"
 else
 	echo "booth list consistency failed (max valid time diff: $maxdiff):"
 fi`
