@@ -172,6 +172,7 @@ int test_external_prog(struct ticket_config *tk,
 		 * Just send a VOTE_FOR message, so the
 		 * others can start elections. */
 		if (leader_and_valid(tk)) {
+			save_committed_tkt(tk);
 			reset_ticket(tk);
 			ticket_write(tk);
 			if (start_election) {
@@ -235,8 +236,9 @@ static void start_revoke_ticket(struct ticket_config *tk)
 {
 	tk_log_info("revoking ticket");
 
+	save_committed_tkt(tk);
 	reset_ticket(tk);
-	tk->leader = no_leader;
+	set_leader(tk, no_leader);
 	ticket_write(tk);
 	ticket_broadcast(tk, OP_REVOKE, OP_ACK, RLT_SUCCESS, OR_ADMIN);
 }
@@ -316,6 +318,25 @@ int list_ticket(char **pdata, unsigned int *len)
 
 	*pdata = data;
 	*len = cp - data;
+
+	return 0;
+}
+
+
+void disown_ticket(struct ticket_config *tk)
+{
+	set_leader(tk, NULL);
+	tk->is_granted = 0;
+	get_time(&tk->term_expires);
+}
+
+int disown_if_expired(struct ticket_config *tk)
+{
+	if (is_past(&tk->term_expires) ||
+			!tk->leader) {
+		disown_ticket(tk);
+		return 1;
+	}
 
 	return 0;
 }
@@ -722,6 +743,7 @@ static void ticket_lost(struct ticket_config *tk)
 	}
 
 	tk->lost_leader = tk->leader;
+	save_committed_tkt(tk);
 	reset_ticket(tk);
 	set_state(tk, ST_FOLLOWER);
 	if (local->type == SITE) {

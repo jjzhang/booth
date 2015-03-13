@@ -154,26 +154,6 @@ static inline const char *ticket_leader_string(struct ticket_config *tk)
 }
 
 
-static inline void disown_ticket(struct ticket_config *tk)
-{
-	tk->leader = NULL;
-	tk->is_granted = 0;
-	get_time(&tk->term_expires);
-}
-
-static inline int disown_if_expired(struct ticket_config *tk)
-{
-	if (is_past(&tk->term_expires) ||
-			!tk->leader) {
-		disown_ticket(tk);
-		return 1;
-	}
-
-	return 0;
-}
-
-
-
 /* We allow half of the uint32_t to be used;
  * half of that below, half of that above the current known "good" value.
  *   0                                                     UINT32_MAX

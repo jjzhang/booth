@@ -68,17 +68,6 @@ inline static void record_vote(struct ticket_config *tk,
 }
 
 
-static int cmp_msg_ticket(struct ticket_config *tk,
-		struct booth_site *sender,
-		struct booth_site *leader,
-		struct boothc_ticket_msg *msg)
-{
-	if (my_last_term(tk) != ntohl(msg->ticket.term)) {
-		return my_last_term(tk) - ntohl(msg->ticket.term);
-	}
-	return 0;
-}
-
 static void update_term_from_msg(struct ticket_config *tk,
 		struct boothc_ticket_msg *msg)
 {
@@ -144,7 +133,7 @@ static void become_follower(struct ticket_config *tk,
 
 static void won_elections(struct ticket_config *tk)
 {
-	tk->leader = local;
+	set_leader(tk, local);
 	set_state(tk, ST_LEADER);
 
 	set_ticket_expiry(tk, tk->term_duration);
@@ -156,11 +145,16 @@ static void won_elections(struct ticket_config *tk)
 		tk_log_debug("reset delay commit as all sites replied");
 	}
 
+	save_committed_tkt(tk);
+
 	ticket_broadcast(tk, OP_HEARTBEAT, OP_ACK, RLT_SUCCESS, 0);
 	tk->ticket_updated = 0;
 }
 
 
+/* if more than one member got the same (and maximum within that
+ * election) number of votes, then that is a tie
+ */
 static int is_tie(struct ticket_config *tk)
 {
 	int i;
@@ -237,7 +231,7 @@ void elections_end(struct ticket_config *tk)
 	} else {
 		tk_log_info("nobody won elections, new elections");
 		notify_client(tk, RLT_MORE);
-		if (!new_election(tk, NULL, is_tie(tk), OR_AGAIN)) {
+		if (!new_election(tk, NULL, is_tie(tk) ? 2 : 0, OR_AGAIN)) {
 			ticket_activate_timeout(tk);
 		}
 	}
@@ -261,7 +255,7 @@ static int newer_term(struct ticket_config *tk,
 	if (term > tk->current_term) {
 		set_state(tk, ST_FOLLOWER);
 		if (!in_election) {
-			tk->leader = leader;
+			set_leader(tk, leader);
 			tk_log_info("from %s: higher term %d vs. %d, following %s",
 					site_string(sender),
 					term, tk->current_term,
@@ -340,7 +334,7 @@ static int answer_HEARTBEAT (
 	/* Racy??? */
 	assert(sender == leader || !leader);
 
-	tk->leader = leader;
+	set_leader(tk, leader);
 
 	/* Ack the heartbeat (we comply). */
 	return send_msg(OP_ACK, tk, sender, msg);
@@ -365,7 +359,7 @@ static int process_UPDATE (
 			site_string(leader));
 
 	become_follower(tk, msg);
-	tk->leader = leader;
+	set_leader(tk, leader);
 	ticket_write(tk);
 
 	/* run ticket_cron if the ticket expires */
@@ -400,8 +394,9 @@ static int process_REVOKE (
 	} else {
 		tk_log_info("%s revokes ticket",
 				site_string(tk->leader));
+		save_committed_tkt(tk);
 		reset_ticket(tk);
-		tk->leader = no_leader;
+		set_leader(tk, no_leader);
 		ticket_write(tk);
 		rv = send_msg(OP_ACK, tk, sender, msg);
 	}
@@ -540,7 +535,7 @@ static int process_REJECTED(
 				ntohl(msg->ticket.term),
 				site_string(leader)
 				);
-		tk->leader = leader;
+		set_leader(tk, leader);
 		tk->expect_more_rejects = 1;
 		become_follower(tk, msg);
 		return 0;
@@ -562,7 +557,7 @@ static int process_REJECTED(
 					"(and we didn't know)",
 					site_string(leader));
 		}
-		tk->leader = leader;
+		set_leader(tk, leader);
 		become_follower(tk, msg);
 		tk->expect_more_rejects = 1;
 		return 0;
@@ -570,7 +565,7 @@ static int process_REJECTED(
 
 	if (tk->state == ST_CANDIDATE &&
 			rv == RLT_YOU_OUTDATED) {
-		tk->leader = leader;
+		set_leader(tk, leader);
 		tk->expect_more_rejects = 1;
 		if (leader && leader != no_leader) {
 			tk_log_warn("our ticket is outdated, granted to %s",
@@ -683,7 +678,7 @@ static int answer_REQ_VOTE(
 
 	/* reset ticket's leader on not valid tickets */
 	if (!valid)
-		tk->leader = NULL;
+		set_leader(tk, NULL);
 
 	/* if it's a newer term or ... */
 	if (newer_term(tk, sender, leader, msg, 1)) {
@@ -735,11 +730,16 @@ int new_election(struct ticket_config *tk,
 	 * listening now either. However, we don't know if we were
 	 * invoked due to a timeout (caller does).
 	 */
-	if (update_term) {
+	/* increment the term only if either the current term was
+	 * valid or if there was a tie (in that case update_term > 1)
+	 */
+	if ((update_term > 1) ||
+		(update_term && tk->last_valid_tk->current_term && 
+			tk->last_valid_tk->current_term >= tk->current_term)) {
 		/* save the previous term, we may need to send out the
 		 * MY_INDEX message */
 		if (tk->state != ST_CANDIDATE) {
-			memcpy(tk->last_valid_tk, tk, sizeof(struct ticket_config));
+			save_committed_tkt(tk);
 		}
 		tk->current_term++;
 	}
@@ -817,7 +817,7 @@ static int process_MY_INDEX (
 	int expired;
 
 	expired = !msg_term_time(msg);
-	i = cmp_msg_ticket(tk, sender, leader, msg);
+	i = my_last_term(tk) - ntohl(msg->ticket.term);
 
 	if (i > 0) {
 		/* let them know about our newer ticket */
@@ -862,8 +862,9 @@ static int process_MY_INDEX (
 	/* their ticket is either newer or not expired, don't
 	 * ignore it */
 	update_ticket_from_msg(tk, sender, msg);
-	tk->leader = leader;
+	set_leader(tk, leader);
 	update_ticket_state(tk, sender);
+	save_committed_tkt(tk);
 	set_ticket_wakeup(tk);
 	return 0;
 }
