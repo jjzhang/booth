@@ -52,9 +52,9 @@ extern int TIME_RES;
 #define save_committed_tkt(tk) \
 	memcpy((tk)->last_valid_tk, tk, sizeof(struct ticket_config))
 
-#define is_term_valid(tk, term) \
+#define is_term_invalid(tk, term) \
 	(tk->last_valid_tk->current_term && \
-		tk->last_valid_tk->current_term <= term)
+		tk->last_valid_tk->current_term > term)
 
 void disown_ticket(struct ticket_config *tk);
 int disown_if_expired(struct ticket_config *tk);

@@ -273,6 +273,25 @@ static int newer_term(struct ticket_config *tk,
 	return 0;
 }
 
+static int msg_term_invalid(struct ticket_config *tk,
+		struct booth_site *sender,
+		struct booth_site *leader,
+		struct boothc_ticket_msg *msg)
+{
+	uint32_t term;
+
+	term = ntohl(msg->ticket.term);
+	/* §5.1 */
+	if (is_term_invalid(tk, term)) {
+		tk_log_info("got invalid term from %s "
+			"(%d vs. %d), ignoring", site_string(sender),
+			term, tk->last_valid_tk->current_term);
+		return 1;
+	}
+
+	return 0;
+}
+
 static int term_too_low(struct ticket_config *tk,
 		struct booth_site *sender,
 		struct booth_site *leader,
@@ -893,6 +912,12 @@ int raft_answer(
 		tk_log_debug("got %s from %s",
 				state_to_string(cmd),
 				site_string(sender));
+
+	/* don't process tickets with invalid term
+	 */
+	if (cmd != OP_STATUS &&
+			msg_term_invalid(tk, sender, leader, msg))
+		return 0;
 
 
 	switch (cmd) {
