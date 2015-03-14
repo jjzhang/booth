@@ -41,16 +41,18 @@ inline static uint32_t get_node_id(struct booth_site *node)
 }
 
 
+/** Returns number of seconds left, if any. */
 inline static int term_time_left(struct ticket_config *tk)
 {
-	int left;
+	int left = 0;
 
-	left = time_left(&tk->term_expires);
+	if (is_time_set(&tk->term_expires)) {
+		left = time_left(&tk->term_expires);
+	}
 	return (left < 0) ? 0 : left;
 }
 
 
-/** Returns number of seconds left, if any. */
 inline static int leader_and_valid(struct ticket_config *tk)
 {
 	if (tk->leader != local)
