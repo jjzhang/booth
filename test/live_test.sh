@@ -183,6 +183,9 @@ stop_arbitrator() {
 restart_site() {
 	manage_site $1 restart
 }
+cleanup_site() {
+	manage_site $1 cleanup
+}
 reload_site() {
 	runcmd $1 OCF_ROOT=/usr/lib/ocf /usr/lib/ocf/resource.d/pacemaker/booth-site reload
 }
@@ -191,6 +194,14 @@ restart_arbitrator() {
 }
 booth_status() {
 	test "`runcmd $1 booth status | get_stat_fld booth_state`" = "started"
+}
+cleanup_booth() {
+	local h procs
+	for h in $sites; do
+		cleanup_site $h & procs="$! $procs"
+	done >/dev/null 2>&1
+	wait $procs
+	wait_timeout
 }
 stop_booth() {
 	local h rc
@@ -1021,6 +1032,7 @@ is_we_server && WE_SERVER=1
 PREFNAME=__pref_booth_live_test
 
 sync_conf || exit
+cleanup_booth
 restart_booth
 all_booth_status || {
 	start_booth
