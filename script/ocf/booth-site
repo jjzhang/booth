@@ -140,7 +140,8 @@ booth_site_start() {
 	$OCF_NOT_RUNNING) ;;
 	esac
 
-	$OCF_RESKEY_daemon daemon -c $OCF_RESKEY_config $OCF_RESKEY_args
+	$OCF_RESKEY_daemon daemon -c $OCF_RESKEY_config $OCF_RESKEY_args ||
+		return $OCF_ERR_GENERIC
 	sleep 1
 	while ! booth_monitor_basic; do
 		sleep 1
