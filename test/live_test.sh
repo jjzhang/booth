@@ -434,9 +434,9 @@ EOF
 check_cib() {
 	local exp_grantee=$1 cib_grantee booth_grantee
 	local rc=0 pending
-	cib_grantee=`check_cib_consistency`
 	booth_grantee=`booth_where_granted`
 	pending=$?
+	cib_grantee=`check_cib_consistency`
 	if [ $pending -eq 0 ]; then
 		[ "$cib_grantee" = "$booth_grantee" ]
 		rc=$?
