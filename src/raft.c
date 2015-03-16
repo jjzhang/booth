@@ -489,7 +489,7 @@ static int process_VOTE_FOR(
 		/* leader wants to step down? */
 		if (sender == tk->leader &&
 			(tk->state == ST_FOLLOWER || tk->state == ST_CANDIDATE)) {
-			tk_log_info("%s wants to give the ticket away",
+			tk_log_info("%s wants to give the ticket away (ticket release)",
 				site_string(tk->leader));
 			save_committed_tkt(tk);
 			reset_ticket(tk);
@@ -499,8 +499,8 @@ static int process_VOTE_FOR(
 				schedule_election(tk, OR_STEPDOWN);
 			}
 		} else {
-			tk_log_info("%s votes for none, ignoring (duplicate ticket drop?)",
-				site_string(tk->sender));
+			tk_log_info("%s votes for none, ignoring (duplicate ticket release?)",
+				site_string(sender));
 		}
 		return 0;
 	}
