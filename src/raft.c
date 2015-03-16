@@ -491,6 +491,7 @@ static int process_VOTE_FOR(
 			(tk->state == ST_FOLLOWER || tk->state == ST_CANDIDATE)) {
 			tk_log_info("%s wants to give the ticket away",
 				site_string(tk->leader));
+			save_committed_tkt(tk);
 			reset_ticket(tk);
 			set_state(tk, ST_FOLLOWER);
 			if (local->type == SITE) {
