@@ -187,7 +187,7 @@ static struct booth_site *majority_votes(struct ticket_config *tk)
 
 	for(i=0; i<booth_conf->site_count; i++) {
 		v = tk->votes_for[i];
-		if (!v)
+		if (!v || v == no_leader)
 			continue;
 
 		n = v->index;
