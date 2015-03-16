@@ -485,16 +485,21 @@ static int process_VOTE_FOR(
 		struct boothc_ticket_msg *msg
 		)
 {
-	/* leader wants to step down? */
-	if (leader == no_leader && sender == tk->leader &&
+	if (leader == no_leader) {
+		/* leader wants to step down? */
+		if (sender == tk->leader &&
 			(tk->state == ST_FOLLOWER || tk->state == ST_CANDIDATE)) {
-		tk_log_info("%s wants to give the ticket away",
-			site_string(tk->leader));
-		reset_ticket(tk);
-		set_state(tk, ST_FOLLOWER);
-		if (local->type == SITE) {
-			ticket_write(tk);
-			schedule_election(tk, OR_STEPDOWN);
+			tk_log_info("%s wants to give the ticket away",
+				site_string(tk->leader));
+			reset_ticket(tk);
+			set_state(tk, ST_FOLLOWER);
+			if (local->type == SITE) {
+				ticket_write(tk);
+				schedule_election(tk, OR_STEPDOWN);
+			}
+		} else {
+			tk_log_info("%s votes for none, ignoring (duplicate ticket drop?)",
+				site_string(tk->sender));
 		}
 		return 0;
 	}
