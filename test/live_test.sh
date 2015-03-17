@@ -582,6 +582,7 @@ runtest() {
 	start_ts=`date +%s`
 	echo -n "Testing: $1... "
 	can_run_test $1 || return 0
+	echo "==================================================" | logmsg
 	echo "starting booth test $1 ..." | logmsg
 	if is_function setup_$1; then
 		if ! setup_$1; then
