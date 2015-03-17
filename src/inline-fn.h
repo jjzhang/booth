@@ -213,30 +213,29 @@ static inline uint32_t index_max3(uint32_t a, uint32_t b, uint32_t c)
 
 
 /* only invoked when ticket leader */
-static inline int get_next_election_time(struct ticket_config *tk, timetype *next)
+static inline void get_next_election_time(struct ticket_config *tk, timetype *next)
 {
 	assert(tk->leader == local);
-	assert(is_time_set(&tk->last_renewal));
-	interval_add(&tk->last_renewal, tk->renewal_freq, next);
+
+	/* if last_renewal is not set, which is unusual, it may mean
+	 * that the ticket never got updated, i.e. nobody acked
+	 * ticket updates (say, due to a temporary connection
+	 * problem)
+	 * we may try a bit later again */
+	if (!is_time_set(&tk->last_renewal)) {
+		time_reset(next);
+	} else {
+		interval_add(&tk->last_renewal, tk->renewal_freq, next);
+	}
+
 	/* if delay_commit is earlier than next, then set next to
 	 * delay_commit */
 	if (is_time_set(&tk->delay_commit) &&
 			time_cmp(next, &tk->delay_commit, >)) {
 		copy_time(&tk->delay_commit, next);
 	}
-	return 1;
 }
 
-
-static inline int should_start_renewal(struct ticket_config *tk)
-{
-	timetype when;
-
-	if (!get_next_election_time(tk, &when))
-		return 0;
-
-	return is_past(&when);
-}
 
 static inline void expect_replies(struct ticket_config *tk,
 		int reply_type)

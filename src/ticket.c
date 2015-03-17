@@ -1005,7 +1005,10 @@ void set_ticket_wakeup(struct ticket_config *tk)
 
 		/* If timestamp is in the past, wakeup in
 		 * near future */
-		if (is_past(&next_vote)) {
+		if (!is_time_set(&next_vote)) {
+			tk_log_debug("next ts unset, wakeup soon");
+			ticket_next_cron_at(tk, &near_future);
+		} else if (is_past(&next_vote)) {
 			int tdiff = time_left(&next_vote);
 			tk_log_debug("next ts in the past " intfmt(tdiff));
 			ticket_next_cron_at(tk, &near_future);
