@@ -46,7 +46,7 @@ run_cnf="/etc/booth/booth.conf"
 shift 1
 ERR_SETUP_FAILED=52
 logf=test_booth.log
-SSH_OPTS="-o StrictHostKeyChecking=no"
+SSH_OPTS="-o StrictHostKeyChecking=no -l root"
 iprules=/usr/share/booth/tests/test/booth_path
 : ${HA_LOGFACILITY:="syslog"}
 
@@ -250,7 +250,7 @@ is_we_server() {
 sync_conf() {
 	local h rc=0
 	for h in $sites $arbitrators; do
-		rsync -q $cnf $h:$run_cnf
+		rsync -q $cnf root@$h:$run_cnf
 		rc=$((rc|$?))
 	done
 	return $rc
@@ -565,10 +565,14 @@ revoke_ticket() {
 }
 run_report() {
 	local start_ts=$1 end_ts=$2 name=$3
+	local hb_report_opts=""
 	local quick_opt=""
 	logmsg "running hb_report"
 	hb_report -Q 2>&1 | grep -sq "illegal.option" ||
 		quick_opt="-Q"
+	if [ `id -u` != 0 ]; then
+		hb_report_opts="-u root"
+	fi
 	hb_report $hb_report_opts $quick_opt -f "`date -d @$((start_ts-5))`" \
 		-t "`date -d @$((end_ts+60))`" \
 		-n "$sites $arbitrators" $name 2>&1 | logmsg
