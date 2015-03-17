@@ -389,7 +389,7 @@ reset_netem_env() {
 	[ -z "$NETEM_ENV" ] && return
 	[ -n "$__NETEM_RESET" ] && return
 	__NETEM_RESET=1
-	forall $0 $run_cnf __netem__ netem_reset
+	forall $ABSPATH $run_cnf __netem__ netem_reset
 }
 setup_netem() {
 	[ -z "$NETEM_ENV" ] && return
@@ -964,29 +964,36 @@ applicable_external_prog_failed() {
 
 # packet loss at one site 30%
 NETEM_ENV_single_loss() {
-	run_site 1 $0 $run_cnf __netem__ netem_loss ${1:-30}
+	run_site 1 $ABSPATH $run_cnf __netem__ netem_loss ${1:-30}
 	PKT_LOSS=${1:-30}
 }
 
 # packet loss everywhere 30%
 NETEM_ENV_loss() {
-	forall $0 $run_cnf __netem__ netem_loss ${1:-30}
+	forall $ABSPATH $run_cnf __netem__ netem_loss ${1:-30}
 	PKT_LOSS=${1:-30}
 }
 
 # network delay 100ms
 NETEM_ENV_net_delay() {
-	forall $0 $run_cnf __netem__ netem_delay ${1:-100}
+	forall $ABSPATH $run_cnf __netem__ netem_delay ${1:-100}
 }
 
 # duplicate packets
 NETEM_ENV_duplicate() {
-	forall $0 $run_cnf __netem__ netem_duplicate ${1:-10}
+	forall $ABSPATH $run_cnf __netem__ netem_duplicate ${1:-10}
 }
 
 # reorder packets
 NETEM_ENV_reorder() {
-	forall $0 $run_cnf __netem__ netem_reorder ${1:-25} ${2:-50}
+	forall $ABSPATH $run_cnf __netem__ netem_reorder ${1:-25} ${2:-50}
+}
+
+# need this if we're run from a local directory or such
+get_prog_abspath() {
+	local p
+	p=`run_site 1 rpm -ql booth-test | fgrep -w $PROG`
+	echo ${p:-/usr/share/booth/tests/test/live_test.sh}
 }
 
 [ -f "$cnf" ] || {
@@ -1049,6 +1056,8 @@ all_booth_status || {
 	}
 }
 revoke_ticket
+
+ABSPATH=`get_prog_abspath`
 
 dump_conf | logmsg
 
