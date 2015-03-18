@@ -14,7 +14,7 @@ SYNOPSIS
 
 *booth* 'list' [-s 'site'] [-c 'config']
 
-*booth* 'grant' [-s 'site'] [-c 'config'] [-Fw] 'ticket'
+*booth* 'grant' [-s 'site'] [-c 'config'] [-FCw] 'ticket'
 
 *booth* 'revoke' [-s 'site'] [-c 'config'] [-w] 'ticket'
 
@@ -67,11 +67,22 @@ The configuration name also determines the name of the PID file - for the defaul
 *-F*::
 	'immediate grant': Don't wait for unreachable sites to
 	relinquish the ticket. See the 'Booth ticket management'
-	section below for more details. Use with caution!
+	section below for more details.
++
+	This option may be DANGEROUS. It makes booth grant the ticket
+	even though it cannot ascertain that unreachable sites don't
+	hold the same ticket. It is up to the user to make sure that
+	unreachable sites don't have this ticket as granted.
 
 *-w*::
-	'wait indefinitely': The client will wait forever for the
-	server result for grant and revoke requests.
+	'wait for the request outcome': The client waits for the
+	final outcome of grant or revoke request.
+
+*-C*::
+	'wait for ticket commit to CIB': The client waits for the
+	ticket commit to CIB (only for grant requests). If one or
+	more sites are unreachable, this takes the ticket expire time
+	(plus, if defined, the 'acquire-after' time).
 
 *-h*, *--help*::
 	Give a short usage output.
@@ -433,20 +444,26 @@ EXIT STATUS
 
 BUGS
 ----
-Probably.
+Booth is tested regularly. See the `README-testing` file for more
+information.
 
-Please report them on GitHub: <https://github.com/ClusterLabs/booth/issues>
+Please report any bugs either at GitHub:
+<https://github.com/ClusterLabs/booth/issues>
 
+Or, if you prefer bugzilla, at openSUSE bugzilla (component "High
+Availability"):
+https://bugzilla.opensuse.org/enter_bug.cgi?product=openSUSE%20Factory
 
 
 AUTHOR
 ------
 'boothd' was originally written (mostly) by Jiaju Zhang.
-Many people have contributed to it.
 
-In 2013 Philipp Marek took over maintainership, followed by Dejan
-Muhamedagic.
+In 2013 and 2014 Philipp Marek took over maintainership.
 
+Since April 2014 it has been mainly developed by Dejan Muhamedagic.
+
+Many people contributed (see the `AUTHORS` file).
 
 
 RESOURCES

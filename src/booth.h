@@ -189,11 +189,12 @@ typedef enum {
 	OR_SPLIT                = CHAR2CONST('S', 'p', 'l', 't'),
 } cmd_reason_t;
 
-/* bitwise command options, currently used only for immediate
- * grant */
+/* bitwise command options
+ */
 typedef enum {
-	OPT_IMMEDIATE = 1,
-	OPT_WAIT = 2,
+	OPT_IMMEDIATE = 1, /* immediate grant */
+	OPT_WAIT = 2, /* wait for the elections' outcome */
+	OPT_WAIT_COMMIT = 4, /* wait for the ticket commit to CIB */
 } cmd_options_t;
 
 /** @} */

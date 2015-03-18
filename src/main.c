@@ -599,7 +599,8 @@ static int test_reply(int reply_code, cmd_request_t cmd)
 
 	case RLT_CIB_PENDING:
 		log_info("%s succeeded (CIB commit pending)", op_str);
-		rv = 0;
+		/* wait for the CIB commit? */
+		rv = (cl.options & OPT_WAIT_COMMIT) ? 2 : 0;
 		break;
 
 	case RLT_MORE:
@@ -870,6 +871,7 @@ static void print_usage(void)
 	"  -F            Try to grant the ticket immediately\n"
 	"                even if not all sites are reachable\n"
 	"  -w            Wait forever for the outcome of the request\n"
+	"  -C            Wait until the ticket is committed to the CIB (grant only)\n"
 	"  -h            Print this help\n"
 	"\n"
 	"Examples:\n"
@@ -883,7 +885,7 @@ static void print_usage(void)
 	);
 }
 
-#define OPTION_STRING		"c:Dl:t:s:FhSw"
+#define OPTION_STRING		"c:Dl:t:s:FhSwC"
 
 void safe_copy(char *dest, char *value, size_t buflen, const char *description) {
 	int content_len = buflen - 1;
@@ -1062,6 +1064,14 @@ static int read_arguments(int argc, char **argv)
 				exit(EXIT_FAILURE);
 			}
 			cl.options |= OPT_WAIT;
+			break;
+
+		case 'C':
+			if (cl.type != CLIENT || cl.op != CMD_GRANT) {
+				log_error("use \"-C\" only for grant");
+				exit(EXIT_FAILURE);
+			}
+			cl.options |= OPT_WAIT | OPT_WAIT_COMMIT;
 			break;
 
 		case 'h':
