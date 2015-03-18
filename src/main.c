@@ -600,7 +600,7 @@ static int test_reply(int reply_code, cmd_request_t cmd)
 	case RLT_CIB_PENDING:
 		log_info("%s succeeded (CIB commit pending)", op_str);
 		/* wait for the CIB commit? */
-		rv = (cl.options & OPT_WAIT_COMMIT) ? 2 : 0;
+		rv = (cl.options & OPT_WAIT_COMMIT) ? 3 : 0;
 		break;
 
 	case RLT_MORE:
@@ -647,7 +647,7 @@ static int do_command(cmd_request_t cmd)
 	struct booth_transport const *tpt;
 	uint32_t leader_id;
 	int rv;
-	int reply_cnt = 0;
+	int reply_cnt = 0, pending_msg_logged = 0;
 	const char *op_str = "";
 
 	if (cmd == CMD_GRANT)
@@ -710,8 +710,7 @@ read_more:
 		goto out_close;
 
 	rv = test_reply(ntohl(reply.header.result), cmd);
-	switch(rv) {
-	case 1:
+	if (rv == 1) {
 		local_transport->close(site);
 		leader_id = ntohl(reply.ticket.leader);
 		if (!find_site_by_id(leader_id, &site)) {
@@ -720,7 +719,8 @@ read_more:
 			goto out_close;
 		}
 		goto redirect;
-	case 2: /* the server has more to say */
+	} else if (rv == 2 || rv == 3) {
+		/* the server has more to say */
 		/* don't wait too long */
 		if (reply_cnt > 1 && !(cl.options & OPT_WAIT)) {
 			rv = 0;
@@ -732,11 +732,12 @@ read_more:
 		if (reply_cnt == 0) {
 			log_info("%s request sent, "
 				"waiting for the result ...", op_str);
+		} else if (rv == 3 && reply_cnt > 2 && !pending_msg_logged) {
+			log_info("waiting for the CIB commit ...");
+			pending_msg_logged = 1;
 		}
 		reply_cnt++;
 		goto read_more;
-	default:
-		break;
 	}
 
 out_close:

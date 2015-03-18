@@ -644,6 +644,9 @@ runtest() {
 grant_ticket() {
 	run_site $1 booth grant -w $tkt >/dev/null
 }
+grant_ticket_cib() {
+	run_site $1 booth grant -C $tkt >/dev/null
+}
 
 ## TEST: grant ##
 
@@ -670,9 +673,9 @@ check_longgrant() {
 
 ## TEST: longgrant2 ##
 
-# just a grant followed by three expire times
+# just a grant followed by 10 expire times
 setup_longgrant2() {
-	grant_ticket 1 || return $ERR_SETUP_FAILED
+	grant_ticket_cib 1 || return $ERR_SETUP_FAILED
 }
 test_longgrant2() {
 	local i
@@ -772,7 +775,7 @@ recover_grant_site_reappear() {
 # simultaneous start of even number of members
 test_simultaneous_start_even() {
 	local serv
-	grant_ticket 2 || return $ERR_SETUP_FAILED
+	grant_ticket_cib 2 || return $ERR_SETUP_FAILED
 	stop_booth || return $ERR_SETUP_FAILED
 	#wait_timeout
 	for serv in $(echo $sites | sed "s/`get_site 1` //"); do
@@ -794,7 +797,7 @@ check_simultaneous_start_even() {
 
 # slow start
 test_slow_start_granted() {
-	grant_ticket 1 || return $ERR_SETUP_FAILED
+	grant_ticket_cib 1 || return $ERR_SETUP_FAILED
 	stop_booth || return $ERR_SETUP_FAILED
 	#wait_timeout
 	for serv in $sites; do
@@ -814,7 +817,7 @@ check_slow_start_granted() {
 
 # restart with ticket granted
 test_restart_granted() {
-	grant_ticket 1 || return $ERR_SETUP_FAILED
+	grant_ticket_cib 1 || return $ERR_SETUP_FAILED
 	restart_site `get_site 1` || return $ERR_SETUP_FAILED
 	wait_timeout
 }
@@ -826,7 +829,7 @@ check_restart_granted() {
 
 # reload with ticket granted
 test_reload_granted() {
-	grant_ticket 1 || return $ERR_SETUP_FAILED
+	grant_ticket_cib 1 || return $ERR_SETUP_FAILED
 	reload_site `get_site 1` || return $ERR_SETUP_FAILED
 	wait_timeout
 }
@@ -838,7 +841,7 @@ check_reload_granted() {
 
 # restart with ticket granted (but cib empty)
 test_restart_granted_nocib() {
-	grant_ticket 1 || return $ERR_SETUP_FAILED
+	grant_ticket_cib 1 || return $ERR_SETUP_FAILED
 	stop_site_clean `get_site 1` || return $ERR_SETUP_FAILED
 	#wait_timeout
 	start_site `get_site 1` || return $ERR_SETUP_FAILED
@@ -854,7 +857,7 @@ check_restart_granted_nocib() {
 
 # restart with ticket not granted
 test_restart_notgranted() {
-	grant_ticket 1 || return $ERR_SETUP_FAILED
+	grant_ticket_cib 1 || return $ERR_SETUP_FAILED
 	stop_site `get_site 2` || return $ERR_SETUP_FAILED
 	#sleep 1
 	start_site `get_site 2` || return $ERR_SETUP_FAILED
@@ -887,7 +890,7 @@ recover_failover() {
 
 # split brain (leader alone)
 test_split_leader() {
-	grant_ticket 1 || return $ERR_SETUP_FAILED
+	grant_ticket_cib 1 || return $ERR_SETUP_FAILED
 	run_site 1 $iprules stop $port   >/dev/null
 	wait_exp
 	wait_timeout
@@ -911,7 +914,7 @@ recover_split_leader() {
 
 # split brain (follower alone)
 test_split_follower() {
-	grant_ticket 1 || return $ERR_SETUP_FAILED
+	grant_ticket_cib 1 || return $ERR_SETUP_FAILED
 	run_site 2 $iprules stop $port  >/dev/null
 	wait_exp
 	wait_timeout
@@ -926,7 +929,7 @@ check_split_follower() {
 
 # split brain (leader alone)
 test_split_edge() {
-	grant_ticket 1 || return $ERR_SETUP_FAILED
+	grant_ticket_cib 1 || return $ERR_SETUP_FAILED
 	run_site 1 $iprules stop $port  >/dev/null
 	wait_exp
 	run_site 1 $iprules start $port  >/dev/null
