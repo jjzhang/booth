@@ -769,7 +769,7 @@ static void next_action(struct ticket_config *tk)
 				site_string(tk->leader),
 				site_string(tk->voted_for));
 		if (!tk->leader) {
-			if (!tk->voted_for) {
+			if (!tk->voted_for || !tk->in_election) {
 				disown_ticket(tk);
 				if (!new_election(tk, NULL, 1, OR_AGAIN)) {
 					ticket_activate_timeout(tk);
@@ -836,7 +836,8 @@ static void ticket_cron(struct ticket_config *tk)
 	}
 
 	/* Has an owner, has an expiry date, and expiry date in the past?
-	 * Losing the ticket must happen in _every_ state. */
+	 * Losing the ticket must happen in _every_ state.
+	 */
 	if (is_owned(tk) && is_time_set(&tk->term_expires)
 			&& is_past(&tk->term_expires)) {
 		ticket_lost(tk);
