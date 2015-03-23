@@ -28,6 +28,7 @@
 #include "config.h"
 #include "raft.h"
 #include "ticket.h"
+#include "request.h"
 #include "log.h"
 
 
@@ -230,7 +231,8 @@ void elections_end(struct ticket_config *tk)
 				site_string(new_leader));
 	} else {
 		tk_log_info("nobody won elections, new elections");
-		notify_client(tk, RLT_MORE);
+		tk->outcome = RLT_MORE;
+		foreach_tkt_req(tk, notify_client);
 		if (!new_election(tk, NULL, is_tie(tk) ? 2 : 0, OR_AGAIN)) {
 			ticket_activate_timeout(tk);
 		}

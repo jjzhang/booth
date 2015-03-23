@@ -94,7 +94,8 @@ int send_reject(struct booth_site *dest, struct ticket_config *tk,
 	cmd_result_t code, struct boothc_ticket_msg *in_msg);
 int send_msg (int cmd, struct ticket_config *tk,
 	struct booth_site *dest, struct boothc_ticket_msg *in_msg);
-void notify_client(struct ticket_config *tk, int rv);
+int notify_client(struct ticket_config *tk, struct client *req_client,
+	struct boothc_ticket_msg *msg);
 int ticket_broadcast(struct ticket_config *tk, cmd_request_t cmd, cmd_request_t expected_reply, cmd_result_t res, cmd_reason_t reason);
 
 int leader_update_ticket(struct ticket_config *tk);

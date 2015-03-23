@@ -226,13 +226,19 @@ int find_client_by_fd(int fd)
 /* Only used for client requests, TCP ???*/
 void process_connection(int ci)
 {
-	struct boothc_ticket_msg msg;
+	struct boothc_ticket_msg *msg;
 	int rv, len, expr, fd;
 	void (*deadfn) (int ci);
 
 
+	msg = calloc(sizeof(struct boothc_ticket_msg), 1);
+	if (!msg) {
+		rv = -ENOMEM;
+		log_error("out of memory for client messages");
+		goto kill;
+	}
 	fd = clients[ci].fd;
-	rv = do_read(fd, &msg.header, sizeof(msg.header));
+	rv = do_read(fd, &msg->header, sizeof(msg->header));
 
 	if (rv < 0) {
 		if (errno == ECONNRESET)
@@ -242,19 +248,18 @@ void process_connection(int ci)
 		goto kill;
 	}
 
-	if (check_boothc_header(&msg.header, -1) < 0)
+	if (check_boothc_header(&msg->header, -1) < 0)
 		goto kill;
 
 	/* Basic sanity checks already done. */
-	len = ntohl(msg.header.length);
+	len = ntohl(msg->header.length);
 	if (len) {
-		if (len != sizeof(msg)) {
-bad_len:
-			log_error("got wrong length %u", len);
+		if (len != sizeof(struct boothc_ticket_msg)) {
+			log_error("got message of wrong length %u from client", len);
 			return;
 		}
-		expr = len - sizeof(msg.header);
-		rv = do_read(clients[ci].fd, msg.header.data, expr);
+		expr = len - sizeof(msg->header);
+		rv = do_read(clients[ci].fd, msg->header.data, expr);
 		if (rv < 0) {
 			log_error("connection %d read data error %d, wanted %d",
 					ci, rv, expr);
@@ -266,24 +271,23 @@ bad_len:
 	/* For CMD_GRANT and CMD_REVOKE:
 	 * Don't close connection immediately, but send
 	 * result a second later? */
-	switch (ntohl(msg.header.cmd)) {
+	switch (ntohl(msg->header.cmd)) {
 	case CMD_LIST:
-		ticket_answer_list(fd, &msg);
+		ticket_answer_list(fd, msg);
 		goto kill;
 
 	case CMD_GRANT:
 	case CMD_REVOKE:
-		/* Expect boothc_ticket_site_msg. */
-		if (len != sizeof(msg))
-			goto bad_len;
-		process_client_request(&clients[ci], &msg);
-		return;
+		if (process_client_request(&clients[ci], msg) == 1)
+			goto kill; /* request processed definitely, close connection */
+		else
+			return;
 
 	default:
 		log_error("connection %d cmd %x unknown",
-				ci, ntohl(msg.header.cmd));
-		init_header(&msg.header, CL_RESULT, 0, 0, RLT_INVALID_ARG, 0, sizeof(msg.header));
-		send_header_only(fd, &msg.header);
+				ci, ntohl(msg->header.cmd));
+		init_header(&msg->header, CL_RESULT, 0, 0, RLT_INVALID_ARG, 0, sizeof(msg->header));
+		send_header_only(fd, &msg->header);
 		goto kill;
 	}
 
@@ -294,6 +298,9 @@ kill:
 	deadfn = clients[ci].deadfn;
 	if(deadfn) {
 		deadfn(ci);
+	}
+	if (msg) {
+		free(msg);
 	}
 	return;
 }
@@ -647,7 +654,7 @@ static int do_command(cmd_request_t cmd)
 	struct booth_transport const *tpt;
 	uint32_t leader_id;
 	int rv;
-	int reply_cnt = 0, pending_msg_logged = 0;
+	int reply_cnt = 0, msg_logged = 0;
 	const char *op_str = "";
 
 	if (cmd == CMD_GRANT)
@@ -732,9 +739,10 @@ read_more:
 		if (reply_cnt == 0) {
 			log_info("%s request sent, "
 				"waiting for the result ...", op_str);
-		} else if (rv == 3 && reply_cnt > 2 && !pending_msg_logged) {
+			msg_logged++;
+		} else if (rv == 3 && msg_logged < 2) {
 			log_info("waiting for the CIB commit ...");
-			pending_msg_logged = 1;
+			msg_logged++;
 		}
 		reply_cnt++;
 		goto read_more;

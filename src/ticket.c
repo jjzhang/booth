@@ -34,6 +34,7 @@
 #include "booth.h"
 #include "raft.h"
 #include "handler.h"
+#include "request.h"
 
 #define TK_LINE			256
 
@@ -485,30 +486,31 @@ int ticket_answer_list(int fd, struct boothc_ticket_msg *msg)
 
 int process_client_request(struct client *req_client, struct boothc_ticket_msg *msg)
 {
-	int rv;
+	int rv, rc = 1;
 	struct ticket_config *tk;
 	int cmd;
+	struct boothc_ticket_msg omsg;
 
 	cmd = ntohl(msg->header.cmd);
 	if (!check_ticket(msg->ticket.id, &tk)) {
 		log_warn("client referenced unknown ticket %s",
 				msg->ticket.id);
 		rv = RLT_INVALID_ARG;
-		goto reply;
+		goto reply_now;
 	}
 
 	if ((cmd == CMD_GRANT) && is_owned(tk)) {
 		log_warn("client wants to grant an (already granted!) ticket %s",
 				msg->ticket.id);
 		rv = RLT_OVERGRANT;
-		goto reply;
+		goto reply_now;
 	}
 
 	if ((cmd == CMD_REVOKE) && !is_owned(tk)) {
 		log_info("client wants to revoke a free ticket %s",
 				msg->ticket.id);
 		rv = RLT_TICKET_IDLE;
-		goto reply;
+		goto reply_now;
 	}
 
 	if ((cmd == CMD_REVOKE) && tk->leader != local) {
@@ -516,7 +518,7 @@ int process_client_request(struct client *req_client, struct boothc_ticket_msg *
 				"redirect to %s",
 				msg->ticket.id, ticket_leader_string(tk));
 		rv = RLT_REDIRECT;
-		goto reply;
+		goto reply_now;
 	}
 
 	if (cmd == CMD_REVOKE)
@@ -525,37 +527,55 @@ int process_client_request(struct client *req_client, struct boothc_ticket_msg *
 		rv = do_grant_ticket(tk, ntohl(msg->header.options));
 
 	if (rv == RLT_MORE) {
-		/* client may receive further notifications */
-		tk->req_client = req_client;
+		/* client may receive further notifications, save the
+		 * request for further processing */
+		add_req(tk, req_client, msg);
+		tk_log_debug("queue request %s for client %d",
+			state_to_string(cmd), req_client->fd);
+		rc = 0; /* we're not yet done with the message */
 	}
 
-reply:
-	init_ticket_msg(msg, CL_RESULT, 0, rv, 0, tk);
-	return send_ticket_msg(req_client->fd, msg);
+reply_now:
+	init_ticket_msg(&omsg, CL_RESULT, 0, rv, 0, tk);
+	send_ticket_msg(req_client->fd, &omsg);
+	return rc;
 }
 
-void notify_client(struct ticket_config *tk, int rv)
+int notify_client(struct ticket_config *tk, struct client *req_client,
+    struct boothc_ticket_msg *msg)
 {
 	struct boothc_ticket_msg omsg;
 	void (*deadfn) (int ci);
-	int rc, ci;
+	int rv, rc, ci;
+	int cmd, options;
 
-	if (!tk->req_client)
-		return;
-
+	cmd = ntohl(msg->header.cmd);
+	options = ntohl(msg->header.options);
+	rv = tk->outcome;
+	tk_log_debug("notifying client %d (request %s)",
+		req_client->fd, state_to_string(cmd));
 	init_ticket_msg(&omsg, CL_RESULT, 0, rv, 0, tk);
-	rc = send_ticket_msg(tk->req_client->fd, &omsg);
+	rc = send_ticket_msg(req_client->fd, &omsg);
 
-	/* we sent a definite answer or there was a write error, drop
-	 * the client */
-	if (rv != RLT_MORE || rc) {
-		deadfn = tk->req_client->deadfn;
+	if (rc == 0 && ((rv == RLT_MORE) ||
+			(rv == RLT_CIB_PENDING && (options & OPT_WAIT_COMMIT)))) {
+		/* more to do here, keep the request */
+		return 1;
+	} else {
+		/* we sent a definite answer or there was a write error, drop
+		 * the client */
+		if (!rc) {
+			tk_log_debug("failed to notify client %d (request %s)",
+				req_client->fd, state_to_string(cmd));
+		}
+		deadfn = req_client->deadfn;
 		if(deadfn) {
-			ci = find_client_by_fd(tk->req_client->fd);
+			ci = find_client_by_fd(req_client->fd);
 			if (ci >= 0)
 				deadfn(ci);
 		}
-		tk->req_client = NULL;
+		free(msg);
+		return 0; /* we're done with this request */
 	}
 }
 
@@ -605,10 +625,14 @@ int leader_update_ticket(struct ticket_config *tk)
 		switch(rv2) {
 		case 0:
 			tk->ticket_updated = 2;
-			notify_client(tk, RLT_SUCCESS);
+			tk->outcome = RLT_SUCCESS;
+			foreach_tkt_req(tk, notify_client);
 			break;
 		case 1:
-			notify_client(tk, RLT_CIB_PENDING);
+			if (tk->outcome != RLT_CIB_PENDING) {
+				tk->outcome = RLT_CIB_PENDING;
+				foreach_tkt_req(tk, notify_client);
+			}
 			break;
 		default:
 			break;
@@ -721,7 +745,8 @@ static void process_next_state(struct ticket_config *tk)
 	case ST_INIT:
 		no_resends(tk);
 		start_revoke_ticket(tk);
-		notify_client(tk, RLT_SUCCESS);
+		tk->outcome = RLT_SUCCESS;
+		foreach_tkt_req(tk, notify_client);
 		break;
 	/* wanting to be follower is not much of an ambition; no
 	 * processing, just return; don't reset start_postpone until
