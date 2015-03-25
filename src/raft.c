@@ -844,14 +844,12 @@ static int process_MY_INDEX (
 	int expired;
 
 	expired = !msg_term_time(msg);
+	/* test against the last valid(!) ticket we have */
 	i = my_last_term(tk) - ntohl(msg->ticket.term);
 
 	if (i > 0) {
 		/* let them know about our newer ticket */
-		/* but if we're voting in elections, our ticket is not
-		 * valid yet, don't send it */
-		if (!tk->in_election)
-			send_msg(OP_MY_INDEX, tk, sender, msg);
+		send_msg(OP_MY_INDEX, tk, sender, msg);
 		if (tk->state == ST_LEADER) {
 			tk_log_info("sending ticket update to %s",
 					site_string(sender));
