@@ -36,6 +36,7 @@
 #define NSECS 1000000000L /* nanoseconds */
 #define TIME_FAC (NSECS/TIME_RES)
 #define SUBSEC tv_nsec
+#define SUBSEC_FAC NSECS
 
 typedef struct timespec timetype;
 
@@ -49,12 +50,13 @@ typedef struct timespec timetype;
 void time_sub(struct timespec *a, struct timespec *b, struct timespec *res);
 void time_add(struct timespec *a, struct timespec *b, struct timespec *res);
 time_t get_secs(struct timespec *p);
-time_t wall_ts(time_t t);
+time_t wall_ts(struct timespec *p);
 time_t unwall_ts(time_t t);
 
 #else
 
 #define MUSECS 1000000L /* microseconds */
+#define SUBSEC_FAC MUSECS
 #define TIME_FAC (MUSECS/TIME_RES)
 #define SUBSEC tv_usec
 
@@ -65,7 +67,7 @@ typedef struct timeval timetype;
 #define time_cmp timercmp
 #define get_secs time
 
-#define wall_ts(t) (t)
+#define wall_ts round2secs
 #define unwall_ts(t) (t)
 
 #endif
@@ -83,5 +85,8 @@ int is_time_set(timetype *p);
 
 /* random time from 0 to t ms (1/TIME_RES) */
 #define rand_time(t) cl_rand_from_interval(0, t*(TIME_RES/1000))
+
+#define round2secs(p) \
+	((p)->tv_sec + ((p)->SUBSEC + SUBSEC_FAC/2)/SUBSEC_FAC)
 
 #endif

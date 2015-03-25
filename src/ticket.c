@@ -280,7 +280,7 @@ int list_ticket(char **pdata, unsigned int *len)
 	cp = data;
 	foreach_ticket(i, tk) {
 		if (is_time_set(&tk->term_expires)) {
-			ts = wall_ts(tk->term_expires.tv_sec);
+			ts = wall_ts(&tk->term_expires);
 			strftime(timeout_str, sizeof(timeout_str), "%F %T",
 					localtime(&ts));
 		} else
@@ -288,7 +288,7 @@ int list_ticket(char **pdata, unsigned int *len)
 
 		if (tk->leader == local && is_time_set(&tk->delay_commit)
 				&& !is_past(&tk->delay_commit)) {
-			ts = wall_ts(tk->delay_commit.tv_sec);
+			ts = wall_ts(&tk->delay_commit);
 			strcpy(pending_str, " (commit pending until ");
 			strftime(pending_str + strlen(" (commit pending until "),
 					sizeof(pending_str) - strlen(" (commit pending until ") - 1,
@@ -908,7 +908,7 @@ void tickets_log_info(void)
 	time_t ts;
 
 	foreach_ticket(i, tk) {
-		ts = wall_ts(tk->term_expires.tv_sec);
+		ts = wall_ts(&tk->term_expires);
 		tk_log_info("state '%s' "
 				"term %d "
 				"leader %s "

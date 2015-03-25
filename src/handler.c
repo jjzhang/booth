@@ -47,7 +47,7 @@ int run_handler(struct ticket_config *tk,
 		return 0;
 
 	assert(synchronous);
-	sprintf(expires, "%" PRId64, (int64_t)wall_ts(tk->term_expires.tv_sec));
+	sprintf(expires, "%" PRId64, (int64_t)wall_ts(&tk->term_expires));
 
 	rv = setenv("BOOTH_TICKET", tk->name, 1) ||
 		setenv("BOOTH_LOCAL", local->addr_string, 1) ||

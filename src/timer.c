@@ -107,8 +107,12 @@ void time_sub(struct timespec *a, struct timespec *b, struct timespec *res)
 
 void time_add(struct timespec *a, struct timespec *b, struct timespec *res)
 {
-	res->tv_nsec = (a->tv_nsec + b->tv_nsec) % NSECS;
-	res->tv_sec = a->tv_sec + b->tv_sec + ((a->tv_nsec + b->tv_nsec) / NSECS);
+	res->tv_nsec = a->tv_nsec + b->tv_nsec;
+	res->tv_sec = a->tv_sec + b->tv_sec;
+	if (res->tv_nsec >= NSECS) {
+		res->tv_sec++;
+		res->tv_nsec %= NSECS;
+	}
 }
 
 time_t get_secs(struct timespec *p)
@@ -126,7 +130,7 @@ time_t get_secs(struct timespec *p)
 
 /* time booth_clk_t is a time since boot or similar, return
  * something humans can understand */
-time_t wall_ts(time_t booth_clk_t)
+time_t wall_ts(struct timespec *booth_clk_t)
 {
 	struct timespec booth_clk_now, now_tv, res;
 	struct timeval now;
@@ -135,7 +139,8 @@ time_t wall_ts(time_t booth_clk_t)
 	gettimeofday(&now, NULL);
 	TIMEVAL_TO_TIMESPEC(&now, &now_tv);
 	time_sub(&now_tv, &booth_clk_now, &res);
-	return booth_clk_t + res.tv_sec;
+	time_add(booth_clk_t, &res, &res);
+	return round2secs(&res);
 }
 
 /* time t is wall clock time, convert to time compatible
