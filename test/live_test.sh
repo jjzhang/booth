@@ -203,6 +203,15 @@ cleanup_booth() {
 	wait $procs
 	wait_timeout
 }
+cleanup_dep_rsc() {
+	local dep_rsc=`get_rsc`
+	test -z "$dep_rsc" && return
+	local h procs
+	for h in $sites; do
+		runcmd $h crm -w resource cleanup $dep_rsc & procs="$! $procs"
+	done >/dev/null 2>&1
+	wait $procs
+}
 stop_booth() {
 	local h rc
 	for h in $sites; do
@@ -239,6 +248,11 @@ restart_booth() {
 	done >/dev/null 2>&1
 	wait $procs
 	wait_timeout
+}
+reboot_test() {
+	cleanup_booth
+	restart_booth
+	cleanup_dep_rsc
 }
 is_we_server() {
 	local h
@@ -632,6 +646,7 @@ runtest() {
 		[ $booth_status -ne 0 ] &&
 			echo "unexpected: some booth daemons not running"
 		run_report $start_ts $end_ts $TEST
+		reboot_test
 	fi
 	revoke_ticket
 }
@@ -1049,8 +1064,7 @@ is_we_server && WE_SERVER=1
 PREFNAME=__pref_booth_live_test
 
 sync_conf || exit
-cleanup_booth
-restart_booth
+reboot_test
 all_booth_status || {
 	start_booth
 	all_booth_status || {
