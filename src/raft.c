@@ -882,6 +882,12 @@ static int process_MY_INDEX (
 			/* we have the ticket and we don't care */
 			return 0;
 		}
+	} else if (tk->state == ST_CANDIDATE) {
+		if (leader == local) {
+			/* a belated MY_INDEX, we're already trying to get the
+			 * ticket */
+			return 0;
+		}
 	}
 
 	/* their ticket is either newer or not expired, don't
