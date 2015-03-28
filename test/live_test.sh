@@ -552,9 +552,12 @@ EOF
 }
 
 check_consistency() {
+	local rc
 	local exp_grantee=$1
-	check_booth_consistency &&
+	check_booth_consistency
+	rc=$?
 	check_cib $exp_grantee
+	return $((rc|$?))
 }
 
 all_booth_status() {
