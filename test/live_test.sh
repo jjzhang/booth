@@ -212,6 +212,16 @@ cleanup_dep_rsc() {
 	done >/dev/null 2>&1
 	wait $procs
 }
+check_dep_rsc() {
+	local dep_rsc=`get_rsc`
+	test -z "$dep_rsc" && return 0
+	local h
+	for h in $sites; do
+		runcmd $h BOOTH_TICKET=$tkt /usr/share/booth/service-runnable $dep_rsc ||
+			return 1
+	done
+	return 0
+}
 stop_booth() {
 	local h rc
 	for h in $sites; do
@@ -595,7 +605,8 @@ run_report() {
 		-n "$sites $arbitrators" $name 2>&1 | logmsg
 }
 runtest() {
-	local start_ts end_ts rc booth_status
+	local start_ts end_ts
+	local rc booth_status dep_rsc_status
 	local start_time end_time
 	local usrmsg
 	TEST=$1
@@ -641,13 +652,17 @@ runtest() {
 	#sleep 3
 	all_booth_status
 	booth_status=$?
-	if [ $rc -eq 0 -a $booth_status -eq 0 ]; then
+	check_dep_rsc
+	dep_rsc_status=$?
+	if [ $((rc|booth_status|dep_rsc_status)) -eq 0 ]; then
 		echo OK
 		[ "$GET_REPORT" ] && run_report $start_ts $end_ts $TEST
 	else
 		echo "$usrmsg (running hb_report ... $1.tar.bz2; see also $logf)"
 		[ $booth_status -ne 0 ] &&
 			echo "unexpected: some booth daemons not running"
+		[ $dep_rsc_status -ne 0 ] &&
+			echo "unexpected: dependent resource failure"
 		run_report $start_ts $end_ts $TEST
 		reboot_test
 	fi
