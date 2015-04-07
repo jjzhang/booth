@@ -32,8 +32,6 @@
 #include "log.h"
 
 
-extern int TIME_RES;
-
 
 inline static void clear_election(struct ticket_config *tk)
 {
