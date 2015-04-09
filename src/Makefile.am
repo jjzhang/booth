@@ -15,7 +15,7 @@ boothd_SOURCES += timer.c
 endif
 
 boothd_LDFLAGS		= $(OS_DYFLAGS) -L./
-boothd_LDADD		= -lplumb -lplumbgpl -lz -lm
+boothd_LDADD		= -lplumb -lplumbgpl -lz -lm -lglib-2.0
 boothd_CPPFLAGS		= $(GLIB_CFLAGS)
 
 noinst_HEADERS		= booth.h pacemaker.h \
