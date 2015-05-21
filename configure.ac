@@ -69,6 +69,12 @@ AC_CHECK_LIB([socket], [socket])
 AC_CHECK_LIB([nsl], [t_open])
 AC_CHECK_LIB([gpl], [cl_log])
 
+# mhash for hmac
+mhash_installed="yes"
+AC_CHECK_HEADERS(mhash.h, , [mhash_installed="no"],)
+AC_CHECK_LIB(mhash, mhash_init, , [mhash_installed="no"])
+AM_CONDITIONAL(BUILD_AUTH_C, test "x${mhash_installed}" = "xyes")
+
 PKG_CHECK_MODULES(GLIB, [glib-2.0])
 
 # Checks for header files.
@@ -81,6 +87,7 @@ AC_CHECK_HEADERS([arpa/inet.h fcntl.h limits.h netdb.h netinet/in.h stdint.h \
 		  sys/time.h syslog.h unistd.h sys/types.h getopt.h malloc.h \
 		  sys/sockio.h utmpx.h])
 AC_CHECK_HEADERS(heartbeat/glue_config.h)
+AC_CHECK_HEADERS(mhash.h)
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
@@ -343,11 +350,6 @@ else
 	COVERAGE_LCRSO_EXTRA_LDFLAGS=""
 fi
 
-
-if test "x${enable_small_memory_footprint}" = xyes ; then
-	AC_DEFINE_UNQUOTED([HAVE_SMALL_MEMORY_FOOTPRINT], 1, [have small_memory_footprint])
-	PACKAGE_FEATURES="$PACKAGE_FEATURES small-memory-footprint"
-fi
 
 if test "x${enable_ansi}" = xyes && \
 		cc_supports_flag -std=iso9899:199409 ; then

@@ -14,6 +14,10 @@ if BUILD_TIMER_C
 boothd_SOURCES += timer.c
 endif
 
+if BUILD_AUTH_C
+boothd_SOURCES += auth.c
+endif
+
 boothd_LDFLAGS		= $(OS_DYFLAGS) -L./
 boothd_LDADD		= -lplumb -lplumbgpl -lz -lm -lglib-2.0
 boothd_CPPFLAGS		= $(GLIB_CFLAGS)
