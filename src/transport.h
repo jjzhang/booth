@@ -20,6 +20,7 @@
 #ifndef _TRANSPORT_H
 #define _TRANSPORT_H
 
+#include "b_config.h"
 #include "booth.h"
 
 typedef enum {
@@ -42,8 +43,11 @@ struct booth_transport {
 	int (*init) (void *);
 	int (*open) (struct booth_site *);
 	int (*send) (struct booth_site *, void *, int);
+	int (*send_auth) (struct booth_site *, void *, int);
 	int (*recv) (struct booth_site *, void *, int);
+	int (*recv_auth) (struct booth_site *, void *, int);
 	int (*broadcast) (void *, int);
+	int (*broadcast_auth) (void *, int);
 	int (*close) (struct booth_site *);
 	int (*exit) (void);
 };
@@ -55,6 +59,7 @@ int check_boothc_header(struct boothc_header *data, int len_incl_data);
 
 int setup_tcp_listener(int test_only);
 int booth_udp_send(struct booth_site *to, void *buf, int len);
+int booth_udp_send_auth(struct booth_site *to, void *buf, int len);
 
 int booth_tcp_open(struct booth_site *to);
 int booth_tcp_send(struct booth_site *to, void *buf, int len);
@@ -69,9 +74,11 @@ inline static void * node_to_addr_pointer(struct booth_site *node) {
 
 extern const struct booth_transport *local_transport;
 
-int send_header_only(int fd, struct boothc_header *hdr);
-int send_header_plus(int fd, struct boothc_header *hdr, void *data, int len);
-int send_ticket_msg(int fd, struct boothc_ticket_msg *msg);
+int send_data(int fd, void *data, int datalen);
+int send_header_plus(int fd, struct boothc_hdr_msg *hdr, void *data, int len);
+#define send_client_msg(fd, msg) send_data(fd, msg, sendmsglen(msg))
 
+int add_hmac(void *data, int len);
+int check_auth(struct booth_site *from, void *buf, int len);
 
 #endif /* _TRANSPORT_H */

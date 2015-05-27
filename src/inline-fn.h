@@ -87,22 +87,22 @@ static inline void init_header_bare(struct boothc_header *h) {
 	h->auth2   = htonl(0);
 }
 
+/* get the _real_ message length out of the header
+ */
+#define sendmsglen(msg) ntohl((msg)->header.length)
+
 static inline void init_header(struct boothc_header *h,
 			int cmd, int request, int options,
 			int result, int reason, int data_len)
 {
 	init_header_bare(h);
-	h->length  = htonl(data_len);
+	h->length  = htonl(data_len -
+		(is_auth_req() ? 0 : sizeof(struct hmac)));
 	h->cmd     = htonl(cmd);
 	h->request = htonl(request);
 	h->options = htonl(options);
 	h->result  = htonl(result);
 	h->reason  = htonl(reason);
-}
-
-static inline void init_ticket_site_header(struct boothc_ticket_msg *msg, int cmd)
-{
-	init_header(&msg->header, cmd, 0, 0, 0, 0, sizeof(*msg));
 }
 
 #define my_last_term(tk) \

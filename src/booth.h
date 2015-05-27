@@ -38,6 +38,11 @@
 
 #define DAEMON_NAME		"boothd"
 #define BOOTH_PATH_LEN		127
+#define BOOTH_MAX_KEY_LEN	64
+#define BOOTH_MIN_KEY_LEN	8
+/* hash size is 160 bits (sha1), but add a bit more space in case
+ * stronger hashes are required */
+#define BOOTH_MAC_SIZE		24
 
 #define BOOTH_DEFAULT_PORT		9929
 
@@ -122,10 +127,24 @@ struct ticket_msg {
 	 *  starting, running, stopping, error, ...? */
 } __attribute__((packed));
 
+struct hmac {
+	/** hash id, currently set to constant BOOTH_HASH */
+	uint32_t hid;
+
+	/** the calculated hash, BOOTH_MAC_SIZE is big enough to
+	 * accommodate the hash of type hid */
+	unsigned char hash[BOOTH_MAC_SIZE];
+} __attribute__((packed));
+
+struct boothc_hdr_msg {
+	struct boothc_header header;
+	struct hmac hmac;
+} __attribute__((packed));
 
 struct boothc_ticket_msg {
 	struct boothc_header header;
 	struct ticket_msg ticket;
+	struct hmac hmac;
 } __attribute__((packed));
 
 
@@ -255,6 +274,7 @@ int do_read(int fd, void *buf, size_t count);
 int do_write(int fd, void *buf, size_t count);
 void process_connection(int ci);
 void safe_copy(char *dest, char *value, size_t buflen, const char *description);
+int update_authkey(void);
 
 
 struct command_line {

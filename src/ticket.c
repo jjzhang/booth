@@ -26,6 +26,7 @@
 #include <assert.h>
 #include <time.h>
 #include <clplumbing/cl_random.h>
+#include "b_config.h"
 #include "ticket.h"
 #include "config.h"
 #include "pacemaker.h"
@@ -472,13 +473,13 @@ int ticket_answer_list(int fd, struct boothc_ticket_msg *msg)
 {
 	char *data;
 	int olen, rv;
-	struct boothc_header hdr;
+	struct boothc_hdr_msg hdr;
 
 	rv = list_ticket(&data, &olen);
 	if (rv < 0)
 		return rv;
 
-	init_header(&hdr, CL_LIST, 0, 0, RLT_SUCCESS, 0, sizeof(hdr) + olen);
+	init_header(&hdr.header, CL_LIST, 0, 0, RLT_SUCCESS, 0, sizeof(hdr) + olen);
 
 	return send_header_plus(fd, &hdr, data, olen);
 }
@@ -537,7 +538,7 @@ int process_client_request(struct client *req_client, struct boothc_ticket_msg *
 
 reply_now:
 	init_ticket_msg(&omsg, CL_RESULT, 0, rv, 0, tk);
-	send_ticket_msg(req_client->fd, &omsg);
+	send_client_msg(req_client->fd, &omsg);
 	return rc;
 }
 
@@ -555,7 +556,7 @@ int notify_client(struct ticket_config *tk, struct client *req_client,
 	tk_log_debug("notifying client %d (request %s)",
 		req_client->fd, state_to_string(cmd));
 	init_ticket_msg(&omsg, CL_RESULT, 0, rv, 0, tk);
-	rc = send_ticket_msg(req_client->fd, &omsg);
+	rc = send_client_msg(req_client->fd, &omsg);
 
 	if (rc == 0 && ((rv == RLT_MORE) ||
 			(rv == RLT_CIB_PENDING && (options & OPT_WAIT_COMMIT)))) {
@@ -596,7 +597,7 @@ int ticket_broadcast(struct ticket_config *tk,
 		expect_replies(tk, expected_reply);
 	}
 	ticket_activate_timeout(tk);
-	return transport()->broadcast(&msg, sizeof(msg));
+	return transport()->broadcast_auth(&msg, sendmsglen(&msg));
 }
 
 
@@ -961,15 +962,19 @@ int message_recv(struct boothc_ticket_msg *msg, int msglen)
 	uint32_t leader_u;
 
 
-	if (check_boothc_header(&msg->header, sizeof(*msg)) < 0 ||
-			msglen != sizeof(*msg)) {
-		log_error("message receive error");
-		return -1;
-	}
-
 	from = ntohl(msg->header.from);
 	if (!find_site_by_id(from, &source) || !source) {
 		log_error("unknown sender: %08x", from);
+		return -1;
+	}
+
+	if (check_boothc_header(&msg->header, msglen) < 0) {
+		log_error("message from %s receive error", site_string(source));
+		return -1;
+	}
+
+	if (check_auth(source, msg, msglen)) {
+		log_error("%s failed to authenticate", site_string(source));
 		return -1;
 	}
 
@@ -1121,7 +1126,7 @@ int send_reject(struct booth_site *dest, struct ticket_config *tk,
 	tk_log_debug("sending reject to %s",
 			site_string(dest));
 	init_ticket_msg(&msg, OP_REJECTED, req, code, 0, tk);
-	return booth_udp_send(dest, &msg, sizeof(msg));
+	return booth_udp_send_auth(dest, &msg, sendmsglen(&msg));
 }
 
 int send_msg (
@@ -1148,5 +1153,5 @@ int send_msg (
 		req = ntohl(in_msg->header.cmd);
 
 	init_ticket_msg(&msg, cmd, req, RLT_SUCCESS, 0, tk);
-	return booth_udp_send(dest, &msg, sizeof(msg));
+	return booth_udp_send_auth(dest, &msg, sendmsglen(&msg));
 }

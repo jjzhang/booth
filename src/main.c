@@ -38,6 +38,7 @@
 #include <clplumbing/coredumps.h>
 #include <fcntl.h>
 #include <string.h>
+#include <ctype.h>
 #include <assert.h>
 #include <error.h>
 #include <sys/ioctl.h>
@@ -223,13 +224,13 @@ int find_client_by_fd(int fd)
 }
 
 
-/* Only used for client requests, TCP ???*/
+/* Only used for client requests (tcp) */
 void process_connection(int ci)
 {
 	struct boothc_ticket_msg *msg;
+	struct boothc_hdr_msg err_reply;
 	int rv, len, expr, fd;
 	void (*deadfn) (int ci);
-
 
 	msg = calloc(sizeof(struct boothc_ticket_msg), 1);
 	if (!msg) {
@@ -254,10 +255,6 @@ void process_connection(int ci)
 	/* Basic sanity checks already done. */
 	len = ntohl(msg->header.length);
 	if (len) {
-		if (len != sizeof(struct boothc_ticket_msg)) {
-			log_error("got message of wrong length %u from client", len);
-			return;
-		}
 		expr = len - sizeof(msg->header);
 		rv = do_read(clients[ci].fd, msg->header.data, expr);
 		if (rv < 0) {
@@ -267,6 +264,10 @@ void process_connection(int ci)
 		}
 	}
 
+	if (check_auth(NULL, msg, sizeof(*msg))) {
+		log_error("client connection %d failed to authenticate", ci);
+		goto kill;
+	}
 
 	/* For CMD_GRANT and CMD_REVOKE:
 	 * Don't close connection immediately, but send
@@ -286,8 +287,8 @@ void process_connection(int ci)
 	default:
 		log_error("connection %d cmd %x unknown",
 				ci, ntohl(msg->header.cmd));
-		init_header(&msg->header, CL_RESULT, 0, 0, RLT_INVALID_ARG, 0, sizeof(msg->header));
-		send_header_only(fd, &msg->header);
+		init_header(&err_reply.header, CL_RESULT, 0, 0, RLT_INVALID_ARG, 0, sizeof(err_reply));
+		send_client_msg(fd, &err_reply);
 		goto kill;
 	}
 
@@ -325,6 +326,75 @@ static void process_listener(int ci)
 	log_debug("add client connection %d fd %d", i, fd);
 }
 
+/* trim trailing spaces if the key is ascii
+ */
+static void trim_key()
+{
+	unsigned char *p;
+	int i;
+
+	for (i=0, p=booth_conf->authkey; i < booth_conf->authkey_len; i++, p++)
+		if (!isascii(*p))
+			return;
+
+	p = booth_conf->authkey;
+	while (booth_conf->authkey_len > 0 && isspace(*p)) {
+		p++;
+		booth_conf->authkey_len--;
+	}
+	memmove(booth_conf->authkey, p, booth_conf->authkey_len);
+
+	p = booth_conf->authkey + booth_conf->authkey_len - 1;
+	while (booth_conf->authkey_len > 0 && isspace(*p)) {
+		booth_conf->authkey_len--;
+		p--;
+	}
+}
+
+static int read_authkey()
+{
+	int fd;
+
+	booth_conf->authkey[0] = '\0';
+	if (stat(booth_conf->authfile, &booth_conf->authstat) < 0) {
+		log_error("cannot stat authentication file %s: %s",
+			booth_conf->authfile, strerror(errno));
+		return -1;
+	}
+	if (booth_conf->authstat.st_mode & (S_IRGRP | S_IROTH)) {
+		log_error("%s: file can be readable only for the owner", booth_conf->authfile);
+		return -1;
+	}
+	fd = open(booth_conf->authfile, O_RDONLY);
+	if (fd < 0) {
+		log_error("cannot open %s: %s",
+			booth_conf->authfile, strerror(errno));
+		return -1;
+	}
+	booth_conf->authkey_len = read(fd, booth_conf->authkey, BOOTH_MAX_KEY_LEN);
+	close(fd);
+	trim_key();
+	log_debug("read key of size %d in authfile %s",
+		booth_conf->authkey_len, booth_conf->authfile);
+	/* make sure that the key is of minimum length */
+	return (booth_conf->authkey_len >= BOOTH_MIN_KEY_LEN) ? 0 : -1;
+}
+
+int update_authkey()
+{
+	struct stat statbuf;
+
+	if (stat(booth_conf->authfile, &statbuf) < 0) {
+		log_error("cannot stat authentication file %s: %s",
+			booth_conf->authfile, strerror(errno));
+		return -1;
+	}
+	if (statbuf.st_mtime > booth_conf->authstat.st_mtime) {
+		return read_authkey();
+	}
+	return 0;
+}
+
 static int setup_config(int type)
 {
 	int rv;
@@ -333,6 +403,11 @@ static int setup_config(int type)
 	if (rv < 0)
 		goto out;
 
+	if (booth_conf->authfile[0] != '\0') {
+		rv = read_authkey();
+		if (rv < 0)
+			goto out;
+	}
 
 	/* Set "local" pointer, ignoring errors. */
 	if (cl.type == DAEMON && cl.site[0]) {
@@ -512,7 +587,7 @@ fail:
 static int query_get_string_answer(cmd_request_t cmd)
 {
 	struct booth_site *site;
-	struct boothc_header reply;
+	struct boothc_hdr_msg reply;
 	char *data;
 	int data_len;
 	int rv;
@@ -534,15 +609,16 @@ static int query_get_string_answer(cmd_request_t cmd)
 	if (rv < 0)
 		goto out_free;
 
-	rv = tpt->send(site, &cl.msg, sizeof(cl.msg));
+	rv = tpt->send(site, &cl.msg, sendmsglen(&cl.msg));
 	if (rv < 0)
 		goto out_free;
 
-	rv = tpt->recv(site, &reply, sizeof(reply));
+	rv = tpt->recv_auth(site, &reply, sizeof(reply));
 	if (rv < 0)
 		goto out_free;
 
-	data_len = ntohl(reply.length) - sizeof(reply);
+	data_len = ntohl(reply.header.length) - rv;
+
 	/* no tickets? */
 	if (!data_len) {
 		rv = 0;
@@ -707,12 +783,12 @@ redirect:
 	if (rv < 0)
 		goto out_close;
 
-	rv = tpt->send(site, &cl.msg, sizeof(cl.msg));
+	rv = tpt->send(site, &cl.msg, sendmsglen(&cl.msg));
 	if (rv < 0)
 		goto out_close;
 
 read_more:
-	rv = tpt->recv(site, &reply, sizeof(reply));
+	rv = tpt->recv_auth(site, &reply, sizeof(reply));
 	if (rv < 0)
 		goto out_close;
 
@@ -1320,7 +1396,6 @@ static int do_server(int type)
 	rv = setup_config(type);
 	if (rv < 0)
 		return rv;
-
 
 	if (!local) {
 		log_error("Cannot find myself in the configuration.");

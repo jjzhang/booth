@@ -178,6 +178,14 @@ The following key/value pairs are defined:
 Clients use TCP to communicate with a daemon; Booth 
 will always bind and listen to both UDP and TCP ports.
 
+*'authfile'*::
+	File containing the authentication key. The key can be either
+	binary or text. If the latter, then both leading and trailing
+	white space, including new lines, is ignored. This key is a
+	shared secret and used to authenticate both clients and
+	servers. The key must be between 8 and 64 characters long and
+	be readable only by the file owner.
+
 *'site'*::
 	Defines a site Raft member with the given IP. Sites can
 	acquire tickets. The sites' IP should be managed by the cluster.
@@ -393,6 +401,10 @@ FILES
 
 *'/etc/booth/booth.conf'*::
 	The default configuration file name. See also the '-c' argument.
+
+*'/etc/booth/authkey'*::
+	There is no default, but this is a typical location for the
+	shared secret (authentication key).
 
 *'/var/run/booth/'*::
 	Directory that holds PID/lock files. See also the 'status' command.

@@ -21,6 +21,7 @@
 #define _CONFIG_H
 
 #include <stdint.h>
+#include <sys/stat.h>
 #include "booth.h"
 #include "timer.h"
 #include "raft.h"
@@ -208,6 +209,12 @@ struct ticket_config {
 struct booth_config {
     char name[BOOTH_NAME_LEN];
 
+    /** File containing the authentication file. */
+	char authfile[BOOTH_PATH_LEN];
+	struct stat authstat;
+	unsigned char authkey[BOOTH_MAX_KEY_LEN];
+	int authkey_len;
+
     transport_layer_t proto;
     uint16_t port;
 
@@ -231,8 +238,9 @@ struct booth_config {
     struct ticket_config *ticket;
 };
 
-
 extern struct booth_config *booth_conf;
+
+#define is_auth_req() (booth_conf->authkey[0] != '\0')
 
 
 int read_config(const char *path, int type);
