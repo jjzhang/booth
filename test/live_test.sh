@@ -991,7 +991,7 @@ recover_external_prog_failed() {
 	repair_external_prog 1
 }
 applicable_external_prog_failed() {
-	[ -n `get_rsc` ]
+	[ -n "`get_rsc`" ]
 }
 
 #
