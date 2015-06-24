@@ -41,6 +41,7 @@
 typedef struct timespec timetype;
 
 #define get_time(p) clock_gettime(BOOTH_CLOCK, p)
+#define get_usecs(p) ((p)->tv_nsec/1000L)
 
 #define time_cmp(a, b, CMP)           \
   (((a)->tv_sec == (b)->tv_sec) ?     \
@@ -51,6 +52,7 @@ void time_sub(struct timespec *a, struct timespec *b, struct timespec *res);
 void time_add(struct timespec *a, struct timespec *b, struct timespec *res);
 time_t get_secs(struct timespec *p);
 time_t wall_ts(struct timespec *p);
+time_t secs_since_epoch(struct timespec *booth_clk_t);
 time_t unwall_ts(time_t t);
 
 #else
@@ -62,6 +64,8 @@ time_t unwall_ts(time_t t);
 
 typedef struct timeval timetype;
 #define get_time(p) gettimeofday(p, NULL)
+#define secs_since_epoch(p) ((p)->tv_sec)
+#define get_usecs(p) ((p)->tv_usec)
 #define time_sub timersub
 #define time_add timeradd
 #define time_cmp timercmp

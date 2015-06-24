@@ -78,13 +78,22 @@ inline static int is_resend(struct ticket_config *tk)
 
 
 static inline void init_header_bare(struct boothc_header *h) {
+	timetype now;
+
 	assert(local && local->site_id);
 	h->magic   = htonl(BOOTHC_MAGIC);
 	h->version = htonl(BOOTHC_VERSION);
 	h->from    = htonl(local->site_id);
-	h->iv      = htonl(0);
-	h->auth1   = htonl(0);
-	h->auth2   = htonl(0);
+	if (is_auth_req()) {
+		get_time(&now);
+		h->iv    = htonl(1);
+		h->secs  = htonl(secs_since_epoch(&now));
+		h->usecs = htonl(get_usecs(&now));
+	} else {
+		h->iv    = htonl(0);
+		h->secs  = htonl(0);
+		h->usecs = htonl(0);
+	}
 }
 
 /* get the _real_ message length out of the header

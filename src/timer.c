@@ -128,19 +128,40 @@ time_t get_secs(struct timespec *p)
 	}
 }
 
-/* time booth_clk_t is a time since boot or similar, return
- * something humans can understand */
-time_t wall_ts(struct timespec *booth_clk_t)
+/* time booth_clk_t is a time since boot or similar, convert that
+ * to time since epoch (Jan 1, 1970)
+ */
+static void clock2epochtime(struct timespec *booth_clk_t, struct timespec *res)
 {
-	struct timespec booth_clk_now, now_tv, res;
+	struct timespec booth_clk_now, now_tv;
 	struct timeval now;
 
 	get_time(&booth_clk_now);
 	gettimeofday(&now, NULL);
 	TIMEVAL_TO_TIMESPEC(&now, &now_tv);
-	time_sub(&now_tv, &booth_clk_now, &res);
-	time_add(booth_clk_t, &res, &res);
+	time_sub(&now_tv, &booth_clk_now, res);
+	time_add(booth_clk_t, res, res);
+}
+
+/* time booth_clk_t is a time since boot or similar, return
+ * something humans can understand (rounded seconds only) */
+time_t wall_ts(struct timespec *booth_clk_t)
+{
+	struct timespec res;
+
+	clock2epochtime(booth_clk_t, &res);
 	return round2secs(&res);
+}
+
+/* time booth_clk_t is a time since boot or similar, get here
+ * seconds since epoch
+ */
+time_t secs_since_epoch(struct timespec *booth_clk_t)
+{
+	struct timespec res;
+
+	clock2epochtime(booth_clk_t, &res);
+	return res.tv_sec;
 }
 
 /* time t is wall clock time, convert to time compatible

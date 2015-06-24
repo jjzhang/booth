@@ -214,6 +214,8 @@ struct booth_config {
 	struct stat authstat;
 	unsigned char authkey[BOOTH_MAX_KEY_LEN];
 	int authkey_len;
+    /** Maximum time skew between peers allowed */
+	int maxtimeskew;
 
     transport_layer_t proto;
     uint16_t port;

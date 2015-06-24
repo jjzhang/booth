@@ -25,6 +25,7 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include "timer.h"
 
 
 #define BOOTH_RUN_DIR "/var/run/booth/"
@@ -43,6 +44,9 @@
 /* hash size is 160 bits (sha1), but add a bit more space in case
  * stronger hashes are required */
 #define BOOTH_MAC_SIZE		24
+
+/* tolerate packets which are not older than 10 minutes */
+#define BOOTH_DEFAULT_MAX_TIME_SKEW		600
 
 #define BOOTH_DEFAULT_PORT		9929
 
@@ -79,10 +83,17 @@ typedef unsigned char boothc_ticket[BOOTH_NAME_LEN];
 
 
 struct boothc_header {
-	/** Authentication data; not used now. */
+	/** Generation info (used for authentication)
+	 * This is something that would need to be monotone
+	 * incremental. CLOCK_MONOTONIC should fit the purpose. On
+	 * failover, however, it may happen that the new host has a
+	 * clock which is significantly behind the clock of old host.
+	 * We'll need to relax a bit for the nodes which are starting
+	 * (just accept all OP_STATUS).
+	 */
 	uint32_t iv;
-	uint32_t auth1;
-	uint32_t auth2;
+	uint32_t secs;  /* seconds */
+	uint32_t usecs; /* microseconds */
 
 
 	/** BOOTHC_MAGIC */
@@ -245,6 +256,10 @@ struct booth_site {
 	};
 	int saddrlen;
 	int addrlen;
+
+	/** last timestamp seen from this site */
+	uint32_t last_secs;
+	uint32_t last_usecs;
 } __attribute__((packed));
 
 

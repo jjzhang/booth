@@ -776,6 +776,54 @@ int add_hmac(void *data, int len)
 	return rv;
 }
 
+/* TODO: we need some client identification */
+#define peer_string(p) (p ? site_string(p) : "client")
+
+/* verify the validity of timestamp from the header
+ * the timestamp needs to be either greater than the one already
+ * recorded for the site or, and this is checked for clients,
+ * not to be older than booth_conf->maxtimeskew
+ * update the timestamp for the site, if this packet is from a
+ * site
+ */
+static int verify_ts(struct booth_site *from, void *buf, int len)
+{
+	struct boothc_header *h;
+	struct timeval tv, curr_tv, now;
+
+	if (len < sizeof(*h)) {
+		log_error("%s: packet too short", peer_string(from));
+		return -1;
+	}
+
+	h = (struct boothc_header *)buf;
+	tv.tv_sec = ntohl(h->secs);
+	tv.tv_usec = ntohl(h->usecs);
+	if (from) {
+		curr_tv.tv_sec = from->last_secs;
+		curr_tv.tv_usec = from->last_usecs;
+		if (timercmp(&tv, &curr_tv, >))
+			goto accept;
+		log_warn("%s: packet timestamp older than previous one",
+			site_string(from));
+	}
+
+	gettimeofday(&now, NULL);
+	now.tv_sec -= booth_conf->maxtimeskew;
+	if (timercmp(&tv, &now, >))
+		goto accept;
+	log_error("%s: packet timestamp older than %d seconds",
+		peer_string(from), booth_conf->maxtimeskew);
+	return -1;
+
+accept:
+	if (from) {
+		from->last_secs = tv.tv_sec;
+		from->last_usecs = tv.tv_usec;
+	}
+	return 0;
+}
+
 int check_auth(struct booth_site *from, void *buf, int len)
 {
 	int rv = 0;
@@ -795,8 +843,11 @@ int check_auth(struct booth_site *from, void *buf, int len)
 	hp = (struct hmac *)((unsigned char *)buf + payload_len);
 	rv = verify_hmac(buf, payload_len, ntohl(hp->hid), hp->hash,
 		booth_conf->authkey, booth_conf->authkey_len);
-	if (rv < 0 && from) {
-		log_error("%s failed to authenticate", site_string(from));
+	if (!rv) {
+		rv = verify_ts(from, buf, len);
+	}
+	if (rv != 0) {
+		log_error("%s: failed to authenticate", peer_string(from));
 	}
 #endif
 	return rv;

@@ -372,6 +372,7 @@ int read_config(const char *path, int type)
 
 	booth_conf->proto = UDP;
 	booth_conf->port = BOOTH_DEFAULT_PORT;
+	booth_conf->maxtimeskew = BOOTH_DEFAULT_MAX_TIME_SKEW;
 	booth_conf->authkey[0] = '\0';
 
 
@@ -516,6 +517,11 @@ no_value:
 			safe_copy(booth_conf->authfile,
 					val, BOOTH_PATH_LEN,
 					"authfile");
+			continue;
+		}
+
+		if (strcmp(key, "maxtimeskew") == 0) {
+			booth_conf->maxtimeskew = atoi(val);
 			continue;
 		}
 #endif
