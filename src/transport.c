@@ -758,11 +758,6 @@ int add_hmac(void *data, int len)
 	if (!is_auth_req())
 		return 0;
 
-	rv = update_authkey();
-	if (rv < 0) {
-		return rv;
-	}
-
 	payload_len = len - sizeof(struct hmac);
 	hp = (struct hmac *)((unsigned char *)data + payload_len);
 	hp->hid = htonl(BOOTH_HASH);
@@ -833,11 +828,6 @@ int check_auth(struct booth_site *from, void *buf, int len)
 
 	if (!is_auth_req())
 		return 0;
-
-	rv = update_authkey();
-	if (rv < 0) {
-		return rv;
-	}
 
 	payload_len = len - sizeof(struct hmac);
 	hp = (struct hmac *)((unsigned char *)buf + payload_len);

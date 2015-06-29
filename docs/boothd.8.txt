@@ -184,8 +184,7 @@ will always bind and listen to both UDP and TCP ports.
 	white space, including new lines, is ignored. This key is a
 	shared secret and used to authenticate both clients and
 	servers. The key must be between 8 and 64 characters long and
-	be readable only by the file owner. The key file, if
-	modified, is automatically loaded by the booth process.
+	be readable only by the file owner.
 
 *'maxtimeskew'*::
 	As protection against replay attacks, packets contain
