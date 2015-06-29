@@ -200,6 +200,7 @@ typedef enum {
 	RLT_OVERGRANT           = CHAR2CONST('O', 'v', 'e', 'r'),
 	RLT_PROBABLY_SUCCESS    = CHAR2CONST('S', 'u', 'c', '?'),
 	RLT_BUSY                = CHAR2CONST('B', 'u', 's', 'y'),
+	RLT_AUTH                = CHAR2CONST('A', 'u', 't', 'h'),
 	RLT_TERM_OUTDATED       = CHAR2CONST('T', 'O', 'd', 't'),
 	RLT_TERM_STILL_VALID    = CHAR2CONST('T', 'V', 'l', 'd'),
 	RLT_YOU_OUTDATED        = CHAR2CONST('O', 'u', 't', 'd'),

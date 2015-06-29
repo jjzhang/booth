@@ -230,6 +230,7 @@ void process_connection(int ci)
 	struct boothc_ticket_msg *msg;
 	struct boothc_hdr_msg err_reply;
 	int rv, len, expr, fd;
+	cmd_result_t errc;
 	void (*deadfn) (int ci);
 
 	msg = calloc(sizeof(struct boothc_ticket_msg), 1);
@@ -265,8 +266,8 @@ void process_connection(int ci)
 	}
 
 	if (check_auth(NULL, msg, sizeof(*msg))) {
-		log_error("client connection %d failed to authenticate", ci);
-		goto kill;
+		errc = RLT_AUTH;
+		goto send_err;
 	}
 
 	/* For CMD_GRANT and CMD_REVOKE:
@@ -287,13 +288,16 @@ void process_connection(int ci)
 	default:
 		log_error("connection %d cmd %x unknown",
 				ci, ntohl(msg->header.cmd));
-		init_header(&err_reply.header, CL_RESULT, 0, 0, RLT_INVALID_ARG, 0, sizeof(err_reply));
-		send_client_msg(fd, &err_reply);
-		goto kill;
+		errc = RLT_INVALID_ARG;
+		goto send_err;
 	}
 
 	assert(0);
 	return;
+
+send_err:
+	init_header(&err_reply.header, CL_RESULT, 0, 0, errc, 0, sizeof(err_reply));
+	send_client_msg(fd, &err_reply);
 
 kill:
 	deadfn = clients[ci].deadfn;
@@ -584,6 +588,92 @@ fail:
 }
 
 
+static int test_reply(int reply_code, cmd_request_t cmd)
+{
+	int rv = 0;
+	const char *op_str = "";
+
+	if (cmd == CMD_GRANT)
+		op_str = "grant";
+	else if (cmd == CMD_REVOKE)
+		op_str = "revoke";
+	else if (cmd == CMD_LIST)
+		op_str = "list";
+	else {
+		log_error("internal error reading reply result!");
+		return -1;
+	}
+
+	switch (reply_code) {
+	case RLT_OVERGRANT:
+		log_info("You're granting a granted ticket. "
+			 "If you wanted to migrate a ticket, "
+			 "use revoke first, then use grant.");
+		rv = -1;
+		break;
+
+	case RLT_TICKET_IDLE:
+		log_info("ticket is not owned");
+		rv = 0;
+		break;
+
+	case RLT_ASYNC:
+		log_info("%s command sent, result will be returned "
+			 "asynchronously. Please use \"booth list\" to "
+			 "see the outcome.", op_str);
+		rv = 0;
+		break;
+
+	case RLT_CIB_PENDING:
+		log_info("%s succeeded (CIB commit pending)", op_str);
+		/* wait for the CIB commit? */
+		rv = (cl.options & OPT_WAIT_COMMIT) ? 3 : 0;
+		break;
+
+	case RLT_MORE:
+		rv = 2;
+		break;
+
+	case RLT_SYNC_SUCC:
+	case RLT_SUCCESS:
+		log_info("%s succeeded!", op_str);
+		rv = 0;
+		break;
+
+	case RLT_SYNC_FAIL:
+		log_info("%s failed!", op_str);
+		rv = -1;
+		break;
+
+	case RLT_INVALID_ARG:
+		log_error("ticket \"%s\" does not exist",
+				cl.msg.ticket.id);
+		rv = -1;
+		break;
+
+	case RLT_AUTH:
+		log_error("authentication error");
+		rv = -1;
+		break;
+
+	case RLT_EXT_FAILED:
+		log_error("before-acquire-handler for ticket \"%s\" failed, grant denied",
+				cl.msg.ticket.id);
+		rv = -1;
+		break;
+
+	case RLT_REDIRECT:
+		/* talk to another site */
+		rv = 1;
+		break;
+
+	default:
+		log_error("got an error code: %x", rv);
+		rv = -1;
+	}
+	return rv;
+}
+
 static int query_get_string_answer(cmd_request_t cmd)
 {
 	struct booth_site *site;
@@ -638,6 +728,9 @@ static int query_get_string_answer(cmd_request_t cmd)
 	rv = 0;
 
 out_free:
+	if (rv < 0) {
+		(void)test_reply(ntohl(reply.header.result), CMD_LIST);
+	}
 	free(data);
 out_close:
 	tpt->close(site);
@@ -645,83 +738,6 @@ out:
 	return rv;
 }
 
-
-static int test_reply(int reply_code, cmd_request_t cmd)
-{
-	int rv = 0;
-	const char *op_str = "";
-
-	if (cmd == CMD_GRANT)
-		op_str = "grant";
-	else if (cmd == CMD_REVOKE)
-		op_str = "revoke";
-	else {
-		log_error("internal error reading reply result!");
-		return -1;
-	}
-
-	switch (reply_code) {
-	case RLT_OVERGRANT:
-		log_info("You're granting a granted ticket. "
-			 "If you wanted to migrate a ticket, "
-			 "use revoke first, then use grant.");
-		rv = -1;
-		break;
-
-	case RLT_TICKET_IDLE:
-		log_info("ticket is not owned");
-		rv = 0;
-		break;
-
-	case RLT_ASYNC:
-		log_info("%s command sent, result will be returned "
-			 "asynchronously. Please use \"booth list\" to "
-			 "see the outcome.", op_str);
-		rv = 0;
-		break;
-
-	case RLT_CIB_PENDING:
-		log_info("%s succeeded (CIB commit pending)", op_str);
-		/* wait for the CIB commit? */
-		rv = (cl.options & OPT_WAIT_COMMIT) ? 3 : 0;
-		break;
-
-	case RLT_MORE:
-		rv = 2;
-		break;
-
-	case RLT_SYNC_SUCC:
-	case RLT_SUCCESS:
-		log_info("%s succeeded!", op_str);
-		rv = 0;
-		break;
-
-	case RLT_SYNC_FAIL:
-		log_info("%s failed!", op_str);
-		rv = -1;
-		break;
-
-	case RLT_INVALID_ARG:
-		log_error("ticket \"%s\" does not exist",
-				cl.msg.ticket.id);
-		break;
-
-	case RLT_EXT_FAILED:
-		log_error("before-acquire-handler for ticket \"%s\" failed, grant denied",
-				cl.msg.ticket.id);
-		break;
-
-	case RLT_REDIRECT:
-		/* talk to another site */
-		rv = 1;
-		break;
-
-	default:
-		log_error("got an error code: %x", rv);
-		rv = -1;
-	}
-	return rv;
-}
 
 static int do_command(cmd_request_t cmd)
 {
@@ -789,8 +805,12 @@ redirect:
 
 read_more:
 	rv = tpt->recv_auth(site, &reply, sizeof(reply));
-	if (rv < 0)
+	if (rv < 0) {
+		/* print any errors depending on the code sent by the
+		 * server */
+		(void)test_reply(ntohl(reply.header.result), cmd);
 		goto out_close;
+	}
 
 	rv = test_reply(ntohl(reply.header.result), cmd);
 	if (rv == 1) {
