@@ -96,46 +96,6 @@ int poll_timeout;
 struct booth_config *booth_conf;
 struct command_line cl;
 
-int do_read(int fd, void *buf, size_t count)
-{
-	int rv, off = 0;
-
-	while (off < count) {
-		rv = read(fd, (char *)buf + off, count - off);
-		if (rv == 0)
-			return -1;
-		if (rv == -1 && errno == EINTR)
-			continue;
-		if (rv == -1)
-			return -1;
-		off += rv;
-	}
-	return 0;
-}
-
-int do_write(int fd, void *buf, size_t count)
-{
-	int rv, off = 0;
-
-retry:
-	rv = write(fd, (char *)buf + off, count);
-	if (rv == -1 && errno == EINTR)
-		goto retry;
-	/* If we cannot write _any_ data, we'd be in an (potential) loop. */
-	if (rv <= 0) {
-		log_error("write failed: %s (%d)", strerror(errno), errno);
-		return rv;
-	}
-
-	if (rv != count) {
-		count -= rv;
-		off += rv;
-		goto retry;
-	}
-	return 0;
-}
-
-
 static void client_alloc(void)
 {
 	int i;
@@ -200,6 +160,8 @@ int client_add(int fd, const struct booth_transport *tpt,
 
 		c->transport = tpt;
 		c->fd = fd;
+		c->msg = NULL;
+		c->offset = 0;
 
 		pollfds[i].fd = fd;
 		pollfds[i].events = POLLIN;
@@ -227,42 +189,21 @@ int find_client_by_fd(int fd)
 /* Only used for client requests (tcp) */
 void process_connection(int ci)
 {
-	struct boothc_ticket_msg *msg;
+	struct client *req_cl;
+	struct boothc_ticket_msg *msg = NULL;
 	struct boothc_hdr_msg err_reply;
-	int rv, len, expr, fd;
 	cmd_result_t errc;
 	void (*deadfn) (int ci);
 
-	msg = calloc(sizeof(struct boothc_ticket_msg), 1);
-	if (!msg) {
-		rv = -ENOMEM;
-		log_error("out of memory for client messages");
+	req_cl = clients + ci;
+	switch (read_client(req_cl)) {
+	case -1: /* error */
 		goto kill;
-	}
-	fd = clients[ci].fd;
-	rv = do_read(fd, &msg->header, sizeof(msg->header));
-
-	if (rv < 0) {
-		if (errno == ECONNRESET)
-			log_debug("client %d connection reset for fd %d",
-					ci, clients[ci].fd);
-
-		goto kill;
-	}
-
-	if (check_boothc_header(&msg->header, -1) < 0)
-		goto kill;
-
-	/* Basic sanity checks already done. */
-	len = ntohl(msg->header.length);
-	if (len) {
-		expr = len - sizeof(msg->header);
-		rv = do_read(clients[ci].fd, msg->header.data, expr);
-		if (rv < 0) {
-			log_error("connection %d read data error %d, wanted %d",
-					ci, rv, expr);
-			goto kill;
-		}
+	case 1: /* more to read */
+		return;
+	case 0:
+		/* we can process the request now */
+		msg = req_cl->msg;
 	}
 
 	if (check_auth(NULL, msg, sizeof(*msg))) {
@@ -275,12 +216,12 @@ void process_connection(int ci)
 	 * result a second later? */
 	switch (ntohl(msg->header.cmd)) {
 	case CMD_LIST:
-		ticket_answer_list(fd, msg);
+		ticket_answer_list(req_cl->fd, msg);
 		goto kill;
 
 	case CMD_GRANT:
 	case CMD_REVOKE:
-		if (process_client_request(&clients[ci], msg) == 1)
+		if (process_client_request(req_cl, msg) == 1)
 			goto kill; /* request processed definitely, close connection */
 		else
 			return;
@@ -297,10 +238,10 @@ void process_connection(int ci)
 
 send_err:
 	init_header(&err_reply.header, CL_RESULT, 0, 0, errc, 0, sizeof(err_reply));
-	send_client_msg(fd, &err_reply);
+	send_client_msg(req_cl->fd, &err_reply);
 
 kill:
-	deadfn = clients[ci].deadfn;
+	deadfn = req_cl->deadfn;
 	if(deadfn) {
 		deadfn(ci);
 	}
@@ -700,7 +641,8 @@ static int query_get_string_answer(cmd_request_t cmd)
 	if (rv < 0)
 		goto out_free;
 
-	do_write(STDOUT_FILENO, data, data_len);
+	fwrite(data, data_len, 1, stdout);
+	fflush(stdout);
 	rv = 0;
 
 out_free:

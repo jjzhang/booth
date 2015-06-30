@@ -301,10 +301,99 @@ int check_boothc_header(struct boothc_header *h, int len_incl_data)
 	return len_incl_data;
 }
 
+static int do_read(int fd, void *buf, size_t count)
+{
+	int rv, off = 0;
+
+	while (off < count) {
+		rv = read(fd, (char *)buf + off, count - off);
+		if (rv == 0)
+			return -1;
+		if (rv == -1 && errno == EINTR)
+			continue;
+		if (rv == -1 && errno == EWOULDBLOCK)
+			break;
+		if (rv == -1)
+			return -1;
+		off += rv;
+	}
+	return off;
+}
+
+static int do_write(int fd, void *buf, size_t count)
+{
+	int rv, off = 0;
+
+retry:
+	rv = write(fd, (char *)buf + off, count);
+	if (rv == -1 && errno == EINTR)
+		goto retry;
+	/* If we cannot write _any_ data, we'd be in an (potential) loop. */
+	if (rv <= 0) {
+		log_error("write failed: %s (%d)", strerror(errno), errno);
+		return rv;
+	}
+
+	if (rv != count) {
+		count -= rv;
+		off += rv;
+		goto retry;
+	}
+	return 0;
+}
+
+/* Only used for client requests (tcp) */
+int read_client(struct client *req_cl)
+{
+	struct boothc_ticket_msg *msg;
+	int rv, len, fd;
+
+	if (!req_cl->msg) {
+		msg = calloc(sizeof(struct boothc_ticket_msg), 1);
+		if (!msg) {
+			log_error("out of memory for client messages");
+			return -1;
+		}
+		req_cl->msg = msg;
+	} else {
+		msg = req_cl->msg;
+	}
+
+	/* how much more do we have to read? */
+	len = (req_cl->offset >= sizeof(msg->header)) ?
+		/* cannot allow more than msg bytes */
+		min(ntohl(msg->header.length), sizeof(*msg)) : sizeof(*msg);
+
+	fd = req_cl->fd;
+	rv = do_read(fd, msg+req_cl->offset, len-req_cl->offset);
+	if (rv < 0) {
+		if (errno == ECONNRESET)
+			log_debug("client connection reset for fd %d", fd);
+		return -1;
+	}
+	req_cl->offset += rv;
+
+	/* update len if we read enough */
+	if (req_cl->offset >= sizeof(msg->header)) {
+		len = min(ntohl(msg->header.length), sizeof(*msg));
+	}
+
+	if (req_cl->offset < len) {
+		/* client promissed to send more */
+		return 1;
+	}
+
+	if (check_boothc_header(&msg->header, len) < 0) {
+		return -1;
+	}
+
+	return 0;
+}
+
 
 static void process_tcp_listener(int ci)
 {
-	int fd, i, one = 1;
+	int fd, i, flags, one = 1;
 	socklen_t addrlen = sizeof(struct sockaddr);
 	struct sockaddr addr;
 
@@ -316,6 +405,8 @@ static void process_tcp_listener(int ci)
 	}
 	setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&one, sizeof(one));
 
+	flags = fcntl(fd, F_GETFL, 0);
+	fcntl(fd, F_SETFL, flags | O_NONBLOCK);
 
 	i = client_add(fd, clients[ci].transport,
 			process_connection, NULL);
@@ -489,7 +580,7 @@ static int booth_tcp_recv(struct booth_site *from, void *buf, int len)
 		log_error("read failed (%d): %s", errno, strerror(errno));
 		return got;
 	}
-	return len;
+	return got;
 }
 
 static int booth_tcp_recv_auth(struct booth_site *from, void *buf, int len)
