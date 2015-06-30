@@ -25,6 +25,7 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include "timer.h"
 
 
 #define BOOTH_RUN_DIR "/var/run/booth/"
@@ -38,6 +39,14 @@
 
 #define DAEMON_NAME		"boothd"
 #define BOOTH_PATH_LEN		127
+#define BOOTH_MAX_KEY_LEN	64
+#define BOOTH_MIN_KEY_LEN	8
+/* hash size is 160 bits (sha1), but add a bit more space in case
+ * stronger hashes are required */
+#define BOOTH_MAC_SIZE		24
+
+/* tolerate packets which are not older than 10 minutes */
+#define BOOTH_DEFAULT_MAX_TIME_SKEW		600
 
 #define BOOTH_DEFAULT_PORT		9929
 
@@ -74,10 +83,17 @@ typedef unsigned char boothc_ticket[BOOTH_NAME_LEN];
 
 
 struct boothc_header {
-	/** Authentication data; not used now. */
+	/** Generation info (used for authentication)
+	 * This is something that would need to be monotone
+	 * incremental. CLOCK_MONOTONIC should fit the purpose. On
+	 * failover, however, it may happen that the new host has a
+	 * clock which is significantly behind the clock of old host.
+	 * We'll need to relax a bit for the nodes which are starting
+	 * (just accept all OP_STATUS).
+	 */
 	uint32_t iv;
-	uint32_t auth1;
-	uint32_t auth2;
+	uint32_t secs;  /* seconds */
+	uint32_t usecs; /* microseconds */
 
 
 	/** BOOTHC_MAGIC */
@@ -122,10 +138,24 @@ struct ticket_msg {
 	 *  starting, running, stopping, error, ...? */
 } __attribute__((packed));
 
+struct hmac {
+	/** hash id, currently set to constant BOOTH_HASH */
+	uint32_t hid;
+
+	/** the calculated hash, BOOTH_MAC_SIZE is big enough to
+	 * accommodate the hash of type hid */
+	unsigned char hash[BOOTH_MAC_SIZE];
+} __attribute__((packed));
+
+struct boothc_hdr_msg {
+	struct boothc_header header;
+	struct hmac hmac;
+} __attribute__((packed));
 
 struct boothc_ticket_msg {
 	struct boothc_header header;
 	struct ticket_msg ticket;
+	struct hmac hmac;
 } __attribute__((packed));
 
 
@@ -170,6 +200,7 @@ typedef enum {
 	RLT_OVERGRANT           = CHAR2CONST('O', 'v', 'e', 'r'),
 	RLT_PROBABLY_SUCCESS    = CHAR2CONST('S', 'u', 'c', '?'),
 	RLT_BUSY                = CHAR2CONST('B', 'u', 's', 'y'),
+	RLT_AUTH                = CHAR2CONST('A', 'u', 't', 'h'),
 	RLT_TERM_OUTDATED       = CHAR2CONST('T', 'O', 'd', 't'),
 	RLT_TERM_STILL_VALID    = CHAR2CONST('T', 'V', 'l', 'd'),
 	RLT_YOU_OUTDATED        = CHAR2CONST('O', 'u', 't', 'd'),
@@ -226,6 +257,10 @@ struct booth_site {
 	};
 	int saddrlen;
 	int addrlen;
+
+	/** last timestamp seen from this site */
+	uint32_t last_secs;
+	uint32_t last_usecs;
 } __attribute__((packed));
 
 
@@ -255,6 +290,7 @@ int do_read(int fd, void *buf, size_t count);
 int do_write(int fd, void *buf, size_t count);
 void process_connection(int ci);
 void safe_copy(char *dest, char *value, size_t buflen, const char *description);
+int update_authkey(void);
 
 
 struct command_line {

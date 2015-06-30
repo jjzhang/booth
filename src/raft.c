@@ -723,7 +723,7 @@ vote_for_sender:
 
 	init_ticket_msg(&omsg, OP_VOTE_FOR, OP_REQ_VOTE, RLT_SUCCESS, 0, tk);
 	omsg.ticket.leader = htonl(get_node_id(tk->voted_for));
-	return booth_udp_send(sender, &omsg, sizeof(omsg));
+	return booth_udp_send_auth(sender, &omsg, sendmsglen(&omsg));
 }
 
 

@@ -178,6 +178,24 @@ The following key/value pairs are defined:
 Clients use TCP to communicate with a daemon; Booth 
 will always bind and listen to both UDP and TCP ports.
 
+*'authfile'*::
+	File containing the authentication key. The key can be either
+	binary or text. If the latter, then both leading and trailing
+	white space, including new lines, is ignored. This key is a
+	shared secret and used to authenticate both clients and
+	servers. The key must be between 8 and 64 characters long and
+	be readable only by the file owner.
+
+*'maxtimeskew'*::
+	As protection against replay attacks, packets contain
+	generation timestamps. Such a timestamp is not allowed to be
+	too old. Just how old can be specified with this parameter.
+	The value is in seconds and the default is 600 (10 minutes).
+	If clocks vary more than this default between sites and nodes
+	(which is definitely something you should fix) then set this
+	parameter to a higher value. The time skew test is performed
+	only in concert with authentication.
+
 *'site'*::
 	Defines a site Raft member with the given IP. Sites can
 	acquire tickets. The sites' IP should be managed by the cluster.
@@ -393,6 +411,10 @@ FILES
 
 *'/etc/booth/booth.conf'*::
 	The default configuration file name. See also the '-c' argument.
+
+*'/etc/booth/authkey'*::
+	There is no default, but this is a typical location for the
+	shared secret (authentication key).
 
 *'/var/run/booth/'*::
 	Directory that holds PID/lock files. See also the 'status' command.

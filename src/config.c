@@ -27,6 +27,7 @@
 #include <grp.h>
 #include <errno.h>
 #include <string.h>
+#include "b_config.h"
 #include "booth.h"
 #include "config.h"
 #include "raft.h"
@@ -371,6 +372,8 @@ int read_config(const char *path, int type)
 
 	booth_conf->proto = UDP;
 	booth_conf->port = BOOTH_DEFAULT_PORT;
+	booth_conf->maxtimeskew = BOOTH_DEFAULT_MAX_TIME_SKEW;
+	booth_conf->authkey[0] = '\0';
 
 
 	/* Provide safe defaults. -1 is reserved, though. */
@@ -508,6 +511,20 @@ no_value:
 					"name");
 			continue;
 		}
+
+#if HAVE_LIBMHASH
+		if (strcmp(key, "authfile") == 0) {
+			safe_copy(booth_conf->authfile,
+					val, BOOTH_PATH_LEN,
+					"authfile");
+			continue;
+		}
+
+		if (strcmp(key, "maxtimeskew") == 0) {
+			booth_conf->maxtimeskew = atoi(val);
+			continue;
+		}
+#endif
 
 		if (strcmp(key, "site") == 0) {
 			if (add_site(val, SITE))

@@ -160,4 +160,36 @@ Short intermittent split brains are handled well because the
 leader keeps resending heartbeats until it gets replies from all
 servers serving sites.
 
+Authentication
+==============
+
+In order to prevent malicious parties from affecting booth
+operation, booth server can authenticate both clients (connecting
+over TCP) and other booth servers (connecting over UDP). The
+authentication is based on SHA1 HMAC (Keyed-Hashing Message
+Authentication) and shared key. The HMAC implementation is
+provided by the mhash library.
+
+Message encryption is not included as the information exchanged
+between various booth parties does not seem to justify that.
+
+Every message (packet) contains a hash code computed from the
+combination of payload and the secret key. Whoever has the secret
+key can then verify that the message is authentic.
+
+The shared key is used by both the booth client and the booth
+server, hence it needs to be copied to all nodes at each site and
+all arbitrators. Of course, a secure channel is required for key
+transfer. It is recommended to use csync2 or ssh.
+
+Timestamps are included and verified to fend against replay
+attacks. Certain time skew, 10 minutes by default, is tolerated.
+Packets either not older than that or with a timestamp more
+recent than the previous one from the same peer are accepted. The
+time skew can be configured in the booth configuration file.
+
+There is no way to configure booth to use a hash different from
+SHA1. That should not be a problem in practice as SHA1 provides
+sufficient security (the lesser MD5 would too).
+
 # vim: set ft=asciidoc :

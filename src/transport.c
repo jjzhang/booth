@@ -30,12 +30,14 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <poll.h>
+#include "b_config.h"
 #include "booth.h"
 #include "inline-fn.h"
 #include "log.h"
 #include "config.h"
 #include "ticket.h"
 #include "transport.h"
+#include "auth.h"
 
 #define BOOTH_IPADDR_LEN	(sizeof(struct in6_addr))
 
@@ -292,7 +294,7 @@ int check_boothc_header(struct boothc_header *h, int len_incl_data)
 
 	if (l != len_incl_data) {
 		log_error("length error - got %d, wanted %d",
-				l, len_incl_data);
+				len_incl_data, l);
 		return -EINVAL;
 	}
 
@@ -469,7 +471,13 @@ error:
 
 int booth_tcp_send(struct booth_site *to, void *buf, int len)
 {
-	return do_write(to->tcp_fd, buf, len);
+	int rv;
+
+	rv = add_hmac(buf, len);
+	if (!rv)
+		rv = do_write(to->tcp_fd, buf, len);
+
+	return rv;
 }
 
 static int booth_tcp_recv(struct booth_site *from, void *buf, int len)
@@ -482,6 +490,28 @@ static int booth_tcp_recv(struct booth_site *from, void *buf, int len)
 		return got;
 	}
 	return len;
+}
+
+static int booth_tcp_recv_auth(struct booth_site *from, void *buf, int len)
+{
+	int got, total;
+	int payload_len;
+	/* Needs timeouts! */
+
+	payload_len = len - sizeof(struct hmac);
+	got = booth_tcp_recv(from, buf, payload_len);
+	if (got < 0) {
+		return got;
+	}
+	total = got;
+	if (is_auth_req()) {
+		got = booth_tcp_recv(from, (unsigned char *)buf+payload_len, sizeof(struct hmac));
+		if (got != sizeof(struct hmac) || check_auth(from, buf, len)) {
+			return -1;
+		}
+		total += got;
+	}
+	return total;
 }
 
 static int booth_tcp_close(struct booth_site *to)
@@ -612,7 +642,17 @@ int booth_udp_send(struct booth_site *to, void *buf, int len)
 	return rv;
 }
 
-static int booth_udp_broadcast(void *buf, int len)
+int booth_udp_send_auth(struct booth_site *to, void *buf, int len)
+{
+	int rv;
+
+	rv = add_hmac(buf, len);
+	if (rv < 0)
+		return rv;
+	return booth_udp_send(to, buf, len);
+}
+
+static int booth_udp_broadcast_auth(void *buf, int len)
 {
 	int i, rv, rvs;
 	struct booth_site *site;
@@ -620,6 +660,10 @@ static int booth_udp_broadcast(void *buf, int len)
 
 	if (!booth_conf || !booth_conf->site_count)
 		return -1;
+
+	rv = add_hmac(buf, len);
+	if (rv < 0)
+		return rv;
 
 	rvs = 0;
 	foreach_node(i, site) {
@@ -673,6 +717,7 @@ const struct booth_transport booth_transport[TRANSPORT_ENTRIES] = {
 		.open = booth_tcp_open,
 		.send = booth_tcp_send,
 		.recv = booth_tcp_recv,
+		.recv_auth = booth_tcp_recv_auth,
 		.close = booth_tcp_close,
 		.exit = booth_tcp_exit
 	},
@@ -681,8 +726,9 @@ const struct booth_transport booth_transport[TRANSPORT_ENTRIES] = {
 		.init = booth_udp_init,
 		.open = return_0_booth_site,
 		.send = booth_udp_send,
+		.send_auth = booth_udp_send_auth,
 		.close = return_0_booth_site,
-		.broadcast = booth_udp_broadcast,
+		.broadcast_auth = booth_udp_broadcast_auth,
 		.exit = booth_udp_exit
 	},
 	[SCTP] = {
@@ -699,44 +745,123 @@ const struct booth_transport *local_transport = booth_transport+TCP;
 
 
 
-int send_header_only(int fd, struct boothc_header *hdr)
+/* data + (datalen-sizeof(struct hmac)) points to struct hmac
+ * i.e. struct hmac is always tacked on the payload
+ */
+int add_hmac(void *data, int len)
 {
-	int rv;
+	int rv = 0;
+#if HAVE_LIBMHASH
+	int payload_len;
+	struct hmac *hp;
 
-	rv = do_write(fd, hdr, sizeof(*hdr));
+	if (!is_auth_req())
+		return 0;
 
-	return rv;
-}
-
-
-int send_ticket_msg(int fd, struct boothc_ticket_msg *msg)
-{
-	int rv;
-
-	rv = do_write(fd, msg, sizeof(*msg));
-
-	return rv;
-}
-
-
-int send_header_plus(int fd, struct boothc_header *hdr, void *data, int len)
-{
-	int rv;
-	int l;
-
-	if (data == hdr->data) {
-		l = sizeof(*hdr) + len;
-		assert(l == ntohl(hdr->length));
-
-		/* One struct */
-		rv = do_write(fd, hdr, l);
-	} else {
-		/* Header and data in two locations */
-		rv = send_header_only(fd, hdr);
-
-		if (rv >= 0 && len)
-			rv = do_write(fd, data, len);
+	payload_len = len - sizeof(struct hmac);
+	hp = (struct hmac *)((unsigned char *)data + payload_len);
+	hp->hid = htonl(BOOTH_HASH);
+	memset(hp->hash, 0, BOOTH_MAC_SIZE);
+	rv = calc_hmac(data, payload_len, BOOTH_HASH, hp->hash,
+		booth_conf->authkey, booth_conf->authkey_len);
+	if (rv < 0) {
+		log_error("internal error: cannot calculate mac");
 	}
+#endif
+	return rv;
+}
+
+/* TODO: we need some client identification */
+#define peer_string(p) (p ? site_string(p) : "client")
+
+/* verify the validity of timestamp from the header
+ * the timestamp needs to be either greater than the one already
+ * recorded for the site or, and this is checked for clients,
+ * not to be older than booth_conf->maxtimeskew
+ * update the timestamp for the site, if this packet is from a
+ * site
+ */
+static int verify_ts(struct booth_site *from, void *buf, int len)
+{
+	struct boothc_header *h;
+	struct timeval tv, curr_tv, now;
+
+	if (len < sizeof(*h)) {
+		log_error("%s: packet too short", peer_string(from));
+		return -1;
+	}
+
+	h = (struct boothc_header *)buf;
+	tv.tv_sec = ntohl(h->secs);
+	tv.tv_usec = ntohl(h->usecs);
+	if (from) {
+		curr_tv.tv_sec = from->last_secs;
+		curr_tv.tv_usec = from->last_usecs;
+		if (timercmp(&tv, &curr_tv, >))
+			goto accept;
+		log_warn("%s: packet timestamp older than previous one",
+			site_string(from));
+	}
+
+	gettimeofday(&now, NULL);
+	now.tv_sec -= booth_conf->maxtimeskew;
+	if (timercmp(&tv, &now, >))
+		goto accept;
+	log_error("%s: packet timestamp older than %d seconds",
+		peer_string(from), booth_conf->maxtimeskew);
+	return -1;
+
+accept:
+	if (from) {
+		from->last_secs = tv.tv_sec;
+		from->last_usecs = tv.tv_usec;
+	}
+	return 0;
+}
+
+int check_auth(struct booth_site *from, void *buf, int len)
+{
+	int rv = 0;
+#if HAVE_LIBMHASH
+	int payload_len;
+	struct hmac *hp;
+
+	if (!is_auth_req())
+		return 0;
+
+	payload_len = len - sizeof(struct hmac);
+	hp = (struct hmac *)((unsigned char *)buf + payload_len);
+	rv = verify_hmac(buf, payload_len, ntohl(hp->hid), hp->hash,
+		booth_conf->authkey, booth_conf->authkey_len);
+	if (!rv) {
+		rv = verify_ts(from, buf, len);
+	}
+	if (rv != 0) {
+		log_error("%s: failed to authenticate", peer_string(from));
+	}
+#endif
+	return rv;
+}
+
+int send_data(int fd, void *data, int datalen)
+{
+	int rv = 0;
+
+	rv = add_hmac(data, datalen);
+	if (!rv)
+		rv = do_write(fd, data, datalen);
+
+	return rv;
+}
+
+int send_header_plus(int fd, struct boothc_hdr_msg *msg, void *data, int len)
+{
+	int rv;
+
+	rv = send_data(fd, msg, sendmsglen(msg)-len);
+
+	if (rv >= 0 && len)
+		rv = do_write(fd, data, len);
 
 	return rv;
 }
