@@ -311,25 +311,6 @@ kill:
 }
 
 
-/** Callback function for the listening TCP socket. */
-static void process_listener(int ci)
-{
-	int fd, i;
-
-	fd = accept(clients[ci].fd, NULL, NULL);
-	if (fd < 0) {
-		log_error("process_listener: accept error for fd %d: %s (%d)",
-			  clients[ci].fd, strerror(errno), errno);
-		if (clients[ci].deadfn)
-			clients[ci].deadfn(ci);
-		return;
-	}
-
-	i = client_add(fd, clients[ci].transport, process_connection, NULL);
-
-	log_debug("add client connection %d fd %d", i, fd);
-}
-
 /* trim trailing spaces if the key is ascii
  */
 static void trim_key()
@@ -535,11 +516,6 @@ static int loop(int fd)
 	rv = setup_ticket();
 	if (rv < 0)
 		goto fail;
-
-
-	client_add(local->tcp_fd, booth_transport + TCP,
-			process_listener, NULL);
-
 
 	rv = write_daemon_state(fd, BOOTHD_STARTED);
 	if (rv != 0) {
