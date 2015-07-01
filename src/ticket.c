@@ -575,7 +575,6 @@ int notify_client(struct ticket_config *tk, struct client *req_client,
 			if (ci >= 0)
 				deadfn(ci);
 		}
-		free(msg);
 		return 0; /* we're done with this request */
 	}
 }

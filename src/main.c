@@ -126,11 +126,19 @@ static void client_alloc(void)
 
 static void client_dead(int ci)
 {
-	if (clients[ci].fd != -1)
-		close(clients[ci].fd);
+	struct client *c = clients + ci;
 
-	clients[ci].fd = -1;
-	clients[ci].workfn = NULL;
+	if (c->fd != -1)
+		close(c->fd);
+
+	c->fd = -1;
+	c->workfn = NULL;
+
+	if (c->msg) {
+		free(c->msg);
+		c->msg = NULL;
+		c->offset = 0;
+	}
 
 	pollfds[ci].fd = -1;
 }
@@ -244,9 +252,6 @@ kill:
 	deadfn = req_cl->deadfn;
 	if(deadfn) {
 		deadfn(ci);
-	}
-	if (msg) {
-		free(msg);
 	}
 	return;
 }
