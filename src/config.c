@@ -336,6 +336,40 @@ static long read_time(char *val)
 	return t;
 }
 
+/* make arguments for execv(2)
+ * tk->clu_test.prog points to the path
+ * tk->clu_test.argv is argument vector (starts with the prog)
+ * (strtok pokes holes in the configuration parameter value, i.e.
+ * we don't need to allocate memory for arguments)
+ */
+static int parse_extprog(char *val, struct ticket_config *tk)
+{
+	char *p;
+	int i = 0;
+
+	if (tk->clu_test.prog) {
+		free(tk->clu_test.prog);
+	}
+	if (!(tk->clu_test.prog = strdup(val))) {
+		log_error("out of memory");
+		return -1;
+	}
+
+	p = strtok(tk->clu_test.prog, " \t");
+	tk->clu_test.argv[i++] = p;
+	do {
+		p = strtok(NULL, " \t");
+		if (i >= MAX_ARGS) {
+			log_error("too many arguments for the acquire-handler");
+			free(tk->clu_test.prog);
+			return -1;
+		}
+		tk->clu_test.argv[i++] = p;
+	} while (p);
+
+	return 0;
+}
+
 extern int poll_timeout;
 
 int read_config(const char *path, int type)
@@ -385,7 +419,10 @@ int read_config(const char *path, int type)
 	strcpy(booth_conf->arb_group,  "nobody");
 
 	parse_weights("", defaults.weight);
-	defaults.ext_verifier  = NULL;
+	defaults.clu_test.prog  = NULL;
+	defaults.clu_test.pid  = 0;
+	defaults.clu_test.status  = 0;
+	defaults.clu_test.progstate  = EXTPROG_IDLE;
 	defaults.term_duration        = DEFAULT_TICKET_EXPIRY;
 	defaults.timeout       = DEFAULT_TICKET_TIMEOUT;
 	defaults.retries       = DEFAULT_RETRIES;
@@ -639,12 +676,7 @@ no_value:
 		}
 
 		if (strcmp(key, "before-acquire-handler") == 0) {
-			if (current_tk->ext_verifier) {
-				free(current_tk->ext_verifier);
-			}
-			current_tk->ext_verifier = strdup(val);
-			if (!current_tk->ext_verifier) {
-				error = "Out of memory";
+			if (parse_extprog(val, current_tk)) {
 				goto err;
 			}
 			continue;

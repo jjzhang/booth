@@ -32,6 +32,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/poll.h>
+#include <sys/wait.h>
 #include <pacemaker/crm/services.h>
 #include <clplumbing/setproctitle.h>
 #include <sys/prctl.h>
@@ -1331,6 +1332,24 @@ static void sig_exit_handler(int sig)
 	exit(0);
 }
 
+static void wait_child(int sig)
+{
+	int status;
+	pid_t pid;
+	struct ticket_config *tk;
+
+	pid = wait(&status);
+	tk = find_ticket_by_pid(pid);
+	if (!tk) {
+		/*log_warn("child pid \"%d\" not connected to any ticket",
+				pid);*/
+		return;
+	}
+
+	tk->clu_test.status = status;
+	tk->clu_test.progstate = EXTPROG_EXITED;
+}
+
 static int do_server(int type)
 {
 	int rv = -1;
@@ -1394,6 +1413,7 @@ static int do_server(int type)
 	cl_cdtocoredir();
 	prctl(PR_SET_DUMPABLE, (unsigned long)TRUE, 0UL, 0UL, 0UL);
 
+	signal(SIGCHLD, (__sighandler_t)wait_child);
 	rv = loop(lock_fd);
 
 	return rv;

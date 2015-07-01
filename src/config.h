@@ -32,9 +32,16 @@
 /** Definitions for in-RAM data. */
 
 #define MAX_NODES	16
+#define MAX_ARGS 	16
 #define TICKET_ALLOC	16
 
 
+
+typedef enum {
+	EXTPROG_IDLE,
+	EXTPROG_RUNNING,
+	EXTPROG_EXITED,
+} extprog_state_e;
 
 struct ticket_config {
 	/** \name Configuration items.
@@ -63,7 +70,13 @@ struct ticket_config {
 
 	/* Program to ask whether it makes sense to
 	 * acquire the ticket */
-	char *ext_verifier;
+	struct clu_test {
+		char *prog;
+		char *argv[MAX_ARGS];
+		pid_t pid;
+		int status; /* child exit status */
+		extprog_state_e progstate; /* program running/idle/waited on */
+	} clu_test;
 
 	/** Node weights. */
 	int weight[MAX_NODES];

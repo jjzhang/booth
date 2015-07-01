@@ -19,8 +19,12 @@
 #ifndef _HANDLER_H
 #define _HANDLER_H
 
-int run_handler(struct ticket_config *tk,
-		const char *cmd, int synchronous);
+enum {
+	RUNCMD_ERR = -1,
+	RUNCMD_MORE = -2,
+};
+
+int run_handler(struct ticket_config *tk);
 
 
 #endif

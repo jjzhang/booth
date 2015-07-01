@@ -69,6 +69,19 @@ int find_ticket_by_name(const char *ticket, struct ticket_config **found)
 	return 0;
 }
 
+struct ticket_config *find_ticket_by_pid(pid_t pid)
+{
+	int i;
+
+	for (i = 0; i < booth_conf->ticket_count; i++) {
+		if (booth_conf->ticket[i].clu_test.pid == pid) {
+			return booth_conf->ticket + i;
+		}
+	}
+
+	return NULL;
+}
+
 
 int check_ticket(char *ticket, struct ticket_config **found)
 {
@@ -157,30 +170,103 @@ int ticket_write(struct ticket_config *tk)
 }
 
 
+static void ext_prog_failed(struct ticket_config *tk,
+		int start_election)
+{
+	/* Give it to somebody else.
+	 * Just send a VOTE_FOR message, so the
+	 * others can start elections. */
+	if (leader_and_valid(tk)) {
+		save_committed_tkt(tk);
+		reset_ticket(tk);
+		ticket_write(tk);
+		if (start_election) {
+			ticket_broadcast(tk, OP_VOTE_FOR, OP_REQ_VOTE, RLT_SUCCESS, OR_LOCAL_FAIL);
+		}
+	}
+}
+
 /* Ask an external program whether getting the ticket
  * makes sense.
 * Eg. if the services have a failcount of INFINITY,
 * we can't serve here anyway. */
-int test_external_prog(struct ticket_config *tk,
+static int test_external_prog(struct ticket_config *tk,
 		int start_election)
 {
 	int rv;
 
-	rv = run_handler(tk, tk->ext_verifier, 1);
-	if (rv) {
-		tk_log_warn("we are not allowed to acquire ticket");
+	rv = run_handler(tk);
+	switch (rv) {
+	case RUNCMD_ERR:
+		tk_log_warn("couldn't run external test, not allowed to acquire ticket");
+		ext_prog_failed(tk, start_election);
+		break;
+	case 0:
+		/* immediately returned with success */
+		break;
+	case RUNCMD_MORE:
+		tk_log_debug("forked %s", tk->clu_test.prog);
+		break;
+	default:
+		break;
+	}
 
-		/* Give it to somebody else.
-		 * Just send a VOTE_FOR message, so the
-		 * others can start elections. */
-		if (leader_and_valid(tk)) {
-			save_committed_tkt(tk);
-			reset_ticket(tk);
-			ticket_write(tk);
-			if (start_election) {
-				ticket_broadcast(tk, OP_VOTE_FOR, OP_REQ_VOTE, RLT_SUCCESS, OR_LOCAL_FAIL);
-			}
-		}
+	return rv;
+}
+
+static int test_exit_status(struct ticket_config *tk,
+		int start_election)
+{
+	int rv = -1, status;
+
+	status = tk->clu_test.status;
+	if (WIFEXITED(status)) {
+		rv = WEXITSTATUS(status);
+	} else if (WIFSIGNALED(status)) {
+		rv = 128 + WTERMSIG(status);
+	}
+	if (rv) {
+		tk_log_warn("handler \"%s\" failed: %s",
+			tk->clu_test.prog, interpret_rv(status));
+		tk_log_warn("we are not allowed to acquire ticket");
+		ext_prog_failed(tk, start_election);
+	} else {
+		tk_log_debug("handler \"%s\" exited with success",
+			tk->clu_test.prog);
+	}
+	tk->clu_test.pid = 0;
+	tk->clu_test.progstate = EXTPROG_IDLE;
+	return rv;
+}
+
+/* do we need to run the external program?
+ * or we already done that and waiting for the outcome
+ * or program exited and we can collect the status
+ * return codes
+ * 0: no program defined
+ * RUNCMD_MORE: program forked, results later
+ * != 0: executing program failed (or some other failure)
+ */
+
+static int do_ext_prog(struct ticket_config *tk,
+		int start_election)
+{
+	int rv = 0;
+
+	if (!tk->clu_test.prog)
+		return 0;
+
+	switch(tk->clu_test.progstate) {
+	case EXTPROG_IDLE:
+		rv = test_external_prog(tk, start_election);
+		break;
+	case EXTPROG_RUNNING:
+		/* should never get here, but just in case */
+		rv = RUNCMD_MORE;
+		break;
+	case EXTPROG_EXITED:
+		rv = test_exit_status(tk, start_election);
+		break;
 	}
 
 	return rv;
@@ -192,13 +278,24 @@ int test_external_prog(struct ticket_config *tk,
  */
 int acquire_ticket(struct ticket_config *tk, cmd_reason_t reason)
 {
-	int rc;
+	int rv;
 
-	if (test_external_prog(tk, 0))
+	switch(do_ext_prog(tk, 0)) {
+	case 0:
+		/* everything fine */
+		break;
+	case RUNCMD_MORE:
+		/* need to wait for the outcome before starting elections */
+		/* set next_state appropriately, so that elections are
+		 * started */
+		tk->next_state = ST_LEADER;
+		return 0;
+	default:
 		return RLT_EXT_FAILED;
+	}
 
-	rc = new_election(tk, local, 1, reason);
-	return rc ? RLT_SYNC_FAIL : 0;
+	rv = new_election(tk, local, 1, reason);
+	return rv ? RLT_SYNC_FAIL : 0;
 }
 
 
@@ -736,11 +833,19 @@ int postpone_ticket_processing(struct ticket_config *tk)
 		(-time_left(&start_time) < tk->timeout);
 }
 
+#define has_extprog_exited(tk) ((tk)->clu_test.progstate == EXTPROG_EXITED)
+
 static void process_next_state(struct ticket_config *tk)
 {
 	switch(tk->next_state) {
 	case ST_LEADER:
-		reacquire_ticket(tk);
+		if (has_extprog_exited(tk)) {
+			/* external program exited, we can start the acquire
+			 * process right away */
+			acquire_ticket(tk, OR_REACQUIRE);
+		} else {
+			reacquire_ticket(tk);
+		}
 		break;
 	case ST_INIT:
 		no_resends(tk);
@@ -822,7 +927,7 @@ static void next_action(struct ticket_config *tk)
 			}
 		} else {
 			/* this is ticket renewal, run local test */
-			if (!test_external_prog(tk, 1)) {
+			if (!do_ext_prog(tk, 1)) {
 				ticket_broadcast(tk, OP_HEARTBEAT, OP_ACK, RLT_SUCCESS, 0);
 				tk->ticket_updated = 0;
 			}
@@ -885,7 +990,8 @@ void process_tickets(void)
 	timetype last_cron;
 
 	foreach_ticket(i, tk) {
-		if (is_time_set(&tk->next_cron) && !is_past(&tk->next_cron))
+		if (!has_extprog_exited(tk) &&
+				is_time_set(&tk->next_cron) && !is_past(&tk->next_cron))
 			continue;
 
 		tk_log_debug("ticket cron");

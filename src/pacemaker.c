@@ -100,16 +100,14 @@ static void test_atomicity(void)
 const char * interpret_rv(int rv)
 {
 	static char text[64];
-	int p;
-
 
 	if (rv == 0)
 		return "0";
 
-	p = sprintf(text, "rv %d", WEXITSTATUS(rv));
-
 	if (WIFSIGNALED(rv))
-		sprintf(text + p, "  signal %d", WTERMSIG(rv));
+		sprintf(text, "got signal %d", WTERMSIG(rv));
+	else
+		sprintf(text, "exit code %d", WEXITSTATUS(rv));
 
 	return text;
 }

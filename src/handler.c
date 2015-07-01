@@ -32,23 +32,12 @@
 #include "booth.h"
 #include "handler.h"
 
-
-
-/** Runs an external handler.
- * See eg. 'before-acquire-handler'.
- * TODO: timeout, async operation?. */
-int run_handler(struct ticket_config *tk,
-		const char *cmd, int synchronous)
+static int set_booth_env(struct ticket_config *tk)
 {
 	int rv;
 	char expires[16];
 
-	if (!cmd)
-		return 0;
-
-	assert(synchronous);
 	sprintf(expires, "%" PRId64, (int64_t)wall_ts(&tk->term_expires));
-
 	rv = setenv("BOOTH_TICKET", tk->name, 1) ||
 		setenv("BOOTH_LOCAL", local->addr_string, 1) ||
 		setenv("BOOTH_CONF_NAME", booth_conf->name, 1) ||
@@ -57,13 +46,50 @@ int run_handler(struct ticket_config *tk,
 
 	if (rv) {
 		log_error("Cannot set environment: %s", strerror(errno));
-	} else {
-		rv = system(cmd);
-		if (rv)
-			tk_log_warn("handler \"%s\" exited with error %s",
-					cmd, interpret_rv(rv));
-		else
-			tk_log_debug("handler \"%s\" exited with success", cmd);
+	}
+	return rv;
+}
+
+static void
+closefiles(void)
+{
+	int fd;
+
+	/* close all descriptors except stdin/out/err */
+	for (fd = getdtablesize() - 1; fd > STDERR_FILENO; fd--) {
+		close(fd);
+	}
+}
+
+/* run some external program
+ * return codes:
+ * RUNCMD_ERR: executing program failed (or some other failure)
+ * RUNCMD_MORE: program forked, results later
+ */
+int run_handler(struct ticket_config *tk)
+{
+	int rv = 0;
+	pid_t pid;
+
+	if (!tk->clu_test.prog)
+		return 0;
+
+	switch(pid=fork()) {
+	case -1:
+		log_error("fork: %s", strerror(errno));
+		return RUNCMD_ERR;
+	case 0: /* child */
+		if (set_booth_env(tk)) {
+			exit(1);
+		}
+		closefiles(); /* don't leak open files */
+		execv(tk->clu_test.prog, tk->clu_test.argv);
+		tk_log_error("%s: execv failed (%s)", tk->clu_test.prog, strerror(errno));
+		exit(1);
+	default: /* parent */
+		tk->clu_test.pid = pid;
+		tk->clu_test.progstate = EXTPROG_RUNNING;
+		rv = RUNCMD_MORE; /* program runs */
 	}
 
 	return rv;
