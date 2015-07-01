@@ -1,4 +1,4 @@
-There's a booth-test RPM available that contains two types of tests.
+There's a booth-test package which contains two types of tests.
 
 It installs the necessary files into `/usr/share/booth/tests`.
 
