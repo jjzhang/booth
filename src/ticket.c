@@ -69,20 +69,6 @@ int find_ticket_by_name(const char *ticket, struct ticket_config **found)
 	return 0;
 }
 
-struct ticket_config *find_ticket_by_pid(pid_t pid)
-{
-	int i;
-
-	for (i = 0; i < booth_conf->ticket_count; i++) {
-		if (booth_conf->ticket[i].clu_test.pid == pid) {
-			return booth_conf->ticket + i;
-		}
-	}
-
-	return NULL;
-}
-
-
 int check_ticket(char *ticket, struct ticket_config **found)
 {
 	if (found)

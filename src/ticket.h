@@ -74,7 +74,6 @@ int do_grant_ticket(struct ticket_config *ticket, int options);
 int do_revoke_ticket(struct ticket_config *tk);
 
 int find_ticket_by_name(const char *ticket, struct ticket_config **found);
-struct ticket_config *find_ticket_by_pid(pid_t pid);
 
 void set_ticket_wakeup(struct ticket_config *tk);
 int postpone_ticket_processing(struct ticket_config *tk);

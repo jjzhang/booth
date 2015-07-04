@@ -1334,20 +1334,20 @@ static void sig_exit_handler(int sig)
 
 static void wait_child(int sig)
 {
-	int status;
-	pid_t pid;
+	int i, status;
 	struct ticket_config *tk;
 
-	pid = wait(&status);
-	tk = find_ticket_by_pid(pid);
-	if (!tk) {
-		/*log_warn("child pid \"%d\" not connected to any ticket",
-				pid);*/
-		return;
+	/* use waitpid(2) and not wait(2) in order not to interfear
+	 * with popen(2)/pclose(2) and system(2) used in pacemaker.c
+	 */
+	foreach_ticket(i, tk) {
+		if (tk->clu_test.prog && tk->clu_test.pid >= 0 &&
+				tk->clu_test.progstate == EXTPROG_RUNNING &&
+				waitpid(tk->clu_test.pid, &status, WNOHANG) == tk->clu_test.pid) {
+			tk->clu_test.status = status;
+			tk->clu_test.progstate = EXTPROG_EXITED;
+		}
 	}
-
-	tk->clu_test.status = status;
-	tk->clu_test.progstate = EXTPROG_EXITED;
 }
 
 static int do_server(int type)
