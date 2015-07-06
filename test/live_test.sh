@@ -44,6 +44,7 @@ cnf=$1
 run_cnf="/etc/booth/booth.conf"
 
 shift 1
+ERR_SETUP_FAILED=52
 logf=test_booth.log
 SSH_OPTS="-o StrictHostKeyChecking=no -l root"
 iprules=/usr/share/booth/tests/test/booth_path
@@ -638,6 +639,9 @@ runtest() {
 			usrmsg="check FAIL: $rc"
 		fi
 		;;
+	$ERR_SETUP_FAILED)
+		usrmsg="setup FAIL"
+		;;
 	*)
 		usrmsg="test FAIL: $rc"
 		;;
@@ -775,11 +779,11 @@ check_grant_elsewhere() {
 # grant with one site lost
 setup_grant_site_lost() {
 	stop_site `get_site 2`
-	#wait_timeout
+	booth_status `get_site 2` && return 1
+	return 0
 }
 test_grant_site_lost() {
 	grant_ticket 1
-	check_cib `get_site 1` || return 1
 	wait_exp
 }
 check_grant_site_lost() {
@@ -793,14 +797,16 @@ recover_grant_site_lost() {
 
 # grant with one site lost then reappearing
 setup_grant_site_reappear() {
-	stop_site `get_site 2` || return 1
+	stop_site `get_site 2`
+	booth_status `get_site 2` && return 1
+	return 0
 	#sleep 1
-	grant_ticket 1 || return 1
-	check_cib `get_site 1` || return 1
-	wait_timeout
-	start_site `get_site 2` || return 1
 }
 test_grant_site_reappear() {
+	grant_ticket 1 || return $ERR_SETUP_FAILED
+	check_cib `get_site 1` || return $ERR_SETUP_FAILED
+	wait_timeout
+	start_site `get_site 2` || return $ERR_SETUP_FAILED
 	wait_timeout
 	wait_timeout
 }
@@ -863,10 +869,10 @@ check_slow_start_granted() {
 
 # restart with ticket granted
 setup_restart_granted() {
-	grant_ticket_cib 1 || return 1
-	restart_site `get_site 1` || return 1
+	grant_ticket_cib 1
 }
 test_restart_granted() {
+	restart_site `get_site 1` || return 1
 	wait_timeout
 }
 check_restart_granted() {
@@ -877,10 +883,10 @@ check_restart_granted() {
 
 # reload with ticket granted
 setup_reload_granted() {
-	grant_ticket_cib 1 || return 1
-	reload_site `get_site 1` || return 1
+	grant_ticket_cib 1
 }
 test_reload_granted() {
+	reload_site `get_site 1` || return 1
 	wait_timeout
 }
 check_reload_granted() {
@@ -891,12 +897,12 @@ check_reload_granted() {
 
 # restart with ticket granted (but cib empty)
 setup_restart_granted_nocib() {
-	grant_ticket_cib 1 || return 1
+	grant_ticket_cib 1
+}
+test_restart_granted_nocib() {
 	stop_site_clean `get_site 1` || return 1
 	#wait_timeout
 	start_site `get_site 1` || return 1
-}
-test_restart_granted_nocib() {
 	wait_timeout
 	wait_timeout
 	wait_timeout
@@ -909,12 +915,12 @@ check_restart_granted_nocib() {
 
 # restart with ticket not granted
 setup_restart_notgranted() {
-	grant_ticket_cib 1 || return 1
+	grant_ticket_cib 1
+}
+test_restart_notgranted() {
 	stop_site `get_site 2` || return 1
 	#sleep 1
 	start_site `get_site 2` || return 1
-}
-test_restart_notgranted() {
 	wait_timeout
 }
 check_restart_notgranted() {
@@ -925,12 +931,11 @@ check_restart_notgranted() {
 
 # ticket failover
 setup_failover() {
-	grant_ticket 1 || return 1
-	stop_site_clean `get_site 1` || return 1
-	booth_status `get_site 1` && return 1
-	return 0
+	grant_ticket 1
 }
 test_failover() {
+	stop_site_clean `get_site 1` || return 1
+	booth_status `get_site 1` && return 1
 	wait_exp
 	wait_timeout
 	wait_timeout
