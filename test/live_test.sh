@@ -422,6 +422,7 @@ setup_netem() {
 		set_netem_env $env
 	done
 	trap "reset_netem_env" EXIT
+	echo "-------------------------------------------------- (netem)" | logmsg
 }
 
 cib_status() {
@@ -617,22 +618,24 @@ runtest() {
 	echo "==================================================" | logmsg
 	echo "starting booth test $1 ..." | logmsg
 	if is_function setup_$1; then
-		if ! setup_$1; then
-			echo "setup test $1 failed" | logmsg
-			return 1
-		fi
+		setup_$1
+		rc=$?
+		echo "-------------------------------------------------- (setup)" | logmsg
+		[ "$rc" -ne 0 ] && rc=$ERR_SETUP_FAILED
 	fi
-	echo "--------------------------------------------------" | logmsg
-	setup_netem
-	test_$1
-	rc=$?
-	echo "--------------------------------------------------" | logmsg
+	if [ "$rc" -eq 0 ]; then
+		setup_netem
+		test_$1
+		rc=$?
+		echo "-------------------------------------------------- (test)" | logmsg
+	fi
 	case $rc in
 	0)
 		# wait a bit more if we're losing packets
 		[ -n "$PKT_LOSS" ] && wait_timeout
 		check_$1
 		rc=$?
+		echo "-------------------------------------------------- (check)" | logmsg
 		if [ $rc -eq 0 ]; then
 			usrmsg="SUCCESS"
 		else
