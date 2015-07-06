@@ -621,9 +621,11 @@ runtest() {
 			return 1
 		fi
 	fi
+	echo "--------------------------------------------------" | logmsg
 	setup_netem
 	test_$1
 	rc=$?
+	echo "--------------------------------------------------" | logmsg
 	case $rc in
 	0)
 		# wait a bit more if we're losing packets
@@ -643,6 +645,7 @@ runtest() {
 	end_time=`date`
 	end_ts=`date +%s`
 	echo "finished booth test $1 ($usrmsg)" | logmsg
+	echo "--------------------------------------------------" | logmsg
 	is_function recover_$1 && recover_$1
 	reset_netem_env
 	#sleep 3
