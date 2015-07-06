@@ -522,7 +522,7 @@ booth_leader_consistency() {
 }
 # are there two leaders or is it just that some booths are outdated
 booth_leader_consistency_2() {
-	test `booth_list_fld 2 | sort -u | grep -iv none | wc -l` -eq 1
+	test `booth_list_fld 2 | sort -u | grep -iv none | wc -l` -le 1
 }
 # do all booths have the same info?
 # possible differences:
@@ -541,7 +541,7 @@ check_booth_consistency() {
 	rc_lead=$?
 	if [ $rc_lead -ne 0 ]; then
 		echo "$tlist" | booth_leader_consistency_2
-		rc_lead=$(($rc_lead + $?))  # rc_load=2 if the prev test failed
+		rc_lead=$(($rc_lead + $?))  # rc_lead=2 if the prev test failed
 	fi
 	rc=$(($rc | $rc_lead<<1))
 	test $rc -eq 0 && return
