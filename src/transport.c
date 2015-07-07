@@ -325,12 +325,12 @@ static int do_write(int fd, void *buf, size_t count)
 	int rv, off = 0;
 
 retry:
-	rv = write(fd, (char *)buf + off, count);
+	rv = send(fd, (char *)buf + off, count, MSG_NOSIGNAL);
 	if (rv == -1 && errno == EINTR)
 		goto retry;
 	/* If we cannot write _any_ data, we'd be in an (potential) loop. */
 	if (rv <= 0) {
-		log_error("write failed: %s (%d)", strerror(errno), errno);
+		log_error("send failed: %s (%d)", strerror(errno), errno);
 		return rv;
 	}
 

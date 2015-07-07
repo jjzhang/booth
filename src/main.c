@@ -1391,6 +1391,8 @@ static int do_server(int type)
 	signal(SIGUSR1, (__sighandler_t)tickets_log_info);
 	signal(SIGTERM, (__sighandler_t)sig_exit_handler);
 	signal(SIGINT, (__sighandler_t)sig_exit_handler);
+	/* we'll handle errors there and then */
+	signal(SIGPIPE, SIG_IGN);
 
 	set_scheduler();
 	/* we don't want to be killed by the OOM-killer */
