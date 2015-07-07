@@ -293,9 +293,6 @@ failcount of 'INFINITY' on all available nodes, the service will
 be unable to run. In that case, it is of no use to claim the
 ticket.
 +
-'boothd' waits synchronously for the result of the handler, so make
-sure that the program returns quickly.
-+
 See below for details about booth specific environment variables.
 The distributed 'service-runnable' script is an example which may
 be used to test whether a pacemaker resource can be started.
