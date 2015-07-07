@@ -635,8 +635,15 @@ int notify_client(struct ticket_config *tk, struct client *req_client,
 	cmd = ntohl(msg->header.cmd);
 	options = ntohl(msg->header.options);
 	rv = tk->outcome;
-	tk_log_debug("notifying client %d (request %s)",
-		req_client->fd, state_to_string(cmd));
+	if (req_client && req_client->fd != -1) {
+		tk_log_debug("notifying client %d (request %s)",
+			req_client->fd, state_to_string(cmd));
+	} else {
+		tk_log_info("client for request %s left "
+			"before being notified about the outcome",
+			state_to_string(cmd));
+		return 0;
+	}
 	init_ticket_msg(&omsg, CL_RESULT, 0, rv, 0, tk);
 	rc = send_client_msg(req_client->fd, &omsg);
 
