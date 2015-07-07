@@ -176,7 +176,7 @@ static void ext_prog_failed(struct ticket_config *tk,
  * makes sense.
 * Eg. if the services have a failcount of INFINITY,
 * we can't serve here anyway. */
-static int test_external_prog(struct ticket_config *tk,
+static int run_external_prog(struct ticket_config *tk,
 		int start_election)
 {
 	int rv;
@@ -244,7 +244,7 @@ static int do_ext_prog(struct ticket_config *tk,
 
 	switch(tk->clu_test.progstate) {
 	case EXTPROG_IDLE:
-		rv = test_external_prog(tk, start_election);
+		rv = run_external_prog(tk, start_election);
 		break;
 	case EXTPROG_RUNNING:
 		/* should never get here, but just in case */
@@ -260,7 +260,11 @@ static int do_ext_prog(struct ticket_config *tk,
 
 
 /* Try to acquire a ticket
- * Could be manual grant or after ticket loss
+ * Could be manual grant or after start (if the ticket is granted
+ * and still valid in the CIB)
+ * If the external program needs to run, this is run twice, once
+ * to start the program, and then to get the result and start
+ * elections.
  */
 int acquire_ticket(struct ticket_config *tk, cmd_reason_t reason)
 {
@@ -274,7 +278,7 @@ int acquire_ticket(struct ticket_config *tk, cmd_reason_t reason)
 		/* need to wait for the outcome before starting elections */
 		/* set next_state appropriately, so that elections are
 		 * started */
-		tk->next_state = ST_LEADER;
+		set_next_state(tk, ST_LEADER);
 		return 0;
 	default:
 		return RLT_EXT_FAILED;
@@ -334,7 +338,7 @@ int do_revoke_ticket(struct ticket_config *tk)
 {
 	if (tk->acks_expected) {
 		tk_log_info("delay ticket revoke until the current operation finishes");
-		tk->next_state = ST_INIT;
+		set_next_state(tk, ST_INIT);
 		return RLT_MORE;
 	} else {
 		start_revoke_ticket(tk);
@@ -435,7 +439,7 @@ void reset_ticket(struct ticket_config *tk)
 }
 
 
-static void reacquire_ticket(struct ticket_config *tk)
+static void log_reacquire_reason(struct ticket_config *tk)
 {
 	int valid;
 	const char *where_granted = "\0";
@@ -465,11 +469,6 @@ static void reacquire_ticket(struct ticket_config *tk)
 				"not recorded as the grantee (will try to reacquire)");
 		}
 	}
-
-	/* try to acquire the
-	 * ticket through new elections
-	 */
-	acquire_ticket(tk, OR_REACQUIRE);
 }
 
 void update_ticket_state(struct ticket_config *tk, struct booth_site *sender)
@@ -497,12 +496,12 @@ void update_ticket_state(struct ticket_config *tk, struct booth_site *sender)
 			disown_ticket(tk);
 			ticket_write(tk);
 			set_state(tk, ST_FOLLOWER);
-			tk->next_state = ST_FOLLOWER;
+			set_next_state(tk, ST_FOLLOWER);
 		} else {
 			if (tk->state == ST_CANDIDATE) {
 				set_state(tk, ST_FOLLOWER);
 			}
-			tk->next_state = ST_LEADER;
+			set_next_state(tk, ST_LEADER);
 		}
 	} else {
 		if (!tk->leader || tk->leader == no_leader) {
@@ -521,7 +520,7 @@ void update_ticket_state(struct ticket_config *tk, struct booth_site *sender)
 					site_string(tk->leader));
 			set_state(tk, ST_FOLLOWER);
 			/* just make sure that we check the ticket soon */
-			tk->next_state = ST_FOLLOWER;
+			set_next_state(tk, ST_FOLLOWER);
 		}
 	}
 }
@@ -825,13 +824,8 @@ static void process_next_state(struct ticket_config *tk)
 {
 	switch(tk->next_state) {
 	case ST_LEADER:
-		if (has_extprog_exited(tk)) {
-			/* external program exited, we can start the acquire
-			 * process right away */
-			acquire_ticket(tk, OR_REACQUIRE);
-		} else {
-			reacquire_ticket(tk);
-		}
+		log_reacquire_reason(tk);
+		acquire_ticket(tk, OR_REACQUIRE);
 		break;
 	case ST_INIT:
 		no_resends(tk);

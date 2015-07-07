@@ -56,6 +56,7 @@
 #include "inline-fn.h"
 #include "pacemaker.h"
 #include "ticket.h"
+#include "request.h"
 
 #define RELEASE_VERSION		"0.2.0"
 #define RELEASE_STR 	RELEASE_VERSION " (build " BOOTH_BUILD_VERSION ")"
@@ -1334,7 +1335,7 @@ static void sig_exit_handler(int sig)
 
 static void wait_child(int sig)
 {
-	int i, status;
+	int i, status, rv;
 	struct ticket_config *tk;
 
 	/* use waitpid(2) and not wait(2) in order not to interfear
@@ -1346,6 +1347,13 @@ static void wait_child(int sig)
 				waitpid(tk->clu_test.pid, &status, WNOHANG) == tk->clu_test.pid) {
 			tk->clu_test.status = status;
 			tk->clu_test.progstate = EXTPROG_EXITED;
+			if (tk->state != ST_LEADER) {
+				rv = acquire_ticket(tk, OR_ADMIN);
+				if (rv != 0) { /* external program failed */
+					tk->outcome = rv;
+					foreach_tkt_req(tk, notify_client);
+				}
+			}
 		}
 	}
 }

@@ -49,6 +49,12 @@ extern int TIME_RES;
 	tk->state = newst; \
 } while(0)
 
+#define set_next_state(tk, newst) do { \
+	if (!(newst)) tk_log_debug("next state reset"); \
+	else tk_log_debug("next state set to %s", state_to_string(newst)); \
+	tk->next_state = newst; \
+} while(0)
+
 #define save_committed_tkt(tk) \
 	memcpy((tk)->last_valid_tk, tk, sizeof(struct ticket_config))
 

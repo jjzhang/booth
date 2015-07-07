@@ -826,7 +826,7 @@ static int leader_handle_newer_ticket(
 				site_string(leader)
 				);
 	}
-	tk->next_state = ST_LEADER;
+	set_next_state(tk, ST_LEADER);
 	return 0;
 }
 
