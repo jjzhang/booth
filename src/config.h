@@ -41,6 +41,7 @@ typedef enum {
 	EXTPROG_IDLE,
 	EXTPROG_RUNNING,
 	EXTPROG_EXITED,
+	EXTPROG_IGNORE,
 } extprog_state_e;
 
 struct ticket_config {

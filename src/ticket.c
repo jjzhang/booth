@@ -253,6 +253,9 @@ static int do_ext_prog(struct ticket_config *tk,
 	case EXTPROG_EXITED:
 		rv = test_exit_status(tk, start_election);
 		break;
+	case EXTPROG_IGNORE:
+		/* nothing to do here */
+		break;
 	}
 
 	return rv;
@@ -320,6 +323,14 @@ int do_grant_ticket(struct ticket_config *tk, int options)
 	}
 }
 
+static void ignore_extprog(struct ticket_config *tk)
+{
+	if (tk->clu_test.prog && tk->clu_test.pid >= 0 &&
+			tk->clu_test.progstate == EXTPROG_RUNNING) {
+		tk->clu_test.progstate = EXTPROG_IGNORE;
+		(void)kill(tk->clu_test.pid, SIGTERM);
+	}
+}
 
 static void start_revoke_ticket(struct ticket_config *tk)
 {
@@ -328,6 +339,7 @@ static void start_revoke_ticket(struct ticket_config *tk)
 	save_committed_tkt(tk);
 	reset_ticket(tk);
 	set_leader(tk, no_leader);
+	ignore_extprog(tk);
 	ticket_write(tk);
 	ticket_broadcast(tk, OP_REVOKE, OP_ACK, RLT_SUCCESS, OR_ADMIN);
 }
