@@ -647,7 +647,7 @@ static int query_get_string_answer(cmd_request_t cmd)
 	if (rv < 0)
 		goto out_free;
 
-	fwrite(data, data_len, 1, stdout);
+	(void)fwrite(data, data_len, 1, stdout);
 	fflush(stdout);
 	rv = 0;
 
