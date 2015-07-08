@@ -563,7 +563,8 @@ static int test_reply(int reply_code, cmd_request_t cmd)
 
 	case RLT_SYNC_SUCC:
 	case RLT_SUCCESS:
-		log_info("%s succeeded!", op_str);
+		if (cmd != CMD_LIST)
+			log_info("%s succeeded!", op_str);
 		rv = 0;
 		break;
 
