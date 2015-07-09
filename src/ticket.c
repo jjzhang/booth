@@ -571,11 +571,15 @@ int ticket_answer_list(int fd, struct boothc_ticket_msg *msg)
 
 	rv = list_ticket(&data, &olen);
 	if (rv < 0)
-		return rv;
+		goto out;
 
 	init_header(&hdr.header, CL_LIST, 0, 0, RLT_SUCCESS, 0, sizeof(hdr) + olen);
+	rv = send_header_plus(fd, &hdr, data, olen);
 
-	return send_header_plus(fd, &hdr, data, olen);
+out:
+	if (data)
+		free(data);
+	return rv;
 }
 
 
