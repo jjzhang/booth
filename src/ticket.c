@@ -636,27 +636,28 @@ reply_now:
 	return rc;
 }
 
-int notify_client(struct ticket_config *tk, struct client *req_client,
+int notify_client(struct ticket_config *tk, int client_fd,
     struct boothc_ticket_msg *msg)
 {
 	struct boothc_ticket_msg omsg;
 	void (*deadfn) (int ci);
 	int rv, rc, ci;
 	int cmd, options;
+	struct client *req_client;
 
 	cmd = ntohl(msg->header.cmd);
 	options = ntohl(msg->header.options);
 	rv = tk->outcome;
-	if (!req_client || req_client->fd == -1) {
-		tk_log_info("client for request %s left "
-			"before being notified about the outcome",
-			state_to_string(cmd));
+	ci = find_client_by_fd(client_fd);
+	if (ci < 0) {
+		tk_log_info("client %d (request %s) left before being notified",
+			client_fd, state_to_string(cmd));
 		return 0;
 	}
 	tk_log_debug("notifying client %d (request %s)",
-		req_client->fd, state_to_string(cmd));
+		client_fd, state_to_string(cmd));
 	init_ticket_msg(&omsg, CL_RESULT, 0, rv, 0, tk);
-	rc = send_client_msg(req_client->fd, &omsg);
+	rc = send_client_msg(client_fd, &omsg);
 
 	if (rc == 0 && ((rv == RLT_MORE) ||
 			(rv == RLT_CIB_PENDING && (options & OPT_WAIT_COMMIT)))) {
@@ -667,16 +668,15 @@ int notify_client(struct ticket_config *tk, struct client *req_client,
 		 * the client */
 		if (rc) {
 			tk_log_debug("failed to notify client %d (request %s)",
-				req_client->fd, state_to_string(cmd));
+				client_fd, state_to_string(cmd));
 		} else {
 			tk_log_debug("client %d (request %s) got final notification",
-				req_client->fd, state_to_string(cmd));
+				client_fd, state_to_string(cmd));
 		}
+		req_client = clients + ci;
 		deadfn = req_client->deadfn;
 		if(deadfn) {
-			ci = find_client_by_fd(req_client->fd);
-			if (ci >= 0)
-				deadfn(ci);
+			deadfn(ci);
 		}
 		return 0; /* we're done with this request */
 	}

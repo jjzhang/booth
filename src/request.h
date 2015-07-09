@@ -38,15 +38,14 @@ struct request {
 	struct ticket_config *tk;
 
 	/** The client which sent the request */
-	struct client *client;
+	int client_fd;
 
 	/** The message containing the request */
 	struct boothc_ticket_msg *msg;
 };
 
 typedef int (*req_fp)(
-	struct ticket_config *, struct client *,
-	struct boothc_ticket_msg *);
+	struct ticket_config *, int, struct boothc_ticket_msg *);
 
 void *add_req(struct ticket_config *tk, struct client *req_client,
 	struct boothc_ticket_msg *msg);

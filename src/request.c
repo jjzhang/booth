@@ -44,7 +44,7 @@ void *add_req(
 		return NULL;
 	rp->id = req_id_cnt++;
 	rp->tk = tk;
-	rp->client = req_client;
+	rp->client_fd = req_client->fd;
 	rp->msg = msg;
 	req_l = g_list_append(req_l, rp);
 	return rp;
@@ -74,8 +74,8 @@ void foreach_tkt_req(struct ticket_config *tk, req_fp f)
 		next = g_list_next(lp);
 		rp = (struct request *)lp->data;
 		if (rp->tk == tk &&
-				(f)(rp->tk, rp->client, rp->msg) == 0) {
-			log_debug("remove request for client %d", rp->client->fd);
+				(f)(rp->tk, rp->client_fd, rp->msg) == 0) {
+			log_debug("remove request for client %d", rp->client_fd);
 			del_req(lp); /* don't need this request anymore */
 		}
 		lp = next;
