@@ -155,7 +155,7 @@ int client_add(int fd, const struct booth_transport *tpt,
 	struct client *c;
 
 
-	if (client_size - 1 < client_maxi ) {
+	if (client_size - 1 <= client_maxi ) {
 		client_alloc();
 	}
 
@@ -193,7 +193,7 @@ int find_client_by_fd(int fd)
 	if (fd < 0)
 		return -1;
 
-	for (i = 0; i < client_size; i++) {
+	for (i = 0; i <= client_maxi; i++) {
 		if (clients[i].fd == fd)
 			return i;
 	}
