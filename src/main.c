@@ -130,8 +130,10 @@ static void client_dead(int ci)
 {
 	struct client *c = clients + ci;
 
-	if (c->fd != -1)
+	if (c->fd != -1) {
+		log_debug("removing client %d", c->fd);
 		close(c->fd);
+	}
 
 	c->fd = -1;
 	c->workfn = NULL;

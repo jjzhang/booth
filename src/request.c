@@ -23,6 +23,7 @@
 #include "booth.h"
 #include "ticket.h"
 #include "request.h"
+#include "log.h"
 
 static GList *req_l = NULL;
 static int req_id_cnt;
@@ -43,7 +44,7 @@ void *add_req(
 		return NULL;
 	rp->id = req_id_cnt++;
 	rp->tk = tk;
-	rp->cl = req_client;
+	rp->client = req_client;
 	rp->msg = msg;
 	req_l = g_list_append(req_l, rp);
 	return rp;
@@ -73,7 +74,8 @@ void foreach_tkt_req(struct ticket_config *tk, req_fp f)
 		next = g_list_next(lp);
 		rp = (struct request *)lp->data;
 		if (rp->tk == tk &&
-				(f)(rp->tk, rp->cl, rp->msg) == 0) {
+				(f)(rp->tk, rp->client, rp->msg) == 0) {
+			log_debug("remove request for client %d", rp->client->fd);
 			del_req(lp); /* don't need this request anymore */
 		}
 		lp = next;

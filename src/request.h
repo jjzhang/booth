@@ -38,7 +38,7 @@ struct request {
 	struct ticket_config *tk;
 
 	/** The client which sent the request */
-	struct client *cl;
+	struct client *client;
 
 	/** The message containing the request */
 	struct boothc_ticket_msg *msg;
