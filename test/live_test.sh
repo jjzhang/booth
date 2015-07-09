@@ -418,11 +418,11 @@ reset_netem_env() {
 setup_netem() {
 	[ -z "$NETEM_ENV" ] && return
 	__NETEM_RESET=
+	echo "-------------------------------------------------- (netem)" | logmsg
 	for env in $NETEM_ENV; do
 		set_netem_env $env
 	done
 	trap "reset_netem_env" EXIT
-	echo "-------------------------------------------------- (netem)" | logmsg
 }
 
 cib_status() {
@@ -618,24 +618,24 @@ runtest() {
 	echo "==================================================" | logmsg
 	echo "starting booth test $1 ..." | logmsg
 	if is_function setup_$1; then
+		echo "-------------------------------------------------- (setup)" | logmsg
 		setup_$1
 		rc=$?
-		echo "-------------------------------------------------- (setup)" | logmsg
 		[ "$rc" -ne 0 ] && rc=$ERR_SETUP_FAILED
 	fi
 	if [ "$rc" -eq 0 ]; then
 		setup_netem
+		echo "-------------------------------------------------- (test)" | logmsg
 		test_$1
 		rc=$?
-		echo "-------------------------------------------------- (test)" | logmsg
 	fi
 	case $rc in
 	0)
 		# wait a bit more if we're losing packets
 		[ -n "$PKT_LOSS" ] && wait_timeout
+		echo "-------------------------------------------------- (check)" | logmsg
 		check_$1
 		rc=$?
-		echo "-------------------------------------------------- (check)" | logmsg
 		if [ $rc -eq 0 ]; then
 			usrmsg="SUCCESS"
 		else
@@ -652,7 +652,7 @@ runtest() {
 	end_time=`date`
 	end_ts=`date +%s`
 	echo "finished booth test $1 ($usrmsg)" | logmsg
-	echo "--------------------------------------------------" | logmsg
+	echo "==================================================" | logmsg
 	is_function recover_$1 && recover_$1
 	reset_netem_env
 	#sleep 3
