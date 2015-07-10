@@ -862,7 +862,9 @@ int add_hmac(void *data, int len)
 	return rv;
 }
 
-/* TODO: we need some client identification */
+#if HAVE_LIBMHASH
+
+/* TODO: we need some client identification for logging */
 #define peer_string(p) (p ? site_string(p) : "client")
 
 /* verify the validity of timestamp from the header
@@ -909,6 +911,7 @@ accept:
 	}
 	return 0;
 }
+#endif
 
 int check_auth(struct booth_site *from, void *buf, int len)
 {
