@@ -69,11 +69,18 @@ AC_CHECK_LIB([socket], [socket])
 AC_CHECK_LIB([nsl], [t_open])
 AC_CHECK_LIB([gpl], [cl_log])
 
-# mhash for hmac
-mhash_installed="yes"
-AC_CHECK_HEADERS(mhash.h, , [mhash_installed="no"],)
-AC_CHECK_LIB(mhash, mhash_init, , [mhash_installed="no"])
-AM_CONDITIONAL(BUILD_AUTH_C, test "x${mhash_installed}" = "xyes")
+# libgcrypt or mhash for hmac
+libgcrypt_installed="yes"
+AC_CHECK_HEADERS(gcrypt.h, , [libgcrypt_installed="no"],)
+AC_CHECK_LIB(gcrypt, gcry_md_open, , [libgcrypt_installed="no"])
+AM_CONDITIONAL(BUILD_AUTH_C, test "x${libgcrypt_installed}" = "xyes")
+
+if test "x$libgcrypt_installed" = "xno"; then
+	mhash_installed="yes"
+	AC_CHECK_HEADERS(mhash.h, , [mhash_installed="no"],)
+	AC_CHECK_LIB(mhash, mhash_init, , [mhash_installed="no"])
+	AM_CONDITIONAL(BUILD_AUTH_C, test "x${mhash_installed}" = "xyes")
+fi
 
 PKG_CHECK_MODULES(GLIB, [glib-2.0])
 

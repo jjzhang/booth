@@ -17,9 +17,23 @@
  */
 
 #include "b_config.h"
+#include "log.h"
 #include <sys/types.h>
 
+#if HAVE_LIBGCRYPT
+
+#include <gcrypt.h>
+
+#define BOOTH_HASH GCRY_MD_SHA1
+
+int calc_hmac(const void *data, size_t datalen,
+	int hid, unsigned char *result, char *key, int keylen);
+int verify_hmac(const void *data, size_t datalen,
+	int hid, unsigned char *hmac, char *key, int keylen);
+#endif
+
 #if HAVE_LIBMHASH
+
 #include <mhash.h>
 
 #define BOOTH_HASH MHASH_SHA1

@@ -37,7 +37,7 @@ BuildRequires:  asciidoc
 BuildRequires:  autoconf
 BuildRequires:  automake
 BuildRequires:  glib2-devel
-BuildRequires:  mhash-devel
+BuildRequires:  libgcrypt-devel
 %if 0%{?fedora} || 0%{?centos} || 0%{?rhel}
 BuildRequires:  cluster-glue-libs-devel
 BuildRequires:  pacemaker-libs-devel

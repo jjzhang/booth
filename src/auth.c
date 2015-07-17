@@ -18,6 +18,60 @@
 
 #include "auth.h"
 
+#if HAVE_LIBGCRYPT
+/* calculate the HMAC of the message in data and store it in result
+ * it is up to the caller to make sure that there's enough space
+ * at result for the MAC
+ */
+int calc_hmac(const void *data, size_t datalen,
+	int hid, unsigned char *result, char *key, int keylen)
+{
+	static gcry_md_hd_t digest;
+	gcry_error_t err;
+
+	if (!digest) {
+		err = gcry_md_open(&digest, hid, GCRY_MD_FLAG_HMAC);
+		if (err) {
+			log_error("gcry_md_open: %s", gcry_strerror(err));
+			return -1;
+		}
+		err = gcry_md_setkey(digest, key, keylen);
+		if (err) {
+			log_error("gcry_md_open: %s", gcry_strerror(err));
+			return -1;
+		}
+	}
+	gcry_md_write(digest, data, datalen);
+	memcpy(result, gcry_md_read(digest, 0), gcry_md_get_algo_dlen(hid));
+	gcry_md_reset(digest);
+	return 0;
+}
+
+/* test HMAC
+ */
+int verify_hmac(const void *data, size_t datalen,
+	int hid, unsigned char *hmac, char *key, int keylen)
+{
+	unsigned char *our_hmac;
+	int rc;
+
+	our_hmac = malloc(gcry_md_get_algo_dlen(hid));
+	if (!our_hmac)
+		return -1;
+
+	rc = calc_hmac(data, datalen, hid, our_hmac, key, keylen);
+	if (rc)
+		goto out_free;
+	rc = memcmp(our_hmac, hmac, gcry_md_get_algo_dlen(hid));
+
+out_free:
+	if (our_hmac)
+		free(our_hmac);
+	return rc;
+}
+#endif
+
+#if HAVE_LIBMHASH
 /* calculate the HMAC of the message in data and store it in result
  * it is up to the caller to make sure that there's enough space
  * at result for the MAC
@@ -72,3 +126,5 @@ out_free:
 		free(our_hmac);
 	return rc;
 }
+
+#endif
