@@ -200,6 +200,61 @@ int find_client_by_fd(int fd)
 	return -1;
 }
 
+static int format_peers(char **pdata, unsigned int *len)
+{
+	struct booth_site *s;
+	char *data, *cp;
+	char time_str[64];
+	int i, alloc;
+	time_t ts;
+
+	*pdata = NULL;
+	*len = 0;
+
+	alloc = booth_conf->site_count * (BOOTH_NAME_LEN + 64);
+	data = malloc(alloc);
+	if (!data)
+		return -ENOMEM;
+
+	cp = data;
+	foreach_node(i, s) {
+		if (s == local)
+			continue;
+		ts = (time_t)s->last_secs;
+		strftime(time_str, sizeof(time_str), "%F %T", localtime(&ts));
+		cp += snprintf(cp,
+				alloc - (cp - data),
+				"%-12s %s, last seen: %s\n",
+				type_to_string(s->type),
+				s->addr_string,
+				time_str);
+		if (alloc - (cp - data) <= 0)
+			return -ENOMEM;
+	}
+
+	*pdata = data;
+	*len = cp - data;
+
+	return 0;
+}
+
+
+static void list_peers(int fd, struct boothc_ticket_msg *msg)
+{
+	char *data;
+	int olen;
+	struct boothc_hdr_msg hdr;
+
+	if (format_peers(&data, &olen) < 0)
+		goto out;
+
+	init_header(&hdr.header, CL_LIST, 0, 0, RLT_SUCCESS, 0, sizeof(hdr) + olen);
+	(void)send_header_plus(fd, &hdr, data, olen);
+
+out:
+	if (data)
+		free(data);
+}
 
 /* Only used for client requests (tcp) */
 void process_connection(int ci)
@@ -232,6 +287,9 @@ void process_connection(int ci)
 	switch (ntohl(msg->header.cmd)) {
 	case CMD_LIST:
 		ticket_answer_list(req_cl->fd, msg);
+		goto kill;
+	case CMD_PEERS:
+		list_peers(req_cl->fd, msg);
 		goto kill;
 
 	case CMD_GRANT:
@@ -528,6 +586,8 @@ static int test_reply(int reply_code, cmd_request_t cmd)
 		op_str = "revoke";
 	else if (cmd == CMD_LIST)
 		op_str = "list";
+	else if (cmd == CMD_PEERS)
+		op_str = "peers";
 	else {
 		log_error("internal error reading reply result!");
 		return -1;
@@ -565,7 +625,7 @@ static int test_reply(int reply_code, cmd_request_t cmd)
 
 	case RLT_SYNC_SUCC:
 	case RLT_SUCCESS:
-		if (cmd != CMD_LIST)
+		if (cmd != CMD_LIST && cmd != CMD_PEERS)
 			log_info("%s succeeded!", op_str);
 		rv = 0;
 		break;
@@ -660,7 +720,7 @@ static int query_get_string_answer(cmd_request_t cmd)
 
 out_free:
 	if (rv < 0) {
-		(void)test_reply(ntohl(reply.header.result), CMD_LIST);
+		(void)test_reply(ntohl(reply.header.result), cmd);
 	}
 	free(data);
 out_close:
@@ -1009,6 +1069,8 @@ static int read_arguments(int argc, char **argv)
 			cl.op = CMD_GRANT;
 		else if (!strcmp(op, "revoke"))
 			cl.op = CMD_REVOKE;
+		else if (!strcmp(op, "peers"))
+			cl.op = CMD_PEERS;
 		else {
 			fprintf(stderr, "client operation \"%s\" is unknown\n",
 					op);
@@ -1455,6 +1517,10 @@ static int do_client(void)
 	switch (cl.op) {
 	case CMD_LIST:
 		rv = query_get_string_answer(CMD_LIST);
+		break;
+
+	case CMD_PEERS:
+		rv = query_get_string_answer(CMD_PEERS);
 		break;
 
 	case CMD_GRANT:

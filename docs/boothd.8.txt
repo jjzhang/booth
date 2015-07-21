@@ -18,6 +18,8 @@ SYNOPSIS
 
 *booth* 'revoke' [-s 'site'] [-c 'config'] [-w] 'ticket'
 
+*booth* 'peers' [-c 'config']
+
 *booth* 'status' [-D] [-c 'config']
 
 
@@ -144,6 +146,9 @@ Use '-s' to direct client to connect to a different site.
 	some output to stdout (for use in shell scripts) and returns
 	an OCF-compatible return code.
 	With '-D', a human-readable message is printed to STDERR as well.
+
+*'peers'*::
+	List the other 'boothd' servers we know about.
 
 
 

@@ -164,6 +164,7 @@ typedef enum {
 	CMD_LIST    = CHAR2CONST('C', 'L', 's', 't'),
 	CMD_GRANT   = CHAR2CONST('C', 'G', 'n', 't'),
 	CMD_REVOKE  = CHAR2CONST('C', 'R', 'v', 'k'),
+	CMD_PEERS   = CHAR2CONST('P', 'e', 'e', 'r'),
 
 	/* Replies */
 	CL_RESULT  = CHAR2CONST('R', 's', 'l', 't'),
