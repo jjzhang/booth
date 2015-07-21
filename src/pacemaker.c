@@ -281,6 +281,8 @@ out:
 	rv = pclose(p);
 	if (!rv) {
 		log_debug("command \"%s\" value %" PRIi64, cmd, v);
+	} else if (rv == 6) {
+		log_info("command \"%s\", ticket not found", cmd);
 	} else {
 		log_error("command \"%s\" %s, value %" PRIi64, cmd, interpret_rv(rv), v);
 	}
