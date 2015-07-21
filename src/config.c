@@ -716,6 +716,9 @@ no_value:
 	}
 
 	poll_timeout = min(POLL_TIMEOUT, min_timeout/10);
+	if (!poll_timeout)
+		poll_timeout = POLL_TIMEOUT;
+
 	return 0;
 
 
