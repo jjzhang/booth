@@ -18,7 +18,7 @@ SYNOPSIS
 
 *booth* 'revoke' [-s 'site'] [-c 'config'] [-w] 'ticket'
 
-*booth* 'peers' [-c 'config']
+*booth* 'peers' [-s 'site'] [-c 'config']
 
 *booth* 'status' [-D] [-c 'config']
 
@@ -149,8 +149,31 @@ Use '-s' to direct client to connect to a different site.
 
 *'peers'*::
 	List the other 'boothd' servers we know about.
++
+In addition to the type, name (IP address), and the last time the
+server was heard from, network statistics are also printed. The
+statistics are split into two rows, the first one consists of
+counters for the sent packets and the second one for the received
+packets. The first counter is the total number of packets and
+descriptions of the other counters follows:
 
+'resends'::
+	Packets which had to be resent because the recipient didn't
+	acknowledge a message. This usually means that either the
+	message or the acknowledgement got lost. The number of
+	resends usually reflect the network reliability.
 
+'error'::
+	Packets which either couldn't be sent, got truncated, or were
+	badly formed. Should be zero.
+
+'invalid'::
+	These packets contain either invalid or non-existing ticket
+	name or refer to a non-existing ticket leader. Should be
+	zero.
+
+'authfail'::
+	Packets which couldn't be authenticated. Should be zero.
 
 CONFIGURATION FILE
 ------------------

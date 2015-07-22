@@ -259,6 +259,16 @@ struct booth_site {
 	int saddrlen;
 	int addrlen;
 
+	/** statistics */
+	time_t last_recv;
+	unsigned int sent_cnt;
+	unsigned int sent_err_cnt;
+	unsigned int resend_cnt;
+	unsigned int recv_cnt;
+	unsigned int recv_err_cnt;
+	unsigned int sec_cnt;
+	unsigned int invalid_cnt;
+
 	/** last timestamp seen from this site */
 	uint32_t last_secs;
 	uint32_t last_usecs;

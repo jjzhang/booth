@@ -785,6 +785,7 @@ static void resend_msg(struct ticket_config *tk)
 		for (i = 0; i < booth_conf->site_count; i++) {
 			n = booth_conf->site + i;
 			if (!(tk->acks_received & n->bitmask)) {
+				n->resend_cnt++;
 				tk_log_debug("resending %s to %s",
 						state_to_string(tk->last_request),
 						site_string(n)
@@ -1078,19 +1079,25 @@ int message_recv(struct boothc_ticket_msg *msg, int msglen)
 		return -1;
 	}
 
+	time(&source->last_recv);
+	source->recv_cnt++;
+
 	if (check_boothc_header(&msg->header, msglen) < 0) {
 		log_error("message from %s receive error", site_string(source));
+		source->recv_err_cnt++;
 		return -1;
 	}
 
 	if (check_auth(source, msg, msglen)) {
 		log_error("%s failed to authenticate", site_string(source));
+		source->sec_cnt++;
 		return -1;
 	}
 
 	if (!check_ticket(msg->ticket.id, &tk)) {
 		log_warn("got invalid ticket name %s from %s",
 				msg->ticket.id, site_string(source));
+		source->invalid_cnt++;
 		return -EINVAL;
 	}
 
@@ -1098,6 +1105,7 @@ int message_recv(struct boothc_ticket_msg *msg, int msglen)
 	leader_u = ntohl(msg->ticket.leader);
 	if (!find_site_by_id(leader_u, &leader)) {
 		tk_log_error("message with unknown leader %u received", leader_u);
+		source->invalid_cnt++;
 		return -EINVAL;
 	}
 

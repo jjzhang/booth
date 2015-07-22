@@ -715,17 +715,20 @@ int booth_udp_send(struct booth_site *to, void *buf, int len)
 {
 	int rv;
 
+	to->sent_cnt++;
 	rv = sendto(local->udp_fd, buf, len, MSG_NOSIGNAL,
 			(struct sockaddr *)&to->sa6, to->saddrlen);
 	if (rv == len) {
 		rv = 0;
 	} else if (rv < 0) {
+		to->sent_err_cnt++;
 		log_error("Cannot send to %s: %d %s",
 				site_string(to),
 				errno,
 				strerror(errno));
 	} else {
 		rv = -1;
+		to->sent_err_cnt++;
 		log_error("Packet sent to %s got truncated",
 				site_string(to));
 	}
