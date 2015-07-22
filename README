@@ -168,7 +168,7 @@ operation, booth server can authenticate both clients (connecting
 over TCP) and other booth servers (connecting over UDP). The
 authentication is based on SHA1 HMAC (Keyed-Hashing Message
 Authentication) and shared key. The HMAC implementation is
-provided by the mhash library.
+provided by the libgcrypt or mhash library.
 
 Message encryption is not included as the information exchanged
 between various booth parties does not seem to justify that.
