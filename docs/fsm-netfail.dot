@@ -1,0 +1,11 @@
+digraph G {
+
+	label="Booth network failure FSM";
+	fontname="Helvetica";
+	fontsize="11";
+	compound="true";
+	ST_FOLLOWER -> ST_CANDIDATE [label="tkt_lost"];
+	ST_LEADER -> ST_FOLLOWER [label="tkt_lost"];
+	ST_CANDIDATE -> ST_CANDIDATE [label="timeout"];
+	ST_CANDIDATE -> ST_LEADER [label="VtFr, timeout"];
+}

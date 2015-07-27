@@ -1,0 +1,17 @@
+digraph G {
+
+	label="Booth full FSM";
+	fontname="Helvetica";
+	fontsize="11";
+	compound="true";
+	ST_INIT -> ST_CANDIDATE [label="grant"];
+	ST_INIT -> ST_FOLLOWER [label="HrtB|UpdE"];
+	ST_FOLLOWER -> ST_CANDIDATE [label="VtFr(tkt_drop)\ntkt_lost"];
+	ST_LEADER -> ST_FOLLOWER [label="lost_maj"];
+	ST_CANDIDATE -> ST_CANDIDATE [label="timeout"];
+	ST_CANDIDATE -> ST_LEADER [label="VtFr, timeout"];
+	ST_CANDIDATE -> ST_FOLLOWER [label="HrtB|UpdE\nRJC!(outd|valid)"];
+	ST_CANDIDATE -> ST_INIT [label="RJC!(outd+no_leader)"];
+	ST_LEADER -> ST_INIT [label="Revk"];
+	ST_FOLLOWER -> ST_INIT [label="Revk"];
+}

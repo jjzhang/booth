@@ -1,0 +1,13 @@
+digraph G {
+
+	label="Booth normal process FSM";
+	fontname="Helvetica";
+	fontsize="11";
+	compound="true";
+	ST_INIT -> ST_CANDIDATE [label="grant"];
+	ST_INIT -> ST_FOLLOWER [label="HrtB|UpdE"];
+	ST_CANDIDATE -> ST_LEADER [label="VtFr"];
+	ST_LEADER -> ST_INIT [label="Revk"];
+	ST_FOLLOWER -> ST_INIT [label="Revk"];
+}
+
