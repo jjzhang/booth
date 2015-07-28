@@ -62,7 +62,7 @@ struct ticket_config {
 	/** If >0, time to wait for a site to get fenced.
 	 * The ticket may be acquired after that timespan by
 	 * another site. */
-	int acquire_after; /* TODO: needed? */
+	int acquire_after;
 
 	/* How often to renew the ticket (in ms)
 	 */

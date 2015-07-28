@@ -83,7 +83,7 @@ int add_site(char *addr_string, int type)
 
 	site = booth_conf->site + booth_conf->site_count;
 
-	site->family = BOOTH_PROTO_FAMILY;
+	site->family = AF_INET;
 	site->type = type;
 	/* Make site_id start at a non-zero point.
 	 * Perhaps use hash over string or address? */
@@ -783,10 +783,6 @@ g_inval:
 			goto g_inval;
 		booth_conf->gid = gr->gr_gid;
 	}
-
-
-	/* TODO: check whether uid or gid is 0 again?
-	 * The admin may shoot himself in the foot, though. */
 
 	return 0;
 }

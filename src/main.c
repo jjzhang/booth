@@ -910,7 +910,6 @@ static int _lockfile(int mode, int *fdp, pid_t *locked_by)
 
 static inline int is_root(void)
 {
-	/* TODO: getuid()? Better way to check? */
 	return geteuid() == 0;
 }
 
@@ -1013,14 +1012,14 @@ static int host_convert(char *hostname, char *ip_str, size_t ip_size)
 	int re = -1;
 
 	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = BOOTH_PROTO_FAMILY;
+	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_DGRAM;
 
 	re = getaddrinfo(hostname, NULL, &hints, &result);
 
 	if (re == 0) {
 		struct in_addr addr = ((struct sockaddr_in *)result->ai_addr)->sin_addr;
-		const char *re_ntop = inet_ntop(BOOTH_PROTO_FAMILY, &addr, ip_str, ip_size);
+		const char *re_ntop = inet_ntop(AF_INET, &addr, ip_str, ip_size);
 		if (re_ntop == NULL) {
 			re = -1;
 		}
@@ -1285,11 +1284,6 @@ static int do_status(int type)
 
 
 	ret = PCMK_OCF_NOT_RUNNING;
-	/* TODO: query all, and return quit only if it's _cleanly_ not
-	 * running, ie. _neither_ of port/lockfile/process is available?
-	 *
-	 * Currently a single failure says "not running", even if "only" the
-	 * lockfile has been removed. */
 
 	rv = setup_config(type);
 	if (rv) {
@@ -1386,8 +1380,6 @@ static int limit_this_process(void)
 		return rv;
 	}
 
-	/* TODO: ulimits? But that would restrict crm_ticket and handler 
-	 * scripts, too! */
 	return 0;
 }
 
