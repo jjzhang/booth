@@ -284,9 +284,6 @@ int acquire_ticket(struct ticket_config *tk, cmd_reason_t reason)
 		break;
 	case RUNCMD_MORE:
 		/* need to wait for the outcome before starting elections */
-		/* set next_state appropriately, so that elections are
-		 * started */
-		set_next_state(tk, ST_LEADER);
 		return 0;
 	default:
 		return RLT_EXT_FAILED;
