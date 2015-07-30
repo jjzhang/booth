@@ -146,6 +146,11 @@ int ticket_write(struct ticket_config *tk)
 		return 1;
 
 	if (tk->leader == local) {
+		if (tk->state != ST_LEADER) {
+			tk_log_info("ticket state not yet consistent, "
+				"delaying ticket grant to CIB");
+			return 1;
+		}
 		pcmk_handler.grant_ticket(tk);
 	} else {
 		pcmk_handler.revoke_ticket(tk);
