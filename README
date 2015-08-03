@@ -188,8 +188,4 @@ Packets either not older than that or with a timestamp more
 recent than the previous one from the same peer are accepted. The
 time skew can be configured in the booth configuration file.
 
-There is no way to configure booth to use a hash different from
-SHA1. That should not be a problem in practice as SHA1 provides
-sufficient security (the lesser MD5 would too).
-
 # vim: set ft=asciidoc :

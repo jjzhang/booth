@@ -124,8 +124,10 @@ rm -rf %{buildroot}
 %defattr(-,root,root,-)
 %{_sbindir}/booth
 %{_sbindir}/boothd
+%{_sbindir}/booth-keygen
 %{_mandir}/man8/booth.8.gz
 %{_mandir}/man8/boothd.8.gz
+%{_mandir}/man8/booth-keygen.8.gz
 %dir /usr/lib/ocf
 %dir /usr/lib/ocf/resource.d
 %dir /usr/lib/ocf/resource.d/pacemaker

@@ -1,0 +1,52 @@
+BOOTH-KEYGEN(8)
+===============
+:doctype: manpage
+
+
+NAME
+----
+booth-keygen - generate authentication key
+
+
+SYNOPSIS
+--------
+*booth-keygen* ['-h'] ['auth-file']
+
+
+DESCRIPTION
+-----------
+This program generates an authentication key suitable for 'booth'
+using '/dev/urandom' as source.
+
+
+PARAMETERS
+----------
+
+*'auth-file'*::
+	The file to contain the generated key. Defaults to
+	'/etc/booth/authkey'. Use absolute paths.
+
+
+OPTIONS
+-------
+*-h*, *--help*::
+	Print usage.
+
+
+EXIT STATUS
+-----------
+*0*::
+    Success.
+
+*!= 0*::
+	File already exists or some other error.
+
+
+COPYING
+-------
+
+Copyright (C) 2015 Dejan Muhamedagic <dmuhamedagic@suse.com>
+
+Free use of this software is granted under the terms of the GNU
+General Public License (GPL).
+

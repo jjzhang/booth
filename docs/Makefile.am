@@ -19,7 +19,7 @@
 #
 MAINTAINERCLEANFILES    = Makefile.in
 
-asciiman	= boothd.8.txt
+asciiman	= boothd.8.txt booth-keygen.8.txt
 doc_DATA	= $(generated_docs)
 
 generated_docs	=
