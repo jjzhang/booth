@@ -54,9 +54,10 @@ if test -f $keyf; then
 fi
 
 umask 077
-dd if=$RND_SRC of=$keyf bs=$KEYSIZE count=1 status=none
+errout=`dd if=$RND_SRC of=$keyf bs=$KEYSIZE count=1 2>&1`
 rc=$?
 if [ $rc -ne 0 ]; then
+	echo "$errout" >&2
 	exit $rc
 fi
 
