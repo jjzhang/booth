@@ -850,10 +850,22 @@ int postpone_ticket_processing(struct ticket_config *tk)
 
 static void process_next_state(struct ticket_config *tk)
 {
+	int rv;
+
 	switch(tk->next_state) {
 	case ST_LEADER:
-		log_reacquire_reason(tk);
-		acquire_ticket(tk, OR_REACQUIRE);
+		if (has_extprog_exited(tk)) {
+			if (tk->state != ST_LEADER) {
+				rv = acquire_ticket(tk, OR_ADMIN);
+				if (rv != 0) { /* external program failed */
+					tk->outcome = rv;
+					foreach_tkt_req(tk, notify_client);
+				}
+			}
+		} else {
+			log_reacquire_reason(tk);
+			acquire_ticket(tk, OR_REACQUIRE);
+		}
 		break;
 	case ST_INIT:
 		no_resends(tk);
@@ -892,12 +904,23 @@ static void ticket_lost(struct ticket_config *tk)
 
 static void next_action(struct ticket_config *tk)
 {
+	int rv;
+
 	switch(tk->state) {
 	case ST_INIT:
 		/* init state, handle resends for ticket revoke */
 		/* and rebroadcast if stepping down */
-		if (tk->acks_expected) {
-			handle_resends(tk);
+		/* try to acquire ticket on grant */
+		if (has_extprog_exited(tk)) {
+			rv = acquire_ticket(tk, OR_ADMIN);
+			if (rv != 0) { /* external program failed */
+				tk->outcome = rv;
+				foreach_tkt_req(tk, notify_client);
+			}
+		} else {
+			if (tk->acks_expected) {
+				handle_resends(tk);
+			}
 		}
 		break;
 
