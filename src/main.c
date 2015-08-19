@@ -1414,18 +1414,18 @@ static void wait_child(int sig)
 	 * with popen(2)/pclose(2) and system(2) used in pacemaker.c
 	 */
 	foreach_ticket(i, tk) {
-		if (tk->clu_test.prog && tk->clu_test.pid >= 0 &&
-				(tk->clu_test.progstate == EXTPROG_RUNNING ||
-				tk->clu_test.progstate == EXTPROG_IGNORE) &&
-				waitpid(tk->clu_test.pid, &status, WNOHANG) == tk->clu_test.pid) {
-			if (tk->clu_test.progstate == EXTPROG_IGNORE) {
+		if (tk_test.prog && tk_test.pid >= 0 &&
+				(tk_test.progstate == EXTPROG_RUNNING ||
+				tk_test.progstate == EXTPROG_IGNORE) &&
+				waitpid(tk_test.pid, &status, WNOHANG) == tk_test.pid) {
+			if (tk_test.progstate == EXTPROG_IGNORE) {
 				/* not interested in the outcome */
-				tk->clu_test.pid = 0;
-				tk->clu_test.progstate = EXTPROG_IDLE;
+				tk_test.pid = 0;
+				tk_test.progstate = EXTPROG_IDLE;
 				return;
 			}
-			tk->clu_test.status = status;
-			tk->clu_test.progstate = EXTPROG_EXITED;
+			tk_test.status = status;
+			tk_test.progstate = EXTPROG_EXITED;
 		}
 	}
 }

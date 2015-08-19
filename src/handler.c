@@ -71,7 +71,7 @@ int run_handler(struct ticket_config *tk)
 	int rv = 0;
 	pid_t pid;
 
-	if (!tk->clu_test.prog)
+	if (!tk_test.prog)
 		return 0;
 
 	switch(pid=fork()) {
@@ -83,12 +83,12 @@ int run_handler(struct ticket_config *tk)
 			exit(1);
 		}
 		closefiles(); /* don't leak open files */
-		execv(tk->clu_test.prog, tk->clu_test.argv);
-		tk_log_error("%s: execv failed (%s)", tk->clu_test.prog, strerror(errno));
+		execv(tk_test.prog, tk_test.argv);
+		tk_log_error("%s: execv failed (%s)", tk_test.prog, strerror(errno));
 		exit(1);
 	default: /* parent */
-		tk->clu_test.pid = pid;
-		tk->clu_test.progstate = EXTPROG_RUNNING;
+		tk_test.pid = pid;
+		tk_test.progstate = EXTPROG_RUNNING;
 		rv = RUNCMD_MORE; /* program runs */
 	}
 

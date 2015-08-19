@@ -337,8 +337,8 @@ static long read_time(char *val)
 }
 
 /* make arguments for execv(2)
- * tk->clu_test.prog points to the path
- * tk->clu_test.argv is argument vector (starts with the prog)
+ * tk_test.prog points to the path
+ * tk_test.argv is argument vector (starts with the prog)
  * (strtok pokes holes in the configuration parameter value, i.e.
  * we don't need to allocate memory for arguments)
  */
@@ -347,24 +347,24 @@ static int parse_extprog(char *val, struct ticket_config *tk)
 	char *p;
 	int i = 0;
 
-	if (tk->clu_test.prog) {
-		free(tk->clu_test.prog);
+	if (tk_test.prog) {
+		free(tk_test.prog);
 	}
-	if (!(tk->clu_test.prog = strdup(val))) {
+	if (!(tk_test.prog = strdup(val))) {
 		log_error("out of memory");
 		return -1;
 	}
 
-	p = strtok(tk->clu_test.prog, " \t");
-	tk->clu_test.argv[i++] = p;
+	p = strtok(tk_test.prog, " \t");
+	tk_test.argv[i++] = p;
 	do {
 		p = strtok(NULL, " \t");
 		if (i >= MAX_ARGS) {
 			log_error("too many arguments for the acquire-handler");
-			free(tk->clu_test.prog);
+			free(tk_test.prog);
 			return -1;
 		}
-		tk->clu_test.argv[i++] = p;
+		tk_test.argv[i++] = p;
 	} while (p);
 
 	return 0;

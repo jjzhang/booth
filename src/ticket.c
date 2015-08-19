@@ -196,7 +196,7 @@ static int run_external_prog(struct ticket_config *tk,
 		/* immediately returned with success */
 		break;
 	case RUNCMD_MORE:
-		tk_log_debug("forked %s", tk->clu_test.prog);
+		tk_log_debug("forked %s", tk_test.prog);
 		break;
 	default:
 		break;
@@ -210,7 +210,7 @@ static int test_exit_status(struct ticket_config *tk,
 {
 	int rv = -1, status;
 
-	status = tk->clu_test.status;
+	status = tk_test.status;
 	if (WIFEXITED(status)) {
 		rv = WEXITSTATUS(status);
 	} else if (WIFSIGNALED(status)) {
@@ -218,15 +218,15 @@ static int test_exit_status(struct ticket_config *tk,
 	}
 	if (rv) {
 		tk_log_warn("handler \"%s\" failed: %s",
-			tk->clu_test.prog, interpret_rv(status));
+			tk_test.prog, interpret_rv(status));
 		tk_log_warn("we are not allowed to acquire ticket");
 		ext_prog_failed(tk, start_election);
 	} else {
 		tk_log_debug("handler \"%s\" exited with success",
-			tk->clu_test.prog);
+			tk_test.prog);
 	}
-	tk->clu_test.pid = 0;
-	tk->clu_test.progstate = EXTPROG_IDLE;
+	tk_test.pid = 0;
+	tk_test.progstate = EXTPROG_IDLE;
 	return rv;
 }
 
@@ -244,10 +244,10 @@ static int do_ext_prog(struct ticket_config *tk,
 {
 	int rv = 0;
 
-	if (!tk->clu_test.prog)
+	if (!tk_test.prog)
 		return 0;
 
-	switch(tk->clu_test.progstate) {
+	switch(tk_test.progstate) {
 	case EXTPROG_IDLE:
 		rv = run_external_prog(tk, start_election);
 		break;
@@ -327,10 +327,10 @@ int do_grant_ticket(struct ticket_config *tk, int options)
 
 static void ignore_extprog(struct ticket_config *tk)
 {
-	if (tk->clu_test.prog && tk->clu_test.pid >= 0 &&
-			tk->clu_test.progstate == EXTPROG_RUNNING) {
-		tk->clu_test.progstate = EXTPROG_IGNORE;
-		(void)kill(tk->clu_test.pid, SIGTERM);
+	if (tk_test.prog && tk_test.pid >= 0 &&
+			tk_test.progstate == EXTPROG_RUNNING) {
+		tk_test.progstate = EXTPROG_IGNORE;
+		(void)kill(tk_test.pid, SIGTERM);
 	}
 }
 

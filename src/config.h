@@ -44,6 +44,8 @@ typedef enum {
 	EXTPROG_IGNORE,
 } extprog_state_e;
 
+#define tk_test tk->clu_test
+
 struct ticket_config {
 	/** \name Configuration items.
 	 * @{ */
