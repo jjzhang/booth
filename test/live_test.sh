@@ -172,7 +172,7 @@ start_arbitrator() {
 stop_site_clean() {
 	manage_site $1 stop &&
 	#sleep 1 &&
-	runcmd $1 crm_ticket --force -t $tkt -r
+	runcmd $1 crm_ticket --force -t $tkt --cleanup > /dev/null
 }
 stop_site() {
 	manage_site $1 stop
