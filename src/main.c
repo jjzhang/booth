@@ -1422,10 +1422,10 @@ static void wait_child(int sig)
 				/* not interested in the outcome */
 				tk_test.pid = 0;
 				tk_test.progstate = EXTPROG_IDLE;
-				return;
+			} else {
+				tk_test.status = status;
+				tk_test.progstate = EXTPROG_EXITED;
 			}
-			tk_test.status = status;
-			tk_test.progstate = EXTPROG_EXITED;
 		}
 	}
 }
