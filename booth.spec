@@ -128,6 +128,7 @@ rm -rf %{buildroot}
 %{_mandir}/man8/booth.8.gz
 %{_mandir}/man8/boothd.8.gz
 %{_mandir}/man8/booth-keygen.8.gz
+%{_mandir}/man8/geostore.8.gz
 %dir /usr/lib/ocf
 %dir /usr/lib/ocf/resource.d
 %dir /usr/lib/ocf/resource.d/pacemaker
