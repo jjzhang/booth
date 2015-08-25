@@ -36,7 +36,12 @@ typedef enum {
 	CLIENT,
 	DAEMON,
 	STATUS,
+	GEOSTORE,
 } action_t;
+
+/* when allocating space for messages
+ */
+#define MAX_MSG_LEN 1024
 
 struct booth_transport {
 	const char *name;
@@ -65,6 +70,8 @@ int booth_udp_send_auth(struct booth_site *to, void *buf, int len);
 int booth_tcp_open(struct booth_site *to);
 int booth_tcp_send(struct booth_site *to, void *buf, int len);
 
+int message_recv(void *msg, int msglen);
+
 inline static void * node_to_addr_pointer(struct booth_site *node) {
 	switch (node->family) {
 	case AF_INET:  return &node->sa4.sin_addr;
@@ -72,8 +79,6 @@ inline static void * node_to_addr_pointer(struct booth_site *node) {
 	}
 	return NULL;
 }
-
-extern const struct booth_transport *local_transport;
 
 int send_data(int fd, void *data, int datalen);
 int send_header_plus(int fd, struct boothc_hdr_msg *hdr, void *data, int len);

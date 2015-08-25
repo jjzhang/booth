@@ -196,6 +196,10 @@ struct ticket_config {
 	*/
 	struct ticket_config *last_valid_tk;
 
+	/** Attributes, user defined
+	 */
+	GHashTable *attr;
+
 	/** Whom to vote for the next time.
 	 * Needed to push a ticket to someone else. */
 

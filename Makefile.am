@@ -85,6 +85,7 @@ install-exec-local:
 
 install-exec-hook:
 	ln -sf ${sbindir}/boothd $(DESTDIR)/${sbindir}/booth
+	ln -sf ${sbindir}/boothd $(DESTDIR)/${sbindir}/geostore
 
 uninstall-local:
 	rmdir $(DESTDIR)/${boothconfdir} || :;

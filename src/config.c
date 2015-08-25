@@ -597,7 +597,7 @@ no_value:
 		}
 
 		if (strcmp(key, "debug") == 0) {
-			if (type != CLIENT)
+			if (type != CLIENT && type != GEOSTORE)
 				debug_level = max(debug_level, atoi(val));
 			continue;
 		}
@@ -841,6 +841,7 @@ const char *type_to_string(int type)
 		case ARBITRATOR: return "arbitrator";
 		case SITE:       return "site";
 		case CLIENT:     return "client";
+		case GEOSTORE:   return "attr";
 	}
 	return "??invalid-type??";
 }

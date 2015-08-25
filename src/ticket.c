@@ -565,7 +565,7 @@ int setup_ticket(void)
 }
 
 
-int ticket_answer_list(int fd, struct boothc_ticket_msg *msg)
+int ticket_answer_list(int fd)
 {
 	char *data;
 	int olen, rv;
@@ -585,13 +585,15 @@ out:
 }
 
 
-int process_client_request(struct client *req_client, struct boothc_ticket_msg *msg)
+int process_client_request(struct client *req_client, void *buf)
 {
 	int rv, rc = 1;
 	struct ticket_config *tk;
 	int cmd;
 	struct boothc_ticket_msg omsg;
+	struct boothc_ticket_msg *msg;
 
+	msg = (struct boothc_ticket_msg *)buf;
 	cmd = ntohl(msg->header.cmd);
 	if (!check_ticket(msg->ticket.id, &tk)) {
 		log_warn("client referenced unknown ticket %s",
@@ -1088,36 +1090,15 @@ static void update_acks(
 	}
 }
 
-/* UDP message receiver. */
-int message_recv(struct boothc_ticket_msg *msg, int msglen)
+/* read ticket message */
+int ticket_recv(void *buf, struct booth_site *source)
 {
-	uint32_t from;
-	struct booth_site *source;
+	struct boothc_ticket_msg *msg;
 	struct ticket_config *tk;
 	struct booth_site *leader;
 	uint32_t leader_u;
 
-
-	from = ntohl(msg->header.from);
-	if (!find_site_by_id(from, &source) || !source) {
-		log_error("unknown sender: %08x", from);
-		return -1;
-	}
-
-	time(&source->last_recv);
-	source->recv_cnt++;
-
-	if (check_boothc_header(&msg->header, msglen) < 0) {
-		log_error("message from %s receive error", site_string(source));
-		source->recv_err_cnt++;
-		return -1;
-	}
-
-	if (check_auth(source, msg, msglen)) {
-		log_error("%s failed to authenticate", site_string(source));
-		source->sec_cnt++;
-		return -1;
-	}
+	msg = (struct boothc_ticket_msg *)buf;
 
 	if (!check_ticket(msg->ticket.id, &tk)) {
 		log_warn("got invalid ticket name %s from %s",

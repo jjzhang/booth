@@ -125,6 +125,7 @@ rm -rf %{buildroot}
 %{_sbindir}/booth
 %{_sbindir}/boothd
 %{_sbindir}/booth-keygen
+%{_sbindir}/geostore
 %{_mandir}/man8/booth.8.gz
 %{_mandir}/man8/boothd.8.gz
 %{_mandir}/man8/booth-keygen.8.gz
