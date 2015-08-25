@@ -271,6 +271,13 @@ is_we_server() {
 	done
 	return 1
 }
+is_pacemaker_running() {
+	local h
+	for h in $sites; do
+		crmadmin -D >/dev/null || return 1
+	done
+	return 0
+}
 sync_conf() {
 	local h rc=0
 	for h in $sites $arbitrators; do
@@ -342,6 +349,12 @@ run_arbitrator() {
 	runcmd $h $@
 }
 
+# need to get logs from _all_ clusters' nodes
+get_all_nodes() {
+	for h in $sites; do
+		runcmd $h crm_node -l | awk '{print $2}'
+	done
+}
 get_port() {
 	grep "^port" | 
 		sed -n 's/.*="//;s/"//p'
@@ -603,7 +616,7 @@ run_report() {
 	fi
 	hb_report $hb_report_opts $quick_opt -f "`date -d @$((start_ts-5))`" \
 		-t "`date -d @$((end_ts+60))`" \
-		-n "$sites $arbitrators" $name 2>&1 | logmsg
+		-n "$all_nodes $arbitrators" $name 2>&1 | logmsg
 }
 runtest() {
 	local start_ts end_ts
@@ -1076,9 +1089,14 @@ get_prog_abspath() {
 	echo "ERROR: configuration file $cnf doesn't exist"
 	usage 1
 }
+is_pacemaker_running || {
+	echo "ERROR: sites must run pacemaker"
+	exit 1
+}
 
 sites=`get_servers site < $cnf`
 arbitrators=`get_servers arbitrator < $cnf`
+all_nodes=`get_all_nodes`
 port=`get_port < $cnf`
 : ${port:=9929}
 site_cnt=`echo $sites | wc -w`
