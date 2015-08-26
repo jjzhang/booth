@@ -97,7 +97,7 @@ static void update_ticket_from_msg(struct ticket_config *tk,
 {
 	int duration;
 
-	tk_log_debug("updating from %s (%d/%d)",
+	tk_log_info("updating from %s (%d/%d)",
 		site_string(sender),
 		ntohl(msg->ticket.term), msg_term_time(msg));
 	duration = min(tk->term_duration, msg_term_time(msg));
@@ -222,8 +222,8 @@ void elections_end(struct ticket_config *tk)
 	tk->in_election = 0;
 	new_leader = majority_votes(tk);
 	if (new_leader == local) {
-		tk_log_info("granted successfully here");
 		won_elections(tk);
+		tk_log_info("granted successfully here");
 	} else if (new_leader) {
 		tk_log_info("ticket granted at %s",
 				site_string(new_leader));
@@ -507,7 +507,7 @@ static int process_VOTE_FOR(
 
 	if (tk->state != ST_CANDIDATE) {
 		/* lost candidate status, somebody rejected our proposal */
-		tk_log_debug("candidate status lost, ignoring vote_for from %s",
+		tk_log_info("candidate status lost, ignoring VtFr from %s",
 			site_string(sender));
 		return 0;
 	}

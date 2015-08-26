@@ -528,7 +528,7 @@ void update_ticket_state(struct ticket_config *tk, struct booth_site *sender)
 			if (sender)
 				tk_log_info("ticket granted to %s (says %s)",
 					site_string(tk->leader),
-					site_string(sender));
+					tk->leader == sender ? "they" : site_string(sender));
 			else
 				tk_log_info("ticket granted to %s (from CIB)",
 					site_string(tk->leader));
@@ -615,9 +615,8 @@ int process_client_request(struct client *req_client, struct boothc_ticket_msg *
 	}
 
 	if ((cmd == CMD_REVOKE) && tk->leader != local) {
-		log_info("the ticket %s is not granted here, "
-				"redirect to %s",
-				msg->ticket.id, ticket_leader_string(tk));
+		tk_log_info("not granted here, redirect to %s",
+				ticket_leader_string(tk));
 		rv = RLT_REDIRECT;
 		goto reply_now;
 	}
@@ -804,7 +803,7 @@ static void handle_resends(struct ticket_config *tk)
 	int ack_cnt;
 
 	if (++tk->retry_number > tk->retries) {
-		tk_log_debug("giving up on sending retries");
+		tk_log_info("giving up on sending retries");
 		no_resends(tk);
 		set_ticket_wakeup(tk);
 		return;
@@ -812,7 +811,7 @@ static void handle_resends(struct ticket_config *tk)
 
 	/* try to reach some sites again if we just stepped down */
 	if (tk->last_request == OP_VOTE_FOR) {
-		tk_log_warn("no answers to our request (try #%d), "
+		tk_log_warn("no answers to our VtFr request to step down (try #%d), "
 		"we are alone",
 		tk->retry_number);
 		goto just_resend;
