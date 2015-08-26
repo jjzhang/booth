@@ -717,7 +717,7 @@ static int query_get_string_answer(cmd_request_t cmd)
 		goto out_close;
 	}
 
-	data = malloc(data_len);
+	data = malloc(data_len+1);
 	if (!data) {
 		rv = -ENOMEM;
 		goto out_free;
@@ -726,6 +726,7 @@ static int query_get_string_answer(cmd_request_t cmd)
 	if (rv < 0)
 		goto out_free;
 
+	*(data + data_len) = '\0';
 	(void)fputs(data, stdout);
 	fflush(stdout);
 	rv = 0;
