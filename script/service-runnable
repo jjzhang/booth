@@ -5,14 +5,30 @@
 # acquire the ticket here.
 
 service="${1:?Need a resource name as first argument.}"
+if [ -z "$service" ]; then
+	ha_logger "$0: bad usage: no resource name"
+	exit 1
+fi
 tmpshadow=`mktemp booth-check.XXXXXX`
+if [ $? -ne 0 -o ! -f "$tmpshadow" ]; then
+	ha_logger "$0: mktemp failed"
+	exit 1
+fi
+
 trap "rm -f $tmpshadow" EXIT
 
 
 # We expect an output like
 #   p_dummy        (ocf::pacemaker:Dummy): Started geo-rz2-a 
 
-if crm_simulate -O $tmpshadow --ticket-grant "$BOOTH_TICKET" --simulate --live-check |
+status=`crm_simulate -O $tmpshadow --ticket-grant "$BOOTH_TICKET" --simulate --live-check 2>&1`
+if [ $? -ne 0 ]; then
+	ha_logger "$0: crm_simulate failed"
+	ha_logger "$0: crm_simulate: $status"
+	exit 1
+fi
+
+if echo "$status" |
 	sed -n '/^Revised cluster status:/,$p' |
 	egrep "^[[:space:]]+$service[[:space:]]+\(.*\):[[:space:]]+Started ([^[:space:]]+) *$" >/dev/null
 then
