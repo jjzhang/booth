@@ -23,5 +23,5 @@ site="147.18.2.1"
 # fail-overed among different sites.
 ticket="ticketA"
 ticket="ticketB"
-	expire = 60
-	weights = 1,2,3,4
+	expire = 600
+	weights = 1,2,3
