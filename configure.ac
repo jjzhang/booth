@@ -290,7 +290,7 @@ ENV_LDFLAGS="$LDFLAGS"
 # debug build stuff
 if test "x${enable_debug}" = xyes; then
 	AC_DEFINE_UNQUOTED([DEBUG], [1], [Compiling Debugging code])
-	OPT_CFLAGS="-O0"
+	OPT_CFLAGS="-O0 -U_FORTIFY_SOURCE"
 	PACKAGE_FEATURES="$PACKAGE_FEATURES debug"
 else
 	OPT_CFLAGS="-O3"
