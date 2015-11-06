@@ -376,7 +376,7 @@ static cmd_result_t attr_list(struct ticket_config *tk, int fd, struct boothc_at
 
 int process_attr_request(struct client *req_client, void *buf)
 {
-	cmd_result_t rv;
+	cmd_result_t rv = RLT_SYNC_FAIL;
 	struct ticket_config *tk;
 	int cmd;
 	struct boothc_attr_msg *msg;
