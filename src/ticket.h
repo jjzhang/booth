@@ -70,7 +70,7 @@ int grant_ticket(struct ticket_config *ticket);
 int revoke_ticket(struct ticket_config *ticket);
 int list_ticket(char **pdata, unsigned int *len);
 
-int message_recv(struct boothc_ticket_msg *msg, int msglen);
+int ticket_recv(void *buf, struct booth_site *source);
 void reset_ticket(struct ticket_config *tk);
 void update_ticket_state(struct ticket_config *tk, struct booth_site *sender);
 int setup_ticket(void);
@@ -86,9 +86,8 @@ int postpone_ticket_processing(struct ticket_config *tk);
 
 int acquire_ticket(struct ticket_config *tk, cmd_reason_t reason);
 
-int ticket_answer_list(int fd, struct boothc_ticket_msg *msg);
-int process_client_request(struct client *req_client,
-	struct boothc_ticket_msg *msg);
+int ticket_answer_list(int fd);
+int process_client_request(struct client *req_client, void *buf);
 
 int ticket_write(struct ticket_config *tk);
 

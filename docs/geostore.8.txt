@@ -1,0 +1,129 @@
+GEOSTORE(8)
+===========
+:doctype: manpage
+
+
+NAME
+----
+geostore - geo cluster attribute manager
+
+
+SYNOPSIS
+--------
+*geostore* 'set' [-t 'ticket'] [-s 'site'] [-c 'config'] 'attribute' 'value'
+
+*geostore* 'get' [-t 'ticket'] [-s 'site'] [-c 'config'] 'attribute'
+
+*geostore* 'delete' [-t 'ticket'] [-s 'site'] [-c 'config'] 'attribute'
+
+*geostore* 'list' [-t 'ticket'] [-s 'site'] [-c 'config']
+
+
+DESCRIPTION
+-----------
+Applications running in GEO cluster environments may need more
+information apart from tickets to make decisions. One example may
+be the status of data replication.
+
+'geostore' is a helper program to manage site attributes. The
+attributes are defined on a per-ticket basis, that is every
+ticket may have one or more attributes.
+
+It can set an attribute value, retrieve an attribute, or delete
+it. The attributes are stored in the CIB status section which is
+managed by the pacemaker 'cib' process. 'boothd(8)' provides
+transport for attributes to other sites.
+
+'crm_ticket(8)' is invoked at the target site to manage the
+attributes.
+
+
+SHORT EXAMPLES
+--------------
+
+---------------------
+# geostore set -t ticket-A -s 44.0.0.61 bigdb-repl-status UPTODATE
+
+# geostore get -t ticket-A -s 44.0.0.61 bigdb-repl-status
+
+# geostore delete -t ticket-A -s 44.0.0.61 bigdb-repl-status
+
+# geostore list -t ticket-A -s 44.0.0.61
+---------------------
+
+
+
+OPTIONS
+-------
+
+*-t*::
+	Ticket scope of the attribute (required, if more than one
+	ticket is configured).
+
+*-s*::
+	Site address or name where the attribute is to be stored/retrieved.
+
+*-c* 'configfile'::
+	Configuration to use.
++
+Can be a full path to a configuration file, or a short name; in the latter
+case, the directory '/etc/booth' and suffix '.conf' are added.
+Per default 'booth' is used, which results in the path
+'/etc/booth/booth.conf'.
+
+*-h*, *--help*::
+	Give a short usage output.
+
+
+COMMANDS
+--------
+
+*'set'*::
+	Sets the attribute to the value.
+
+
+*'get'*::
+	Get the attribute value and print it to 'stdout'. If the
+	attribute doesn't exist, appropriate error message is printed
+	to 'stderr'.
+
+
+*'delete'*::
+	Delete the attribute. If the attribute doesn't exist,
+	appropriate error message is printed to 'stderr'.
+
+
+*'list'*::
+	List all attributes and their values stored at the site.
+
+
+
+EXIT STATUS
+-----------
+*0*::
+    Success.
+
+*1*::
+	Request failed or bad usage.
+
+
+RESOURCES
+---------
+GitHub: <https://github.com/ClusterLabs/booth>
+
+
+COPYING
+-------
+
+Copyright (C) 2015 Dejan Muhamedagic <dmuhamedagic@suse.com>
+
+Free use of this software is
+granted under the terms of the GNU General Public License (GPL).
+
+
+SEE ALSO
+--------
+
+'boothd(8)', 'crm_attribute(8)'
+
+// vim: set ft=asciidoc :

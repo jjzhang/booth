@@ -41,7 +41,7 @@ struct request {
 	int client_fd;
 
 	/** The message containing the request */
-	struct boothc_ticket_msg *msg;
+	void *msg;
 };
 
 typedef int (*req_fp)(

@@ -57,6 +57,7 @@
 #include "pacemaker.h"
 #include "ticket.h"
 #include "request.h"
+#include "attr.h"
 
 #define RELEASE_VERSION		"0.2.0"
 #define RELEASE_STR 	RELEASE_VERSION " (build " BOOTH_BUILD_VERSION ")"
@@ -251,7 +252,7 @@ static int format_peers(char **pdata, unsigned int *len)
 }
 
 
-static void list_peers(int fd, struct boothc_ticket_msg *msg)
+void list_peers(int fd)
 {
 	char *data;
 	int olen;
@@ -267,72 +268,6 @@ out:
 	if (data)
 		free(data);
 }
-
-/* Only used for client requests (tcp) */
-void process_connection(int ci)
-{
-	struct client *req_cl;
-	struct boothc_ticket_msg *msg = NULL;
-	struct boothc_hdr_msg err_reply;
-	cmd_result_t errc;
-	void (*deadfn) (int ci);
-
-	req_cl = clients + ci;
-	switch (read_client(req_cl)) {
-	case -1: /* error */
-		goto kill;
-	case 1: /* more to read */
-		return;
-	case 0:
-		/* we can process the request now */
-		msg = req_cl->msg;
-	}
-
-	if (check_auth(NULL, msg, sizeof(*msg))) {
-		errc = RLT_AUTH;
-		goto send_err;
-	}
-
-	/* For CMD_GRANT and CMD_REVOKE:
-	 * Don't close connection immediately, but send
-	 * result a second later? */
-	switch (ntohl(msg->header.cmd)) {
-	case CMD_LIST:
-		ticket_answer_list(req_cl->fd, msg);
-		goto kill;
-	case CMD_PEERS:
-		list_peers(req_cl->fd, msg);
-		goto kill;
-
-	case CMD_GRANT:
-	case CMD_REVOKE:
-		if (process_client_request(req_cl, msg) == 1)
-			goto kill; /* request processed definitely, close connection */
-		else
-			return;
-
-	default:
-		log_error("connection %d cmd %x unknown",
-				ci, ntohl(msg->header.cmd));
-		errc = RLT_INVALID_ARG;
-		goto send_err;
-	}
-
-	assert(0);
-	return;
-
-send_err:
-	init_header(&err_reply.header, CL_RESULT, 0, 0, errc, 0, sizeof(err_reply));
-	send_client_msg(req_cl->fd, &err_reply);
-
-kill:
-	deadfn = req_cl->deadfn;
-	if(deadfn) {
-		deadfn(ci);
-	}
-	return;
-}
-
 
 /* trim trailing spaces if the key is ascii
  */
@@ -426,7 +361,7 @@ static int setup_config(int type)
 		}
 		local->local = 1;
 	} else
-		find_myself(NULL, type == CLIENT);
+		find_myself(NULL, type == CLIENT || type == GEOSTORE);
 
 
 	rv = check_config(type);
@@ -587,7 +522,7 @@ fail:
 }
 
 
-static int test_reply(int reply_code, cmd_request_t cmd)
+static int test_reply(cmd_result_t reply_code, cmd_request_t cmd)
 {
 	int rv = 0;
 	const char *op_str = "";
@@ -680,13 +615,28 @@ static int query_get_string_answer(cmd_request_t cmd)
 {
 	struct booth_site *site;
 	struct boothc_hdr_msg reply;
+	struct boothc_header *header;
 	char *data;
 	int data_len;
 	int rv;
 	struct booth_transport const *tpt;
+	int (*test_reply_f) (cmd_result_t reply_code, cmd_request_t cmd);
+	size_t msg_size;
+	void *request;
 
+	if (cl.type == GEOSTORE) {
+		test_reply_f = test_attr_reply;
+		msg_size = sizeof(cl.attr_msg);
+		request = &cl.attr_msg;
+	} else {
+		test_reply_f = test_reply;
+		msg_size = sizeof(cl.msg);
+		request = &cl.msg;
+	}
+	header = (struct boothc_header *)request;
 	data = NULL;
-	init_header(&cl.msg.header, cmd, 0, cl.options, 0, 0, sizeof(cl.msg));
+
+	init_header(header, cmd, 0, cl.options, 0, 0, msg_size);
 
 	if (!*cl.site)
 		site = local;
@@ -699,46 +649,45 @@ static int query_get_string_answer(cmd_request_t cmd)
 	tpt = booth_transport + TCP;
 	rv = tpt->open(site);
 	if (rv < 0)
-		goto out_free;
+		goto out_close;
 
-	rv = tpt->send(site, &cl.msg, sendmsglen(&cl.msg));
+	rv = tpt->send(site, request, msg_size);
 	if (rv < 0)
-		goto out_free;
+		goto out_close;
 
 	rv = tpt->recv_auth(site, &reply, sizeof(reply));
 	if (rv < 0)
-		goto out_free;
+		goto out_close;
 
 	data_len = ntohl(reply.header.length) - rv;
 
-	/* no tickets? */
+	/* no attribute, or no ticket found */
 	if (!data_len) {
-		rv = 0;
-		goto out_close;
+		goto out_test_reply;
 	}
 
 	data = malloc(data_len+1);
 	if (!data) {
 		rv = -ENOMEM;
-		goto out_free;
+		goto out_close;
 	}
 	rv = tpt->recv(site, data, data_len);
 	if (rv < 0)
-		goto out_free;
+		goto out_close;
+	*(data+data_len) = '\0';
 
 	*(data + data_len) = '\0';
 	(void)fputs(data, stdout);
 	fflush(stdout);
 	rv = 0;
 
-out_free:
-	if (rv < 0) {
-		(void)test_reply(ntohl(reply.header.result), cmd);
-	}
-	free(data);
+out_test_reply:
+	rv = test_reply_f(ntohl(reply.header.result), cmd);
 out_close:
 	tpt->close(site);
 out:
+	if (data)
+		free(data);
 	return rv;
 }
 
@@ -760,6 +709,9 @@ static int do_command(cmd_request_t cmd)
 
 	rv = 0;
 	site = NULL;
+
+	/* Always use TCP for client - at least for now. */
+	tpt = booth_transport + TCP;
 
 	if (!*cl.site)
 		site = local;
@@ -797,8 +749,6 @@ static int do_command(cmd_request_t cmd)
 redirect:
 	init_header(&cl.msg.header, cmd, 0, cl.options, 0, 0, sizeof(cl.msg));
 
-	/* Always use TCP for client - at least for now. */
-	tpt = booth_transport + TCP;
 	rv = tpt->open(site);
 	if (rv < 0)
 		goto out_close;
@@ -818,7 +768,7 @@ read_more:
 
 	rv = test_reply(ntohl(reply.header.result), cmd);
 	if (rv == 1) {
-		local_transport->close(site);
+		tpt->close(site);
 		leader_id = ntohl(reply.ticket.leader);
 		if (!find_site_by_id(leader_id, &site)) {
 			log_error("Message with unknown redirect site %x received", leader_id);
@@ -850,18 +800,8 @@ read_more:
 
 out_close:
 	if (site)
-		local_transport->close(site);
+		tpt->close(site);
 	return rv;
-}
-
-static int do_grant(void)
-{
-	return do_command(CMD_GRANT);
-}
-
-static int do_revoke(void)
-{
-	return do_command(CMD_REVOKE);
 }
 
 
@@ -994,6 +934,7 @@ static void print_usage(void)
 }
 
 #define OPTION_STRING		"c:Dl:t:s:FhSwC"
+#define ATTR_OPTION_STRING		"c:Dt:s:h"
 
 void safe_copy(char *dest, char *value, size_t buflen, const char *description) {
 	int content_len = buflen - 1;
@@ -1030,28 +971,31 @@ static int host_convert(char *hostname, char *ip_str, size_t ip_size)
 	return re;
 }
 
+#define cparg(dest, descr) do { \
+	if (optind >= argc) \
+		goto missingarg; \
+	safe_copy(dest, argv[optind], sizeof(dest), descr); \
+	optind++; \
+} while(0)
+
 static int read_arguments(int argc, char **argv)
 {
 	int optchar;
 	char *arg1 = argv[1];
 	char *op = NULL;
 	char *cp;
+	const char *opt_string = OPTION_STRING;
 	char site_arg[INET_ADDRSTRLEN] = {0};
 	int left;
 
-	if (argc < 2 || !strcmp(arg1, "help") || !strcmp(arg1, "--help") ||
-			!strcmp(arg1, "-h")) {
-		print_usage();
-		exit(EXIT_SUCCESS);
-	}
-
-	if (!strcmp(arg1, "version") || !strcmp(arg1, "--version") ||
-			!strcmp(arg1, "-V")) {
-		printf("%s %s\n", argv[0], RELEASE_STR);
-		exit(EXIT_SUCCESS);
-	}
-
-	if (strcmp(arg1, "arbitrator") == 0 ||
+	cl.type = 0;
+	if ((cp = strstr(argv[0], ATTR_PROG)) &&
+			!strcmp(cp, ATTR_PROG)) {
+		cl.type = GEOSTORE;
+		op = argv[1];
+		optind = 2;
+		opt_string = ATTR_OPTION_STRING;
+	} else if (strcmp(arg1, "arbitrator") == 0 ||
 			strcmp(arg1, "site") == 0 ||
 			strcmp(arg1, "start") == 0 ||
 			strcmp(arg1, "daemon") == 0) {
@@ -1068,11 +1012,27 @@ static int read_arguments(int argc, char **argv)
 		}
 		op = argv[2];
 		optind = 3;
-	} else {
+	}
+	if (!cl.type) {
 		cl.type = CLIENT;
 		op = argv[1];
 		optind = 2;
     }
+
+	if (argc < 2 || !strcmp(arg1, "help") || !strcmp(arg1, "--help") ||
+			!strcmp(arg1, "-h")) {
+		if (cl.type == GEOSTORE)
+			print_geostore_usage();
+		else
+			print_usage();
+		exit(EXIT_SUCCESS);
+	}
+
+	if (!strcmp(arg1, "version") || !strcmp(arg1, "--version") ||
+			!strcmp(arg1, "-V")) {
+		printf("%s %s\n", argv[0], RELEASE_STR);
+		exit(EXIT_SUCCESS);
+	}
 
     if (cl.type == CLIENT) {
 		if (!strcmp(op, "list"))
@@ -1088,10 +1048,24 @@ static int read_arguments(int argc, char **argv)
 					op);
 			exit(EXIT_FAILURE);
 		}
+	} else if (cl.type == GEOSTORE) {
+		if (!strcmp(op, "list"))
+			cl.op = ATTR_LIST;
+		else if (!strcmp(op, "set"))
+			cl.op = ATTR_SET;
+		else if (!strcmp(op, "get"))
+			cl.op = ATTR_GET;
+		else if (!strcmp(op, "delete"))
+			cl.op = ATTR_DEL;
+		else {
+			fprintf(stderr, "attribute operation \"%s\" is unknown\n",
+					op);
+			exit(EXIT_FAILURE);
+		}
 	}
 
 	while (optind < argc) {
-		optchar = getopt(argc, argv, OPTION_STRING);
+		optchar = getopt(argc, argv, opt_string);
 
 		switch (optchar) {
 		case 'c':
@@ -1133,6 +1107,9 @@ static int read_arguments(int argc, char **argv)
 			if (cl.op == CMD_GRANT || cl.op == CMD_REVOKE) {
 				safe_copy(cl.msg.ticket.id, optarg,
 						sizeof(cl.msg.ticket.id), "ticket name");
+			} else if (cl.type == GEOSTORE) {
+				safe_copy(cl.attr_msg.attr.tkt_id, optarg,
+						sizeof(cl.attr_msg.attr.tkt_id), "ticket name");
 			} else {
 				print_usage();
 				exit(EXIT_FAILURE);
@@ -1145,7 +1122,7 @@ static int read_arguments(int argc, char **argv)
 			 * can be set manually.
 			 * This makes it easier to start multiple processes
 			 * on one machine. */
-			if (cl.type == CLIENT ||
+			if (cl.type == CLIENT || cl.type == GEOSTORE ||
 					(cl.type == DAEMON && debug_level)) {
 				int re = host_convert(optarg, site_arg, INET_ADDRSTRLEN);
 				if (re == 0) {
@@ -1185,7 +1162,10 @@ static int read_arguments(int argc, char **argv)
 			break;
 
 		case 'h':
-			print_usage();
+			if (cl.type == GEOSTORE)
+				print_geostore_usage();
+			else
+				print_usage();
 			exit(EXIT_SUCCESS);
 			break;
 
@@ -1206,16 +1186,16 @@ static int read_arguments(int argc, char **argv)
 
 	return 0;
 
-
-
 extra_args:
 	if (cl.type == CLIENT && !cl.msg.ticket.id[0]) {
-		/* Use additional argument as ticket name. */
-		safe_copy(cl.msg.ticket.id,
-				argv[optind],
-				sizeof(cl.msg.ticket.id),
-				"ticket name");
-		optind++;
+		cparg(cl.msg.ticket.id, "ticket name");
+	} else if (cl.type == GEOSTORE) {
+		if (cl.op != ATTR_LIST) {
+			cparg(cl.attr_msg.attr.name, "attribute name");
+		}
+		if (cl.op == ATTR_SET) {
+			cparg(cl.attr_msg.attr.val, "attribute value");
+		}
 	}
 
 	if (optind == argc)
@@ -1231,6 +1211,10 @@ extra_args:
 
 unknown:
 	fprintf(stderr, "unknown option: %s\n", argv[optind]);
+	exit(EXIT_FAILURE);
+
+missingarg:
+	fprintf(stderr, "not enough arguments\n");
 	exit(EXIT_FAILURE);
 }
 
@@ -1504,7 +1488,7 @@ static int do_server(int type)
 
 static int do_client(void)
 {
-	int rv = -1;
+	int rv;
 
 	rv = setup_config(CLIENT);
 	if (rv < 0) {
@@ -1514,19 +1498,53 @@ static int do_client(void)
 
 	switch (cl.op) {
 	case CMD_LIST:
-		rv = query_get_string_answer(CMD_LIST);
-		break;
-
 	case CMD_PEERS:
-		rv = query_get_string_answer(CMD_PEERS);
+		rv = query_get_string_answer(cl.op);
 		break;
 
 	case CMD_GRANT:
-		rv = do_grant();
+	case CMD_REVOKE:
+		rv = do_command(cl.op);
+		break;
+	}
+
+out:
+	return rv;
+}
+
+static int do_attr(void)
+{
+	int rv = -1;
+
+	rv = setup_config(GEOSTORE);
+	if (rv < 0) {
+		log_error("cannot read config");
+		goto out;
+	}
+
+	/* We don't check for existence of ticket, so that asking can be
+	 * done without local configuration, too.
+	 * Although, that means that the UDP port has to be specified, too. */
+	if (!cl.attr_msg.attr.tkt_id[0]) {
+		/* If the loaded configuration has only a single ticket defined, use that. */
+		if (booth_conf->ticket_count == 1) {
+			strcpy(cl.attr_msg.attr.tkt_id, booth_conf->ticket[0].name);
+		} else {
+			rv = 1;
+			log_error("No ticket given.");
+			goto out;
+		}
+	}
+
+	switch (cl.op) {
+	case ATTR_LIST:
+	case ATTR_GET:
+		rv = query_get_string_answer(cl.op);
 		break;
 
-	case CMD_REVOKE:
-		rv = do_revoke();
+	case ATTR_SET:
+	case ATTR_DEL:
+		rv = do_attr_command(cl.op);
 		break;
 	}
 
@@ -1537,6 +1555,7 @@ out:
 int main(int argc, char *argv[], char *envp[])
 {
 	int rv;
+	char *cp;
 
 	init_set_proc_title(argc, argv, envp);
 	get_time(&start_time);
@@ -1546,7 +1565,12 @@ int main(int argc, char *argv[], char *envp[])
 			BOOTH_DEFAULT_CONF, BOOTH_PATH_LEN - 1);
 	cl.lockfile[0] = 0;
 	debug_level = 0;
-	cl_log_set_entity("booth");
+
+	cl_log_set_entity(
+		(cp = strstr(argv[0], ATTR_PROG)) && !strcmp(cp, ATTR_PROG)
+		? ATTR_PROG
+		: "booth"
+		);
 	cl_log_enable_stderr(TRUE);
 	cl_log_set_facility(0);
 
@@ -1569,6 +1593,10 @@ int main(int argc, char *argv[], char *envp[])
 
 	case CLIENT:
 		rv = do_client();
+		break;
+
+	case GEOSTORE:
+		rv = do_attr();
 		break;
 	}
 

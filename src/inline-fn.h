@@ -86,11 +86,11 @@ static inline void init_header_bare(struct boothc_header *h) {
 	h->from    = htonl(local->site_id);
 	if (is_auth_req()) {
 		get_time(&now);
-		h->iv    = htonl(1);
+		h->opts  = htonl(BOOTH_OPT_AUTH);
 		h->secs  = htonl(secs_since_epoch(&now));
 		h->usecs = htonl(get_usecs(&now));
 	} else {
-		h->iv    = htonl(0);
+		h->opts  = htonl(0);
 		h->secs  = htonl(0);
 		h->usecs = htonl(0);
 	}
@@ -144,6 +144,24 @@ static inline void init_ticket_msg(struct boothc_ticket_msg *msg,
 		msg->ticket.term           = htonl(tk->current_term);
 		set_msg_term_time(msg, tk);
 	}
+}
+
+static inline void init_attr_msg(struct boothc_attr_msg *msg,
+		int cmd, int request, int rv, int reason,
+		struct ticket_config *tk, char *attr_name, struct geo_attr *attr)
+{
+	assert(tk);
+	assert(attr);
+
+	init_header(&msg->header, cmd, request, 0, rv, reason, sizeof(*msg));
+
+	if (!tk) {
+		memset(&msg->attr.tkt_id, 0, sizeof(msg->attr.tkt_id));
+	} else {
+		memcpy(msg->attr.tkt_id, tk->name, sizeof(msg->attr.tkt_id));
+	}
+	memcpy(msg->attr.name, attr_name, sizeof(msg->attr.name));
+	memcpy(msg->attr.val, attr->val, sizeof(msg->attr.val));
 }
 
 

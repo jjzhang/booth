@@ -25,6 +25,7 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <glib.h>
 #include "timer.h"
 
 
@@ -64,6 +65,7 @@
 /** The on-network data structures and constants. */
 
 #define BOOTH_NAME_LEN		64
+#define BOOTH_ATTRVAL_LEN		128
 
 #define CHAR2CONST(a,b,c,d) ((a << 24) | (b << 16) | (c << 8) | d)
 
@@ -77,9 +79,20 @@
 
 typedef unsigned char boothc_site  [BOOTH_NAME_LEN];
 typedef unsigned char boothc_ticket[BOOTH_NAME_LEN];
+typedef unsigned char boothc_attr[BOOTH_NAME_LEN];
+typedef unsigned char boothc_attr_value[BOOTH_ATTRVAL_LEN];
 
+/* message option bits */
+enum {
+	BOOTH_OPT_AUTH = 1, /* authentication */
+	BOOTH_OPT_ATTR = 4, /* attr message type, otherwise ticket */
+};
 
 struct boothc_header {
+	/** Various options, message type, authentication
+	 */
+	uint32_t opts;
+
 	/** Generation info (used for authentication)
 	 * This is something that would need to be monotone
 	 * incremental. CLOCK_MONOTONIC should fit the purpose. On
@@ -88,7 +101,6 @@ struct boothc_header {
 	 * We'll need to relax a bit for the nodes which are starting
 	 * (just accept all OP_STATUS).
 	 */
-	uint32_t iv;
 	uint32_t secs;  /* seconds */
 	uint32_t usecs; /* microseconds */
 
@@ -135,6 +147,32 @@ struct ticket_msg {
 	 *  starting, running, stopping, error, ...? */
 } __attribute__((packed));
 
+struct attr_msg {
+	/** Ticket name. */
+	boothc_ticket tkt_id;
+
+	/** Attribute name. */
+	boothc_attr name;
+
+	/** The value. */
+	boothc_attr_value val;
+} __attribute__((packed));
+
+/* GEO attributes
+ * attributes should be regularly updated.
+ */
+struct geo_attr {
+	/** Update timestamp. */
+	timetype update_ts;
+
+	/** The value. */
+	char *val;
+
+	/** Who set it (currently unused)
+	struct booth_site *origin;
+	*/
+} __attribute__((packed));
+
 struct hmac {
 	/** hash id, currently set to constant BOOTH_HASH */
 	uint32_t hid;
@@ -155,6 +193,11 @@ struct boothc_ticket_msg {
 	struct hmac hmac;
 } __attribute__((packed));
 
+struct boothc_attr_msg {
+	struct boothc_header header;
+	struct attr_msg attr;
+	struct hmac hmac;
+} __attribute__((packed));
 
 typedef enum {
 	/* 0x43 = "C"ommands */
@@ -181,6 +224,12 @@ typedef enum {
 	OP_UPDATE   = CHAR2CONST('U', 'p', 'd', 'E'), /* Update ticket */
 	OP_REVOKE   = CHAR2CONST('R', 'e', 'v', 'k'), /* Revoke ticket */
 	OP_REJECTED = CHAR2CONST('R', 'J', 'C', '!'),
+
+	/* Attributes */
+	ATTR_SET     = CHAR2CONST('A', 'S', 'e', 't'),
+	ATTR_GET     = CHAR2CONST('A', 'G', 'e', 't'),
+	ATTR_DEL     = CHAR2CONST('A', 'D', 'e', 'l'),
+	ATTR_LIST    = CHAR2CONST('A', 'L', 's', 't'),
 } cmd_request_t;
 
 
@@ -192,6 +241,7 @@ typedef enum {
 	RLT_SYNC_SUCC           = CHAR2CONST('S', 'c', 'c', 's'),
 	RLT_SYNC_FAIL           = CHAR2CONST('F', 'a', 'i', 'l'),
 	RLT_INVALID_ARG         = CHAR2CONST('I', 'A', 'r', 'g'),
+	RLT_NO_SUCH_ATTR        = CHAR2CONST('N', 'A', 't', 'r'),
 	RLT_CIB_PENDING         = CHAR2CONST('P', 'e', 'n', 'd'),
 	RLT_EXT_FAILED          = CHAR2CONST('X', 'P', 'r', 'g'),
 	RLT_TICKET_IDLE         = CHAR2CONST('T', 'i', 'd', 'l'),
@@ -296,9 +346,9 @@ extern struct pollfd *pollfds;
 int client_add(int fd, const struct booth_transport *tpt,
 		void (*workfn)(int ci), void (*deadfn)(int ci));
 int find_client_by_fd(int fd);
-void process_connection(int ci);
 void safe_copy(char *dest, char *value, size_t buflen, const char *description);
 int update_authkey(void);
+void list_peers(int fd);
 
 
 struct command_line {
@@ -310,6 +360,7 @@ struct command_line {
 
 	char site[BOOTH_NAME_LEN];
 	struct boothc_ticket_msg msg;
+	struct boothc_attr_msg attr_msg;
 };
 extern struct command_line cl;
 

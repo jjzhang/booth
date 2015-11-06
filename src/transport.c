@@ -38,6 +38,7 @@
 #include "ticket.h"
 #include "transport.h"
 #include "auth.h"
+#include "attr.h"
 
 #define BOOTH_IPADDR_LEN	(sizeof(struct in6_addr))
 
@@ -342,27 +343,31 @@ retry:
 	return 0;
 }
 
+
 /* Only used for client requests (tcp) */
 int read_client(struct client *req_cl)
 {
-	struct boothc_ticket_msg *msg;
-	int rv, len, fd;
+	char *msg;
+	struct boothc_header *header;
+	int rv, fd;
+	int len = MAX_MSG_LEN;
 
 	if (!req_cl->msg) {
-		msg = calloc(sizeof(struct boothc_ticket_msg), 1);
+		msg = malloc(MAX_MSG_LEN);
 		if (!msg) {
 			log_error("out of memory for client messages");
 			return -1;
 		}
-		req_cl->msg = msg;
+		req_cl->msg = (void *)msg;
 	} else {
-		msg = req_cl->msg;
+		msg = (char *)req_cl->msg;
 	}
+	header = (struct boothc_header *)msg;
 
-	/* how much more do we have to read? */
-	len = (req_cl->offset >= sizeof(msg->header)) ?
-		/* cannot allow more than msg bytes */
-		min(ntohl(msg->header.length), sizeof(*msg)) : sizeof(*msg);
+	/* update len if we read enough */
+	if (req_cl->offset >= sizeof(header)) {
+		len = min(ntohl(header->length), MAX_MSG_LEN);
+	}
 
 	fd = req_cl->fd;
 	rv = do_read(fd, msg+req_cl->offset, len-req_cl->offset);
@@ -374,20 +379,97 @@ int read_client(struct client *req_cl)
 	req_cl->offset += rv;
 
 	/* update len if we read enough */
-	if (req_cl->offset >= sizeof(msg->header)) {
-		len = min(ntohl(msg->header.length), sizeof(*msg));
+	if (req_cl->offset >= sizeof(header)) {
+		len = min(ntohl(header->length), MAX_MSG_LEN);
 	}
 
 	if (req_cl->offset < len) {
-		/* client promissed to send more */
+		/* client promised to send more */
 		return 1;
 	}
 
-	if (check_boothc_header(&msg->header, len) < 0) {
+	if (check_boothc_header(header, len) < 0) {
 		return -1;
 	}
 
 	return 0;
+}
+
+
+/* Only used for client requests (tcp) */
+static void process_connection(int ci)
+{
+	struct client *req_cl;
+	void *msg = NULL;
+	struct boothc_header *header;
+	struct boothc_hdr_msg err_reply;
+	cmd_result_t errc;
+	void (*deadfn) (int ci);
+
+	req_cl = clients + ci;
+	switch (read_client(req_cl)) {
+	case -1: /* error */
+		goto kill;
+	case 1: /* more to read */
+		return;
+	case 0:
+		/* we can process the request now */
+		msg = req_cl->msg;
+	}
+
+	header = (struct boothc_header *)msg;
+	if (check_auth(NULL, msg, ntohl(header->length))) {
+		errc = RLT_AUTH;
+		goto send_err;
+	}
+
+	/* For CMD_GRANT and CMD_REVOKE:
+	 * Don't close connection immediately, but send
+	 * result a second later? */
+	switch (ntohl(header->cmd)) {
+	case CMD_LIST:
+		ticket_answer_list(req_cl->fd);
+		goto kill;
+	case CMD_PEERS:
+		list_peers(req_cl->fd);
+		goto kill;
+
+	case CMD_GRANT:
+	case CMD_REVOKE:
+		if (process_client_request(req_cl, msg) == 1)
+			goto kill; /* request processed definitely, close connection */
+		else
+			return;
+
+	case ATTR_LIST:
+	case ATTR_GET:
+	case ATTR_SET:
+	case ATTR_DEL:
+		if (process_attr_request(req_cl, msg) == 1)
+			goto kill; /* request processed definitely, close connection */
+		else
+			return;
+
+	default:
+		log_error("connection %d cmd %x unknown",
+				ci, ntohl(header->cmd));
+		errc = RLT_INVALID_ARG;
+		goto send_err;
+	}
+
+	assert(0);
+	return;
+
+send_err:
+	init_header(&err_reply.header, CL_RESULT, 0, 0, errc, 0, sizeof(err_reply));
+	send_client_msg(req_cl->fd, &err_reply);
+
+kill:
+	deadfn = req_cl->deadfn;
+	if(deadfn) {
+		deadfn(ci);
+	}
+	return;
 }
 
 
@@ -678,9 +760,11 @@ static void process_recv(int ci)
 	struct sockaddr_storage sa;
 	int rv;
 	socklen_t sa_len;
-	char buffer[256];
+	/* beware, the buffer needs to be large enought to accept a
+	 * packet */
+	char buffer[MAX_MSG_LEN];
 	/* Used for unit tests */
-	struct boothc_ticket_msg *msg;
+	void *msg;
 
 
 	sa_len = sizeof(sa);
@@ -835,10 +919,6 @@ const struct booth_transport booth_transport[TRANSPORT_ENTRIES] = {
 	}
 };
 
-const struct booth_transport *local_transport = booth_transport+TCP;
-
-
-
 /* data + (datalen-sizeof(struct hmac)) points to struct hmac
  * i.e. struct hmac is always tacked on the payload
  */
@@ -927,6 +1007,11 @@ int check_auth(struct booth_site *from, void *buf, int len)
 		return 0;
 
 	payload_len = len - sizeof(struct hmac);
+	if (payload_len < 0) {
+		log_error("%s: failed to authenticate, packet too short (size:%d)",
+			peer_string(from), len);
+		return -1;
+	}
 	hp = (struct hmac *)((unsigned char *)buf + payload_len);
 	rv = verify_hmac(buf, payload_len, ntohl(hp->hid), hp->hash,
 		booth_conf->authkey, booth_conf->authkey_len);
@@ -961,4 +1046,44 @@ int send_header_plus(int fd, struct boothc_hdr_msg *msg, void *data, int len)
 		rv = do_write(fd, data, len);
 
 	return rv;
+}
+
+/* UDP message receiver. */
+int message_recv(void *msg, int msglen)
+{
+	uint32_t from;
+	struct boothc_header *header;
+	struct booth_site *source;
+
+	header = (struct boothc_header *)msg;
+
+	from = ntohl(header->from);
+	if (!find_site_by_id(from, &source) || !source) {
+		log_error("unknown sender: %08x", from);
+		return -1;
+	}
+
+	time(&source->last_recv);
+	source->recv_cnt++;
+
+	if (check_boothc_header(header, msglen) < 0) {
+		log_error("message from %s receive error", site_string(source));
+		source->recv_err_cnt++;
+		return -1;
+	}
+
+	if (check_auth(source, msg, msglen)) {
+		log_error("%s failed to authenticate", site_string(source));
+		source->sec_cnt++;
+		return -1;
+	}
+
+	if (ntohl(header->opts) & BOOTH_OPT_ATTR) {
+		/* not used, clients send/retrieve attributes directly
+		 * from sites
+		 */
+		return attr_recv(msg, source);
+	} else {
+		return ticket_recv(msg, source);
+	}
 }
