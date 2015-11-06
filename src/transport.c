@@ -236,10 +236,15 @@ int _find_myself(int family, struct booth_site **mep, int fuzzy_allowed)
 				}
 
 				/* First try with exact addresses, then optionally with subnet matching. */
-				if (ifa->ifa_prefixlen > address_bits_matched)
+				if (ifa->ifa_prefixlen > address_bits_matched) {
 					find_address(ipaddr,
 							ifa->ifa_family, ifa->ifa_prefixlen,
 							fuzzy_allowed, &me, &address_bits_matched);
+					if (me) {
+						log_debug("found myself at %s (%d bits matched)",
+								site_string(me), address_bits_matched);
+					}
+				}
 			}
 			h = NLMSG_NEXT(h, status);
 		}
