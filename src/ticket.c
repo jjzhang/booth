@@ -230,6 +230,42 @@ static int test_exit_status(struct ticket_config *tk,
 	return rv;
 }
 
+#define attr_found(geo_ap, ap) \
+	((geo_ap) && !strcmp((geo_ap)->val, (ap)->attr_val))
+
+int check_attr_prereq(struct ticket_config *tk, grant_type_e grant_type)
+{
+	GList *el;
+	struct attr_prereq *ap;
+	struct geo_attr *geo_ap;
+
+	for (el = g_list_first(tk->attr_prereqs); el; el = g_list_next(el))
+	{
+		ap = (struct attr_prereq *)el->data;
+		if (ap->grant_type != grant_type)
+			continue;
+		geo_ap = (struct geo_attr *)g_hash_table_lookup(tk->attr, ap->attr_name);
+		switch(ap->op) {
+		case ATTR_OP_EQ:
+			if (!attr_found(geo_ap, ap))
+				goto fail;
+			break;
+		case ATTR_OP_NE:
+			if (attr_found(geo_ap, ap))
+				goto fail;
+			break;
+		default:
+			break;
+		}
+	}
+	return 0;
+
+fail:
+	tk_log_warn("not granted (%s attr-prereq failed)",
+			ap->attr_name);
+	return 1;
+}
+
 /* do we need to run the external program?
  * or we already done that and waiting for the outcome
  * or program exited and we can collect the status
@@ -277,6 +313,9 @@ static int do_ext_prog(struct ticket_config *tk,
 int acquire_ticket(struct ticket_config *tk, cmd_reason_t reason)
 {
 	int rv;
+
+	if (reason == OR_ADMIN && check_attr_prereq(tk, GRANT_MANUAL))
+		return RLT_ATTR_PREREQ;
 
 	switch(do_ext_prog(tk, 0)) {
 	case 0:

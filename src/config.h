@@ -46,6 +46,28 @@ typedef enum {
 
 #define tk_test tk->clu_test
 
+typedef enum {
+	ATTR_OP_EQ = 1,
+	ATTR_OP_NE,
+} attr_op_e;
+
+typedef enum {
+	GRANT_AUTO = 1,
+	GRANT_MANUAL,
+} grant_type_e;
+
+struct toktab {
+	const char *str;
+	int val;
+};
+
+struct attr_prereq {
+	grant_type_e grant_type; /* grant type */
+	attr_op_e op; /* attribute operation */
+	char *attr_name;
+	char *attr_val;
+};
+
 struct ticket_config {
 	/** \name Configuration items.
 	 * @{ */
@@ -199,6 +221,10 @@ struct ticket_config {
 	/** Attributes, user defined
 	 */
 	GHashTable *attr;
+
+	/** Attribute prerequisites
+	 */
+	GList *attr_prereqs;
 
 	/** Whom to vote for the next time.
 	 * Needed to push a ticket to someone else. */

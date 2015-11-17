@@ -325,6 +325,38 @@ See below for details about booth specific environment variables.
 The distributed 'service-runnable' script is an example which may
 be used to test whether a pacemaker resource can be started.
 
+*'attr-prereq'*::
+	Sites can have GEO attributes managed with the 'geostore(8)'
+	program. Attributes are within ticket's scope and may be
+	tested by 'boothd' for additional control of ticket failover
+	(automatic) or ticket acquire (manual).
++
+Attributes are typically used to convey extra information about
+resources, for instance database replication status. The
+attributes are commonly updated by resource agents.
++
+Attribute values are referenced in expressions and may be tested
+for equality with the 'eq' binary operator or inequality with the
+'ne' operator. The usage is as follows:
+
+	attr-prereq = <grant_type> <name> <op> <value>
+
+	<grant_type>: "auto" | "manual"
+	<name>:       attribute name
+	<op>:         "eq" | "ne"
+	<value>:      attribute value
++
+The two grant types are 'auto' for ticket failover and 'manual'
+for grants using the booth client. Only in case the expression
+evaluates to true can the ticket be granted.
++
+It is not clear whether the 'manual' grant type has any practical
+use because, obviously, this operation is anyway controlled by a
+human.
++
+Note that there can be no guarantee on whether an attribute value
+is up to date, i.e. if it actually reflects the current state.
+
 One example of a booth configuration file:
 
 -----------------------
@@ -345,6 +377,7 @@ ticket="ticket-db8"
     retries       = 5
     renewal-freq  = 60
     before-acquire-handler = /usr/share/booth/service-runnable db8
+    attr-prereq = auto repl_state eq ACTIVE
 -----------------------
 
 

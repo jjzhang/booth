@@ -370,6 +370,103 @@ static int parse_extprog(char *val, struct ticket_config *tk)
 	return 0;
 }
 
+struct toktab grant_type[] = {
+	{ "auto", GRANT_AUTO},
+	{ "manual", GRANT_MANUAL},
+	{ NULL, 0},
+};
+
+struct toktab attr_op[] = {
+	{"eq", ATTR_OP_EQ},
+	{"ne", ATTR_OP_NE},
+	{NULL, 0},
+};
+
+static int lookup_tokval(char *key, struct toktab *tab)
+{
+	struct toktab *tp;
+
+	for (tp = tab; tp->str; tp++) {
+		if (!strcmp(tp->str, key))
+			return tp->val;
+	}
+	return 0;
+}
+
+/* attribute prerequisite
+ */
+static int parse_attr_prereq(char *val, struct ticket_config *tk)
+{
+	struct attr_prereq *ap = NULL;
+	char *p;
+
+	ap = (struct attr_prereq *)calloc(1, sizeof(struct attr_prereq));
+	if (!ap) {
+		log_error("out of memory");
+		return -1;
+	}
+
+	p = strtok(val, " \t");
+	if (!p) {
+		log_error("not enough arguments to attr-prereq");
+		goto err_out;
+	}
+	ap->grant_type = lookup_tokval(p, grant_type);
+	if (!ap->grant_type) {
+		log_error("%s is not a grant type", p);
+		goto err_out;
+	}
+
+	p = strtok(NULL, " \t");
+	if (!p) {
+		log_error("not enough arguments to attr-prereq");
+		goto err_out;
+	}
+	if (!(ap->attr_name = strdup(p))) {
+		log_error("out of memory");
+		goto err_out;
+	}
+
+	p = strtok(NULL, " \t");
+	if (!p) {
+		log_error("not enough arguments to attr-prereq");
+		goto err_out;
+	}
+	ap->op = lookup_tokval(p, attr_op);
+	if (!ap->op) {
+		log_error("%s is not an attribute operation", p);
+		goto err_out;
+	}
+
+	p = strtok(NULL, " \t");
+	if (!p) {
+		log_error("not enough arguments to attr-prereq");
+		goto err_out;
+	}
+	if (!(ap->attr_val = strdup(p))) {
+		log_error("out of memory");
+		goto err_out;
+	}
+
+	tk->attr_prereqs = g_list_append(tk->attr_prereqs, ap);
+	if (!tk->attr_prereqs) {
+		log_error("out of memory");
+		goto err_out;
+	}
+
+	return 0;
+
+err_out:
+	if (ap) {
+		if (ap->attr_val)
+			free(ap->attr_val);
+		if (ap->attr_name)
+			free(ap->attr_name);
+		free(ap);
+	}
+	return -1;
+}
+
 extern int poll_timeout;
 
 int read_config(const char *path, int type)
@@ -677,6 +774,13 @@ no_value:
 
 		if (strcmp(key, "before-acquire-handler") == 0) {
 			if (parse_extprog(val, current_tk)) {
+				goto err;
+			}
+			continue;
+		}
+
+		if (strcmp(key, "attr-prereq") == 0) {
+			if (parse_attr_prereq(val, current_tk)) {
 				goto err;
 			}
 			continue;

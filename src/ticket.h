@@ -106,6 +106,8 @@ int leader_update_ticket(struct ticket_config *tk);
 void add_random_delay(struct ticket_config *tk);
 void schedule_election(struct ticket_config *tk, cmd_reason_t reason);
 
+int check_attr_prereq(struct ticket_config *tk, grant_type_e grant_type);
+
 static inline void ticket_next_cron_at(struct ticket_config *tk, timetype *when)
 {
 	copy_time(when, &tk->next_cron);

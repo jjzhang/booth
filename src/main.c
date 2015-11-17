@@ -599,6 +599,12 @@ static int test_reply(cmd_result_t reply_code, cmd_request_t cmd)
 		rv = -1;
 		break;
 
+	case RLT_ATTR_PREREQ:
+		log_error("attr-prereq for ticket \"%s\" failed, grant denied",
+				cl.msg.ticket.id);
+		rv = -1;
+		break;
+
 	case RLT_REDIRECT:
 		/* talk to another site */
 		rv = 1;

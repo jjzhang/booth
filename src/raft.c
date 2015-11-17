@@ -726,6 +726,8 @@ vote_for_sender:
 	return booth_udp_send_auth(sender, &omsg, sendmsglen(&omsg));
 }
 
+#define is_reason(r, tk) \
+	(reason == (r) || (reason == OR_AGAIN && (tk)->election_reason == (r)))
 
 int new_election(struct ticket_config *tk,
 	struct booth_site *preference, int update_term, cmd_reason_t reason)
@@ -733,6 +735,10 @@ int new_election(struct ticket_config *tk,
 	struct booth_site *new_leader;
 
 	if (local->type != SITE)
+		return 0;
+
+	if ((is_reason(OR_TKT_LOST, tk) || is_reason(OR_STEPDOWN, tk)) &&
+			check_attr_prereq(tk, GRANT_AUTO))
 		return 0;
 
 	/* elections were already started, but not yet finished/timed out */
@@ -747,6 +753,9 @@ int new_election(struct ticket_config *tk,
 		} else {
 			tk_log_debug("starting elections");
 		}
+		tk_log_debug("elections caused by %s %s",
+				state_to_string(reason),
+				reason == OR_AGAIN ? state_to_string(tk->election_reason) : "" );
 	}
 
 	/* §5.2 */

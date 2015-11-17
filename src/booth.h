@@ -244,6 +244,7 @@ typedef enum {
 	RLT_NO_SUCH_ATTR        = CHAR2CONST('N', 'A', 't', 'r'),
 	RLT_CIB_PENDING         = CHAR2CONST('P', 'e', 'n', 'd'),
 	RLT_EXT_FAILED          = CHAR2CONST('X', 'P', 'r', 'g'),
+	RLT_ATTR_PREREQ         = CHAR2CONST('A', 'P', 'r', 'q'),
 	RLT_TICKET_IDLE         = CHAR2CONST('T', 'i', 'd', 'l'),
 	RLT_OVERGRANT           = CHAR2CONST('O', 'v', 'e', 'r'),
 	RLT_PROBABLY_SUCCESS    = CHAR2CONST('S', 'u', 'c', '?'),
