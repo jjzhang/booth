@@ -61,6 +61,7 @@ AC_PROG_RANLIB
 
 AC_PATH_PROGS(PKGCONFIG, pkg-config)
 AC_PATH_PROGS(ASCIIDOC, asciidoc)
+AC_PATH_PROGS(XML2CONFIG, xml2-config)
 
 AM_CONDITIONAL(BUILD_ASCIIDOC, test x"${ASCIIDOC}" != x"")
 
@@ -81,6 +82,17 @@ if test "x$libgcrypt_installed" = "xno"; then
 	AC_CHECK_LIB(mhash, mhash_init, , [mhash_installed="no"])
 	AM_CONDITIONAL(BUILD_AUTH_C, test "x${mhash_installed}" = "xyes")
 fi
+
+AC_MSG_CHECKING(for special libxml2 includes)
+if test "x$XML2CONFIG" = "x"; then
+   AC_MSG_ERROR(libxml2 config not found)
+else
+   XML2HEAD="`$XML2CONFIG --cflags`"
+   AC_MSG_RESULT($XML2HEAD)
+   AC_CHECK_LIB(xml2, xmlReadMemory)
+fi
+
+CPPFLAGS="$CPPFLAGS $XML2HEAD"
 
 PKG_CHECK_MODULES(GLIB, [glib-2.0])
 

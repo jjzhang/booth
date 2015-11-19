@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include "attr.h"
 #include "ticket.h"
+#include "pacemaker.h"
 
 void print_geostore_usage(void)
 {
@@ -243,11 +244,13 @@ static void free_geo_attr(gpointer data)
 	g_free(a);
 }
 
-static cmd_result_t attr_set(struct ticket_config *tk, struct boothc_attr_msg *msg)
+int store_geo_attr(struct ticket_config *tk, const char *name, char *val, int notime)
 {
 	struct geo_attr *a;
 	GDestroyNotify free_geo_attr_notify = free_geo_attr;
 
+	if (!tk)
+		return -1;
 	/*
 	 * allocate new, if attr doesn't already exist
 	 * copy the attribute value
@@ -258,21 +261,34 @@ static cmd_result_t attr_set(struct ticket_config *tk, struct boothc_attr_msg *m
 			free_geo_attr_notify, g_free);
 	if (!tk->attr) {
 		log_error("out of memory");
-		return RLT_SYNC_FAIL;
+		return -1;
 	}
 
 	a = (struct geo_attr *)calloc(1, sizeof(struct geo_attr));
 	if (!a) {
 		log_error("out of memory");
-		return RLT_SYNC_FAIL;
+		return -1;
 	}
 
-	a->val = g_strdup(msg->attr.val);
-	get_time(&a->update_ts);
+	a->val = g_strdup(val);
+	if (!notime)
+		get_time(&a->update_ts);
 
 	g_hash_table_insert(tk->attr,
-		g_strndup(msg->attr.name, BOOTH_NAME_LEN), a);
+		g_strndup(name, BOOTH_NAME_LEN), a);
 
+	return 0;
+}
+
+static cmd_result_t attr_set(struct ticket_config *tk, struct boothc_attr_msg *msg)
+{
+	int rc;
+
+	rc = store_geo_attr(tk, msg->attr.name, msg->attr.val, 0);
+	if (rc) {
+		return RLT_SYNC_FAIL;
+	}
+	(void)pcmk_handler.set_attr(tk, msg->attr.name, msg->attr.val);
 	return RLT_SUCCESS;
 }
 
@@ -295,6 +311,8 @@ static cmd_result_t attr_del(struct ticket_config *tk, struct boothc_attr_msg *m
 		return RLT_NO_SUCH_ATTR;
 
 	rv = g_hash_table_remove(tk->attr, msg->attr.name);
+
+	(void)pcmk_handler.del_attr(tk, msg->attr.name);
 
 	return gbool2rlt(rv);
 }

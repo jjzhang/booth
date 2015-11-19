@@ -27,6 +27,9 @@ struct ticket_handler {
 	int (*grant_ticket) (struct ticket_config *tk);
 	int (*revoke_ticket) (struct ticket_config *tk);
 	int (*load_ticket) (struct ticket_config *tk);
+	int (*set_attr) (struct ticket_config *tk, const char *a, const char *v);
+	int (*get_attr) (struct ticket_config *tk, const char *a, const char **vp);
+	int (*del_attr) (struct ticket_config *tk, const char *a);
 };
 
 struct ticket_handler pcmk_handler;
