@@ -738,8 +738,11 @@ int new_election(struct ticket_config *tk,
 		return 0;
 
 	if ((is_reason(OR_TKT_LOST, tk) || is_reason(OR_STEPDOWN, tk)) &&
-			check_attr_prereq(tk, GRANT_AUTO))
+			check_attr_prereq(tk, GRANT_AUTO)) {
+		tk_log_info("attribute prerequisite not met, "
+			"not starting elections");
 		return 0;
+	}
 
 	/* elections were already started, but not yet finished/timed out */
 	if (is_time_set(&tk->election_end) && !is_past(&tk->election_end))

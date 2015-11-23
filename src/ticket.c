@@ -261,8 +261,7 @@ int check_attr_prereq(struct ticket_config *tk, grant_type_e grant_type)
 	return 0;
 
 fail:
-	tk_log_warn("not granted (%s attr-prereq failed)",
-			ap->attr_name);
+	tk_log_warn("'%s' attr-prereq failed", ap->attr_name);
 	return 1;
 }
 
@@ -926,10 +925,13 @@ static void process_next_state(struct ticket_config *tk)
 
 static void ticket_lost(struct ticket_config *tk)
 {
+	int reason = OR_TKT_LOST;
+
 	if (tk->leader != local) {
 		tk_log_warn("lost at %s", site_string(tk->leader));
 	} else {
 		tk_log_warn("lost majority (revoking locally)");
+		reason = tk->election_reason ? tk->election_reason : OR_REACQUIRE;
 	}
 
 	tk->lost_leader = tk->leader;
@@ -938,7 +940,7 @@ static void ticket_lost(struct ticket_config *tk)
 	set_state(tk, ST_FOLLOWER);
 	if (local->type == SITE) {
 		ticket_write(tk);
-		schedule_election(tk, OR_TKT_LOST);
+		schedule_election(tk, reason);
 	}
 }
 
