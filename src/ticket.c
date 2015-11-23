@@ -1221,8 +1221,7 @@ void set_ticket_wakeup(struct ticket_config *tk)
 	case ST_FOLLOWER:
 		/* If there is (or should be) some owner, check on it later on.
 		 * If no one is interested - don't care. */
-		if (is_owned(tk) &&
-				(local->type == SITE)) {
+		if (is_owned(tk)) {
 			interval_add(&tk->term_expires, tk->acquire_after, &tv);
 			ticket_next_cron_at(tk, &tv);
 		}
