@@ -370,7 +370,26 @@ n && (/^$/ || /^ticket.*/) {exit}
 /^ticket.*'$tkt'/ {n=1}
 ' $cnf
 }
+get_attr() {
+	awk '
+n && /^[[:space:]]*attr-prereq = auto .* eq / {print $4,$6; exit}
+n && (/^$/ || /^ticket.*/) {exit}
+/^ticket.*'$tkt'/ {n=1}
+' $cnf
+}
 
+set_site_attr() {
+	local site
+	site=`get_site $1`
+	set -- `get_attr`
+	geostore set -s $site $1 $2
+}
+del_site_attr() {
+	local site
+	site=`get_site $1`
+	set -- `get_attr`
+	geostore delete -s $site $1
+}
 break_external_prog() {
 	run_site $1 crm configure "location $PREFNAME `get_rsc` rule -inf: defined \#uname"
 }
@@ -507,7 +526,7 @@ booth_where_granted() {
 	# list on all of them (at least one should have booth
 	# running)
 	ticket_line=`forall_sites booth list | grep $tkt | sort -u | head -1`
-	grantee=`echo "$ticket_line" | sed 's/.*leader: //;s/,.*//'`
+	grantee=`echo "$ticket_line" | sed 's/.*leader: //;s/,.*//;s/NONE/none/'`
 	echo $grantee
 	[ "$grantee" = "none" ] && return
 	! echo "$ticket_line" | grep -q "$tkt.*pending"
@@ -1047,6 +1066,57 @@ applicable_external_prog_failed() {
 	[ -n "`get_rsc`" ]
 }
 
+## TEST: attr_prereq_ok ##
+
+# failover with attribute prerequisite
+setup_attr_prereq_ok() {
+	grant_ticket 1 || return 1
+	set_site_attr 2
+	stop_site_clean `get_site 1`
+	booth_status `get_site 1` && return 1
+	return 0
+}
+test_attr_prereq_ok() {
+	wait_exp
+	wait_timeout
+}
+check_attr_prereq_ok() {
+	check_consistency `get_site 2`
+}
+recover_attr_prereq_ok() {
+	start_site `get_site 1`
+	del_site_attr 2
+}
+applicable_attr_prereq_ok() {
+	[ -n "`get_attr`" ]
+}
+
+## TEST: attr_prereq_fail ##
+
+# failover with failed attribute prerequisite
+setup_attr_prereq_fail() {
+	grant_ticket 1 || return 1
+	del_site_attr 2 >/dev/null 2>&1
+	stop_site_clean `get_site 1`
+	booth_status `get_site 1` && return 1
+	return 0
+}
+test_attr_prereq_fail() {
+	wait_exp
+	wait_exp
+	wait_exp
+}
+check_attr_prereq_fail() {
+	check_consistency &&
+	booth_where_granted | grep -qwi none
+}
+recover_attr_prereq_fail() {
+	start_site `get_site 1`
+}
+applicable_attr_prereq_fail() {
+	[ -n "`get_attr`" ]
+}
+
 #
 # environment modifications
 #
@@ -1161,7 +1231,7 @@ grant_site_lost grant_site_reappear revoke
 simultaneous_start_even slow_start_granted
 restart_granted reload_granted restart_granted_nocib restart_notgranted
 failover split_leader split_follower split_edge
-external_prog_failed"}
+external_prog_failed attr_prereq_ok attr_prereq_fail"}
 
 for t in $TESTS; do
 	runtest $t
