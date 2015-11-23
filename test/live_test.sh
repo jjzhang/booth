@@ -967,6 +967,8 @@ check_restart_notgranted() {
 # ticket failover
 setup_failover() {
 	grant_ticket 1
+	[ -n "`get_attr`" ] && set_site_attr 2
+	return 0
 }
 test_failover() {
 	stop_site_clean `get_site 1` || return 1
@@ -988,6 +990,8 @@ recover_failover() {
 # split brain (leader alone)
 setup_split_leader() {
 	grant_ticket_cib 1
+	[ -n "`get_attr`" ] && set_site_attr 2
+	return 0
 }
 test_split_leader() {
 	run_site 1 $iprules stop $port   >/dev/null
@@ -1048,6 +1052,7 @@ check_split_edge() {
 # external test prog failed
 setup_external_prog_failed() {
 	grant_ticket 1 || return 1
+	[ -n "`get_attr`" ] && set_site_attr 2
 	break_external_prog 1
 	show_pref 1 || return 1
 }
