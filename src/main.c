@@ -1130,8 +1130,8 @@ static int read_arguments(int argc, char **argv)
 			 * on one machine. */
 			if (cl.type == CLIENT || cl.type == GEOSTORE ||
 					(cl.type == DAEMON && debug_level)) {
-				int re = host_convert(optarg, site_arg, INET_ADDRSTRLEN);
-				if (re == 0) {
+				if (strcmp(optarg, OTHER_SITE) &&
+						host_convert(optarg, site_arg, INET_ADDRSTRLEN) == 0) {
 					safe_copy(cl.site, site_arg, sizeof(cl.site), "site name");
 				} else {
 					safe_copy(cl.site, optarg, sizeof(cl.site), "site name");

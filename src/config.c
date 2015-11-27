@@ -892,6 +892,30 @@ g_inval:
 }
 
 
+static int get_other_site(struct booth_site **node)
+{
+	struct booth_site *n;
+	int i;
+
+	*node = NULL;
+	if (!booth_conf)
+		return 0;
+
+	for (i = 0; i < booth_conf->site_count; i++) {
+		n = booth_conf->site + i;
+		if (n != local && n->type == SITE) {
+			if (!*node) {
+				*node = n;
+			} else {
+				return 0;
+			}
+		}
+	}
+
+	return !*node ? 0 : 1;
+}
+
+
 int find_site_by_name(unsigned char *site, struct booth_site **node, int any_type)
 {
 	struct booth_site *n;
@@ -899,6 +923,9 @@ int find_site_by_name(unsigned char *site, struct booth_site **node, int any_typ
 
 	if (!booth_conf)
 		return 0;
+
+	if (!strcmp(site, OTHER_SITE))
+		return get_other_site(node);
 
 	for (i = 0; i < booth_conf->site_count; i++) {
 		n = booth_conf->site + i;
@@ -935,7 +962,6 @@ int find_site_by_id(uint32_t site_id, struct booth_site **node)
 
 	return 0;
 }
-
 
 
 const char *type_to_string(int type)

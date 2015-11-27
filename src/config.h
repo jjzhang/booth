@@ -35,6 +35,7 @@
 #define MAX_ARGS 	16
 #define TICKET_ALLOC	16
 
+#define OTHER_SITE "other"
 
 
 typedef enum {

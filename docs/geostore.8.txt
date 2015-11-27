@@ -42,13 +42,13 @@ SHORT EXAMPLES
 --------------
 
 ---------------------
-# geostore set -t ticket-A -s 44.0.0.61 bigdb-repl-status UPTODATE
+# geostore set -t ticket-A -s other bigdb-repl-status UPTODATE
 
-# geostore get -t ticket-A -s 44.0.0.61 bigdb-repl-status
+# geostore get -t ticket-A -s other bigdb-repl-status
 
 # geostore delete -t ticket-A -s 44.0.0.61 bigdb-repl-status
 
-# geostore list -t ticket-A -s 44.0.0.61
+# geostore list -t ticket-A -s other
 ---------------------
 
 
@@ -62,6 +62,10 @@ OPTIONS
 
 *-s*::
 	Site address or name where the attribute is to be stored/retrieved.
++
+	The special value 'other' can be used to specify the other
+	site. Obviously, in that case, the booth configuration must
+	have exactly two sites defined.
 
 *-c* 'configfile'::
 	Configuration to use.

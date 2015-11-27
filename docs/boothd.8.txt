@@ -65,6 +65,10 @@ The configuration name also determines the name of the PID file - for the defaul
 
 *-s*::
 	Site address or name.
++
+	The special value 'other' can be used to specify the other
+	site. Obviously, in that case, the booth configuration must
+	have exactly two sites defined.
 
 *-F*::
 	'immediate grant': Don't wait for unreachable sites to
