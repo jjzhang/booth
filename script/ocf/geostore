@@ -80,6 +80,7 @@ END
 geostore_start() {
 	if [ -n "$OCF_RESKEY_booth_ticket" ]; then
 		geo_attr_geo_attr 1
+		ocf_log info "set GEO attribute to `geo_attr_read_attr`"
 	fi
 	ha_pseudo_resource geostore_${OCF_RESOURCE_INSTANCE} start
 }
@@ -87,6 +88,7 @@ geostore_start() {
 geostore_stop() {
 	if [ -n "$OCF_RESKEY_booth_ticket" ]; then
 		geo_attr_geo_attr 0
+		ocf_log info "removed GEO attribute"
 	fi
 	ha_pseudo_resource geostore_${OCF_RESOURCE_INSTANCE} stop
 }
@@ -101,6 +103,9 @@ geostore_monitor() {
 }
 
 geostore_validate_all() {
+	if ! geo_attr_validate_all; then
+		return $OCF_ERR_INSTALL
+	fi
     return $OCF_SUCCESS
 }
 

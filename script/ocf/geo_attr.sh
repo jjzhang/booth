@@ -52,7 +52,7 @@
 # Invoke geo_attr_validate_all to test the environment:
 #
 ##	 if ! geo_attr_validate_all; then
-##	 	return 1
+##	 	return $OCF_ERR_INSTALL
 ##	 fi
 
 # 3) Attribute updating
@@ -157,10 +157,23 @@ geo_attr_geo_attr() {
 	fi
 
 	if [ "$val" = "0" ]; then
-		geostore delete -s $site $1
+		geostore delete -s $site $1 >/dev/null 2>&1
 	else
 		geostore set -s $site $1 $2
 	fi
+}
+
+geo_attr_read_attr() {
+	local site
+
+	set -- `geo_attr_get_attr`
+	if test z"`command -v get_site_name`" = z"get_site_name"; then
+		site=`get_site_name`
+	else
+		site="other"
+	fi
+
+	geostore get -s $site $1
 }
 
 # test the environment for geo_attr
@@ -175,7 +188,7 @@ geo_attr_validate_all() {
 		return 1
 	fi
 
-	if ! grep -qs "^ticket[[:space:]]*=[[:space:]]*\"$OCF_RESKEY_booth_ticket\""; then
+	if ! grep -qs "^ticket[[:space:]]*=[[:space:]]*\"$OCF_RESKEY_booth_ticket\"" $OCF_RESKEY_booth_config; then
 		ocf_log err "ticket $OCF_RESKEY_booth_ticket not found in $OCF_RESKEY_booth_config"
 		return 1
 	fi
