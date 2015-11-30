@@ -133,12 +133,14 @@ rm -rf %{buildroot}
 %dir /usr/lib/ocf
 %dir /usr/lib/ocf/resource.d
 %dir /usr/lib/ocf/resource.d/pacemaker
+%dir /usr/lib/ocf/resource.d/booth
 %dir /usr/lib/ocf/lib
 %dir /usr/lib/ocf/lib/booth
 %dir %{_sysconfdir}/booth
 %{_sbindir}/rcbooth-arbitrator
 /usr/lib/ocf/resource.d/pacemaker/booth-site
 /usr/lib/ocf/lib/booth/geo_attr.sh
+/usr/lib/ocf/resource.d/booth/geostore
 %config %{_sysconfdir}/booth/booth.conf.example
 %if 0%{?suse_version}
 %config %{_fwdefdir}/booth

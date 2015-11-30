@@ -1,0 +1,107 @@
+#!/bin/sh
+#
+#
+#	geostore OCF RA. Just an example on how to use
+#	geo-attr.sh
+#
+# Copyright (c) 2015 Dejan Muhamedagic <dmuhamedagic@suse.com>
+#                    All Rights Reserved.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of version 2 of the GNU General Public License as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it would be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#
+# Further, this software is distributed without any warranty that it is
+# free of the rightful claim of any third person regarding infringement
+# or the like.  Any license provided herein, whether implied or
+# otherwise, applies only to this software file.  Patent licenses, if
+# any, provided herein do not apply to combinations of this program with
+# other software, or any other product whatsoever.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write the Free Software Foundation,
+# Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
+#
+
+#######################################################################
+# Initialization:
+
+: ${OCF_FUNCTIONS_DIR=${OCF_ROOT}/lib/heartbeat}
+. ${OCF_FUNCTIONS_DIR}/ocf-shellfuncs
+. ${OCF_ROOT}/lib/booth/geo_attr.sh
+
+#######################################################################
+
+geostore_meta_data() {
+	cat <<END
+<?xml version="1.0"?>
+<!DOCTYPE resource-agent SYSTEM "ra-api-1.dtd">
+<resource-agent name="$NAME" version="0.9">
+<version>1.0</version>
+
+<longdesc lang="en">
+This is the geostore Resource Agent. It's a sample for how to use
+geo_attr.sh.
+</longdesc>
+<shortdesc lang="en">Sample GEO attribute RA</shortdesc>
+
+<parameters>
+`geo_attr_meta_data`
+</parameters>
+
+<actions>
+<action name="start"        timeout="20" />
+<action name="stop"         timeout="20" />
+<action name="monitor"      timeout="20" interval="10" depth="0" />
+<action name="reload"       timeout="20" />
+<action name="migrate_to"   timeout="20" />
+<action name="migrate_from" timeout="20" />
+<action name="meta-data"    timeout="5" />
+<action name="validate-all"   timeout="20" />
+</actions>
+</resource-agent>
+END
+}
+
+#######################################################################
+
+geostore_usage() {
+	cat <<END
+usage: $0 {start|stop|monitor|migrate_to|migrate_from|validate-all|meta-data}
+
+Expects to have a fully populated OCF RA-compliant environment set.
+END
+}
+
+geostore_start() {
+	if [ -n "$OCF_RESKEY_booth_ticket" ]; then
+		geo_attr_geo_attr 1
+	fi
+	ha_pseudo_resource geostore_${OCF_RESOURCE_INSTANCE} start
+}
+
+geostore_stop() {
+	if [ -n "$OCF_RESKEY_booth_ticket" ]; then
+		geo_attr_geo_attr 0
+	fi
+	ha_pseudo_resource geostore_${OCF_RESOURCE_INSTANCE} stop
+}
+
+geostore_monitor() {
+	if ha_pseudo_resource geostore_${OCF_RESOURCE_INSTANCE} monitor
+	then
+		return $OCF_SUCCESS
+	else
+		return $OCF_NOT_RUNNING
+	fi
+}
+
+geostore_validate_all() {
+    return $OCF_SUCCESS
+}
+
+ocf_rarun $*
