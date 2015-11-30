@@ -55,7 +55,7 @@ boothsitedir		= /usr/lib/ocf/resource.d/pacemaker
 boothsite_SCRIPTS	= script/ocf/booth-site
 
 boothocfdir		= /usr/lib/ocf/resource.d/booth
-boothocf_SCRIPTS	= script/ocf/sharedrsc
+boothocf_SCRIPTS	= script/ocf/sharedrsc script/ocf/geo_attr.sh
 
 bootharbitratordir	= ${INITDDIR}
 
