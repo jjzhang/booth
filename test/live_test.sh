@@ -703,6 +703,7 @@ runtest() {
 			echo "unexpected: dependent resource failure"
 		run_report $start_ts $end_ts $TEST
 		reboot_test
+		master_rc=1
 	fi
 	revoke_ticket
 }
@@ -1238,6 +1239,9 @@ restart_granted reload_granted restart_granted_nocib restart_notgranted
 failover split_leader split_follower split_edge
 external_prog_failed attr_prereq_ok attr_prereq_fail"}
 
+master_rc=0 # updated in runtest
 for t in $TESTS; do
 	runtest $t
 done
+
+exit $master_rc
