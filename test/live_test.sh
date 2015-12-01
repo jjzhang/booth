@@ -41,6 +41,7 @@ EOF
 [ $# -eq 0 ] && usage 0
 
 cnf=$1
+BOOTH_DIR="/etc/booth"
 run_cnf="/etc/booth/booth.conf"
 
 shift 1
@@ -283,6 +284,10 @@ sync_conf() {
 	for h in $sites $arbitrators; do
 		rsync -q $cnf root@$h:$run_cnf
 		rc=$((rc|$?))
+		if [ -n "$authfile" ]; then
+			run_site 1 rsync -q $authfile root@$h:$BOOTH_DIR
+			rc=$((rc|$?))
+		fi
 	done
 	return $rc
 }
@@ -355,13 +360,9 @@ get_all_nodes() {
 		runcmd $h crm_node -l | awk '{print $2}'
 	done
 }
-get_port() {
-	grep "^port" | 
-		sed -n 's/.*="//;s/"//p'
-}
-get_servers() {
+get_value() {
 	grep "^$1" | 
-		sed -n 's/.*="//;s/"//p'
+		sed 's/.*=[ "]*//;s/"//'
 }
 get_rsc() {
 	awk '
@@ -1170,15 +1171,16 @@ is_pacemaker_running || {
 	exit 1
 }
 
-sites=`get_servers site < $cnf`
-arbitrators=`get_servers arbitrator < $cnf`
+sites=`get_value site < $cnf`
+arbitrators=`get_value arbitrator < $cnf`
 all_nodes=`get_all_nodes`
-port=`get_port < $cnf`
+port=`get_value port < $cnf`
 : ${port:=9929}
 site_cnt=`echo $sites | wc -w`
 arbitrator_cnt=`echo $arbitrators | wc -w`
 tkt=`get_tkt < $cnf`
 eval `get_tkt_settings`
+
 MIN_TIMEOUT=`awk -v tm=$T_timeout 'BEGIN{
 		if (tm >= 2) print tm;
 		else print 2*tm;
@@ -1214,6 +1216,9 @@ WE_SERVER=""
 is_we_server && WE_SERVER=1
 
 PREFNAME=__pref_booth_live_test
+
+authfile=`get_value authfile < $cnf`
+run_site 1 'test -f '"$authfile"' || booth-keygen '"$authfile"
 
 sync_conf || exit
 reboot_test
