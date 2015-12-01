@@ -360,9 +360,16 @@ get_all_nodes() {
 		runcmd $h crm_node -l | awk '{print $2}'
 	done
 }
+get_servers() {
+	grep "^$1" |
+		awk '
+		{ if(/#  *external-ip=/) print $NF; else print; }
+		' |
+		sed 's/ *#.*//;s/.*=//;s/"//g'
+}
 get_value() {
 	grep "^$1" | 
-		sed 's/.*=[ "]*//;s/"//'
+		sed 's/ *#.*//;s/.*=//;s/"//g'
 }
 get_rsc() {
 	awk '
@@ -1171,8 +1178,8 @@ is_pacemaker_running || {
 	exit 1
 }
 
-sites=`get_value site < $cnf`
-arbitrators=`get_value arbitrator < $cnf`
+sites=`get_servers site < $cnf`
+arbitrators=`get_servers arbitrator < $cnf`
 all_nodes=`get_all_nodes`
 port=`get_value port < $cnf`
 : ${port:=9929}

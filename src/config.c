@@ -532,7 +532,7 @@ int read_config(const char *path, int type)
 		lineno++;
 
 		s = skip_while(line, isspace);
-		if (is_end_of_line(s))
+		if (is_end_of_line(s) || *s == '#')
 			continue;
 		key = s;
 
@@ -580,7 +580,7 @@ exp_equal:
 				/* Remove and skip quote */
 				*s = 0;
 				s++;
-				if (* skip_while(s, isspace)) {
+				if (*(s = skip_while(s, isspace)) && *s != '#') {
 					error = "Surplus data after value";
 					goto err;
 				}
