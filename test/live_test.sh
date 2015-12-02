@@ -281,12 +281,16 @@ is_pacemaker_running() {
 }
 sync_conf() {
 	local h rc=0
+	local tmpf
 	for h in $sites $arbitrators; do
-		rsync -q $cnf root@$h:$run_cnf
+		rsync -q -e "ssh $SSH_OPTS" $cnf root@$h:$run_cnf
 		rc=$((rc|$?))
 		if [ -n "$authfile" ]; then
-			run_site 1 rsync -q $authfile root@$h:$BOOTH_DIR
+			tmpf=`mktemp`
+			scp -q $(get_site 1):$authfile $tmpf &&
+			rsync -q -e "ssh $SSH_OPTS" $tmpf root@$h:$authfile
 			rc=$((rc|$?))
+			rm -f $tmpf
 		fi
 	done
 	return $rc
@@ -368,8 +372,8 @@ get_servers() {
 		sed 's/ *#.*//;s/.*=//;s/"//g'
 }
 get_value() {
-	grep "^$1" | 
-		sed 's/ *#.*//;s/.*=//;s/"//g'
+	grep "^$1" |
+		sed 's/ *#.*//;s/.*=//;s/"//g;s/^ *//;s/ *$//'
 }
 get_rsc() {
 	awk '
