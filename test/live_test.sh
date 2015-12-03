@@ -55,6 +55,10 @@ get_site() {
 	local n=$1
 	echo $sites | awk '{print $'$n'}'
 }
+get_internal_site() {
+	local n=$1
+	echo $internal_sites | awk '{print $'$n'}'
+}
 
 logmsg() {
 	if [ "$WE_SERVER" -o "$_JUST_NETEM" ]; then
@@ -275,7 +279,7 @@ is_we_server() {
 is_pacemaker_running() {
 	local h
 	for h in $sites; do
-		crmadmin -D >/dev/null || return 1
+		runcmd $h crmadmin -D >/dev/null || return 1
 	done
 	return 0
 }
@@ -364,16 +368,21 @@ get_all_nodes() {
 		runcmd $h crm_node -l | awk '{print $2}'
 	done
 }
-get_servers() {
+extract_value() {
+	sed 's/ *#.*//;s/.*=//;s/"//g;s/^ *//;s/ *$//'
+}
+get_extern_ip() {
 	grep "^$1" |
 		awk '
-		{ if(/#  *external-ip=/) print $NF; else print; }
-		' |
-		sed 's/ *#.*//;s/.*=//;s/"//g'
+		{ if(/#  *external[_-]ip=/) print $NF; else print; }
+		' | extract_value
 }
 get_value() {
-	grep "^$1" |
-		sed 's/ *#.*//;s/.*=//;s/"//g;s/^ *//;s/ *$//'
+	grep "^$1" | extract_value
+}
+# get internal IP for the external address
+internal_ip() {
+	fgrep "$1" $cnf | extract_value
 }
 get_rsc() {
 	awk '
@@ -392,15 +401,15 @@ n && (/^$/ || /^ticket.*/) {exit}
 
 set_site_attr() {
 	local site
-	site=`get_site $1`
+	site=$1
 	set -- `get_attr`
-	geostore set -s $site $1 $2
+	run_site $site geostore set $1 $2
 }
 del_site_attr() {
 	local site
-	site=`get_site $1`
+	site=$1
 	set -- `get_attr`
-	geostore delete -s $site $1
+	run_site $site geostore delete $1
 }
 break_external_prog() {
 	run_site $1 crm configure "location $PREFNAME `get_rsc` rule -inf: defined \#uname"
@@ -486,7 +495,7 @@ check_cib_consistency() {
 	for h in $sites; do
 		if is_cib_granted $h; then
 			[ -n "$gh" ] && rc=1 # granted twice
-			gh="$gh $h"
+			gh="$gh `internal_ip $h`"
 		fi
 	done
 	[ -z "$gh" ] && gh="none"
@@ -501,8 +510,9 @@ EOF
 	return $rc
 }
 check_cib() {
-	local exp_grantee=$1 cib_grantee booth_grantee
+	local exp_grantee cib_grantee booth_grantee
 	local rc=0 pending
+	exp_grantee=$1
 	booth_grantee=`booth_where_granted`
 	pending=$?
 	cib_grantee=`check_cib_consistency`
@@ -739,7 +749,7 @@ test_grant() {
 	grant_ticket 1
 }
 check_grant() {
-	check_consistency `get_site 1`
+	check_consistency `get_internal_site 1`
 }
 
 ## TEST: longgrant ##
@@ -754,7 +764,7 @@ test_longgrant() {
 	wait_exp
 }
 check_longgrant() {
-	check_consistency `get_site 1`
+	check_consistency `get_internal_site 1`
 }
 
 ## TEST: longgrant2 ##
@@ -770,7 +780,7 @@ test_longgrant2() {
 	done
 }
 check_longgrant2() {
-	check_consistency `get_site 1`
+	check_consistency `get_internal_site 1`
 }
 
 ## TEST: grant_noarb ##
@@ -787,7 +797,7 @@ test_grant_noarb() {
 	grant_ticket 1
 }
 check_grant_noarb() {
-	check_consistency `get_site 1`
+	check_consistency `get_internal_site 1`
 }
 recover_grant_noarb() {
 	local h
@@ -816,10 +826,10 @@ check_revoke() {
 
 # just a grant to another site
 test_grant_elsewhere() {
-	run_site 1 booth grant -w -s `get_site 2` $tkt >/dev/null
+	run_site 1 booth grant -w -s `get_internal_site 2` $tkt >/dev/null
 }
 check_grant_elsewhere() {
-	check_consistency `get_site 2`
+	check_consistency `get_internal_site 2`
 }
 
 ## TEST: grant_site_lost ##
@@ -835,7 +845,7 @@ test_grant_site_lost() {
 	wait_exp
 }
 check_grant_site_lost() {
-	check_consistency `get_site 1`
+	check_consistency `get_internal_site 1`
 }
 recover_grant_site_lost() {
 	start_site `get_site 2`
@@ -852,14 +862,14 @@ setup_grant_site_reappear() {
 }
 test_grant_site_reappear() {
 	grant_ticket 1 || return $ERR_SETUP_FAILED
-	check_cib `get_site 1` || return $ERR_SETUP_FAILED
+	check_cib `get_internal_site 1` || return $ERR_SETUP_FAILED
 	wait_timeout
 	start_site `get_site 2` || return $ERR_SETUP_FAILED
 	wait_timeout
 	wait_timeout
 }
 check_grant_site_reappear() {
-	check_consistency `get_site 1` &&
+	check_consistency `get_internal_site 1` &&
 	is_cib_granted `get_site 1`
 }
 recover_grant_site_reappear() {
@@ -888,7 +898,7 @@ test_simultaneous_start_even() {
 	wait_timeout
 }
 check_simultaneous_start_even() {
-	check_consistency `get_site 2`
+	check_consistency `get_internal_site 2`
 }
 
 ## TEST: slow_start_granted ##
@@ -910,7 +920,7 @@ test_slow_start_granted() {
 	done
 }
 check_slow_start_granted() {
-	check_consistency `get_site 1`
+	check_consistency `get_internal_site 1`
 }
 
 ## TEST: restart_granted ##
@@ -924,7 +934,7 @@ test_restart_granted() {
 	wait_timeout
 }
 check_restart_granted() {
-	check_consistency `get_site 1`
+	check_consistency `get_internal_site 1`
 }
 
 ## TEST: reload_granted ##
@@ -938,7 +948,7 @@ test_reload_granted() {
 	wait_timeout
 }
 check_reload_granted() {
-	check_consistency `get_site 1`
+	check_consistency `get_internal_site 1`
 }
 
 ## TEST: restart_granted_nocib ##
@@ -956,7 +966,7 @@ test_restart_granted_nocib() {
 	wait_timeout
 }
 check_restart_granted_nocib() {
-	check_consistency `get_site 1`
+	check_consistency `get_internal_site 1`
 }
 
 ## TEST: restart_notgranted ##
@@ -972,7 +982,7 @@ test_restart_notgranted() {
 	wait_timeout
 }
 check_restart_notgranted() {
-	check_consistency `get_site 1`
+	check_consistency `get_internal_site 1`
 }
 
 ## TEST: failover ##
@@ -1040,7 +1050,7 @@ test_split_follower() {
 	wait_timeout
 }
 check_split_follower() {
-	check_consistency `get_site 1`
+	check_consistency `get_internal_site 1`
 }
 
 ## TEST: split_edge ##
@@ -1075,7 +1085,7 @@ test_external_prog_failed() {
 }
 check_external_prog_failed() {
 	check_consistency any &&
-	[ `booth_where_granted` != `get_site 1` ]
+	[ `booth_where_granted` != `get_internal_site 1` ]
 }
 recover_external_prog_failed() {
 	repair_external_prog 1
@@ -1099,7 +1109,7 @@ test_attr_prereq_ok() {
 	wait_timeout
 }
 check_attr_prereq_ok() {
-	check_consistency `get_site 2`
+	check_consistency `get_internal_site 2`
 }
 recover_attr_prereq_ok() {
 	start_site `get_site 1`
@@ -1182,13 +1192,15 @@ is_pacemaker_running || {
 	exit 1
 }
 
-sites=`get_servers site < $cnf`
-arbitrators=`get_servers arbitrator < $cnf`
+sites=`get_extern_ip site < $cnf`
+arbitrators=`get_extern_ip arbitrator < $cnf`
+internal_sites=`get_value site < $cnf`
+internal_arbitrators=`get_value arbitrator < $cnf`
 all_nodes=`get_all_nodes`
 port=`get_value port < $cnf`
 : ${port:=9929}
-site_cnt=`echo $sites | wc -w`
-arbitrator_cnt=`echo $arbitrators | wc -w`
+site_cnt=`echo $internal_sites | wc -w`
+arbitrator_cnt=`echo $internal_arbitrators | wc -w`
 tkt=`get_tkt < $cnf`
 eval `get_tkt_settings`
 
@@ -1204,7 +1216,7 @@ if [ "$1" = "__netem__" ]; then
 	exit
 fi
 
-[ -z "$sites" ] && {
+[ -z "$internal_sites" ] && {
 	echo no sites in $cnf
 	usage 1
 }
