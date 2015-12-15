@@ -284,8 +284,7 @@ static int msg_term_invalid(struct ticket_config *tk,
 	/* §5.1 */
 	if (is_term_invalid(tk, term)) {
 		tk_log_info("got invalid term from %s "
-			"(%d vs. %d), ignoring", site_string(sender),
-			term, tk->last_valid_tk->current_term);
+			"(%d), ignoring", site_string(sender), term);
 		return 1;
 	}
 
@@ -771,7 +770,7 @@ int new_election(struct ticket_config *tk,
 	 * valid or if there was a tie (in that case update_term > 1)
 	 */
 	if ((update_term > 1) ||
-		(update_term && tk->last_valid_tk->current_term && 
+		(update_term && tk->last_valid_tk &&
 			tk->last_valid_tk->current_term >= tk->current_term)) {
 		/* save the previous term, we may need to send out the
 		 * MY_INDEX message */

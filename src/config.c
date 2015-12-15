@@ -211,13 +211,6 @@ static int add_ticket(const char *name, struct ticket_config **tkp,
 	tk = booth_conf->ticket + booth_conf->ticket_count;
 	booth_conf->ticket_count++;
 
-	tk->last_valid_tk = malloc(sizeof(struct ticket_config));
-	if (!tk->last_valid_tk) {
-		log_error("out of memory");
-		return -ENOMEM;
-	}
-	memset(tk->last_valid_tk, 0, sizeof(struct ticket_config));
-
 	if (!check_max_len_valid(name, sizeof(tk->name))) {
 		log_error("ticket name \"%s\" too long.", name);
 		return -EINVAL;

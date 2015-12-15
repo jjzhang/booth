@@ -161,6 +161,19 @@ int ticket_write(struct ticket_config *tk)
 }
 
 
+void save_committed_tkt(struct ticket_config *tk)
+{
+	if (!tk->last_valid_tk) {
+		tk->last_valid_tk = malloc(sizeof(struct ticket_config));
+		if (!tk->last_valid_tk) {
+			log_error("out of memory");
+			return;
+		}
+	}
+	memcpy(tk->last_valid_tk, tk, sizeof(struct ticket_config));
+}
+
+
 static void ext_prog_failed(struct ticket_config *tk,
 		int start_election)
 {
@@ -1305,7 +1318,7 @@ int send_msg (
 
 	if (cmd == OP_MY_INDEX) {
 		if (current_tk->state == ST_CANDIDATE &&
-				current_tk->last_valid_tk->current_term) {
+				current_tk->last_valid_tk) {
 			tk = current_tk->last_valid_tk;
 		}
 		tk_log_info("sending status to %s",

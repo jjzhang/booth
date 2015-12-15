@@ -115,7 +115,7 @@ static inline void init_header(struct boothc_header *h,
 }
 
 #define my_last_term(tk) \
-	(((tk)->state == ST_CANDIDATE && (tk)->last_valid_tk->current_term) ? \
+	(((tk)->state == ST_CANDIDATE && (tk)->last_valid_tk) ? \
 	(tk)->last_valid_tk->current_term : (tk)->current_term)
 
 extern int TIME_RES, TIME_MULT;
