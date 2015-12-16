@@ -664,6 +664,7 @@ runtest() {
 	local rc booth_status dep_rsc_status
 	local start_time end_time
 	local usrmsg
+	rc=0
 	TEST=$1
 	start_time=`date`
 	start_ts=`date +%s`
