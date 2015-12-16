@@ -1307,19 +1307,22 @@ int send_reject(struct booth_site *dest, struct ticket_config *tk,
 
 int send_msg (
 		int cmd,
-		struct ticket_config *current_tk,
+		struct ticket_config *tk,
 		struct booth_site *dest,
 		struct boothc_ticket_msg *in_msg
 	       )
 {
 	int req = 0;
-	struct ticket_config *tk = current_tk;
+	struct ticket_config *valid_tk = tk;
 	struct boothc_ticket_msg msg;
 
+	/* if we want to send the last valid ticket, then if we're in
+	 * the ST_CANDIDATE state, the last valid ticket is in
+	 * tk->last_valid_tk
+	 */
 	if (cmd == OP_MY_INDEX) {
-		if (current_tk->state == ST_CANDIDATE &&
-				current_tk->last_valid_tk) {
-			tk = current_tk->last_valid_tk;
+		if (tk->state == ST_CANDIDATE && tk->last_valid_tk) {
+			valid_tk = tk->last_valid_tk;
 		}
 		tk_log_info("sending status to %s",
 				site_string(dest));
@@ -1328,6 +1331,6 @@ int send_msg (
 	if (in_msg)
 		req = ntohl(in_msg->header.cmd);
 
-	init_ticket_msg(&msg, cmd, req, RLT_SUCCESS, 0, tk);
+	init_ticket_msg(&msg, cmd, req, RLT_SUCCESS, 0, valid_tk);
 	return booth_udp_send_auth(dest, &msg, sendmsglen(&msg));
 }
