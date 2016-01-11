@@ -1001,16 +1001,16 @@ static int read_arguments(int argc, char **argv)
 		op = argv[1];
 		optind = 2;
 		opt_string = ATTR_OPTION_STRING;
-	} else if (strcmp(arg1, "arbitrator") == 0 ||
+	} else if (argc > 1 && (strcmp(arg1, "arbitrator") == 0 ||
 			strcmp(arg1, "site") == 0 ||
 			strcmp(arg1, "start") == 0 ||
-			strcmp(arg1, "daemon") == 0) {
+			strcmp(arg1, "daemon") == 0)) {
 		cl.type = DAEMON;
 		optind = 2;
-	} else if (strcmp(arg1, "status") == 0) {
+	} else if (argc > 1 && (strcmp(arg1, "status") == 0)) {
 		cl.type = STATUS;
 		optind = 2;
-	} else if (strcmp(arg1, "client") == 0) {
+	} else if (argc > 1 && (strcmp(arg1, "client") == 0)) {
 		cl.type = CLIENT;
 		if (argc < 3) {
 			print_usage();
