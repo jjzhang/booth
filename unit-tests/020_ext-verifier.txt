@@ -14,7 +14,7 @@ ticket:
     # but shall start renewal now
     term_expires        time(0) + 1000
     ext_verifier        "test `set|grep ^BOOTH|wc -l` -ge 5"
-    hb_sent_at          time(0) - 10
+    req_sent_at          time(0) - 10
 
 
 
@@ -25,7 +25,7 @@ outgoing0:
 ticket1:
     ext_verifier        'test "$BOOTH_TICKET" == "tick1"'
     # cause re-query of the verifier
-    hb_sent_at          time(0) - 10
+    req_sent_at          time(0) - 10
 
 #
 #gdb1:
@@ -40,7 +40,7 @@ outgoing1:
 ticket2:
     ext_verifier        'test "$BOOTH_TICKET" == "tick2FOO"'
     # cause re-query of the verifier
-    hb_sent_at          time(0) - 10
+    req_sent_at          time(0) - 10
 
 # We just tell the others we don't have it anymore.
 outgoing2:
