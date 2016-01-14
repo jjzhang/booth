@@ -220,7 +220,7 @@ class UT():
                     ]);
 
         logging.info("started booth with PID %d, lockfile %s" % (self.booth.pid, self.lockfile))
-        self.booth.expect("BOOTH site daemon is starting", timeout=2)
+        self.booth.expect("BOOTH site \S+ \(build \S+\) daemon is starting", timeout=2)
         #print self.booth.before; exit
 
         self.gdb = self.start_a_process("gdb",
