@@ -769,7 +769,7 @@ static void process_recv(int ci)
 	 * packet */
 	char buffer[MAX_MSG_LEN];
 	/* Used for unit tests */
-	void *msg;
+	struct boothc_ticket_msg *msg;
 
 
 	sa_len = sizeof(sa);
@@ -781,7 +781,7 @@ static void process_recv(int ci)
 	if (rv == -1)
 		return;
 
-	deliver_fn(msg, rv);
+	deliver_fn((void*)msg, rv);
 }
 
 static int booth_udp_init(void *f)

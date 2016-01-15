@@ -15,14 +15,15 @@ ticket:
 
     # defaults for all tests
     state           ST_INIT
-    next_cron       0
+    next_cron.tv_sec       0
+
 # time(0)+1
     # local is site[0] per convention
 
     leader          booth_conf->site+1
     #owner           booth_conf->site+1
     #expires         time(0)+1
-    term_expires    time(0)+1
+    term_expires.tv_sec    time(0)+1
     #last_ack_ballot 242
 
     leader          0
@@ -51,5 +52,4 @@ message:
     ticket.leader           -1
     ticket.term             0
     ticket.term_valid_for   0
-    ticket.leader_commit    -1
 
