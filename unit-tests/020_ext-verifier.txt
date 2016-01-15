@@ -13,10 +13,11 @@ ticket:
     term_duration       3000
     # but shall start renewal now
     term_expires        time(0) + 1000
-    ext_verifier        "test `set|grep ^BOOTH|wc -l` -ge 5"
     req_sent_at          time(0) - 10
 
 
+gdb0:
+    call parse_extprog("test `set|grep ^BOOTH|wc -l` -ge 5", booth_conf->ticket+0)
 
 outgoing0:
     header.cmd          OP_HEARTBEAT

@@ -471,14 +471,14 @@ class UT():
                 comment = tkt.aux.get("comment", "")
                 logging.info("ticket change %s  (%s:%d)  %s" % (ktkt, fn, self.current_nr, comment))
                 self.set_state(tkt)
+            if gdb:
+                for (k, v) in gdb.iteritems():
+                    self.send_cmd(k + " " + v.replace("§", "\n"))
             if msg:
                 self.current_nr = msg.aux.get("line")
                 comment = msg.aux.get("comment", "")
                 logging.info("sending %s  (%s:%d)  %s" % (kmsg, fn, self.current_nr, comment))
                 self.send_message(self.merge_dicts(data["message"], msg))
-            if gdb:
-                for (k, v) in gdb.iteritems():
-                    self.send_cmd(k + " " + v.replace("§", "\n"))
             if data.has_key(kgdb) and len(gdb) == 0:
                 self.user_debug("manual override")
             if out:
