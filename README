@@ -118,14 +118,18 @@ time so that the followers can update local ticket copies. Ticket
 renewals are configurable and by default set to half ticket
 expire time.
 
-Before ticket renewal, the leader runs an external program if
-such program is set in 'before-acquire-handler'. The external
-program should ensure that the cluster managed service which is
-protected by this ticket can run at this site. If that program
-fails, the leader relinquishes the ticket. It announces its
-intention to step down by broadcasting an unsolicited VOTE_FOR
-with an empty vote. On receiving such RPC other servers start new
-elections to elect a new leader.
+Before ticket renewal, the leader runs one or more external
+programs if such are set in 'before-acquire-handler'. This can
+point either to a file or a directory. In the former case, that
+file is the program, but in the latter there could be a number of
+programs in the specified directory. All files which have the
+executable bit set and whose names don't start with a '.' are
+run sequentially. This program or programs should ensure that the
+cluster managed service which is protected by this ticket can run
+at this site. If any of them fails, the leader relinquishes the
+ticket. It announces its intention to step down by broadcasting
+an unsolicited VOTE_FOR with an empty vote. On receiving such RPC
+other servers start new elections to elect a new leader.
 
 Split brain
 ------------
