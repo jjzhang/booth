@@ -65,11 +65,6 @@ AC_PATH_PROGS(XML2CONFIG, xml2-config)
 
 AM_CONDITIONAL(BUILD_ASCIIDOC, test x"${ASCIIDOC}" != x"")
 
-# Checks for libraries.
-AC_CHECK_LIB([socket], [socket])
-AC_CHECK_LIB([nsl], [t_open])
-AC_CHECK_LIB([gpl], [cl_log])
-
 # libgcrypt or mhash for hmac
 libgcrypt_installed="yes"
 AC_CHECK_HEADERS(gcrypt.h, , [libgcrypt_installed="no"],)
