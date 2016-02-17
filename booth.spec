@@ -28,7 +28,11 @@
 Name:           booth
 Url:            https://github.com/ClusterLabs/booth
 Summary:        Ticket Manager for Multi-site Clusters
+%if 0%{?suse_version}
 License:        GPL-2.0+
+%else
+License:        GPLv2+
+%endif
 Group:          %{pkg_group}
 Version:        1.0
 Release:        0
