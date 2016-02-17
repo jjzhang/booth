@@ -1457,7 +1457,7 @@ static int do_server(int type)
 		return rv;
 
 	if (cl_enable_coredumps(TRUE) < 0){
-		cl_log(LOG_ERR, "enabling core dump failed");
+		log_error("enabling core dump failed");
 	}
 	cl_cdtocoredir();
 	prctl(PR_SET_DUMPABLE, (unsigned long)TRUE, 0UL, 0UL, 0UL);
