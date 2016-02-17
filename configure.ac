@@ -197,7 +197,7 @@ AC_ARG_ENABLE([small-memory-footprint],
 	[ default="no" ])
 
 AC_ARG_WITH([initddir],
-	[  --with-initddir=DIR     : path to init script directory. ],
+	[  --with-initddir=DIR             : path to init script directory. ],
 	[ INITDDIR="$withval" ],
 	[ INITDDIR="$sysconfdir/init.d" ])
 
@@ -205,7 +205,7 @@ test -s .git_info &&
 	GIT_VER="`cat .git_info`"
 
 AC_ARG_WITH([build-version],
-	[  --with-build-version=STR     : build version ],
+	[  --with-build-version=STR        : build version ],
 	[ BOOTH_BUILD_VERSION="$withval" ],
 	[ BOOTH_BUILD_VERSION="${GIT_VER:-$PACKAGE_VERSION}" ])
 
@@ -441,7 +441,7 @@ AC_MSG_RESULT([  System configuration     = ${sysconfdir}])
 AC_MSG_RESULT([  System init.d directory  = ${INITDDIR}])
 AC_MSG_RESULT([  booth config dir         = ${BOOTHSYSCONFDIR}])
 AC_MSG_RESULT([  SOCKETDIR                = ${SOCKETDIR}])
-AC_MSG_RESULT([  Features                 =${PACKAGE_FEATURES}])
+AC_MSG_RESULT([  Features                 = ${PACKAGE_FEATURES}])
 AC_MSG_RESULT([])
 AC_MSG_RESULT([$PACKAGE build info:])
 AC_MSG_RESULT([  Library SONAME           = ${SONAME}])
