@@ -122,9 +122,6 @@ make check
 echo "%%run_build_tests set to %run_build_tests; skipping tests"
 %endif
 
-%clean
-rm -rf %{buildroot}
-
 %files
 %defattr(-,root,root,-)
 %{_sbindir}/booth
