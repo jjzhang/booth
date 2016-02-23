@@ -102,12 +102,12 @@ static int find_address(unsigned char ipaddr[BOOTH_IPADDR_LEN],
 
 
 		if (matched == node->addrlen) {
-			/* Full match. */
+			/* Exact match. */
+exact_match:
 			*address_bits_matched = matched * 8;
-found:
 			*me = node;
 			did_match = EXACT_MATCH;
-			continue;
+			break;
 		}
 
 		if (!fuzzy_allowed)
@@ -120,14 +120,14 @@ found:
 		if (matched * 8 < *address_bits_matched)
 			continue;
 		if (!bits_left)
-			goto found;
+			goto exact_match;
 
 		node_bits = n_a[bytes];
 		ip_bits = ipaddr[bytes];
 		if (((node_bits ^ ip_bits) & mask) == 0) {
 			/* _At_least_ prefixlen bits matched. */
-			*address_bits_matched = prefixlen;
 			if (did_match < EXACT_MATCH) {
+				*address_bits_matched = prefixlen;
 				*me = node;
 				did_match = FUZZY_MATCH;
 			}
