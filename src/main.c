@@ -274,7 +274,7 @@ out:
  */
 static void trim_key()
 {
-	unsigned char *p;
+	char *p;
 	int i;
 
 	for (i=0, p=booth_conf->authkey; i < booth_conf->authkey_len; i++, p++)

@@ -908,7 +908,7 @@ static int get_other_site(struct booth_site **node)
 }
 
 
-int find_site_by_name(unsigned char *site, struct booth_site **node, int any_type)
+int find_site_by_name(char *site, struct booth_site **node, int any_type)
 {
 	struct booth_site *n;
 	int i;
