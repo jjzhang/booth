@@ -244,7 +244,8 @@ static void free_geo_attr(gpointer data)
 	g_free(a);
 }
 
-int store_geo_attr(struct ticket_config *tk, const char *name, char *val, int notime)
+int store_geo_attr(struct ticket_config *tk, const char *name,
+		   const char *val, int notime)
 {
 	struct geo_attr *a;
 	GDestroyNotify free_geo_attr_notify = free_geo_attr;

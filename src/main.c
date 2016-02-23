@@ -1537,7 +1537,7 @@ out:
 int main(int argc, char *argv[], char *envp[])
 {
 	int rv;
-	char *cp;
+	const char *cp;
 
 	init_set_proc_title(argc, argv, envp);
 	get_time(&start_time);
