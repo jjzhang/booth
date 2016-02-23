@@ -256,7 +256,7 @@ static int format_peers(char **pdata, unsigned int *len)
 void list_peers(int fd)
 {
 	char *data;
-	int olen;
+	unsigned int olen;
 	struct boothc_hdr_msg hdr;
 
 	if (format_peers(&data, &olen) < 0)

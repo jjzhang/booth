@@ -564,7 +564,8 @@ int setup_ticket(void)
 int ticket_answer_list(int fd)
 {
 	char *data;
-	int olen, rv;
+	int rv;
+	unsigned int olen;
 	struct boothc_hdr_msg hdr;
 
 	rv = list_ticket(&data, &olen);
