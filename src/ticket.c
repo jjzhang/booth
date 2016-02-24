@@ -25,8 +25,12 @@
 #include <stdio.h>
 #include <assert.h>
 #include <time.h>
-#include <clplumbing/cl_random.h>
 #include "b_config.h"
+#ifndef RANGE2RANDOM_GLIB
+#include <clplumbing/cl_random.h>
+#else
+#include "alt/range2random_glib.h"
+#endif
 #include "ticket.h"
 #include "config.h"
 #include "pacemaker.h"

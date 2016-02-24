@@ -33,5 +33,13 @@ boothd_SOURCES		+= alt/logging_libqb.c
 noinst_HEADERS		+= alt/logging_libqb.h
 endif
 
+if !RANGE2RANDOM_GLIB
+boothd_LDADD		+= -lplumb
+else
+boothd_LDADD		+= $(GLIB_LIBS)
+boothd_SOURCES		+= alt/range2random_glib.c
+noinst_HEADERS		+= alt/range2random_glib.h
+endif
+
 lint:
 	-splint $(INCLUDES) $(LINT_FLAGS) $(CFLAGS) *.c

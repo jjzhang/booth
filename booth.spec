@@ -69,6 +69,8 @@ BuildRequires:  libglue-devel
 %else
 # logging provider
 BuildRequires:  pkgconfig(libqb)
+# random2range provider
+BuildRequires:  pkgconfig(glib-2.0)
 %endif
 BuildRequires:  libxml2-devel
 BuildRequires:  zlib-devel

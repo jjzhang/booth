@@ -245,6 +245,29 @@ libqb)
 esac
 AM_CONDITIONAL([LOGGING_LIBQB], [test "x$logging_provider" = "xlibqb"])
 
+# figure out range2random provider
+range2random_provider=""
+if test "x$range2random_provider" = "x" && test "x$with_glue" = "xyes"; then
+       AC_CHECK_LIB([plumb], [get_next_random], [range2random_provider="libplumb"])
+       AC_CHECK_DECL([cl_rand_from_interval], [], [range2random_provider=""],
+		     [#include <clplumbing/cl_random.h>])
+fi
+if test "x$range2random_provider" = "x" && test "x$with_glue" = "xno"; then
+       AC_CHECK_LIB([glib-2.0], [g_random_int_range], [range2random_provider="glib"])
+fi
+case "$range2random_provider" in
+libplumb)
+	;;
+glib)
+	PKG_CHECK_MODULES([GLIB], [glib-2.0])
+	AC_DEFINE([RANGE2RANDOM_GLIB], [], [use glib as a range2random provider])
+	;;
+*)
+	AC_MSG_ERROR([range2random provider required (libplumb, or glib when --without-glue)])
+	;;
+esac
+AM_CONDITIONAL([RANGE2RANDOM_GLIB], [test "x$range2random_provider" = "xglib"])
+
 # OS detection
 # THIS SECTION MUST DIE!
 CP=cp
@@ -474,6 +497,7 @@ AC_MSG_RESULT([  booth config dir         = ${BOOTHSYSCONFDIR}])
 AC_MSG_RESULT([  SOCKETDIR                = ${SOCKETDIR}])
 AC_MSG_RESULT([  Features                 = ${PACKAGE_FEATURES}])
 AC_MSG_RESULT([  Logging provider         = ${logging_provider}])
+AC_MSG_RESULT([  Range2random provider    = ${range2random_provider}])
 AC_MSG_RESULT([])
 AC_MSG_RESULT([$PACKAGE build info:])
 AC_MSG_RESULT([  Library SONAME           = ${SONAME}])
