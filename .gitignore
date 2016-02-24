@@ -44,3 +44,5 @@ tools/booth_resource_monitord
 docs/boothd.8*
 
 doxygen
+
+/conf/booth*.service.in

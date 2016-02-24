@@ -71,6 +71,8 @@ BuildRequires:  libglue-devel
 BuildRequires:  pkgconfig(libqb)
 # random2range provider
 BuildRequires:  pkgconfig(glib-2.0)
+# nametag provider
+BuildRequires:  pkgconfig(libsystemd)
 %endif
 BuildRequires:  libxml2-devel
 BuildRequires:  zlib-devel

@@ -145,7 +145,9 @@ AC_CHECK_FUNCS([alarm alphasort atexit bzero dup2 endgrent endpwent fcntl \
 
 AC_CONFIG_FILES([Makefile
 		 src/Makefile
-		 docs/Makefile])
+		 docs/Makefile
+		 conf/Makefile])
+AC_CONFIG_FILES([conf/booth-arbitrator.service conf/booth@.service])
 
 # ===============================================
 # Helpers
@@ -267,6 +269,30 @@ glib)
 	;;
 esac
 AM_CONDITIONAL([RANGE2RANDOM_GLIB], [test "x$range2random_provider" = "xglib"])
+
+# figure out nametag/distinguished-role provider
+nametag_provider=""
+if test "x$nametag_provider" = "x" && test "x$with_glue" != "xno"; then
+       AC_CHECK_LIB([plumbgpl], [set_proc_title], [nametag_provider="libplumbgpl"])
+fi
+if test "x$nametag_provider" = "x" && test "x$with_glue" = "xno"; then
+       AC_CHECK_LIB([systemd], [sd_notify], [nametag_provider="libsystemd"])
+fi
+NOTIFY_ACCESS_SWITCH='# '
+case "$nametag_provider" in
+libplumbgpl)
+	;;
+libsystemd)
+	PKG_CHECK_MODULES([LIBSYSTEMD], [libsystemd])
+	AC_DEFINE([NAMETAG_LIBSYSTEMD], [], [use libsystemd as a nametag provider])
+	NOTIFY_ACCESS_SWITCH=
+	;;
+*)
+	AC_MSG_ERROR([nametag provider required (libplumbgpl, or libsystemd when --without-glue)])
+	;;
+esac
+AM_CONDITIONAL([NAMETAG_LIBSYSTEMD], [test "x$nametag_provider" = "xlibsystemd"])
+AC_SUBST([NOTIFY_ACCESS_SWITCH])
 
 # OS detection
 # THIS SECTION MUST DIE!
@@ -498,6 +524,7 @@ AC_MSG_RESULT([  SOCKETDIR                = ${SOCKETDIR}])
 AC_MSG_RESULT([  Features                 = ${PACKAGE_FEATURES}])
 AC_MSG_RESULT([  Logging provider         = ${logging_provider}])
 AC_MSG_RESULT([  Range2random provider    = ${range2random_provider}])
+AC_MSG_RESULT([  Nametag provider         = ${nametag_provider}])
 AC_MSG_RESULT([])
 AC_MSG_RESULT([$PACKAGE build info:])
 AC_MSG_RESULT([  Library SONAME           = ${SONAME}])

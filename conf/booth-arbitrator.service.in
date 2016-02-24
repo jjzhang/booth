@@ -12,5 +12,5 @@ WantedBy=multi-user.target
 
 [Service]
 Type=simple
+@NOTIFY_ACCESS_SWITCH@NotifyAccess=main
 ExecStart=/usr/sbin/boothd daemon -S -c /etc/booth/booth.conf
-

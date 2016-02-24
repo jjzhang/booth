@@ -34,7 +34,6 @@
 #include <sys/poll.h>
 #include <sys/wait.h>
 #include <pacemaker/crm/services.h>
-#include <clplumbing/setproctitle.h>
 #include <sys/prctl.h>
 #include <clplumbing/coredumps.h>
 #include <fcntl.h>
@@ -49,6 +48,11 @@
 #include <arpa/inet.h>
 #include <sys/types.h>
 #include "b_config.h"
+#ifndef NAMETAG_LIBSYSTEMD
+#include <clplumbing/setproctitle.h>
+#else
+#include "alt/nametag_libsystemd.h"
+#endif
 #include "log.h"
 #include "booth.h"
 #include "config.h"

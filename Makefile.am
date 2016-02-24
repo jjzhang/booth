@@ -72,7 +72,7 @@ sbin_SCRIPTS		= script/booth-keygen
 
 TESTS			= test/runtests.py
 
-SUBDIRS			= src docs
+SUBDIRS			= src docs conf
 
 coverity:
 	cov-build --dir=cov make
