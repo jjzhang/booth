@@ -61,8 +61,7 @@ static int ticket_realloc(void)
 }
 
 
-int add_site(char *address, int type);
-int add_site(char *addr_string, int type)
+static int add_site(char *addr_string, int type)
 {
 	int rv;
 	struct booth_site *site;
