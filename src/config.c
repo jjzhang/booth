@@ -75,7 +75,8 @@ static int add_site(char *addr_string, int type)
 		log_error("too many nodes");
 		goto out;
 	}
-	if (strlen(addr_string)+1 >= sizeof(booth_conf->site[0].addr_string)) {
+	if (strnlen(addr_string, sizeof(booth_conf->site[0].addr_string))
+			>= sizeof(booth_conf->site[0].addr_string)) {
 		log_error("site address \"%s\" too long", addr_string);
 		goto out;
 	}
@@ -86,7 +87,7 @@ static int add_site(char *addr_string, int type)
 	site->type = type;
 	/* Make site_id start at a non-zero point.
 	 * Perhaps use hash over string or address? */
-	strcpy(site->addr_string, addr_string);
+	strncpy(site->addr_string, addr_string, sizeof(site->addr_string));
 
 
 	site->index = booth_conf->site_count;
@@ -922,7 +923,7 @@ int find_site_by_name(char *site, struct booth_site **node, int any_type)
 	for (i = 0; i < booth_conf->site_count; i++) {
 		n = booth_conf->site + i;
 		if ((n->type == SITE || any_type) &&
-		    strcmp(n->addr_string, site) == 0) {
+		    strncmp(n->addr_string, site, sizeof(n->addr_string)) == 0) {
 			*node = n;
 			return 1;
 		}

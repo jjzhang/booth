@@ -746,7 +746,8 @@ static int do_command(cmd_request_t cmd)
 	if (!cl.msg.ticket.id[0]) {
 		/* If the loaded configuration has only a single ticket defined, use that. */
 		if (booth_conf->ticket_count == 1) {
-			strcpy(cl.msg.ticket.id, booth_conf->ticket[0].name);
+			strncpy(cl.msg.ticket.id, booth_conf->ticket[0].name,
+				sizeof(cl.msg.ticket.id));
 		} else {
 			log_error("No ticket given.");
 			goto out_close;
@@ -1510,7 +1511,8 @@ static int do_attr(void)
 	if (!cl.attr_msg.attr.tkt_id[0]) {
 		/* If the loaded configuration has only a single ticket defined, use that. */
 		if (booth_conf->ticket_count == 1) {
-			strcpy(cl.attr_msg.attr.tkt_id, booth_conf->ticket[0].name);
+			strncpy(cl.attr_msg.attr.tkt_id, booth_conf->ticket[0].name,
+				sizeof(cl.attr_msg.attr.tkt_id));
 		} else {
 			rv = 1;
 			log_error("No ticket given.");

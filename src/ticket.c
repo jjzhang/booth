@@ -59,7 +59,8 @@ int find_ticket_by_name(const char *ticket, struct ticket_config **found)
 		*found = NULL;
 
 	for (i = 0; i < booth_conf->ticket_count; i++) {
-		if (!strcmp(booth_conf->ticket[i].name, ticket)) {
+		if (!strncmp(booth_conf->ticket[i].name, ticket,
+			     sizeof(booth_conf->ticket[i].name))) {
 			if (found)
 				*found = booth_conf->ticket + i;
 			return 1;
