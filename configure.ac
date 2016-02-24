@@ -64,6 +64,8 @@ AC_PATH_PROGS(ASCIIDOC, asciidoc)
 AC_PATH_PROGS(XML2CONFIG, xml2-config)
 
 AM_CONDITIONAL(BUILD_ASCIIDOC, test x"${ASCIIDOC}" != x"")
+AM_CONDITIONAL(BUILD_ASCIIDOC_HTML_MAN,
+	       test "x${ASCIIDOC}" != "x" && test "x$with_html_man" = "xyes")
 
 # libgcrypt or mhash for hmac
 libgcrypt_installed="yes"
@@ -208,6 +210,9 @@ AC_ARG_WITH([build-version],
 	[  --with-build-version=STR        : build version ],
 	[ BOOTH_BUILD_VERSION="$withval" ],
 	[ BOOTH_BUILD_VERSION="${GIT_VER:-$PACKAGE_VERSION}" ])
+
+AC_ARG_WITH([html_man],
+	[  --without-html_man              : Avoid generating man pages in HTML.])
 
 # OS detection
 # THIS SECTION MUST DIE!

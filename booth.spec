@@ -1,3 +1,5 @@
+%bcond_with html_man
+
 %if 0%{?suse_version}
 %global booth_docdir %{_defaultdocdir}/%{name}
 %else
@@ -67,7 +69,8 @@ Pacemaker.
 ./autogen.sh
 %configure \
 	--with-initddir=%{_initrddir} \
-	--docdir=%{booth_docdir}
+	--docdir=%{booth_docdir} \
+	%{!?with_html_man:--without-html_man}
 
 make
 
