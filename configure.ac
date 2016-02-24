@@ -209,10 +209,6 @@ AC_ARG_WITH([build-version],
 	[ BOOTH_BUILD_VERSION="$withval" ],
 	[ BOOTH_BUILD_VERSION="${GIT_VER:-$PACKAGE_VERSION}" ])
 
-AC_ARG_ENABLE([resource-monitor],
-	[  --enable-resource-monitor       : Enabling Resource Monitor ],
-	[ default="no" ])
-
 # OS detection
 # THIS SECTION MUST DIE!
 CP=cp
