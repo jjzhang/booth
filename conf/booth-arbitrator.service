@@ -1,0 +1,16 @@
+#  This file is part of Booth.
+
+[Unit]
+Description=Booth - Ticket Manager for Pacemaker Clusters
+Documentation=man:boothd(8)
+After=network-online.target
+ConditionFileNotEmpty=/etc/booth/booth.conf
+Conflicts=pacemaker.service
+
+[Install]
+WantedBy=multi-user.target
+
+[Service]
+Type=simple
+ExecStart=/usr/sbin/boothd daemon -S -c /etc/booth/booth.conf
+

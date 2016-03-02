@@ -86,6 +86,7 @@ ln %{buildroot}/%{_mandir}/man8/booth.8.gz %{buildroot}/%{_mandir}/man8/boothd.8
 # systemd
 mkdir -p %{buildroot}/%{_unitdir}
 cp -a conf/booth@.service %{buildroot}/%{_unitdir}/booth@.service
+cp -a conf/booth-arbitrator.service %{buildroot}/%{_unitdir}/booth-arbitrator.service
 ln -s /usr/sbin/service %{buildroot}%{_sbindir}/rcbooth-arbitrator
 %else
 # sysV init
@@ -148,6 +149,7 @@ rm -rf %{buildroot}
 
 %if %{defined _unitdir}
 %{_unitdir}/booth@.service
+%{_unitdir}/booth-arbitrator.service
 %exclude %{_initddir}/booth-arbitrator
 %else
 %{_initddir}/booth-arbitrator
