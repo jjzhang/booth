@@ -4,7 +4,8 @@
 Description=Booth - Ticket Manager for Pacemaker Clusters
 Documentation=man:boothd(8)
 After=network-online.target
-ConditionFileExists=/etc/booth/%i.conf
+ConditionFileNotEmpty=/etc/booth/%i.conf
+Conflicts=pacemaker.service
 
 [Install]
 Alias=boothd
@@ -12,6 +13,5 @@ WantedBy=multi-user.target
 
 [Service]
 Type=simple
-Conflicts=pacemaker.service
 ExecStart=/usr/sbin/boothd daemon -S -c %i
 
