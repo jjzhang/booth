@@ -66,7 +66,7 @@ bootharbitrator_SCRIPTS	= script/lsb/booth-arbitrator
 
 boothnoarchdir		= $(datadir)/$(PACKAGE_NAME)
 
-boothnoarch_SCRIPTS	= script/service-runnable
+nodist_boothnoarch_SCRIPTS = script/service-runnable
 
 sbin_SCRIPTS		= script/booth-keygen
 

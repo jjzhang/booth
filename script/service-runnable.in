@@ -6,12 +6,12 @@
 
 service="${1:?Need a resource name as first argument.}"
 if [ -z "$service" ]; then
-	ha_logger "$0: bad usage: no resource name"
+	@LOGGER@ "$0: bad usage: no resource name"
 	exit 1
 fi
 tmpshadow=`mktemp booth-check.XXXXXX`
 if [ $? -ne 0 -o ! -f "$tmpshadow" ]; then
-	ha_logger "$0: mktemp failed"
+	@LOGGER@ "$0: mktemp failed"
 	exit 1
 fi
 
@@ -19,12 +19,12 @@ trap "rm -f $tmpshadow" EXIT
 
 
 # We expect an output like
-#   p_dummy        (ocf::pacemaker:Dummy): Started geo-rz2-a 
+#   p_dummy        (ocf::pacemaker:Dummy): Started geo-rz2-a
 
 status=`crm_simulate -O $tmpshadow --ticket-grant "$BOOTH_TICKET" --simulate --live-check 2>&1`
 if [ $? -ne 0 ]; then
-	ha_logger "$0: crm_simulate failed"
-	ha_logger "$0: crm_simulate: $status"
+	@LOGGER@ "$0: crm_simulate failed"
+	@LOGGER@ "$0: crm_simulate: $status"
 	exit 1
 fi
 
@@ -55,8 +55,7 @@ fi
 #
 # disallow ms-resources, ie. only primitives wanted here
 if ! crm_resource -l | grep -v ":" | grep "$service" ; then
-	ha_logger "Defined resource '$service' in $BOOTH_CONF_PATH is not a primitive??"
+	@LOGGER@ "Defined resource '$service' in $BOOTH_CONF_PATH is not a primitive??"
 fi
 
 exit 1
-

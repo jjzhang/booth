@@ -149,6 +149,8 @@ AC_CONFIG_FILES([Makefile
 		 conf/Makefile])
 AC_CONFIG_FILES([conf/booth-arbitrator.service conf/booth@.service])
 
+AC_CONFIG_FILES([script/service-runnable], [chmod +x script/service-runnable])
+
 # ===============================================
 # Helpers
 # ===============================================
@@ -232,6 +234,7 @@ if test "x$logging_provider" = "x" && test "x$with_glue" = "xno"; then
 fi
 case "$logging_provider" in
 libplumb)
+	LOGGER="ha_logger"
 	;;
 libqb)
 	PKG_CHECK_MODULES([LIBQB], [libqb])
@@ -240,12 +243,14 @@ libqb)
 			  [AC_DEFINE([LOGGING_LIBQB_MAJOR], [1],
 				     [libqb major version lower bound])],
 			  [AC_MSG_WARN([[syslog identifier will not get changed]])])
+	LOGGER="logger -t booth-script"
 	;;
 *)
 	AC_MSG_ERROR([logging provider required (libplumb, or libqb when --without-glue)])
 	;;
 esac
 AM_CONDITIONAL([LOGGING_LIBQB], [test "x$logging_provider" = "xlibqb"])
+AC_SUBST([LOGGER])
 
 # figure out range2random provider
 range2random_provider=""
