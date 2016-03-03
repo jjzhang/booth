@@ -71,7 +71,7 @@ int run_handler(struct ticket_config *tk)
 	int rv = 0;
 	pid_t pid;
 
-	if (!tk_test.prog)
+	if (!tk_test.path)
 		return 0;
 
 	switch(pid=fork()) {
@@ -83,8 +83,8 @@ int run_handler(struct ticket_config *tk)
 			exit(1);
 		}
 		closefiles(); /* don't leak open files */
-		execv(tk_test.prog, tk_test.argv);
-		tk_log_error("%s: execv failed (%s)", tk_test.prog, strerror(errno));
+		execv(tk_test.path, tk_test.argv);
+		tk_log_error("%s: execv failed (%s)", tk_test.path, strerror(errno));
 		exit(1);
 	default: /* parent */
 		tk_test.pid = pid;

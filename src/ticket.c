@@ -209,7 +209,7 @@ static int run_external_prog(struct ticket_config *tk,
 		/* immediately returned with success */
 		break;
 	case RUNCMD_MORE:
-		tk_log_debug("forked %s", tk_test.prog);
+		tk_log_debug("forked %s", tk_test.path);
 		break;
 	default:
 		break;
@@ -231,12 +231,12 @@ static int test_exit_status(struct ticket_config *tk,
 	}
 	if (rv) {
 		tk_log_warn("handler \"%s\" failed: %s",
-			tk_test.prog, interpret_rv(status));
+			tk_test.path, interpret_rv(status));
 		tk_log_warn("we are not allowed to acquire ticket");
 		ext_prog_failed(tk, start_election);
 	} else {
 		tk_log_debug("handler \"%s\" exited with success",
-			tk_test.prog);
+			tk_test.path);
 	}
 	tk_test.pid = 0;
 	tk_test.progstate = EXTPROG_IDLE;
@@ -292,7 +292,7 @@ static int do_ext_prog(struct ticket_config *tk,
 {
 	int rv = 0;
 
-	if (!tk_test.prog)
+	if (!tk_test.path)
 		return 0;
 
 	switch(tk_test.progstate) {
@@ -378,7 +378,7 @@ int do_grant_ticket(struct ticket_config *tk, int options)
 
 static void ignore_extprog(struct ticket_config *tk)
 {
-	if (tk_test.prog && tk_test.pid >= 0 &&
+	if (tk_test.path && tk_test.pid >= 0 &&
 			tk_test.progstate == EXTPROG_RUNNING) {
 		tk_test.progstate = EXTPROG_IGNORE;
 		(void)kill(tk_test.pid, SIGTERM);
