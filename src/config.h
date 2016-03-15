@@ -98,6 +98,7 @@ struct ticket_config {
 	 * acquire the ticket */
 	struct clu_test {
 		char *path;
+		int is_dir;
 		char *argv[MAX_ARGS];
 		pid_t pid;
 		int status; /* child exit status */

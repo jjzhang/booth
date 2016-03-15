@@ -509,7 +509,7 @@ int read_config(const char *path, int type)
 	strcpy(booth_conf->arb_group,  "nobody");
 
 	parse_weights("", defaults.weight);
-	defaults.clu_test.prog  = NULL;
+	defaults.clu_test.path  = NULL;
 	defaults.clu_test.pid  = 0;
 	defaults.clu_test.status  = 0;
 	defaults.clu_test.progstate  = EXTPROG_IDLE;

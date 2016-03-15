@@ -190,59 +190,6 @@ static void ext_prog_failed(struct ticket_config *tk,
 	}
 }
 
-/* Ask an external program whether getting the ticket
- * makes sense.
-* Eg. if the services have a failcount of INFINITY,
-* we can't serve here anyway. */
-static int run_external_prog(struct ticket_config *tk,
-		int start_election)
-{
-	int rv;
-
-	rv = run_handler(tk);
-	switch (rv) {
-	case RUNCMD_ERR:
-		tk_log_warn("couldn't run external test, not allowed to acquire ticket");
-		ext_prog_failed(tk, start_election);
-		break;
-	case 0:
-		/* immediately returned with success */
-		break;
-	case RUNCMD_MORE:
-		tk_log_debug("forked %s", tk_test.path);
-		break;
-	default:
-		break;
-	}
-
-	return rv;
-}
-
-static int test_exit_status(struct ticket_config *tk,
-		int start_election)
-{
-	int rv = -1, status;
-
-	status = tk_test.status;
-	if (WIFEXITED(status)) {
-		rv = WEXITSTATUS(status);
-	} else if (WIFSIGNALED(status)) {
-		rv = 128 + WTERMSIG(status);
-	}
-	if (rv) {
-		tk_log_warn("handler \"%s\" failed: %s",
-			tk_test.path, interpret_rv(status));
-		tk_log_warn("we are not allowed to acquire ticket");
-		ext_prog_failed(tk, start_election);
-	} else {
-		tk_log_debug("handler \"%s\" exited with success",
-			tk_test.path);
-	}
-	tk_test.pid = 0;
-	tk_test.progstate = EXTPROG_IDLE;
-	return rv;
-}
-
 #define attr_found(geo_ap, ap) \
 	((geo_ap) && !strcmp((geo_ap)->val, (ap)->attr_val))
 
@@ -297,14 +244,21 @@ static int do_ext_prog(struct ticket_config *tk,
 
 	switch(tk_test.progstate) {
 	case EXTPROG_IDLE:
-		rv = run_external_prog(tk, start_election);
+		rv = run_handler(tk);
+		if (rv == RUNCMD_ERR) {
+			tk_log_warn("couldn't run external test, not allowed to acquire ticket");
+			ext_prog_failed(tk, start_election);
+		}
 		break;
 	case EXTPROG_RUNNING:
 		/* should never get here, but just in case */
 		rv = RUNCMD_MORE;
 		break;
 	case EXTPROG_EXITED:
-		rv = test_exit_status(tk, start_election);
+		rv = tk_test_exit_status(tk);
+		if (rv) {
+			ext_prog_failed(tk, start_election);
+		}
 		break;
 	case EXTPROG_IGNORE:
 		/* nothing to do here */
@@ -376,15 +330,6 @@ int do_grant_ticket(struct ticket_config *tk, int options)
 	}
 }
 
-static void ignore_extprog(struct ticket_config *tk)
-{
-	if (tk_test.path && tk_test.pid >= 0 &&
-			tk_test.progstate == EXTPROG_RUNNING) {
-		tk_test.progstate = EXTPROG_IGNORE;
-		(void)kill(tk_test.pid, SIGTERM);
-	}
-}
-
 static void start_revoke_ticket(struct ticket_config *tk)
 {
 	tk_log_info("revoking ticket");
@@ -392,7 +337,6 @@ static void start_revoke_ticket(struct ticket_config *tk)
 	save_committed_tkt(tk);
 	reset_ticket(tk);
 	set_leader(tk, no_leader);
-	ignore_extprog(tk);
 	ticket_write(tk);
 	ticket_broadcast(tk, OP_REVOKE, OP_ACK, RLT_SUCCESS, OR_ADMIN);
 }
@@ -497,6 +441,7 @@ int disown_if_expired(struct ticket_config *tk)
 
 void reset_ticket(struct ticket_config *tk)
 {
+	ignore_ext_test(tk);
 	disown_ticket(tk);
 	no_resends(tk);
 	set_state(tk, ST_INIT);

@@ -25,6 +25,9 @@ enum {
 };
 
 int run_handler(struct ticket_config *tk);
+int tk_test_exit_status(struct ticket_config *tk);
+void ignore_ext_test(struct ticket_config *tk);
+void wait_child(int sig);
 
 
 #endif
