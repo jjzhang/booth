@@ -1,3 +1,8 @@
+* Mar Jan 16 2016 Dejan Muhamedagic <dmuhamedagic@suse.com> and others
+- stable release 1.0
+- systemd: add booth-arbitrator.service (bsc#967036)
+- main: improve address matching procedure
+
 * Mon Jan 11 2016 Dejan Muhamedagic <dmuhamedagic@suse.com> and others
 - release candidate 1.0 rc1
 - main: prevent segfault on no arguments

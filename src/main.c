@@ -59,7 +59,7 @@
 #include "request.h"
 #include "attr.h"
 
-#define RELEASE_VERSION		"0.2.0"
+#define RELEASE_VERSION		"1.0"
 #define RELEASE_STR 	RELEASE_VERSION " (build " BOOTH_BUILD_VERSION ")"
 
 #define CLIENT_NALLOC		32

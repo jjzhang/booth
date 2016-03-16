@@ -29,7 +29,7 @@ Summary:        Ticket Manager for Multi-site Clusters
 License:        GPL-2.0+
 Group:          %{pkg_group}
 Version:        1.0
-Release:        rc1
+Release:        0
 Source:         booth.tar.bz2
 Source1:        %name-rpmlintrc
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build

@@ -4,7 +4,7 @@
 # bootstrap / init
 AC_PREREQ([2.61])
 
-AC_INIT([booth], [1.0-0-rc1], [users@clusterlabs.org])
+AC_INIT([booth], [1.0], [users@clusterlabs.org])
 
 AM_INIT_AUTOMAKE([-Wno-portability])
 
