@@ -161,23 +161,6 @@ rm -rf %{buildroot}
 %doc AUTHORS README COPYING
 %doc README.upgrade-from-v0.1
 
-# this should be preun, but...
-%pre
-# new installation?
-test -x %{_sbindir}/booth || exit 0
-# stop the arbitrator if it's the previous paxos version 1.0
-if [ "`booth version | awk '{print $2}'`" = "1.0" ]; then
-	echo "booth v0.1 found"
-	if grep -qs 'ticket.*;' /etc/booth/booth.conf; then
-		echo "Convert the booth configuration in /etc/booth/booth.conf!"
-	fi
-	if ps -o pid,cmd -e | grep -qs "[b]oothd arbitrator"; then
-		rcbooth-arbitrator stop
-	fi
-fi
-exit 0
-
-
 %package test
 Summary:        Test scripts for Booth
 Group:          %{pkg_group}
