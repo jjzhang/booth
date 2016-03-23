@@ -888,8 +888,13 @@ static void ticket_lost(struct ticket_config *tk)
 	if (tk->leader != local) {
 		tk_log_warn("lost at %s", site_string(tk->leader));
 	} else {
-		tk_log_warn("lost majority (revoking locally)");
-		reason = tk->election_reason ? tk->election_reason : OR_REACQUIRE;
+		if (is_ext_prog_running(tk)) {
+			ext_prog_timeout(tk);
+			reason = OR_LOCAL_FAIL;
+		} else {
+			tk_log_warn("lost majority (revoking locally)");
+			reason = tk->election_reason ? tk->election_reason : OR_REACQUIRE;
+		}
 	}
 
 	tk->lost_leader = tk->leader;

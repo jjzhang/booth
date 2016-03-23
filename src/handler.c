@@ -161,11 +161,21 @@ static void ignore_rest(int sig)
 	}
 }
 
-void ignore_ext_test(struct ticket_config *tk)
+void ext_prog_timeout(struct ticket_config *tk)
+{
+	tk_log_warn("handler timed out");
+}
+
+int is_ext_prog_running(struct ticket_config *tk)
 {
 	if (!tk_test.path)
-		return;
-	if (tk_test.pid > 0 && tk_test.progstate == EXTPROG_RUNNING) {
+		return 0;
+	return (tk_test.pid > 0 && tk_test.progstate == EXTPROG_RUNNING);
+}
+
+void ignore_ext_test(struct ticket_config *tk)
+{
+	if (is_ext_prog_running(tk)) {
 		(void)kill(tk_test.pid, SIGTERM);
 		tk_test.progstate = EXTPROG_IGNORE;
 	}
