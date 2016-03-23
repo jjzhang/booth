@@ -97,7 +97,8 @@ struct ticket_config {
 	/* Program to ask whether it makes sense to
 	 * acquire the ticket */
 	struct clu_test {
-		char *prog;
+		char *path;
+		int is_dir;
 		char *argv[MAX_ARGS];
 		pid_t pid;
 		int status; /* child exit status */

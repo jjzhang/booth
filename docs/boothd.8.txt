@@ -282,10 +282,10 @@ The default is '0'.
 If the network reliability is often reduced over prolonged
 periods, it is advisable to try to renew more often.
 +
-Before every renewal, if defined, the command specified in
-'before-acquire-handler' is run. In that case the 'renewal-freq'
-parameter is effectively also the local cluster monitoring
-interval.
+Before every renewal, if defined, the command or commands
+specified in 'before-acquire-handler' is run. In that case the
+'renewal-freq' parameter is effectively also the local cluster
+monitoring interval.
 
 *'timeout'*::
 	After that time 'booth' will re-send packets if there was an
@@ -314,9 +314,11 @@ Default is '0' for all; this means that the order in the configuration
 file defines priority for conflicting requests.
 
 *'before-acquire-handler'*::
-	If set, this command will be called before 'boothd' tries to
-	acquire or renew a ticket. On exit code other than 0,
-	'boothd' relinquishes the ticket.
+	If set, this parameter specifies either a file containing a
+	program to be run or a directory where a number of programs
+	can reside. They are invoked before 'boothd' tries to acquire
+	or renew a ticket. If any of them exits with a code other
+	than 0, 'boothd' relinquishes the ticket.
 +
 Thus it is possible to ensure whether the services and its
 dependencies protected by the ticket are in good shape at this
@@ -324,6 +326,10 @@ site. For instance, if a service in the dependency-chain has a
 failcount of 'INFINITY' on all available nodes, the service will
 be unable to run. In that case, it is of no use to claim the
 ticket.
++
+One or more arguments may follow the program or directory
+location. Typically, there is at least the name of one of
+the resources which depend on this ticket.
 +
 See below for details about booth specific environment variables.
 The distributed 'service-runnable' script is an example which may

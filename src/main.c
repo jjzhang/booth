@@ -58,6 +58,7 @@
 #include "ticket.h"
 #include "request.h"
 #include "attr.h"
+#include "handler.h"
 
 #define RELEASE_VERSION		"1.0"
 #define RELEASE_STR 	RELEASE_VERSION " (build " BOOTH_BUILD_VERSION ")"
@@ -1394,31 +1395,6 @@ static void sig_exit_handler(int sig)
 {
 	log_info("caught signal %d", sig);
 	exit(0);
-}
-
-static void wait_child(int sig)
-{
-	int i, status;
-	struct ticket_config *tk;
-
-	/* use waitpid(2) and not wait(2) in order not to interfear
-	 * with popen(2)/pclose(2) and system(2) used in pacemaker.c
-	 */
-	foreach_ticket(i, tk) {
-		if (tk_test.prog && tk_test.pid >= 0 &&
-				(tk_test.progstate == EXTPROG_RUNNING ||
-				tk_test.progstate == EXTPROG_IGNORE) &&
-				waitpid(tk_test.pid, &status, WNOHANG) == tk_test.pid) {
-			if (tk_test.progstate == EXTPROG_IGNORE) {
-				/* not interested in the outcome */
-				tk_test.pid = 0;
-				tk_test.progstate = EXTPROG_IDLE;
-			} else {
-				tk_test.status = status;
-				tk_test.progstate = EXTPROG_EXITED;
-			}
-		}
-	}
 }
 
 static int do_server(int type)
