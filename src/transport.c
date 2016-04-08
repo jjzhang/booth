@@ -100,10 +100,7 @@ static int find_address(unsigned char ipaddr[BOOTH_IPADDR_LEN],
 			if (ipaddr[matched] != n_a[matched])
 				break;
 
-
 		if (matched == node->addrlen) {
-			/* Exact match. */
-exact_match:
 			*address_bits_matched = matched * 8;
 			*me = node;
 			did_match = EXACT_MATCH;
@@ -119,8 +116,6 @@ exact_match:
 			continue;
 		if (matched * 8 < *address_bits_matched)
 			continue;
-		if (!bits_left)
-			goto exact_match;
 
 		node_bits = n_a[bytes];
 		ip_bits = ipaddr[bytes];
