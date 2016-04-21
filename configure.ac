@@ -104,6 +104,9 @@ AC_CHECK_HEADERS([arpa/inet.h fcntl.h limits.h netdb.h netinet/in.h stdint.h \
 		  sys/sockio.h utmpx.h])
 AC_CHECK_HEADERS(heartbeat/glue_config.h)
 AC_CHECK_HEADERS(mhash.h)
+AC_CHECK_HEADER([zlib.h],
+		[AC_SUBST(ZLIB_LIBS, ["-lz"])],
+		[AC_MSG_ERROR([zlib development files required])])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
