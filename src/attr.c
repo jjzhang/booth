@@ -17,7 +17,9 @@
  */
 
 #include <stdio.h>
+#include <string.h>
 #include "attr.h"
+#include "booth.h"
 #include "ticket.h"
 #include "pacemaker.h"
 
@@ -265,18 +267,26 @@ int store_geo_attr(struct ticket_config *tk, const char *name,
 		return -1;
 	}
 
-	a = (struct geo_attr *)calloc(1, sizeof(struct geo_attr));
-	if (!a) {
-		log_error("out of memory");
-		return -1;
+	if (strnlen(name, BOOTH_NAME_LEN) == BOOTH_NAME_LEN)
+		log_warn("name of the attribute too long (%d+ bytes), skipped",
+			 BOOTH_NAME_LEN);
+	else if (strnlen(val, BOOTH_ATTRVAL_LEN) == BOOTH_ATTRVAL_LEN)
+		log_warn("value of the attribute too long (%d+ bytes), skipped",
+			 BOOTH_ATTRVAL_LEN);
+	else {
+		a = (struct geo_attr *)calloc(1, sizeof(struct geo_attr));
+		if (!a) {
+			log_error("out of memory");
+			return -1;
+		}
+
+		a->val = g_strdup(val);
+		if (!notime)
+			get_time(&a->update_ts);
+
+		g_hash_table_insert(tk->attr,
+			g_strdup(name), a);
 	}
-
-	a->val = g_strdup(val);
-	if (!notime)
-		get_time(&a->update_ts);
-
-	g_hash_table_insert(tk->attr,
-		g_strndup(name, BOOTH_NAME_LEN), a);
 
 	return 0;
 }
