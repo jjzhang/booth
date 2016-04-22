@@ -197,10 +197,6 @@ AC_ARG_ENABLE([coverage],
 	[  --enable-coverage               : coverage analysis of the codebase. ],
 	[ default="no" ])
 
-AC_ARG_ENABLE([small-memory-footprint],
-	[  --enable-small-memory-footprint : Use small message queues and small messages sizes. ],
-	[ default="no" ])
-
 AC_ARG_WITH([initddir],
 	[  --with-initddir=DIR             : path to init script directory. ],
 	[ INITDDIR="$withval" ],
@@ -360,12 +356,10 @@ if test "x${enable_coverage}" = xyes && \
 	OPT_CFLAGS="-O0"
 	COVERAGE_CFLAGS="-ftest-coverage -fprofile-arcs"
 	COVERAGE_LDFLAGS="-ftest-coverage -fprofile-arcs"
-	COVERAGE_LCRSO_EXTRA_LDFLAGS="-rdynamic"
 	PACKAGE_FEATURES="$PACKAGE_FEATURES coverage"
 else
 	COVERAGE_CFLAGS=""
 	COVERAGE_LDFLAGS=""
-	COVERAGE_LCRSO_EXTRA_LDFLAGS=""
 fi
 
 
@@ -403,7 +397,6 @@ LDFLAGS="$ENV_LDFLAGS $COVERAGE_LDFLAGS $OS_LDFLAGS"
 # substitute what we need:
 AC_SUBST([INITDDIR])
 
-AC_SUBST([COVERAGE_LCRSO_EXTRA_LDFLAGS])
 AC_SUBST([OS_DYFLAGS])
 
 AC_SUBST([OS_LDL])
@@ -417,9 +410,7 @@ AM_CONDITIONAL(BUILD_HTML_DOCS, test -n "${GROFF}")
 
 AC_SUBST([LINT_FLAGS])
 
-AC_DEFINE_UNQUOTED([LCRSODIR], "$(eval echo ${LCRSODIR})", [LCRSO directory])
 AC_DEFINE_UNQUOTED([SOCKETDIR], "$(eval echo ${SOCKETDIR})", [Socket directory])
-AC_DEFINE_UNQUOTED([LOCALSTATEDIR], "$(eval echo ${localstatedir})", [localstate directory])
 
 BOOTHSYSCONFDIR=${sysconfdir}/booth
 AC_SUBST([HAVE_LOG_CIB_DIFF])
