@@ -146,24 +146,6 @@ static inline void init_ticket_msg(struct boothc_ticket_msg *msg,
 	}
 }
 
-static inline void init_attr_msg(struct boothc_attr_msg *msg,
-		int cmd, int request, int rv, int reason,
-		struct ticket_config *tk, char *attr_name, struct geo_attr *attr)
-{
-	assert(tk);
-	assert(attr);
-
-	init_header(&msg->header, cmd, request, 0, rv, reason, sizeof(*msg));
-
-	if (!tk) {
-		memset(&msg->attr.tkt_id, 0, sizeof(msg->attr.tkt_id));
-	} else {
-		memcpy(msg->attr.tkt_id, tk->name, sizeof(msg->attr.tkt_id));
-	}
-	memcpy(msg->attr.name, attr_name, sizeof(msg->attr.name));
-	memcpy(msg->attr.val, attr->val, sizeof(msg->attr.val));
-}
-
 
 static inline struct booth_transport const *transport(void)
 {
