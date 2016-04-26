@@ -28,7 +28,11 @@
 Name:           booth
 Url:            https://github.com/ClusterLabs/booth
 Summary:        Ticket Manager for Multi-site Clusters
+%if 0%{?suse_version}
 License:        GPL-2.0+
+%else
+License:        GPLv2+
+%endif
 Group:          %{pkg_group}
 Version:        1.0
 Release:        0
@@ -38,7 +42,12 @@ BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 BuildRequires:  asciidoc
 BuildRequires:  autoconf
 BuildRequires:  automake
+BuildRequires:  pkgconfig
+%if 0%{?suse_version}
 BuildRequires:  glib2-devel
+%else
+BuildRequires:  pkgconfig(glib-2.0)
+%endif
 BuildRequires:  libgcrypt-devel
 %if 0%{?fedora} || 0%{?centos} || 0%{?rhel}
 BuildRequires:  cluster-glue-libs-devel
@@ -48,7 +57,6 @@ BuildRequires:  libglue-devel
 BuildRequires:  libpacemaker-devel
 %endif
 BuildRequires:  libxml2-devel
-BuildRequires:  pkgconfig
 BuildRequires:  zlib-devel
 %if 0%{?fedora} || 0%{?centos} || 0%{?rhel}
 Requires:       pacemaker >= 1.1.8
@@ -74,10 +82,6 @@ Pacemaker.
 	%{!?with_html_man:--without-html_man}
 
 make
-
-#except check
-#%check
-#make check
 
 %install
 make DESTDIR=$RPM_BUILD_ROOT install docdir=%{booth_docdir}
@@ -121,9 +125,6 @@ make check
 %else
 echo "%%run_build_tests set to %run_build_tests; skipping tests"
 %endif
-
-%clean
-rm -rf %{buildroot}
 
 %files
 %defattr(-,root,root,-)
