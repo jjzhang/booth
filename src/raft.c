@@ -787,10 +787,7 @@ int new_election(struct ticket_config *tk,
 			tk->current_term);
 	clear_election(tk);
 
-	if(preference)
-		new_leader = preference;
-	else
-		new_leader = (local->type == SITE) ? local : NULL;
+	new_leader = preference ? preference : local;
 	record_vote(tk, local, new_leader);
 	tk->voted_for = new_leader;
 

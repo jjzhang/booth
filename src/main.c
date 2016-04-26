@@ -65,7 +65,7 @@
 
 #define CLIENT_NALLOC		32
 
-int daemonize = 0;
+static int daemonize = 1;
 int enable_stderr = 0;
 timetype start_time;
 
@@ -1105,7 +1105,7 @@ static int read_arguments(int argc, char **argv)
 			enable_stderr = 1;
 			/* Fall through */
 		case 'S':
-			daemonize = 1;
+			daemonize = 0;
 			break;
 
 		case 'l':
@@ -1340,7 +1340,7 @@ static int do_status(int type)
 
 	fprintf(stdout, "booth_lockfile='%s' %s\n",
 			cl.lockfile, lockfile_data);
-	if (daemonize)
+	if (!daemonize)
 		fprintf(stderr, "Booth at %s port %d seems to be running.\n",
 				local->addr_string, booth_conf->port);
 	return 0;
@@ -1349,7 +1349,7 @@ static int do_status(int type)
 quit:
 	log_debug("not running: %s", reason);
 	/* Ie. "DEBUG" */
-	if (daemonize)
+	if (!daemonize)
 		fprintf(stderr, "not running: %s\n", reason);
 	return ret;
 }
@@ -1412,7 +1412,7 @@ static int do_server(int type)
 		exit(EXIT_FAILURE);
 	}
 
-	if (!daemonize) {
+	if (daemonize) {
 		if (daemon(0, 0) < 0) {
 			perror("daemon error");
 			exit(EXIT_FAILURE);
