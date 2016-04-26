@@ -294,6 +294,16 @@ esac
 AM_CONDITIONAL([NAMETAG_LIBSYSTEMD], [test "x$nametag_provider" = "xlibsystemd"])
 AC_SUBST([NOTIFY_ACCESS_SWITCH])
 
+# figure out if "coredump nursing" supported and desired
+coredump_nursing="no"
+if test "x$with_glue" != "xno"; then
+	AC_CHECK_LIB([plumb], [cl_enable_coredumps], [coredump_nursing="libplumb"])
+fi
+if test "x$coredump_nursing" != "xno"; then
+	AC_DEFINE(COREDUMP_NURSING, [], [eligible for coredump nursing])
+fi
+AM_CONDITIONAL([COREDUMP_NURSING], [test "x$coredump_nursing" != "xno"])
+
 # OS detection
 # THIS SECTION MUST DIE!
 CP=cp
@@ -525,6 +535,7 @@ AC_MSG_RESULT([  Features                 = ${PACKAGE_FEATURES}])
 AC_MSG_RESULT([  Logging provider         = ${logging_provider}])
 AC_MSG_RESULT([  Range2random provider    = ${range2random_provider}])
 AC_MSG_RESULT([  Nametag provider         = ${nametag_provider}])
+AC_MSG_RESULT([  Coredump nursing         = ${coredump_nursing}])
 AC_MSG_RESULT([])
 AC_MSG_RESULT([$PACKAGE build info:])
 AC_MSG_RESULT([  Library SONAME           = ${SONAME}])

@@ -33,9 +33,6 @@
 #include <sys/un.h>
 #include <sys/poll.h>
 #include <sys/wait.h>
-#include <pacemaker/crm/services.h>
-#include <sys/prctl.h>
-#include <clplumbing/coredumps.h>
 #include <fcntl.h>
 #include <string.h>
 #include <ctype.h>
@@ -47,11 +44,18 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <sys/types.h>
+
+#include <pacemaker/crm/services.h>
+
 #include "b_config.h"
 #ifndef NAMETAG_LIBSYSTEMD
 #include <clplumbing/setproctitle.h>
 #else
 #include "alt/nametag_libsystemd.h"
+#endif
+#ifdef COREDUMP_NURSING
+#include <sys/prctl.h>
+#include <clplumbing/coredumps.h>
 #endif
 #include "log.h"
 #include "booth.h"
@@ -1457,11 +1461,13 @@ static int do_server(int type)
 	if (rv)
 		return rv;
 
+#ifdef COREDUMP_NURSING
 	if (cl_enable_coredumps(TRUE) < 0){
 		log_error("enabling core dump failed");
 	}
 	cl_cdtocoredir();
 	prctl(PR_SET_DUMPABLE, (unsigned long)TRUE, 0UL, 0UL, 0UL);
+#endif
 
 	signal(SIGCHLD, (__sighandler_t)wait_child);
 	rv = loop(lock_fd);

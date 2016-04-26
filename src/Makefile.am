@@ -22,7 +22,7 @@ boothd_SOURCES += auth.c
 endif
 
 boothd_LDFLAGS		= $(OS_DYFLAGS) -L./
-boothd_LDADD		= -lplumb -lm $(GLIB_LIBS) $(ZLIB_LIBS)
+boothd_LDADD		= -lm $(GLIB_LIBS) $(ZLIB_LIBS)
 boothd_CFLAGS		= $(GLIB_CFLAGS)
 
 if !LOGGING_LIBQB
@@ -47,6 +47,10 @@ else
 boothd_LDADD		+= $(LIBSYSTEMD_LIBS)
 boothd_SOURCES		+= alt/nametag_libsystemd.c
 noinst_HEADERS		+= alt/nametag_libsystemd.h
+endif
+
+if COREDUMP_NURSING
+boothd_LDADD		+= -lplumb
 endif
 
 lint:
