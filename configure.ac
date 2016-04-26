@@ -64,11 +64,8 @@ AC_PATH_PROGS(ASCIIDOC, asciidoc)
 AC_PATH_PROGS(XML2CONFIG, xml2-config)
 
 AM_CONDITIONAL(BUILD_ASCIIDOC, test x"${ASCIIDOC}" != x"")
-
-# Checks for libraries.
-AC_CHECK_LIB([socket], [socket])
-AC_CHECK_LIB([nsl], [t_open])
-AC_CHECK_LIB([gpl], [cl_log])
+AM_CONDITIONAL(BUILD_ASCIIDOC_HTML_MAN,
+	       test "x${ASCIIDOC}" != "x" && test "x$with_html_man" = "xyes")
 
 # libgcrypt or mhash for hmac
 libgcrypt_installed="yes"
@@ -107,6 +104,9 @@ AC_CHECK_HEADERS([arpa/inet.h fcntl.h limits.h netdb.h netinet/in.h stdint.h \
 		  sys/sockio.h utmpx.h])
 AC_CHECK_HEADERS(heartbeat/glue_config.h)
 AC_CHECK_HEADERS(mhash.h)
+AC_CHECK_HEADER([zlib.h],
+		[AC_SUBST(ZLIB_LIBS, ["-lz"])],
+		[AC_MSG_ERROR([zlib development files required])])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
@@ -197,12 +197,8 @@ AC_ARG_ENABLE([coverage],
 	[  --enable-coverage               : coverage analysis of the codebase. ],
 	[ default="no" ])
 
-AC_ARG_ENABLE([small-memory-footprint],
-	[  --enable-small-memory-footprint : Use small message queues and small messages sizes. ],
-	[ default="no" ])
-
 AC_ARG_WITH([initddir],
-	[  --with-initddir=DIR     : path to init script directory. ],
+	[  --with-initddir=DIR             : path to init script directory. ],
 	[ INITDDIR="$withval" ],
 	[ INITDDIR="$sysconfdir/init.d" ])
 
@@ -210,13 +206,12 @@ test -s .git_info &&
 	GIT_VER="`cat .git_info`"
 
 AC_ARG_WITH([build-version],
-	[  --with-build-version=STR     : build version ],
+	[  --with-build-version=STR        : build version ],
 	[ BOOTH_BUILD_VERSION="$withval" ],
 	[ BOOTH_BUILD_VERSION="${GIT_VER:-$PACKAGE_VERSION}" ])
 
-AC_ARG_ENABLE([resource-monitor],
-	[  --enable-resource-monitor       : Enabling Resource Monitor ],
-	[ default="no" ])
+AC_ARG_WITH([html_man],
+	[  --without-html_man              : Avoid generating man pages in HTML.])
 
 # OS detection
 # THIS SECTION MUST DIE!
@@ -361,12 +356,10 @@ if test "x${enable_coverage}" = xyes && \
 	OPT_CFLAGS="-O0"
 	COVERAGE_CFLAGS="-ftest-coverage -fprofile-arcs"
 	COVERAGE_LDFLAGS="-ftest-coverage -fprofile-arcs"
-	COVERAGE_LCRSO_EXTRA_LDFLAGS="-rdynamic"
 	PACKAGE_FEATURES="$PACKAGE_FEATURES coverage"
 else
 	COVERAGE_CFLAGS=""
 	COVERAGE_LDFLAGS=""
-	COVERAGE_LCRSO_EXTRA_LDFLAGS=""
 fi
 
 
@@ -404,7 +397,6 @@ LDFLAGS="$ENV_LDFLAGS $COVERAGE_LDFLAGS $OS_LDFLAGS"
 # substitute what we need:
 AC_SUBST([INITDDIR])
 
-AC_SUBST([COVERAGE_LCRSO_EXTRA_LDFLAGS])
 AC_SUBST([OS_DYFLAGS])
 
 AC_SUBST([OS_LDL])
@@ -418,9 +410,7 @@ AM_CONDITIONAL(BUILD_HTML_DOCS, test -n "${GROFF}")
 
 AC_SUBST([LINT_FLAGS])
 
-AC_DEFINE_UNQUOTED([LCRSODIR], "$(eval echo ${LCRSODIR})", [LCRSO directory])
 AC_DEFINE_UNQUOTED([SOCKETDIR], "$(eval echo ${SOCKETDIR})", [Socket directory])
-AC_DEFINE_UNQUOTED([LOCALSTATEDIR], "$(eval echo ${localstatedir})", [localstate directory])
 
 BOOTHSYSCONFDIR=${sysconfdir}/booth
 AC_SUBST([HAVE_LOG_CIB_DIFF])
@@ -450,7 +440,7 @@ AC_MSG_RESULT([  System configuration     = ${sysconfdir}])
 AC_MSG_RESULT([  System init.d directory  = ${INITDDIR}])
 AC_MSG_RESULT([  booth config dir         = ${BOOTHSYSCONFDIR}])
 AC_MSG_RESULT([  SOCKETDIR                = ${SOCKETDIR}])
-AC_MSG_RESULT([  Features                 =${PACKAGE_FEATURES}])
+AC_MSG_RESULT([  Features                 = ${PACKAGE_FEATURES}])
 AC_MSG_RESULT([])
 AC_MSG_RESULT([$PACKAGE build info:])
 AC_MSG_RESULT([  Library SONAME           = ${SONAME}])

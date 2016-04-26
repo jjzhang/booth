@@ -1,3 +1,5 @@
+%bcond_with html_man
+
 %if 0%{?suse_version}
 %global booth_docdir %{_defaultdocdir}/%{name}
 %else
@@ -47,6 +49,7 @@ BuildRequires:  libpacemaker-devel
 %endif
 BuildRequires:  libxml2-devel
 BuildRequires:  pkgconfig
+BuildRequires:  zlib-devel
 %if 0%{?fedora} || 0%{?centos} || 0%{?rhel}
 Requires:       pacemaker >= 1.1.8
 Requires:       cluster-glue-libs >= 1.0.6
@@ -67,7 +70,8 @@ Pacemaker.
 ./autogen.sh
 %configure \
 	--with-initddir=%{_initrddir} \
-	--docdir=%{booth_docdir}
+	--docdir=%{booth_docdir} \
+	%{!?with_html_man:--without-html_man}
 
 make
 
