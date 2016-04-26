@@ -25,5 +25,13 @@ boothd_LDFLAGS		= $(OS_DYFLAGS) -L./
 boothd_LDADD		= -lplumb -lplumbgpl -lm $(GLIB_LIBS) $(ZLIB_LIBS)
 boothd_CFLAGS		= $(GLIB_CFLAGS)
 
+if !LOGGING_LIBQB
+boothd_LDADD		+= -lplumb
+else
+boothd_LDADD		+= $(LIBQB_LIBS)
+boothd_SOURCES		+= alt/logging_libqb.c
+noinst_HEADERS		+= alt/logging_libqb.h
+endif
+
 lint:
 	-splint $(INCLUDES) $(LINT_FLAGS) $(CFLAGS) *.c

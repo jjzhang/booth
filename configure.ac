@@ -6,7 +6,7 @@ AC_PREREQ([2.61])
 
 AC_INIT([booth], [1.0], [users@clusterlabs.org])
 
-AM_INIT_AUTOMAKE([-Wno-portability])
+AM_INIT_AUTOMAKE([-Wno-portability subdir-objects])
 
 AC_CONFIG_SRCDIR([src/main.c])
 AC_CONFIG_HEADER([src/b_config.h src/booth_config.h])
@@ -219,6 +219,31 @@ AC_ARG_WITH([glue],
 	[  --without-glue                  : Avoid libraries from (cluster-)glue project.],
 	[],
 	[with_glue=yes])
+
+# figure out logging provider
+logging_provider=""
+if test "x$logging_provider" = "x" && test "x$with_glue" = "xyes"; then
+	AC_CHECK_LIB([plumb], [cl_log], [logging_provider="libplumb"])
+fi
+if test "x$logging_provider" = "x" && test "x$with_glue" = "xno"; then
+	AC_CHECK_LIB([qb], [qb_log_real_], [logging_provider="libqb"])
+fi
+case "$logging_provider" in
+libplumb)
+	;;
+libqb)
+	PKG_CHECK_MODULES([LIBQB], [libqb])
+	AC_DEFINE([LOGGING_LIBQB], [], [use libqb as a logging provider])
+	PKG_CHECK_MODULES([LIBQB1], [libqb >= 1.0],
+			  [AC_DEFINE([LOGGING_LIBQB_MAJOR], [1],
+				     [libqb major version lower bound])],
+			  [AC_MSG_WARN([[syslog identifier will not get changed]])])
+	;;
+*)
+	AC_MSG_ERROR([logging provider required (libplumb, or libqb when --without-glue)])
+	;;
+esac
+AM_CONDITIONAL([LOGGING_LIBQB], [test "x$logging_provider" = "xlibqb"])
 
 # OS detection
 # THIS SECTION MUST DIE!
@@ -448,6 +473,7 @@ AC_MSG_RESULT([  System init.d directory  = ${INITDDIR}])
 AC_MSG_RESULT([  booth config dir         = ${BOOTHSYSCONFDIR}])
 AC_MSG_RESULT([  SOCKETDIR                = ${SOCKETDIR}])
 AC_MSG_RESULT([  Features                 = ${PACKAGE_FEATURES}])
+AC_MSG_RESULT([  Logging provider         = ${logging_provider}])
 AC_MSG_RESULT([])
 AC_MSG_RESULT([$PACKAGE build info:])
 AC_MSG_RESULT([  Library SONAME           = ${SONAME}])

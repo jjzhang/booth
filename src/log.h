@@ -21,26 +21,36 @@
 #ifndef _LOG_H
 #define _LOG_H
 
+#include "b_config.h"
+
+#ifndef LOGGING_LIBQB
 #include <heartbeat/glue_config.h>
 #include <clplumbing/cl_log.h>
+#define priv_log(prio, ...)		cl_log(prio, __VA_ARGS__)
+#else
+#include "alt/logging_libqb.h"
+#define priv_log(prio, ...)		qb_log(prio, __VA_ARGS__)
+#endif
+
 #include "inline-fn.h"
 
+
 #define log_debug(fmt, args...)		do { \
-	if (ANYDEBUG) cl_log(LOG_DEBUG, fmt, ##args); } \
+	if (ANYDEBUG) priv_log(LOG_DEBUG, fmt, ##args); } \
 	while (0)
-#define log_info(fmt, args...)		cl_log(LOG_INFO, fmt, ##args)
-#define log_warn(fmt, args...)		cl_log(LOG_WARNING, fmt, ##args)
-#define log_error(fmt, args...)		cl_log(LOG_ERR, fmt, ##args)
+#define log_info(fmt, args...)		priv_log(LOG_INFO, fmt, ##args)
+#define log_warn(fmt, args...)		priv_log(LOG_WARNING, fmt, ##args)
+#define log_error(fmt, args...)		priv_log(LOG_ERR, fmt, ##args)
 
 /* all tk_* macros prepend "%(tk->name): " (the caller needs to
  * have the ticket named tk!)
  */
 #define tk_cl_log(sev, fmt, args...) \
-	cl_log(sev, "%s (%s/%d/%d): " fmt, \
+	priv_log(sev, "%s (%s/%d/%d): " fmt, \
 	tk->name, state_to_string(tk->state), tk->current_term, term_time_left(tk), \
 	##args)
 #define tk_cl_log_src(sev, fmt, args...) \
-	cl_log(sev, "%s:%d: %s (%s/%d/%d): " fmt, \
+	priv_log(sev, "%s:%d: %s (%s/%d/%d): " fmt, \
 	__FUNCTION__, __LINE__, \
 	tk->name, state_to_string(tk->state), tk->current_term, term_time_left(tk), \
 	##args)

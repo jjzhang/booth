@@ -66,6 +66,9 @@ BuildRequires:  cluster-glue-libs-devel
 %else
 BuildRequires:  libglue-devel
 %endif
+%else
+# logging provider
+BuildRequires:  pkgconfig(libqb)
 %endif
 BuildRequires:  libxml2-devel
 BuildRequires:  zlib-devel
