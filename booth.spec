@@ -1,5 +1,11 @@
 %bcond_with html_man
 
+%if 0%{?fedora} > 18 || 0%{?centos} > 6 || 0%{?rhel} > 6
+%bcond_with glue
+%else
+%bcond_without glue
+%endif
+
 %if 0%{?suse_version}
 %global booth_docdir %{_defaultdocdir}/%{name}
 %else
@@ -50,17 +56,24 @@ BuildRequires:  pkgconfig(glib-2.0)
 %endif
 BuildRequires:  libgcrypt-devel
 %if 0%{?fedora} || 0%{?centos} || 0%{?rhel}
-BuildRequires:  cluster-glue-libs-devel
 BuildRequires:  pacemaker-libs-devel
 %else
-BuildRequires:  libglue-devel
 BuildRequires:  libpacemaker-devel
+%endif
+%if 0%{?with_glue}
+%if 0%{?fedora} || 0%{?centos} || 0%{?rhel}
+BuildRequires:  cluster-glue-libs-devel
+%else
+BuildRequires:  libglue-devel
+%endif
 %endif
 BuildRequires:  libxml2-devel
 BuildRequires:  zlib-devel
 %if 0%{?fedora} || 0%{?centos} || 0%{?rhel}
 Requires:       pacemaker >= 1.1.8
+%if 0%{?with_glue}
 Requires:       cluster-glue-libs >= 1.0.6
+%endif
 %else
 Requires:       pacemaker-ticket-support >= 2.0
 %endif
@@ -79,7 +92,8 @@ Pacemaker.
 %configure \
 	--with-initddir=%{_initrddir} \
 	--docdir=%{booth_docdir} \
-	%{!?with_html_man:--without-html_man}
+	%{!?with_html_man:--without-html_man} \
+	%{!?with_glue:--without-glue}
 
 make
 

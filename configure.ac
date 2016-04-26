@@ -215,6 +215,11 @@ AC_ARG_WITH([html_man],
 	[],
 	[with_html_man=yes])
 
+AC_ARG_WITH([glue],
+	[  --without-glue                  : Avoid libraries from (cluster-)glue project.],
+	[],
+	[with_glue=yes])
+
 # OS detection
 # THIS SECTION MUST DIE!
 CP=cp
