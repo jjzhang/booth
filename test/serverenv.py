@@ -143,7 +143,7 @@ ticket="ticketB"
             self.kill_pid(int(daemon_pid))
             time.sleep(1)
             daemon_pid = self.get_daemon_pid_from_lock_file(runner.lock_file)
-            self.assertTrue(daemon_pid is not None,
+            self.assertTrue(daemon_pid is None,
                             'bnc#749763: lock file should vanish after daemon is killed')
 
     def get_daemon_pid_from_lock_file(self, lock_file):
