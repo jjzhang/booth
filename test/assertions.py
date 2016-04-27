@@ -8,7 +8,7 @@ class BoothAssertions:
             self.run_booth(config_file=config_file, lock_file=lock_file,
                            expected_exitcode=1, expected_daemon=False)
 
-        expected_error = "ERROR: Cannot find myself in the configuration"
+        expected_error = "(ERROR|error): Cannot find myself in the configuration"
         self.assertRegexpMatches(stderr, expected_error)
 
     def assertLockFileError(self, config_file=None, config_text=None,
