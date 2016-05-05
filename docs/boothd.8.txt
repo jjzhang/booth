@@ -573,8 +573,9 @@ Copyright (C) 2013-2014 Philipp Marek <philipp.marek@linbit.com>
 
 Copyright (C) 2014 Dejan Muhamedagic <dmuhamedagic@suse.com>
 
-Free use of this software is
-granted under the terms of the GNU General Public License (GPL).
+Free use of this software is granted under the terms of the GNU
+General Public License (GPL) as of version 2 (see `COPYING` file)
+or later.
 
 
 // vim: set ft=asciidoc : 
