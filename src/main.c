@@ -306,7 +306,8 @@ static int read_authkey()
 		return -1;
 	}
 	if (booth_conf->authstat.st_mode & (S_IRGRP | S_IROTH)) {
-		log_error("%s: file can be readable only for the owner", booth_conf->authfile);
+		log_error("%s: file shall not be readable for anyone but the owner",
+			booth_conf->authfile);
 		return -1;
 	}
 	fd = open(booth_conf->authfile, O_RDONLY);
