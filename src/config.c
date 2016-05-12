@@ -486,6 +486,7 @@ int read_config(const char *path, int type)
 	booth_conf = malloc(sizeof(struct booth_config)
 			+ TICKET_ALLOC * sizeof(struct ticket_config));
 	if (!booth_conf) {
+		fclose(fp);
 		log_error("failed to alloc memory for booth config");
 		return -ENOMEM;
 	}
@@ -788,6 +789,7 @@ no_value:
 		error = "Unknown keyword";
 		goto err;
 	}
+	fclose(fp);
 
 	if ((booth_conf->site_count % 2) == 0) {
 		log_warn("Odd number of nodes is strongly recommended!");
@@ -820,6 +822,7 @@ no_value:
 
 
 err:
+	fclose(fp);
 out:
 	log_error("%s in config file line %d",
 			error, lineno);
