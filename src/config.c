@@ -655,13 +655,13 @@ no_value:
 
 		if (strcmp(key, "site") == 0) {
 			if (add_site(val, SITE))
-				goto out;
+				goto err;
 			continue;
 		}
 
 		if (strcmp(key, "arbitrator") == 0) {
 			if (add_site(val, ARBITRATOR))
-				goto out;
+				goto err;
 			continue;
 		}
 
@@ -695,13 +695,13 @@ no_value:
 		if (strcmp(key, "ticket") == 0) {
 			if (current_tk && strcmp(current_tk->name, "__defaults__")) {
 				if (!postproc_ticket(current_tk)) {
-					goto out;
+					goto err;
 				}
 			}
 			if (!strcmp(val, "__defaults__")) {
 				current_tk = &defaults;
 			} else if (add_ticket(val, &current_tk, &defaults)) {
-				goto out;
+				goto err;
 			}
 			continue;
 		}
@@ -781,7 +781,7 @@ no_value:
 
 		if (strcmp(key, "weights") == 0) {
 			if (parse_weights(val, current_tk->weight) < 0)
-				goto out;
+				goto err;
 			continue;
 		}
 
@@ -802,7 +802,7 @@ no_value:
 			cp2 = cp + strlen(cp);
 		if (cp2-cp >= BOOTH_NAME_LEN) {
 			log_error("booth config file name too long");
-			goto err;
+			goto out;
 		}
 		strncpy(booth_conf->name, cp, cp2-cp);
 		*(booth_conf->name+(cp2-cp)) = '\0';
