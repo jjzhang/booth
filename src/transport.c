@@ -365,7 +365,7 @@ int read_client(struct client *req_cl)
 	header = (struct boothc_header *)msg;
 
 	/* update len if we read enough */
-	if (req_cl->offset >= sizeof(header)) {
+	if (req_cl->offset >= sizeof(*header)) {
 		len = min(ntohl(header->length), MAX_MSG_LEN);
 	}
 
@@ -379,7 +379,7 @@ int read_client(struct client *req_cl)
 	req_cl->offset += rv;
 
 	/* update len if we read enough */
-	if (req_cl->offset >= sizeof(header)) {
+	if (req_cl->offset >= sizeof(*header)) {
 		len = min(ntohl(header->length), MAX_MSG_LEN);
 	}
 
