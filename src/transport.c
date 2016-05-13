@@ -509,6 +509,7 @@ int setup_tcp_listener(int test_only)
 
 	rv = setsockopt(s, SOL_SOCKET, SO_REUSEADDR, (char *)&one, sizeof(one));
 	if (rv == -1) {
+		close(s);
 		log_error("failed to set the SO_REUSEADDR option");
 		return rv;
 	}
@@ -521,12 +522,14 @@ int setup_tcp_listener(int test_only)
 	}
 
 	if (rv == -1) {
+		close(s);
 		log_error("failed to bind socket %s", strerror(errno));
 		return rv;
 	}
 
 	rv = listen(s, 5);
 	if (rv == -1) {
+		close(s);
 		log_error("failed to listen on socket %s", strerror(errno));
 		return rv;
 	}
