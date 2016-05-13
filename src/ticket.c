@@ -410,8 +410,10 @@ int list_ticket(char **pdata, unsigned int *len)
 			cp += snprintf(cp, alloc - (cp - data), "\n");
 		}
 
-		if (alloc - (cp - data) <= 0)
+		if (alloc - (cp - data) <= 0) {
+			free(data);
 			return -ENOMEM;
+		}
 	}
 
 	*pdata = data;
