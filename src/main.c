@@ -1315,8 +1315,7 @@ static int do_status(int type)
 	}
 	lockfile_data[rv] = 0;
 
-	if (status_lock_fd != -1)
-		close(status_lock_fd);
+	close(status_lock_fd);
 
 
 	/* Make sure it's only a single line */
