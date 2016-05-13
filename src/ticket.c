@@ -369,8 +369,7 @@ int list_ticket(char **pdata, unsigned int *len)
 	*pdata = NULL;
 	*len = 0;
 
-	alloc = 256 +
-		booth_conf->ticket_count * (BOOTH_NAME_LEN * 2 + 128);
+	alloc = booth_conf->ticket_count * (BOOTH_NAME_LEN * 2 + 128);
 	data = malloc(alloc);
 	if (!data)
 		return -ENOMEM;
