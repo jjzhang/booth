@@ -104,16 +104,11 @@ static void client_alloc(void)
 {
 	int i;
 
-	if (!clients) {
-		clients = malloc(CLIENT_NALLOC * sizeof(struct client));
-		pollfds = malloc(CLIENT_NALLOC * sizeof(struct pollfd));
-	} else {
-		clients = realloc(clients, (client_size + CLIENT_NALLOC) *
-					sizeof(struct client));
-		pollfds = realloc(pollfds, (client_size + CLIENT_NALLOC) *
-					sizeof(struct pollfd));
-	}
-	if (!clients || !pollfds) {
+	if (!(clients = realloc(
+		clients, (client_size + CLIENT_NALLOC) * sizeof(*clients))
+	) || !(pollfds = realloc(
+		pollfds, (client_size + CLIENT_NALLOC) * sizeof(*pollfds))
+	)) {
 		log_error("can't alloc for client array");
 		exit(1);
 	}
