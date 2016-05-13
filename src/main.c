@@ -1293,20 +1293,18 @@ static int do_status(int type)
 
 
 	rv = _lockfile(O_RDWR, &status_lock_fd, &pid);
-	if (rv == 0) {
-		reason = "PID file not locked.";
-		goto quit;
-	}
 	if (status_lock_fd == -1) {
 		reason = "No PID file.";
 		goto quit;
 	}
-
+	if (rv == 0) {
+		reason = "PID file not locked.";
+		goto quit;
+	}
 	if (pid) {
 		fprintf(stdout, "booth_lockpid=%d ", pid);
 		fflush(stdout);
 	}
-
 
 	rv = read(status_lock_fd, lockfile_data, sizeof(lockfile_data) - 1);
 	if (rv < 4) {
