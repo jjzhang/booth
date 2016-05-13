@@ -85,8 +85,6 @@ static int add_site(char *addr_string, int type)
 
 	site->family = AF_INET;
 	site->type = type;
-	/* Make site_id start at a non-zero point.
-	 * Perhaps use hash over string or address? */
 	strncpy(site->addr_string, addr_string, sizeof(site->addr_string));
 
 
