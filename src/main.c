@@ -1271,7 +1271,7 @@ static int set_procfs_val(const char *path, const char *val)
 static int do_status(int type)
 {
 	pid_t pid;
-	int rv, lock_fd, ret;
+	int rv, status_lock_fd, ret;
 	const char *reason = NULL;
 	char lockfile_data[1024], *cp;
 
@@ -1292,12 +1292,12 @@ static int do_status(int type)
 	}
 
 
-	rv = _lockfile(O_RDWR, &lock_fd, &pid);
+	rv = _lockfile(O_RDWR, &status_lock_fd, &pid);
 	if (rv == 0) {
 		reason = "PID file not locked.";
 		goto quit;
 	}
-	if (lock_fd == -1) {
+	if (status_lock_fd == -1) {
 		reason = "No PID file.";
 		goto quit;
 	}
@@ -1308,7 +1308,7 @@ static int do_status(int type)
 	}
 
 
-	rv = read(lock_fd, lockfile_data, sizeof(lockfile_data) - 1);
+	rv = read(status_lock_fd, lockfile_data, sizeof(lockfile_data) - 1);
 	if (rv < 4) {
 		reason = "Cannot read lockfile data.";
 		ret = PCMK_LSB_UNKNOWN_ERROR;
@@ -1317,8 +1317,8 @@ static int do_status(int type)
 	}
 	lockfile_data[rv] = 0;
 
-	if (lock_fd != -1)
-		close(lock_fd);
+	if (status_lock_fd != -1)
+		close(status_lock_fd);
 
 
 	/* Make sure it's only a single line */
