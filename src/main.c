@@ -1298,6 +1298,7 @@ static int do_status(int type)
 		goto quit;
 	}
 	if (rv == 0) {
+		close(status_lock_fd);
 		reason = "PID file not locked.";
 		goto quit;
 	}
@@ -1308,10 +1309,10 @@ static int do_status(int type)
 
 	rv = read(status_lock_fd, lockfile_data, sizeof(lockfile_data) - 1);
 	if (rv < 4) {
+		close(status_lock_fd);
 		reason = "Cannot read lockfile data.";
 		ret = PCMK_LSB_UNKNOWN_ERROR;
 		goto quit;
-
 	}
 	lockfile_data[rv] = 0;
 
