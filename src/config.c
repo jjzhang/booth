@@ -484,6 +484,7 @@ int read_config(const char *path, int type)
 	booth_conf = malloc(sizeof(struct booth_config)
 			+ TICKET_ALLOC * sizeof(struct ticket_config));
 	if (!booth_conf) {
+		fclose(fp);
 		log_error("failed to alloc memory for booth config");
 		return -ENOMEM;
 	}
@@ -653,13 +654,13 @@ no_value:
 
 		if (strcmp(key, "site") == 0) {
 			if (add_site(val, SITE))
-				goto out;
+				goto err;
 			continue;
 		}
 
 		if (strcmp(key, "arbitrator") == 0) {
 			if (add_site(val, ARBITRATOR))
-				goto out;
+				goto err;
 			continue;
 		}
 
@@ -693,13 +694,13 @@ no_value:
 		if (strcmp(key, "ticket") == 0) {
 			if (current_tk && strcmp(current_tk->name, "__defaults__")) {
 				if (!postproc_ticket(current_tk)) {
-					goto out;
+					goto err;
 				}
 			}
 			if (!strcmp(val, "__defaults__")) {
 				current_tk = &defaults;
 			} else if (add_ticket(val, &current_tk, &defaults)) {
-				goto out;
+				goto err;
 			}
 			continue;
 		}
@@ -779,13 +780,14 @@ no_value:
 
 		if (strcmp(key, "weights") == 0) {
 			if (parse_weights(val, current_tk->weight) < 0)
-				goto out;
+				goto err;
 			continue;
 		}
 
 		error = "Unknown keyword";
 		goto err;
 	}
+	fclose(fp);
 
 	if ((booth_conf->site_count % 2) == 0) {
 		log_warn("Odd number of nodes is strongly recommended!");
@@ -800,7 +802,7 @@ no_value:
 			cp2 = cp + strlen(cp);
 		if (cp2-cp >= BOOTH_NAME_LEN) {
 			log_error("booth config file name too long");
-			goto err;
+			goto out;
 		}
 		strncpy(booth_conf->name, cp, cp2-cp);
 		*(booth_conf->name+(cp2-cp)) = '\0';
@@ -818,6 +820,7 @@ no_value:
 
 
 err:
+	fclose(fp);
 out:
 	log_error("%s in config file line %d",
 			error, lineno);
