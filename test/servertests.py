@@ -79,7 +79,7 @@ class ServerTests(ServerTestEnvironment):
             if line_contains_IP:
                 self.assertRegexpMatches(
                     self.read_log(),
-                    "ERROR: invalid config file format: unquoted '.'",
+                    "(ERROR|error): invalid config file format: unquoted '.'",
                     'IP addresses need to be quoted'
                 )
 

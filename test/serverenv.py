@@ -136,14 +136,14 @@ ticket="ticketB"
         self.assertTrue(daemon_pid is not None, err)
 
         daemon_running = self.is_pid_running_daemon(daemon_pid)
-        err = "pid in lock file should referred to a running daemon"
+        err = "pid in lock file should refer to a running daemon"
         self.assertTrue(daemon_running, err)
 
         if daemon_running:
             self.kill_pid(int(daemon_pid))
             time.sleep(1)
             daemon_pid = self.get_daemon_pid_from_lock_file(runner.lock_file)
-            self.assertTrue(daemon_pid is not None,
+            self.assertTrue(daemon_pid is None,
                             'bnc#749763: lock file should vanish after daemon is killed')
 
     def get_daemon_pid_from_lock_file(self, lock_file):
