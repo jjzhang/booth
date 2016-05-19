@@ -29,7 +29,7 @@
 
 
 
-inline static uint32_t get_local_id(void)
+inline static int get_local_id(void)
 {
 	return local ? local->site_id : -1;
 }

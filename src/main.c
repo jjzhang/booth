@@ -237,8 +237,10 @@ static int format_peers(char **pdata, unsigned int *len)
 				s->recv_err_cnt,
 				s->sec_cnt,
 				s->invalid_cnt);
-		if (alloc - (cp - data) <= 0)
+		if (alloc - (cp - data) <= 0) {
+			free(data);
 			return -ENOMEM;
+		}
 	}
 
 	*pdata = data;
