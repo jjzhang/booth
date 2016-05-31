@@ -451,6 +451,7 @@ void reset_ticket(struct ticket_config *tk)
 	disown_ticket(tk);
 	no_resends(tk);
 	set_state(tk, ST_INIT);
+	set_next_state(tk, 0);
 	tk->voted_for = NULL;
 }
 
