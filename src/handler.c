@@ -113,7 +113,7 @@ static void
 reset_test_state(struct ticket_config *tk)
 {
 	tk_test.pid = 0;
-	tk_test.progstate = EXTPROG_IDLE;
+	set_progstate(tk, EXTPROG_IDLE);
 }
 
 int tk_test_exit_status(struct ticket_config *tk)
@@ -143,7 +143,7 @@ void wait_child(int sig)
 				reset_test_state(tk);
 			} else {
 				tk_test.status = status;
-				tk_test.progstate = EXTPROG_EXITED;
+				set_progstate(tk, EXTPROG_EXITED);
 			}
 		}
 	}
@@ -178,7 +178,7 @@ void ignore_ext_test(struct ticket_config *tk)
 {
 	if (is_ext_prog_running(tk)) {
 		(void)kill(tk_test.pid, SIGTERM);
-		tk_test.progstate = EXTPROG_IGNORE;
+		set_progstate(tk, EXTPROG_IGNORE);
 	}
 }
 
@@ -263,7 +263,7 @@ int run_handler(struct ticket_config *tk)
 		}
 	default: /* parent */
 		tk_test.pid = pid;
-		tk_test.progstate = EXTPROG_RUNNING;
+		set_progstate(tk, EXTPROG_RUNNING);
 		rv = RUNCMD_MORE; /* program runs */
 	}
 

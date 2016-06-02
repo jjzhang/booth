@@ -31,5 +31,10 @@ int is_ext_prog_running(struct ticket_config *tk);
 void ext_prog_timeout(struct ticket_config *tk);
 void wait_child(int sig);
 
+#define set_progstate(tk, newst) do { \
+	if (!(newst)) tk_log_debug("progstate reset"); \
+	else tk_log_debug("progstate set to %d", newst); \
+	tk->clu_test.progstate = newst; \
+} while(0)
 
 #endif
