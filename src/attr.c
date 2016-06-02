@@ -341,6 +341,8 @@ append_attr(gpointer key, gpointer value, gpointer user_data)
 		ts = wall_ts(&a->update_ts);
 		strftime(time_str, sizeof(time_str), "%F %T",
 				localtime(&ts));
+	} else {
+		time_str[0] = '\0';
 	}
 	g_string_append_printf(data, "%s %s %s\n",
 		attr_name, a->val, time_str);
