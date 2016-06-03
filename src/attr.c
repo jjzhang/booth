@@ -261,7 +261,7 @@ int store_geo_attr(struct ticket_config *tk, const char *name,
 	 */
 	if (!tk->attr)
 		tk->attr = g_hash_table_new_full(g_str_hash, g_str_equal,
-			free_geo_attr_notify, g_free);
+			g_free, free_geo_attr_notify);
 	if (!tk->attr) {
 		log_error("out of memory");
 		return -1;
