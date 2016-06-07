@@ -179,6 +179,10 @@ void ignore_ext_test(struct ticket_config *tk)
 	if (is_ext_prog_running(tk)) {
 		(void)kill(tk_test.pid, SIGTERM);
 		set_progstate(tk, EXTPROG_IGNORE);
+	} else if (tk_test.progstate == EXTPROG_EXITED) {
+		/* external prog exited, but the status not yet examined;
+		 * we're not interested in checking the status anymore */
+		reset_test_state(tk);
 	}
 }
 
