@@ -286,14 +286,16 @@ if test "x$nametag_provider" = "x" && test "x$with_glue" != "xno"; then
 	AC_CHECK_LIB([plumbgpl], [set_proc_title], [nametag_provider="libplumbgpl"])
 fi
 if test "x$nametag_provider" = "x" && test "x$with_glue" = "xno"; then
-	AC_CHECK_LIB([systemd], [sd_notify], [nametag_provider="libsystemd"])
+	AC_SEARCH_LIBS([sd_notify], [systemd systemd-daemon], [nametag_provider="libsystemd"])
 fi
 NOTIFY_ACCESS_SWITCH='# '
 case "$nametag_provider" in
 libplumbgpl)
 	;;
 libsystemd)
-	PKG_CHECK_MODULES([LIBSYSTEMD], [libsystemd])
+	PKG_CHECK_MODULES([LIBSYSTEMD], [libsystemd],, [
+		PKG_CHECK_MODULES([LIBSYSTEMD], [libsystemd-daemon])
+	])
 	AC_DEFINE([NAMETAG_LIBSYSTEMD], [], [use libsystemd as a nametag provider])
 	NOTIFY_ACCESS_SWITCH=
 	;;
