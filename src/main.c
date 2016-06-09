@@ -48,6 +48,10 @@
 #include <pacemaker/crm/services.h>
 
 #include "b_config.h"
+
+#if HAVE_LIBGCRYPT
+#include <gcrypt.h>
+#endif
 #ifndef NAMETAG_LIBSYSTEMD
 #include <clplumbing/setproctitle.h>
 #else
@@ -357,6 +361,15 @@ static int setup_config(int type)
 		rv = read_authkey();
 		if (rv < 0)
 			goto out;
+#if HAVE_LIBGCRYPT
+		if (!gcry_check_version(NULL)) {
+			log_error("gcry_check_version");
+			rv = -ENOENT;
+			goto out;
+		}
+		gcry_control(GCRYCTL_DISABLE_SECMEM, 0);
+		gcry_control(GCRYCTL_INITIALIZATION_FINISHED, 0);
+#endif
 	}
 
 	/* Set "local" pointer, ignoring errors. */
