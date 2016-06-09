@@ -107,6 +107,11 @@ AC_CHECK_HEADERS(mhash.h)
 AC_CHECK_HEADER([zlib.h],
 		[AC_SUBST(ZLIB_LIBS, ["-lz"])],
 		[AC_MSG_ERROR([zlib development files required])])
+saved_CPPFLAGS="${CPPFLAGS}"
+CPPFLAGS="${CPPFLAGS} ${GLIB_CFLAGS}"
+AC_CHECK_HEADER([pacemaker/crm/services.h], [],
+		[AC_MSG_ERROR([pacemaker/crm/services.h header required])])
+CPPFLAGS="${saved_CPPFLAGS}"
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
