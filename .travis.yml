@@ -1,0 +1,46 @@
+# container-based environment blockers:
+# - cluster-glue-dev
+#   https://github.com/travis-ci/apt-package-whitelist/issues/2936
+# - libsystemd-daemon-dev (libsystemd-dev)
+#   https://github.com/travis-ci/apt-package-whitelist/issues/2449
+# - no equivalent of "libcrmcluster4-dev" (trusty) for precise,
+#   but can be worked around with something like (or local dir + CPPFLAGS):
+#   GHREPO=ClusterLabs/pacemaker INCLFILE=crm/services.h curl --create-dirs \
+#     -o "/usr/include/pacemaker/${INCLFILE}" \
+#     "https://raw.githubusercontent.com/${GHREPO}/master/include/${INCLFILE}"
+sudo: required
+dist: trusty
+
+language: c
+compiler: gcc
+
+env:
+        - GLUE=1
+        - GLUE=0
+
+before_install:
+        - sudo apt-get update -qq
+        - sudo apt-get install -qq -y libglib2.0-dev libcrmcluster4-dev
+        - test "${GLUE}" = 0
+          || sudo apt-get install -qq -y cluster-glue-dev
+        - test "${GLUE}" != 0
+          || sudo apt-get install -qq -y libqb-dev libsystemd-daemon-dev
+
+before_script:
+        - ./autogen.sh
+          && ./configure --with-glue=$(test "${GLUE}" = 0 && echo no || echo yes)
+        - ulimit -S -c unlimited  # ensure cores are generated (~after_failure)
+
+script: VERBOSE=1 make check
+
+after_failure:
+        - sudo apt-get install -qq gdb libc6-dbg
+        # examine core files
+        - find -name 'core*' -print0
+          | xargs -0I@ -- sh -xc
+            'file "@";
+             gdb -se $(file "@" | sed -n "s|.* core file .* from \x27\([^\x27 ]*\).*|\1|p")
+                 -c "@" -batch -ex "t a a bt f" -ex "set pagination 0"'
+
+notifications:
+        irc: "irc.freenode.net#clusterlabs-dev"

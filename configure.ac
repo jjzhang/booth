@@ -107,6 +107,11 @@ AC_CHECK_HEADERS(mhash.h)
 AC_CHECK_HEADER([zlib.h],
 		[AC_SUBST(ZLIB_LIBS, ["-lz"])],
 		[AC_MSG_ERROR([zlib development files required])])
+saved_CPPFLAGS="${CPPFLAGS}"
+CPPFLAGS="${CPPFLAGS} ${GLIB_CFLAGS}"
+AC_CHECK_HEADER([pacemaker/crm/services.h], [],
+		[AC_MSG_ERROR([pacemaker/crm/services.h header required])])
+CPPFLAGS="${saved_CPPFLAGS}"
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
@@ -278,17 +283,19 @@ AM_CONDITIONAL([RANGE2RANDOM_GLIB], [test "x$range2random_provider" = "xglib"])
 # figure out nametag/distinguished-role provider
 nametag_provider=""
 if test "x$nametag_provider" = "x" && test "x$with_glue" != "xno"; then
-       AC_CHECK_LIB([plumbgpl], [set_proc_title], [nametag_provider="libplumbgpl"])
+	AC_CHECK_LIB([plumbgpl], [set_proc_title], [nametag_provider="libplumbgpl"])
 fi
 if test "x$nametag_provider" = "x" && test "x$with_glue" = "xno"; then
-       AC_CHECK_LIB([systemd], [sd_notify], [nametag_provider="libsystemd"])
+	AC_SEARCH_LIBS([sd_notify], [systemd systemd-daemon], [nametag_provider="libsystemd"])
 fi
 NOTIFY_ACCESS_SWITCH='# '
 case "$nametag_provider" in
 libplumbgpl)
 	;;
 libsystemd)
-	PKG_CHECK_MODULES([LIBSYSTEMD], [libsystemd])
+	PKG_CHECK_MODULES([LIBSYSTEMD], [libsystemd],, [
+		PKG_CHECK_MODULES([LIBSYSTEMD], [libsystemd-daemon])
+	])
 	AC_DEFINE([NAMETAG_LIBSYSTEMD], [], [use libsystemd as a nametag provider])
 	NOTIFY_ACCESS_SWITCH=
 	;;

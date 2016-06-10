@@ -45,8 +45,6 @@ MAINTAINERCLEANFILES	= Makefile.in aclocal.m4 configure depcomp \
 
 dist_doc_DATA		= AUTHORS README COPYING README.upgrade-from-v0.1
 
-notrans_dist_man8_MANS = docs/boothd.8 docs/booth-keygen.8
-
 boothconfdir		= ${BOOTHSYSCONFDIR}
 
 boothconf_DATA		= conf/booth.conf.example
