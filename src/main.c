@@ -97,7 +97,7 @@ static const struct booth_site _no_leader = {
 	.addr_string = "none",
 	.site_id = NO_ONE,
 };
-struct booth_site *no_leader = (struct booth_site*)& _no_leader;
+struct booth_site *const no_leader = (struct booth_site*) &_no_leader;
 
 typedef enum
 {
