@@ -110,7 +110,10 @@ static int add_site(char *addr_string, int type)
 	 * increase even more.
 	 * Whether there'll be a collision in real-life, with 3 or 5 nodes, is
 	 * another question ... but for now get the ID from the binary
-	 * representation - that had *no* collisions up to 32.0.0.0. */
+	 * representation - that had *no* collisions up to 32.0.0.0.
+	 * Note that POSIX mandates inet_pton to arange the address pointed
+	 * to by "dst" in network byte order, assuring little/big-endianess
+	 * mutual compatibility. */
 	if (inet_pton(AF_INET,
 				site->addr_string,
 				&site->sa4.sin_addr) > 0) {
