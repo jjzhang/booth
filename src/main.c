@@ -37,9 +37,6 @@
 #include <string.h>
 #include <ctype.h>
 #include <assert.h>
-#include <error.h>
-#include <sys/ioctl.h>
-#include <termios.h>
 #include <signal.h>
 #include <netdb.h>
 #include <arpa/inet.h>
