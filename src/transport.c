@@ -23,6 +23,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <netdb.h>  /* getnameinfo */
 #include <poll.h>
 #include <arpa/inet.h>
 #include <asm/types.h>
@@ -30,6 +31,7 @@
 #include <net/if.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+#include <sys/socket.h>  /* getnameinfo */
 #include "b_config.h"
 #include "attr.h"
 #include "auth.h"
@@ -50,7 +52,12 @@
 
 struct booth_site *local = NULL;
 
-
+/* function to be called when handling booth-group-internal messages;
+ * it's expected to return 0 to indicate success, negative integer
+ * to indicate silent (or possibly already complained about) error,
+ * or positive integer to indicate sender's ID that will then be
+ * emitted in the error log message together with the real source
+ * address if this is available */
 static int (*deliver_fn) (void *msg, int msglen);
 
 
@@ -779,7 +786,15 @@ static void process_recv(int ci)
 	if (rv == -1)
 		return;
 
-	deliver_fn((void*)msg, rv);
+	rv = deliver_fn((void*)msg, rv);
+	if (rv > 0) {
+		if (getnameinfo((struct sockaddr *)&sa, sa_len,
+				buffer, sizeof(buffer), NULL, 0,
+				NI_NUMERICHOST) == 0)
+			log_error("unknown sender: %08x (real: %s)", rv, buffer);
+		else
+			log_error("unknown sender: %08x", rv);
+	}
 }
 
 static int booth_udp_init(void *f)
@@ -1051,7 +1066,7 @@ int send_header_plus(int fd, struct boothc_hdr_msg *msg, void *data, int len)
 	return rv;
 }
 
-/* UDP message receiver. */
+/* UDP message receiver (see also deliver_fn declaration's comment) */
 int message_recv(void *msg, int msglen)
 {
 	uint32_t from;
@@ -1062,8 +1077,10 @@ int message_recv(void *msg, int msglen)
 
 	from = ntohl(header->from);
 	if (!find_site_by_id(from, &source)) {
-		log_error("unknown sender: %08x", from);
-		return -1;
+		/* caller knows the actual source address, pass
+		   the (assuredly) positive number and let it report */
+		from = from ? from : ~from;  /* avoid 0 (success) */
+		return from & (~0U >> 1);  /* avoid negative (error code} */
 	}
 
 	time(&source->last_recv);

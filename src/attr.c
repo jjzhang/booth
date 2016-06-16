@@ -464,7 +464,7 @@ int attr_recv(void *buf, struct booth_site *source)
 		log_warn("got invalid ticket name %s from %s",
 				msg->attr.tkt_id, site_string(source));
 		source->invalid_cnt++;
-		return 1;
+		return -1;
 	}
 
 	return 0;

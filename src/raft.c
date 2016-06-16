@@ -402,13 +402,13 @@ static int process_REVOKE (
 		tk_log_error("%s wants to revoke ticket, "
 				"but it is not granted there (ignoring)",
 				site_string(sender));
-		return 1;
+		return -1;
 	} else if (tk->state != ST_FOLLOWER) {
 		tk_log_error("unexpected ticket revoke from %s "
 				"(in state %s) (ignoring)",
 				site_string(sender),
 				state_to_string(tk->state));
-		return 1;
+		return -1;
 	} else {
 		tk_log_info("%s revokes ticket",
 				site_string(tk->leader));
