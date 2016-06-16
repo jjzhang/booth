@@ -19,26 +19,26 @@
 
 #include <string.h>
 #include <stdlib.h>
-#include <net/if.h>
+#include <unistd.h>
+#include <assert.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <poll.h>
+#include <arpa/inet.h>
 #include <asm/types.h>
 #include <linux/rtnetlink.h>
-#include <arpa/inet.h>
+#include <net/if.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
-#include <assert.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <errno.h>
-#include <poll.h>
 #include "b_config.h"
+#include "attr.h"
+#include "auth.h"
 #include "booth.h"
+#include "config.h"
 #include "inline-fn.h"
 #include "log.h"
-#include "config.h"
 #include "ticket.h"
 #include "transport.h"
-#include "auth.h"
-#include "attr.h"
 
 #define BOOTH_IPADDR_LEN	(sizeof(struct in6_addr))
 
