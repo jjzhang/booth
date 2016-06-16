@@ -1061,7 +1061,7 @@ int message_recv(void *msg, int msglen)
 	header = (struct boothc_header *)msg;
 
 	from = ntohl(header->from);
-	if (!find_site_by_id(from, &source) || !source) {
+	if (!find_site_by_id(from, &source)) {
 		log_error("unknown sender: %08x", from);
 		return -1;
 	}
