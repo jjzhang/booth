@@ -67,15 +67,12 @@ int test_attr_reply(cmd_result_t reply_code, cmd_request_t cmd)
 	int rv = 0;
 	const char *op_str = "";
 
-	if (cmd == ATTR_SET)
-		op_str = "set";
-	else if (cmd == ATTR_GET)
-		op_str = "get";
-	else if (cmd == ATTR_LIST)
-		op_str = "list";
-	else if (cmd == ATTR_DEL)
-		op_str = "delete";
-	else {
+	switch (cmd) {
+	case ATTR_SET:	op_str = "set";		break;
+	case ATTR_GET:	op_str = "get";		break;
+	case ATTR_LIST:	op_str = "list";	break;
+	case ATTR_DEL:	op_str = "delete";	break;
+	default:
 		log_error("internal error reading reply result!");
 		return -1;
 	}
