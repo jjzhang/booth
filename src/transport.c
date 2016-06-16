@@ -763,8 +763,8 @@ static void process_recv(int ci)
 	struct sockaddr_storage sa;
 	int rv;
 	socklen_t sa_len;
-	/* beware, the buffer needs to be large enought to accept a
-	 * packet */
+	/* beware, the buffer needs to be large enough to accept
+	 * a packet */
 	char buffer[MAX_MSG_LEN];
 	/* Used for unit tests */
 	struct boothc_ticket_msg *msg;
