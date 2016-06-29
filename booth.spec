@@ -124,8 +124,9 @@ ln -s ../../%{_initddir}/booth-arbitrator %{buildroot}%{_sbindir}/rcbooth-arbitr
 
 #install test-parts
 
-mkdir -p %{buildroot}/%{test_path}
-cp -a unit-tests/ script/unit-test.py test conf %{buildroot}/%{test_path}/
+mkdir -p %{buildroot}/%{test_path}/conf
+cp -a unit-tests/ script/unit-test.py test %{buildroot}/%{test_path}/
+cp -a conf/booth.conf.example %{buildroot}/%{test_path}/conf/
 chmod +x %{buildroot}/%{test_path}/test/booth_path
 chmod +x %{buildroot}/%{test_path}/test/live_test.sh
 
