@@ -80,7 +80,6 @@ class UT():
 # {{{ setup functions
     @classmethod
     def _filename(cls, desc):
-        return "/tmp/booth-unittest.%s" % desc
         return "/tmp/booth-unittest.%d.%s" % (os.getpid(), desc)
 
 
