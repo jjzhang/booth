@@ -137,7 +137,8 @@ rm -f %{buildroot}/%{test_path}/test/*.pyc
 %if 0%{?suse_version}
 #SUSE firewall rule
 mkdir -p $RPM_BUILD_ROOT/%{_fwdefdir}
-install -m 644 %{S:2} $RPM_BUILD_ROOT/%{_fwdefdir}/booth
+install -m 644 contrib/geo-cluster.fwd $RPM_BUILD_ROOT/%{_fwdefdir}/booth
+#install -m 644 %{S:2} $RPM_BUILD_ROOT/%{_fwdefdir}/booth
 %endif
 
 %check
