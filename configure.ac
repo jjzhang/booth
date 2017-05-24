@@ -169,6 +169,31 @@ cc_supports_flag() {
          return $RC
 }
 
+## extract header or define
+try_extract_header_define() {
+	  AC_MSG_CHECKING(if $2 in $1 exists)
+	  Cfile=$srcdir/extract_define.$2.${$}
+	  printf "#include <stdio.h>\n" > ${Cfile}.c
+	  printf "#include <%s>\n" $1 >> ${Cfile}.c
+	  printf "int main(int argc, char **argv) {\n" >> ${Cfile}.c
+	  printf "#ifdef %s\n" $2 >> ${Cfile}.c
+	  printf "printf(\"%%s\", %s);\n" $2 >> ${Cfile}.c
+	  printf "#endif \n return 0; }\n" >> ${Cfile}.c
+	  $CC $CFLAGS ${Cfile}.c -o ${Cfile} 2>/dev/null
+	  value=
+	  if test -x ${Cfile}; then
+	      value=`${Cfile} 2>/dev/null`
+	  fi
+	  if  test x"${value}" == x""; then
+	      value=$3
+	      AC_MSG_RESULT(default: $value)
+	  else
+	      AC_MSG_RESULT($value)
+	  fi
+	  printf $value
+	  rm -rf ${Cfile}.c ${Cfile} ${Cfile}.dSYM ${Cfile}.gcno
+	}
+
 ## cleanup
 AC_MSG_NOTICE(Sanitizing prefix: ${prefix})
 case $prefix in
@@ -315,6 +340,15 @@ if test "x$coredump_nursing" != "xno"; then
 	AC_DEFINE(COREDUMP_NURSING, [], [eligible for coredump nursing])
 fi
 AM_CONDITIONAL([COREDUMP_NURSING], [test "x$coredump_nursing" != "xno"])
+
+# define CRM daemon user & group
+CRM_DAEMON_USER=`try_extract_header_define glue_config.h HA_CCMUSER hacluster`
+AC_DEFINE_UNQUOTED(CRM_DAEMON_USER,"$CRM_DAEMON_USER", User to run Booth daemon as)
+AC_SUBST(CRM_DAEMON_USER)
+
+CRM_DAEMON_GROUP=`try_extract_header_define glue_config.h HA_APIGROUP haclient`
+AC_DEFINE_UNQUOTED(CRM_DAEMON_GROUP,"$CRM_DAEMON_GROUP", Group to run Booth daemon as)
+AC_SUBST(CRM_DAEMON_GROUP)
 
 # OS detection
 # THIS SECTION MUST DIE!
@@ -515,11 +549,19 @@ AC_SUBST([LINT_FLAGS])
 
 AC_DEFINE_UNQUOTED([SOCKETDIR], "$(eval echo ${SOCKETDIR})", [Socket directory])
 
+BOOTH_LIB_DIR=${localstatedir}/lib/booth
+BOOTH_CORE_DIR=${localstatedir}/lib/booth/cores
 BOOTHSYSCONFDIR=${sysconfdir}/booth
+
 AC_SUBST([HAVE_LOG_CIB_DIFF])
 AC_SUBST([HAVE_XML_LOG_PATCHSET])
+AC_SUBST([BOOTH_LIB_DIR])
+AC_SUBST([BOOTH_CORE_DIR])
 AC_SUBST([BOOTHSYSCONFDIR])
 AC_SUBST([BOOTH_BUILD_VERSION])
+
+AC_DEFINE_UNQUOTED([BOOTH_LIB_DIR], "$(eval echo ${BOOTH_LIB_DIR})", [booth lib directory])
+AC_DEFINE_UNQUOTED([BOOTH_CORE_DIR], "$(eval echo ${BOOTH_CORE_DIR})", [booth working directory])
 AC_DEFINE_UNQUOTED([BOOTHSYSCONFDIR], "$(eval echo ${BOOTHSYSCONFDIR})", [booth config directory])
 
 AC_DEFINE_UNQUOTED([PACKAGE_FEATURES], "${PACKAGE_FEATURES}", [booth built-in features])
@@ -548,6 +590,9 @@ AC_MSG_RESULT([  Logging provider         = ${logging_provider}])
 AC_MSG_RESULT([  Range2random provider    = ${range2random_provider}])
 AC_MSG_RESULT([  Nametag provider         = ${nametag_provider}])
 AC_MSG_RESULT([  Coredump nursing         = ${coredump_nursing}])
+AC_MSG_RESULT([  Working directory        = ${BOOTH_CORE_DIR}])
+AC_MSG_RESULT([  HA group name            = ${CRM_DAEMON_GROUP}])
+AC_MSG_RESULT([  HA user name             = ${CRM_DAEMON_USER}])
 AC_MSG_RESULT([])
 AC_MSG_RESULT([$PACKAGE build info:])
 AC_MSG_RESULT([  Library SONAME           = ${SONAME}])
