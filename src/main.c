@@ -1480,8 +1480,6 @@ static int do_server(int type)
 #else
 	if (chdir(BOOTH_CORE_DIR) < 0) {
 		log_error("cannot change working directory to %s", BOOTH_CORE_DIR);
-	} else {
-		log_info("booth working directory set to %s", BOOTH_CORE_DIR);
 	}
 #endif
 
