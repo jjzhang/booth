@@ -66,21 +66,18 @@ static void hostname_to_ip(char * hostname)
 	struct hostent *he;
 	struct in_addr **addr_list;
 
-	if ( (he = gethostbyname( hostname ) ) == NULL) 
-	{
+	if ((he = gethostbyname(hostname)) == NULL) {
 		log_error("can't find IP for the host \"%s\"", hostname);
 		return;
 	}
 
 	addr_list = (struct in_addr **) he->h_addr_list;
 
-	// Return the first found address
-	if (addr_list[0] != NULL)
-	{
+	/* Return the first found address */
+	if (addr_list[0] != NULL) {
 		strncpy(hostname, inet_ntoa(*addr_list[0]), BOOTH_NAME_LEN);
 	}
-	else
-	{
+	else {
 		log_error("no IP addresses found for the host \"%s\"", hostname);
 	}
 }
@@ -112,9 +109,9 @@ static int add_site(char *addr_string, int type)
 	strncpy(site->addr_string, addr_string, sizeof(site->addr_string));
 
 	if (!(inet_pton(AF_INET, site->addr_string, &site->sa4.sin_addr) > 0) &&
-		!(inet_pton(AF_INET6, site->addr_string, &site->sa6.sin6_addr) > 0)) {
+        !(inet_pton(AF_INET6, site->addr_string, &site->sa6.sin6_addr) > 0)) {
 
-		// Not a valid address, so let us try to convert it into an IP address:
+		/* Not a valid address, so let us try to convert it into an IP address */
 		hostname_to_ip(site->addr_string);
 	}
 
