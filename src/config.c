@@ -27,6 +27,7 @@
 #include <grp.h>
 #include <errno.h>
 #include <string.h>
+#include <netdb.h>
 #include "b_config.h"
 #include "booth.h"
 #include "config.h"
@@ -60,6 +61,29 @@ static int ticket_realloc(void)
 	return 0;
 }
 
+static void hostname_to_ip(char * hostname)
+{
+	struct hostent *he;
+	struct in_addr **addr_list;
+
+	if ( (he = gethostbyname( hostname ) ) == NULL) 
+	{
+		log_error("can't find IP for the host \"%s\"", hostname);
+		return;
+	}
+
+	addr_list = (struct in_addr **) he->h_addr_list;
+
+	// Return the first found address
+	if (addr_list[0] != NULL)
+	{
+		strncpy(hostname, inet_ntoa(*addr_list[0]), BOOTH_NAME_LEN);
+	}
+	else
+	{
+		log_error("no IP addresses found for the host \"%s\"", hostname);
+	}
+}
 
 static int add_site(char *addr_string, int type)
 {
@@ -68,7 +92,6 @@ static int add_site(char *addr_string, int type)
 	uLong nid;
 	uint32_t mask;
 	int i;
-
 
 	rv = 1;
 	if (booth_conf->site_count == MAX_NODES) {
@@ -85,8 +108,15 @@ static int add_site(char *addr_string, int type)
 
 	site->family = AF_INET;
 	site->type = type;
+
 	strncpy(site->addr_string, addr_string, sizeof(site->addr_string));
 
+	if (!(inet_pton(AF_INET, site->addr_string, &site->sa4.sin_addr) > 0) &&
+		!(inet_pton(AF_INET6, site->addr_string, &site->sa6.sin6_addr) > 0)) {
+
+		// Not a valid address, so let us try to convert it into an IP address:
+		hostname_to_ip(site->addr_string);
+	}
 
 	site->index = booth_conf->site_count;
 	site->bitmask = 1 << booth_conf->site_count;
