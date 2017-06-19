@@ -166,6 +166,8 @@ echo "%%run_build_tests set to %run_build_tests; skipping tests"
 %dir /usr/lib/ocf/lib
 %dir /usr/lib/ocf/lib/booth
 %dir %{_sysconfdir}/booth
+%dir %attr (750, %{uname}, %{gname}) %{_var}/lib/booth/
+%dir %attr (750, %{uname}, %{gname}) %{_var}/lib/booth/cores
 %{_sbindir}/rcbooth-arbitrator
 /usr/lib/ocf/resource.d/pacemaker/booth-site
 /usr/lib/ocf/lib/booth/geo_attr.sh

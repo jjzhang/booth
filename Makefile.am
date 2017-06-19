@@ -83,6 +83,10 @@ install-exec-local:
 	$(INSTALL) -d $(DESTDIR)/${boothsitedir}
 	$(INSTALL) -d $(DESTDIR)/${boothocfdir}
 	$(INSTALL) -d $(DESTDIR)/${SOCKETDIR}
+	$(INSTALL) -d $(DESTDIR)/${BOOTH_LIB_DIR} -m 750
+	-chown $(CRM_DAEMON_USER):$(CRM_DAEMON_GROUP) $(DESTDIR)/${BOOTH_LIB_DIR} 
+	$(INSTALL) -d $(DESTDIR)/${BOOTH_CORE_DIR} -m 750
+	-chown $(CRM_DAEMON_USER):$(CRM_DAEMON_GROUP) $(DESTDIR)/${BOOTH_CORE_DIR}
 
 install-exec-hook:
 	ln -sf ${sbindir}/boothd $(DESTDIR)/${sbindir}/booth
@@ -93,6 +97,8 @@ uninstall-local:
 	rmdir $(DESTDIR)/${bootharbitratordir} || :;
 	rmdir $(DESTDIR)/${boothsitedir} || :;
 	rmdir $(DESTDIR)/${SOCKETDIR} || :;
+	rmdir $(DESTDIR)/${BOOTH_CORE_DIR} || :;
+	rmdir $(DESTDIR)/${BOOTH_LIB_DIR} || :;
 
 test: check
 
