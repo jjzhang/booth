@@ -460,7 +460,7 @@ static void log_reacquire_reason(struct ticket_config *tk)
 {
 	int valid;
 	const char *where_granted = "\0";
-	char buff[64];
+	char buff[75];
 
 	valid = is_time_set(&tk->term_expires) && !is_past(&tk->term_expires);
 
