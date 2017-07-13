@@ -31,6 +31,9 @@ class BoothRunner:
     def set_debug(self):
         self.args += [ '-D' ]
 
+    def set_foreground(self):
+        self.args += [ '-S' ]
+
     def all_args(self):
         return [ self.boothd_path ] + self.args + self.final_args
 

@@ -86,6 +86,16 @@ class ServerTests(ServerTestEnvironment):
     def test_debug_mode(self):
         (pid, ret, stdout, stderr, runner) = \
             self.run_booth(config_text=self.working_config, debug=True,
+                           expected_exitcode=0, expected_daemon=True)
+
+    def test_foreground_mode(self):
+        (pid, ret, stdout, stderr, runner) = \
+            self.run_booth(config_text=self.working_config, foreground=True,
+                           expected_exitcode=None, expected_daemon=True)
+
+    def test_debug_and_foreground_mode(self):
+        (pid, ret, stdout, stderr, runner) = \
+            self.run_booth(config_text=self.working_config, debug=True, foreground=True,
                            expected_exitcode=None, expected_daemon=True)
 
     def test_missing_transport(self):

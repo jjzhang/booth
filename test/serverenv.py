@@ -33,7 +33,7 @@ ticket="ticketB"
 
     def run_booth(self, expected_exitcode, expected_daemon,
                   config_text=None, config_file=None, lock_file=True,
-                  args=[], debug=False):
+                  args=[], debug=False, foreground=False):
         '''
         Runs boothd.  Defaults to using a temporary lock file and the
         standard config file path.  There are four possible types of
@@ -42,7 +42,7 @@ ticket="ticketB"
             - boothd exits non-zero without launching a daemon (setup phase failed,
               e.g. due to invalid configuration file)
             - boothd exits zero after launching a daemon (successful operation)
-            - boothd does not exit (running in foreground / debug mode)
+            - boothd does not exit (running in foreground mode)
             - boothd does not exit (setup phase hangs, e.g. while attempting
               to connect to peer during ticket_catchup())
 
@@ -61,13 +61,15 @@ ticket="ticketB"
                 an integer, or False if booth is not expected to terminate
                 within the timeout
             expected_daemon
-                True iff a daemon is expected to be launched (this includes
-                running the server in debug / foreground mode via -D; even
-                though in this case the server's not technically not a daemon,
+                True iff a daemon is expected to be launched (this means
+                running the server in foreground mode via -S;
+                even though in this case the server's not technically not a daemon,
                 we still want to treat it like one by checking the lockfile
                 before and after we kill it)
             debug
                 True means pass the -D parameter
+            foreground
+                True means pass the -S parameter
 
         Returns a (pid, return_code, stdout, stderr, runner) tuple,
         where return_code/stdout/stderr are None iff pid is still running.
@@ -96,6 +98,9 @@ ticket="ticketB"
 
         if debug:
             runner.set_debug()
+
+        if foreground:
+            runner.set_foreground()
 
         runner.show_args()
         (pid, return_code, stdout, stderr) = runner.run()
