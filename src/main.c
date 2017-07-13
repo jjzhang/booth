@@ -1116,10 +1116,12 @@ static int read_arguments(int argc, char **argv)
 					strcat(cp, BOOTH_DEFAULT_CONF_EXT);
 			}
 			break;
+
 		case 'D':
 			debug_level++;
 			enable_stderr = 1;
-			/* Fall through */
+			break;
+
 		case 'S':
 			daemonize = 0;
 			break;
