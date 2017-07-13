@@ -1124,6 +1124,7 @@ static int read_arguments(int argc, char **argv)
 
 		case 'S':
 			daemonize = 0;
+			enable_stderr = 1;
 			break;
 
 		case 'l':
