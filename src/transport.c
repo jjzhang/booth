@@ -237,14 +237,36 @@ int _find_myself(int family, struct booth_site **mep, int fuzzy_allowed)
 							BOOTH_IPADDR_LEN);
 				}
 
-				/* First try with exact addresses, then optionally with subnet matching. */
+				/* Try to find the exact address or the address with subnet matching.
+				 * The function find_address will be called for each address received
+				 * from NLMSG_DATA above.
+				 * The exact match will be prefered. If no exact match is found,
+				 * the function find_address will try to return another, most similar
+				 * address (with the longest possible number of same bytes). */
 				if (ifa->ifa_prefixlen > address_bits_matched) {
 					find_address(ipaddr,
 							ifa->ifa_family, ifa->ifa_prefixlen,
 							fuzzy_allowed, &me, &address_bits_matched);
+
 					if (me) {
 						log_debug("found myself at %s (%d bits matched)",
 								site_string(me), address_bits_matched);
+					}
+				}
+				/* If the previous NLMSG_DATA calls have already allowed us
+				 * to find an address with address_bits_matched matching bits,
+				 * then no other better non-exact address can bo found.
+				 * But we can still try to find an exact match, so let us
+				 * call the function find_address with disabled searching of
+				 * similar addresses (fuzzy_allowed == 0) */
+				else if (ifa->ifa_prefixlen == address_bits_matched) {
+					find_address(ipaddr,
+							ifa->ifa_family, ifa->ifa_prefixlen,
+							0 /* fuzzy_allowed */, &me, &address_bits_matched);
+
+					if (me) {
+						log_debug("found myself at %s (exact match)", 
+								site_string(me));
 					}
 				}
 			}
