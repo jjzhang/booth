@@ -97,12 +97,11 @@ The configuration name also determines the name of the PID file - for the defaul
 	Report version information.
 
 *-S*::
-	'systemd' mode: don't fork. This is like '-D' but without the debug output.
+	'systemd' mode: don't fork.
+	Disables daemonizing, the process will remain in the foreground.
 
 *-D*::
-	Debug output/don't daemonize.
-	Increases the debug output level; booth daemon remains
-	in the foreground.
+	Increases the debug output level.
 
 *-l* 'lockfile'::
 	Use another lock file. By default, the lock file name is
