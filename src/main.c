@@ -1119,7 +1119,6 @@ static int read_arguments(int argc, char **argv)
 
 		case 'D':
 			debug_level++;
-			enable_stderr = 1;
 			break;
 
 		case 'S':
