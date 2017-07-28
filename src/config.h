@@ -57,6 +57,11 @@ typedef enum {
 	GRANT_MANUAL,
 } grant_type_e;
 
+typedef enum {
+	TICKET_MODE_AUTO = 1,
+	TICKET_MODE_MANUAL,
+} ticket_mode_e;
+
 struct toktab {
 	const char *str;
 	int val;
@@ -107,6 +112,15 @@ struct ticket_config {
 
 	/** Node weights. */
 	int weight[MAX_NODES];
+
+	/* Mode operation of the ticket.
+	 * Set to MANUAL to make sure that the ticket will be manipulated
+	 * only by manual commands of the administrator. In such a case
+	 * automatic elections will be disabled.
+	 * Manual tickets do not have to be renewed every some time.
+	 * The leader will continue to send heartbeat messages to other sites.
+	 */
+	ticket_mode_e mode;
 	/** @} */
 
 

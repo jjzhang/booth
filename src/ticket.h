@@ -60,7 +60,6 @@ extern int TIME_RES;
 
 void save_committed_tkt(struct ticket_config *tk);
 void disown_ticket(struct ticket_config *tk);
-int disown_if_expired(struct ticket_config *tk);
 int check_ticket(char *ticket, struct ticket_config **tc);
 int check_site(char *site, int *local);
 int grant_ticket(struct ticket_config *ticket);

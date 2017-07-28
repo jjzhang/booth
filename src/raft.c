@@ -30,7 +30,7 @@
 #include "ticket.h"
 #include "request.h"
 #include "log.h"
-
+#include "manual.h"
 
 
 inline static void clear_election(struct ticket_config *tk)
@@ -399,10 +399,22 @@ static int process_REVOKE (
 		/* assume that our ack got lost */
 		rv = send_msg(OP_ACK, tk, sender, msg);
 	} else if (tk->leader != sender) {
-		tk_log_error("%s wants to revoke ticket, "
-				"but it is not granted there (ignoring)",
-				site_string(sender));
-		return -1;
+		if (tk->mode != TICKET_MODE_MANUAL) {
+			tk_log_error("%s wants to revoke ticket, "
+					"but it is not granted there (ignoring)",
+					site_string(sender));
+			return -1;
+		} else {
+			// For manual tickets, we may end up having two leaders.
+			// If one of them is revoked, we may find ourselves here.
+
+			// We are going to send the ACK, to satisfy the requestor.
+			rv = send_msg(OP_ACK, tk, sender, msg);
+
+			// Ticket itself is not modified. This means that
+			// the current site will still follow another
+			// leader (or be a leader itself).
+		}
 	} else if (tk->state != ST_FOLLOWER) {
 		tk_log_error("unexpected ticket revoke from %s "
 				"(in state %s) (ignoring)",

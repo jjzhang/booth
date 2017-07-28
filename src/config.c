@@ -259,6 +259,7 @@ static int add_ticket(const char *name, struct ticket_config **tkp,
 	tk->term_duration = def->term_duration;
 	tk->retries = def->retries;
 	memcpy(tk->weight, def->weight, sizeof(tk->weight));
+	tk->mode = def->mode;
 
 	if (tkp)
 		*tkp = tk;
@@ -331,6 +332,16 @@ static int parse_weights(const char *input, int weights[MAX_NODES])
 	return i;
 }
 
+/* returns TICKET_MODE_AUTO if failed to parse the ticket mode. */
+static ticket_mode_e retrieve_ticket_mode(const char *input)
+{
+	if ((strcmp(input, "manual") == 0) ||
+	    (strcmp(input, "MANUAL") == 0)) {
+		return TICKET_MODE_MANUAL;
+	}
+
+	return TICKET_MODE_AUTO;
+}
 
 /* scan val for time; time is [0-9]+(ms)?, i.e. either in seconds
  * or milliseconds
@@ -546,6 +557,7 @@ int read_config(const char *path, int type)
 	defaults.timeout       = DEFAULT_TICKET_TIMEOUT;
 	defaults.retries       = DEFAULT_RETRIES;
 	defaults.acquire_after = 0;
+	defaults.mode  = 0;  /* by default, ticket management is automatic */
 
 	error = "";
 
@@ -805,6 +817,11 @@ no_value:
 			if (parse_attr_prereq(val, current_tk)) {
 				goto err;
 			}
+			continue;
+		}
+
+		if (strcmp(key, "mode") == 0) {
+			current_tk->mode = retrieve_ticket_mode(val);
 			continue;
 		}
 
