@@ -74,7 +74,7 @@ The configuration name also determines the name of the PID file - for the defaul
 	'immediate grant': Don't wait for unreachable sites to
 	relinquish the ticket. See the 'Booth ticket management'
 	section below for more details.
-	For manual tickets this option allows to grat a ticket
+	For manual tickets this option allows to grant a ticket
 	which is currently granted. See the 'Manual tickets' section
 	below for more details.
 +
