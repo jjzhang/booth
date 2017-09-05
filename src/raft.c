@@ -399,7 +399,7 @@ static int process_REVOKE (
 		/* assume that our ack got lost */
 		rv = send_msg(OP_ACK, tk, sender, msg);
 	} else if (tk->leader != sender) {
-		if (tk->mode != TICKET_MODE_MANUAL) {
+		if (!is_manual(tk)) {
 			tk_log_error("%s wants to revoke ticket, "
 					"but it is not granted there (ignoring)",
 					site_string(sender));

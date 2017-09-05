@@ -335,8 +335,7 @@ static int parse_weights(const char *input, int weights[MAX_NODES])
 /* returns TICKET_MODE_AUTO if failed to parse the ticket mode. */
 static ticket_mode_e retrieve_ticket_mode(const char *input)
 {
-	if ((strcmp(input, "manual") == 0) ||
-	    (strcmp(input, "MANUAL") == 0)) {
+	if (strcasecmp(input, "manual") == 0) {
 		return TICKET_MODE_MANUAL;
 	}
 
@@ -557,7 +556,7 @@ int read_config(const char *path, int type)
 	defaults.timeout       = DEFAULT_TICKET_TIMEOUT;
 	defaults.retries       = DEFAULT_RETRIES;
 	defaults.acquire_after = 0;
-	defaults.mode  = 0;  /* by default, ticket management is automatic */
+	defaults.mode          = TICKET_MODE_AUTO;
 
 	error = "";
 

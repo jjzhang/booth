@@ -183,7 +183,7 @@ void save_committed_tkt(struct ticket_config *tk)
 static void ext_prog_failed(struct ticket_config *tk,
 		int start_election)
 {
-	if (tk->mode != TICKET_MODE_MANUAL) {
+	if (!is_manual(tk)) {
 		/* Give it to somebody else.
 	 	 * Just send a VOTE_FOR message, so the
 		 * others can start elections. */
@@ -312,7 +312,7 @@ int acquire_ticket(struct ticket_config *tk, cmd_reason_t reason)
 		return RLT_EXT_FAILED;
 	}
 
-	if (tk->mode == TICKET_MODE_MANUAL) {
+	if (is_manual(tk)) {
 		rv = manual_selection(tk, local, 1, reason);
 	} else {
 		rv = new_election(tk, local, 1, reason);
@@ -333,8 +333,7 @@ int do_grant_ticket(struct ticket_config *tk, int options)
 	if (tk->leader == local)
 		return RLT_SUCCESS;
 	if (is_owned(tk)) {
-		if ((options & OPT_IMMEDIATE) &&
-			(tk->mode == TICKET_MODE_MANUAL)) {
+		if (is_manual(tk) && (options & OPT_IMMEDIATE)) {
 			/* -F flag has been used while granting a manual ticket.
 			 * The ticket will be granted and may end up being granted
 			 * on multiple sites */
@@ -409,7 +408,7 @@ int list_ticket(char **pdata, unsigned int *len)
 
 	cp = data;
 	foreach_ticket(i, tk) {
-		if (is_time_set(&tk->term_expires) && (tk->mode != TICKET_MODE_MANUAL)) {
+		if ((!is_manual(tk)) && is_time_set(&tk->term_expires)) {
 			/* Manual tickets doesn't have term_expires defined */
 			ts = wall_ts(&tk->term_expires);
 			strftime(timeout_str, sizeof(timeout_str), "%F %T",
@@ -442,7 +441,7 @@ int list_ticket(char **pdata, unsigned int *len)
 					pending_str);
 		}
 
-		if (tk->mode == TICKET_MODE_MANUAL) {
+		if (is_manual(tk)) {
 			cp += snprintf(cp,
 					alloc - (cp - data),
 					" [manual mode]");
@@ -468,6 +467,17 @@ void disown_ticket(struct ticket_config *tk)
 	set_leader(tk, NULL);
 	tk->is_granted = 0;
 	get_time(&tk->term_expires);
+}
+
+int disown_if_expired(struct ticket_config *tk)
+{
+	if (is_past(&tk->term_expires) ||
+			!tk->leader) {
+		disown_ticket(tk);
+		return 1;
+	}
+
+	return 0;
 }
 
 void reset_ticket(struct ticket_config *tk)
@@ -633,7 +643,7 @@ int process_client_request(struct client *req_client, void *buf)
 
 	/* Perform the initial check before granting
 	 * an already granted non-manual ticket */
-	if ((cmd == CMD_GRANT) && is_owned(tk) && (tk->mode != TICKET_MODE_MANUAL)) {
+	if ((!is_manual(tk) && (cmd == CMD_GRANT) && is_owned(tk))) {
 		log_warn("client wants to grant an (already granted!) ticket %s",
 				msg->ticket.id);
 
@@ -755,7 +765,7 @@ int leader_update_ticket(struct ticket_config *tk)
 		return 0;
 
 	/* for manual tickets, we don't set time expiration */
-	if (tk->mode != TICKET_MODE_MANUAL) {
+	if (!is_manual(tk)) {
 		if (tk->ticket_updated < 1) {
 			tk->ticket_updated = 1;
 			get_time(&now);
@@ -969,7 +979,7 @@ static void next_action(struct ticket_config *tk)
 		break;
 
 	case ST_FOLLOWER:
-	if (tk->mode != TICKET_MODE_MANUAL) {
+	if (!is_manual(tk)) {
 		/* leader/ticket lost? and we didn't vote yet */
 		tk_log_debug("leader: %s, voted_for: %s",
 				site_string(tk->leader),
@@ -1051,9 +1061,9 @@ static void ticket_cron(struct ticket_config *tk)
 	 * For automatic tickets, losing the ticket must happen
 	 * in _every_ state.
 	 */
-	if (is_owned(tk) && is_time_set(&tk->term_expires)
-			&& is_past(&tk->term_expires)
-			&& (tk->mode != TICKET_MODE_MANUAL)) {
+	if ((!is_manual(tk)) &&
+			is_owned(tk) && is_time_set(&tk->term_expires)
+			&& is_past(&tk->term_expires)) {
 		ticket_lost(tk);
 		goto out;
 	}
@@ -1207,7 +1217,7 @@ void set_ticket_wakeup(struct ticket_config *tk)
 
 	switch (tk->state) {
 	case ST_LEADER:
-		if (tk->mode != TICKET_MODE_MANUAL) {
+		if (!is_manual(tk)) {
 			/* Leader won't initialize new elections for manual tickets */
 			assert(tk->leader == local);
 
@@ -1229,7 +1239,7 @@ void set_ticket_wakeup(struct ticket_config *tk)
 		break;
 
 	case ST_CANDIDATE:
-		if (tk->mode != TICKET_MODE_MANUAL) {
+		if (!is_manual(tk)) {
 			/* There is no Candidate state for manual tickets */
 			assert(is_time_set(&tk->election_end));
 			ticket_next_cron_at(tk, &tk->election_end);
@@ -1241,7 +1251,7 @@ void set_ticket_wakeup(struct ticket_config *tk)
 		/* If there is (or should be) some owner, check on it later on.
 		 * If no one is interested - don't care. */
 		if (is_owned(tk)) {
-			if (tk->mode != TICKET_MODE_MANUAL) {
+			if (!is_manual(tk)) {
 				interval_add(&tk->term_expires, tk->acquire_after, &tv);
 				ticket_next_cron_at(tk, &tv);
 			} else {
@@ -1279,6 +1289,12 @@ void schedule_election(struct ticket_config *tk, cmd_reason_t reason)
 	get_time(&tk->next_cron);
 	/* introduce a short delay before starting election */
 	add_random_delay(tk);
+}
+
+
+int is_manual(struct ticket_config *tk)
+{
+	return (tk->mode == TICKET_MODE_MANUAL) ? 1 : 0;
 }
 
 

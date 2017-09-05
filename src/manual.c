@@ -31,8 +31,7 @@ int manual_selection(struct ticket_config *tk,
 	if (local->type != SITE)
 		return 0;
 
-	tk_log_debug("starting manual selection");
-	tk_log_debug("selection caused by %s %s",
+	tk_log_debug("starting manual selection (caused by %s %s)",
 				state_to_string(reason),
 				reason == OR_AGAIN ? state_to_string(tk->election_reason) : "" );
 

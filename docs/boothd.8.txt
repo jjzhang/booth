@@ -532,17 +532,18 @@ name 'booth'.
 
 MANUAL TICKETS
 -----------------------
-Manual tickets allow users to create and manage tickets which behave
-more predictably than standard Raft tickets. Granting and revoking
-manual tickets if fully controlled by the administrator. It is possible
-to define a number of manual and normal tickets in one GEO cluster.
+Manual tickets allow users to create and manage tickets which are
+subsequently not controlled by booth more predictably than standard
+Raft tickets. Granting and revoking manual tickets if fully controlled
+by the administrator. It is possible to define a number of manual and
+normal tickets in one GEO cluster.
 
-Automatic ticket management provided by Raft algorithm doesn't apply
+Automatic ticket management provided by Raft algorithm isn't applied
 to manually controlled tickets. In particular, there is no elections,
 automatic failover procedures, and term expiration.
 
-On the other hand, 'booth' controls if a ticket is currently being
-granted to any site and warns the user approprietly.
+However, 'booth' controls if a ticket is currently being granted to
+any site and warns the user approprietly.
 
 Tickets which were manually granted to a site, will remain there until
 they are manually revoked. Even if a site becomes offline, the ticket
@@ -553,7 +554,7 @@ geographical location.
 
 Also, configuring only manual tickets in a GEO cluster, allows to have
 just two sites in a cluster, without a need of having an arbitrator.
-This happens because there is no automatic elections and no voting
+This is possible because there is no automatic elections and no voting
 performed for manual tickets.
 
 Manual tickets are defined in a configuration files by adding a 'mode'
@@ -567,8 +568,8 @@ ticket="manual-ticket"
 Manual tickets can be granted and revoked by using normal 'grant' and
 'revoke' commands, with the usual flags and parameters. The only
 difference is that specyfiyng '-F' flag during 'grant' command, forced
-a site to become a leader of the specified ticket, irrespective of the
-fact if there is already another leader.
+a site to become a leader of the specified ticket, even if the ticket
+is granted to another site.
 
 
 EXIT STATUS
