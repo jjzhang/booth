@@ -405,15 +405,11 @@ static int process_REVOKE (
 					site_string(sender));
 			return -1;
 		} else {
-			// For manual tickets, we may end up having two leaders.
-			// If one of them is revoked, we may find ourselves here.
-
-			// We are going to send the ACK, to satisfy the requestor.
-			rv = send_msg(OP_ACK, tk, sender, msg);
-
-			// Ticket itself is not modified. This means that
-			// the current site will still follow another
-			// leader (or be a leader itself).
+			rv = process_REVOKE_for_manual_ticket(tk, sender, msg);
+	
+			// Ticket data stored in this site is not modified. This means
+			// that this site will still follow another leader (the one which
+			// has not been revoked) or be a leader itself.
 		}
 	} else if (tk->state != ST_FOLLOWER) {
 		tk_log_error("unexpected ticket revoke from %s "

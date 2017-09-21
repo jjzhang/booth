@@ -24,7 +24,12 @@
 #include "log.h"
 #include "request.h"
 
-
+/* For manual tickets, manual_selection function is an equivalent
+ * of new_election function used for assigning automatic tickets.
+ * The workflow here is much simplier, as no voting is performed,
+ * and the current node doesn't have to wait for any responses
+ * from other sites.
+ */
 int manual_selection(struct ticket_config *tk,
 	struct booth_site *preference, int update_term, cmd_reason_t reason)
 {
@@ -44,10 +49,9 @@ int manual_selection(struct ticket_config *tk,
 	// Make sure that election_end field is empty
 	time_reset(&tk->election_end);
 
-	if (is_time_set(&tk->delay_commit) && all_sites_replied(tk)) {
-		time_reset(&tk->delay_commit);
-		tk_log_debug("reset delay commit as all sites replied");
-	}
+	// Make sure that delay commit is empty, as manual tickets don't
+	// wait for any kind of confirmation from other nodes
+	time_reset(&tk->delay_commit);
 
 	save_committed_tkt(tk);
 
@@ -58,6 +62,44 @@ int manual_selection(struct ticket_config *tk,
 	return 0;
 }
 
+/* This function is called for manual tickets that were
+ * revoked from another site, which this site doesn't
+ * consider as a leader.
+ */
+int process_REVOKE_for_manual_ticket (
+	struct ticket_config *tk,
+	struct booth_site *sender,
+	struct boothc_ticket_msg *msg)
+{
+	int rv;
+
+	// For manual tickets, we may end up having two leaders.
+	// If one of them is revoked, it will send information 
+	// to all members of the GEO cluster.
+	
+	// We may find ourselves here if this particular site
+	// has not been following the leader which had been revoked
+	// (and which had sent this message).
+
+	// We are going to send the ACK, to satisfy the requestor.
+	rv = send_msg(OP_ACK, tk, sender, msg);		
+	
+	if (tk->state == ST_LEADER) {
+		tk_log_warn("%s wants to revoke ticket, "
+			"but this site is itself a leader",
+			site_string(sender));
+
+		// Because another leader is presumably stepping down,
+		// let's notify other sites that now we are the only leader.
+		ticket_broadcast(tk, OP_HEARTBEAT, OP_ACK, RLT_SUCCESS, 0);
+	} else {
+		tk_log_warn("%s wants to revoke ticket, "
+			"but this site is not following it",
+			site_string(sender));
+	}
+
+	return rv;
+}
 
 
 

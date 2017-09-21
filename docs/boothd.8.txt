@@ -533,8 +533,8 @@ name 'booth'.
 MANUAL TICKETS
 -----------------------
 Manual tickets allow users to create and manage tickets which are
-subsequently not controlled by booth more predictably than standard
-Raft tickets. Granting and revoking manual tickets if fully controlled
+subsequently handled by booth without using the Raft algorithm.
+Granting and revoking manual tickets is fully controlled
 by the administrator. It is possible to define a number of manual and
 normal tickets in one GEO cluster.
 

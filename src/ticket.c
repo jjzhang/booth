@@ -979,30 +979,41 @@ static void next_action(struct ticket_config *tk)
 		break;
 
 	case ST_FOLLOWER:
-	if (!is_manual(tk)) {
-		/* leader/ticket lost? and we didn't vote yet */
-		tk_log_debug("leader: %s, voted_for: %s",
-				site_string(tk->leader),
-				site_string(tk->voted_for));
-		if (!tk->leader) {
-			if (!tk->voted_for || !tk->in_election) {
-				disown_ticket(tk);
-				if (!new_election(tk, NULL, 1, OR_AGAIN)) {
+		if (!is_manual(tk)) {
+			/* leader/ticket lost? and we didn't vote yet */
+			tk_log_debug("leader: %s, voted_for: %s",
+					site_string(tk->leader),
+					site_string(tk->voted_for));
+			if (!tk->leader) {
+				if (!tk->voted_for || !tk->in_election) {
+					disown_ticket(tk);
+					if (!new_election(tk, NULL, 1, OR_AGAIN)) {
+						ticket_activate_timeout(tk);
+					}
+				} else {
+					/* we should restart elections in case nothing
+					* happens in the meantime */
+					tk->in_election = 0;
 					ticket_activate_timeout(tk);
 				}
+			}
+		} else {
+			/* for manual tickets, also try to acquire ticket on grant
+			 * in the Follower state (because we may end up having
+			 * two Leaders) */
+			if (has_extprog_exited(tk)) {
+				rv = acquire_ticket(tk, OR_ADMIN);
+				if (rv != 0) { /* external program failed */
+					tk->outcome = rv;
+					foreach_tkt_req(tk, notify_client);
+				}
 			} else {
-				/* we should restart elections in case nothing
-				 * happens in the meantime */
-				tk->in_election = 0;
-				ticket_activate_timeout(tk);
+				/* Otherwise, just send ACKs if needed */
+				if (tk->acks_expected) {
+					handle_resends(tk);
+				}
 			}
 		}
-	} else {
-		/* for manual tickets, just send ACKs if needed */
-		if (tk->acks_expected) {
-			handle_resends(tk);
-		}
-	}
 		break;
 
 	case ST_CANDIDATE:
@@ -1215,16 +1226,20 @@ void set_ticket_wakeup(struct ticket_config *tk)
 	tk_log_debug("ticket will be woken up after up to one hour");
 	ticket_next_cron_in(tk, 3600*TIME_RES);
 
-	switch (tk->state) {
-	case ST_LEADER:
-		if (!is_manual(tk)) {
-			/* Leader won't initialize new elections for manual tickets */
+	if (!is_manual(tk)) {
+		/* For manual tickets, no earlier timeout could be set in a similar
+		 * way as it is done below for automatic tickets. The reason is that
+		 * term's timeout is INF and no Raft-based elections are performed.
+		 */
+
+		switch (tk->state) {
+		case ST_LEADER:
 			assert(tk->leader == local);
 
 			get_next_election_time(tk, &next_vote);
 
 			/* If timestamp is in the past, wakeup in
-			 * near future */
+			* near future */
 			if (!is_time_set(&next_vote)) {
 				tk_log_debug("next ts unset, wakeup soon");
 				ticket_next_cron_at(tk, &near_future);
@@ -1235,42 +1250,34 @@ void set_ticket_wakeup(struct ticket_config *tk)
 			} else {
 				ticket_next_cron_at(tk, &next_vote);
 			}
-		}
-		break;
+			break;
 
-	case ST_CANDIDATE:
-		if (!is_manual(tk)) {
-			/* There is no Candidate state for manual tickets */
+		case ST_CANDIDATE:
 			assert(is_time_set(&tk->election_end));
 			ticket_next_cron_at(tk, &tk->election_end);
-		}
-		break;
+			break;
 
-	case ST_INIT:
-	case ST_FOLLOWER:
-		/* If there is (or should be) some owner, check on it later on.
-		 * If no one is interested - don't care. */
-		if (is_owned(tk)) {
-			if (!is_manual(tk)) {
+		case ST_INIT:
+		case ST_FOLLOWER:
+			/* If there is (or should be) some owner, check on it later on.
+			* If no one is interested - don't care. */
+			if (is_owned(tk)) {
 				interval_add(&tk->term_expires, tk->acquire_after, &tv);
 				ticket_next_cron_at(tk, &tv);
-			} else {
-				/* Set next cron some half minute after acquire_after time */
-				ticket_next_cron_in(tk, 30*TIME_RES + tk->acquire_after);
 			}
+			break;
+
+		default:
+			tk_log_error("unknown ticket state: %d", tk->state);
 		}
-		break;
 
-	default:
-		tk_log_error("unknown ticket state: %d", tk->state);
-	}
-
-	if (tk->next_state) {
-		/* we need to do something soon here */
-		if (!tk->acks_expected) {
-			ticket_next_cron_at(tk, &near_future);
-		} else {
-			ticket_activate_timeout(tk);
+		if (tk->next_state) {
+			/* we need to do something soon here */
+			if (!tk->acks_expected) {
+				ticket_next_cron_at(tk, &near_future);
+			} else {
+				ticket_activate_timeout(tk);
+			}
 		}
 	}
 
