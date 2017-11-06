@@ -339,7 +339,7 @@ int do_grant_ticket(struct ticket_config *tk, int options)
 			 * on multiple sites */
 			tk_log_warn("manual ticket forced to be granted! be aware that "
 					"you may end up having two sites holding the same manual "
-					"ticket! revoke ticket from the unnecessary site!");
+					"ticket! revoke the ticket from the unnecessary site!");
 		} else {
 			return RLT_OVERGRANT;
 		}
@@ -368,6 +368,7 @@ static void start_revoke_ticket(struct ticket_config *tk)
 	tk_log_info("revoking ticket");
 
 	save_committed_tkt(tk);
+	mark_ticket_as_revoked_from_leader(tk);
 	reset_ticket(tk);
 	set_leader(tk, no_leader);
 	ticket_write(tk);
@@ -395,13 +396,24 @@ int list_ticket(char **pdata, unsigned int *len)
 	char timeout_str[64];
 	char pending_str[64];
 	char *data, *cp;
-	int i, alloc;
+	int i, alloc, site_index;
 	time_t ts;
+	int multiple_grant_warning_length = 0;
 
 	*pdata = NULL;
 	*len = 0;
 
 	alloc = booth_conf->ticket_count * (BOOTH_NAME_LEN * 2 + 128 + 16);
+
+	foreach_ticket(i, tk) {
+		multiple_grant_warning_length = number_sites_marked_as_granted(tk);
+		
+		if (multiple_grant_warning_length > 1) {
+			// 164: 55 + 45 + 2*number_of_multiple_sites + some margin
+			alloc += 164 + BOOTH_NAME_LEN * (1+multiple_grant_warning_length);
+		}
+	}
+
 	data = malloc(alloc);
 	if (!data)
 		return -ENOMEM;
@@ -455,6 +467,36 @@ int list_ticket(char **pdata, unsigned int *len)
 		}
 	}
 
+	foreach_ticket(i, tk) {
+		multiple_grant_warning_length = number_sites_marked_as_granted(tk);
+		
+		if (multiple_grant_warning_length > 1) {
+			cp += snprintf(cp,
+					alloc - (cp - data),
+					"\nWARNING: The ticket %s is granted to multiple sites: ",  // ~55 characters
+					tk->name);
+			
+			for(site_index=0; site_index<booth_conf->site_count; ++site_index) {
+				if (tk->sites_where_granted[site_index] > 0) {
+					cp += snprintf(cp,
+						alloc - (cp - data),
+						"%s",
+						site_string(&(booth_conf->site[site_index])));
+
+					if (--multiple_grant_warning_length > 0) {
+						cp += snprintf(cp,
+							alloc - (cp - data),
+							", ");
+					}
+				}
+			}
+
+			cp += snprintf(cp,
+				alloc - (cp - data),
+				". Revoke the ticket from the faulty sites.\n");  // ~45 characters
+		}
+	}
+
 	*pdata = data;
 	*len = cp - data;
 
@@ -464,6 +506,7 @@ int list_ticket(char **pdata, unsigned int *len)
 
 void disown_ticket(struct ticket_config *tk)
 {
+	mark_ticket_as_revoked_from_leader(tk);
 	set_leader(tk, NULL);
 	tk->is_granted = 0;
 	get_time(&tk->term_expires);
@@ -948,6 +991,7 @@ static void ticket_lost(struct ticket_config *tk)
 
 	tk->lost_leader = tk->leader;
 	save_committed_tkt(tk);
+	mark_ticket_as_revoked_from_leader(tk);
 	reset_ticket(tk);
 	set_state(tk, ST_FOLLOWER);
 	if (local->type == SITE) {
@@ -1222,15 +1266,10 @@ void set_ticket_wakeup(struct ticket_config *tk)
 
 	set_future_time(&near_future, 10);
 
-	/* At least every hour, perhaps sooner (default) */
-	tk_log_debug("ticket will be woken up after up to one hour");
-	ticket_next_cron_in(tk, 3600*TIME_RES);
-
 	if (!is_manual(tk)) {
-		/* For manual tickets, no earlier timeout could be set in a similar
-		 * way as it is done below for automatic tickets. The reason is that
-		 * term's timeout is INF and no Raft-based elections are performed.
-		 */
+		/* At least every hour, perhaps sooner (default) */
+		tk_log_debug("ticket will be woken up after up to one hour");
+		ticket_next_cron_in(tk, 3600*TIME_RES);
 
 		switch (tk->state) {
 		case ST_LEADER:
@@ -1279,6 +1318,18 @@ void set_ticket_wakeup(struct ticket_config *tk)
 				ticket_activate_timeout(tk);
 			}
 		}
+	} else {
+		/* At least six minutes, to make sure that multi-leader situations
+		 * will be solved promptly.
+		 */
+		tk_log_debug("manual ticket will be woken up after up to six minutes");
+		ticket_next_cron_in(tk, 60*TIME_RES);
+
+		/* For manual tickets, no earlier timeout could be set in a similar
+		 * way as it is done in a switch above for automatic tickets.
+		 * The reason is that term's timeout is INF and no Raft-based elections
+		 * are performed.
+		 */
 	}
 
 	if (ANYDEBUG) {
@@ -1303,6 +1354,18 @@ int is_manual(struct ticket_config *tk)
 {
 	return (tk->mode == TICKET_MODE_MANUAL) ? 1 : 0;
 }
+
+int number_sites_marked_as_granted(struct ticket_config *tk)
+{
+	int i, result = 0;
+
+	for(i=0; i<booth_conf->site_count; ++i) {
+		result += tk->sites_where_granted[i];
+	}
+
+	return result;
+}
+
 
 
 /* Given a state (in host byte order), return a human-readable (char*).

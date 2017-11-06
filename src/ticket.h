@@ -43,6 +43,27 @@ extern int TIME_RES;
 	tk_log_debug("ticket leader set to %s", ticket_leader_string(tk)); \
 } while(0)
 
+#define mark_ticket_as_granted_to(tk, who) do { \
+	if (is_manual(tk) && (who->index > -1)) { \
+		tk->sites_where_granted[who->index] = 1; \
+		tk_log_debug("ticket marked as granted to %s", ticket_leader_string(tk)); \
+	} \
+} while(0)
+
+#define mark_ticket_as_revoked(tk, who) do { \
+	if (is_manual(tk) && (who->index > -1)) { \
+		tk->sites_where_granted[who->index] = 0; \
+		tk_log_debug("ticket marked as revoked from %s", site_string(who)); \
+	} \
+} while(0)
+
+#define mark_ticket_as_revoked_from_leader(tk) do { \
+	if (is_manual(tk) && tk->leader && (tk->leader->index > -1)) { \
+		tk->sites_where_granted[tk->leader->index] = 0; \
+		tk_log_debug("ticket marked as revoked from %s", ticket_leader_string(tk)); \
+	} \
+} while(0)
+
 #define set_state(tk, newst) do { \
 	tk_log_debug("state transition: %s -> %s", \
 		state_to_string(tk->state), state_to_string(newst)); \
@@ -104,6 +125,7 @@ void add_random_delay(struct ticket_config *tk);
 void schedule_election(struct ticket_config *tk, cmd_reason_t reason);
 
 int is_manual(struct ticket_config *tk);
+int number_sites_marked_as_granted(struct ticket_config *tk);
 
 int check_attr_prereq(struct ticket_config *tk, grant_type_e grant_type);
 

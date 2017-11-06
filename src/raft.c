@@ -133,6 +133,7 @@ static void become_follower(struct ticket_config *tk,
 static void won_elections(struct ticket_config *tk)
 {
 	set_leader(tk, local);
+	mark_ticket_as_granted_to(tk, local);
 	set_state(tk, ST_LEADER);
 
 	set_ticket_expiry(tk, tk->term_duration);
@@ -256,6 +257,7 @@ static int newer_term(struct ticket_config *tk,
 		set_state(tk, ST_FOLLOWER);
 		if (!in_election) {
 			set_leader(tk, leader);
+			mark_ticket_as_granted_to(tk, leader);
 			tk_log_info("from %s: higher term %d vs. %d, following %s",
 					site_string(sender),
 					term, tk->current_term,
@@ -353,6 +355,7 @@ static int answer_HEARTBEAT (
 	assert(sender == leader || !leader);
 
 	set_leader(tk, leader);
+	mark_ticket_as_granted_to(tk, leader);
 
 	/* Ack the heartbeat (we comply). */
 	return send_msg(OP_ACK, tk, sender, msg);
@@ -370,6 +373,8 @@ static int process_UPDATE (
 		tk_log_warn("different leader %s wants to update "
 				"our ticket, sending reject",
 			site_string(leader));
+		
+		mark_ticket_as_granted_to(tk, sender);
 		return send_reject(sender, tk, RLT_TERM_OUTDATED, msg);
 	}
 
@@ -378,6 +383,7 @@ static int process_UPDATE (
 
 	become_follower(tk, msg);
 	set_leader(tk, leader);
+	mark_ticket_as_granted_to(tk, leader);
 	ticket_write(tk);
 
 	/* run ticket_cron if the ticket expires */
@@ -421,6 +427,7 @@ static int process_REVOKE (
 		tk_log_info("%s revokes ticket",
 				site_string(tk->leader));
 		save_committed_tkt(tk);
+		mark_ticket_as_revoked_from_leader(tk);
 		reset_ticket(tk);
 		set_leader(tk, no_leader);
 		ticket_write(tk);
@@ -568,6 +575,7 @@ static int process_REJECTED(
 				site_string(leader)
 				);
 		set_leader(tk, leader);
+		mark_ticket_as_granted_to(tk, leader);
 		tk->expect_more_rejects = 1;
 		become_follower(tk, msg);
 		return 0;
@@ -590,6 +598,7 @@ static int process_REJECTED(
 					site_string(leader));
 		}
 		set_leader(tk, leader);
+		mark_ticket_as_granted_to(tk, leader);
 		become_follower(tk, msg);
 		tk->expect_more_rejects = 1;
 		return 0;
@@ -598,6 +607,7 @@ static int process_REJECTED(
 	if (tk->state == ST_CANDIDATE &&
 			rv == RLT_YOU_OUTDATED) {
 		set_leader(tk, leader);
+		mark_ticket_as_granted_to(tk, leader);
 		tk->expect_more_rejects = 1;
 		if (leader && leader != no_leader) {
 			tk_log_warn("our ticket is outdated, granted to %s",
@@ -709,8 +719,10 @@ static int answer_REQ_VOTE(
 	tk->in_election = 1;
 
 	/* reset ticket's leader on not valid tickets */
-	if (!valid)
+	if (!valid) {
+		mark_ticket_as_revoked_from_leader(tk);
 		set_leader(tk, NULL);
+	}
 
 	/* if it's a newer term or ... */
 	if (newer_term(tk, sender, leader, msg, 1)) {
@@ -908,6 +920,7 @@ static int process_MY_INDEX (
 	 * ignore it */
 	update_ticket_from_msg(tk, sender, msg);
 	set_leader(tk, leader);
+	mark_ticket_as_granted_to(tk, leader);
 	update_ticket_state(tk, sender);
 	save_committed_tkt(tk);
 	set_ticket_wakeup(tk);
@@ -967,6 +980,8 @@ int raft_answer(
 			tk_log_warn("unexpected message %s, from %s",
 				state_to_string(cmd),
 				site_string(sender));
+				mark_ticket_as_granted_to(tk, sender);			
+
 			if (ticket_seems_ok(tk))
 				send_reject(sender, tk, RLT_TERM_STILL_VALID, msg);
 			rv = -EINVAL;

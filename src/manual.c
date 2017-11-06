@@ -42,6 +42,7 @@ int manual_selection(struct ticket_config *tk,
 
 	// Manual selection is done without any delay, the leader is assigned
 	set_leader(tk, local);
+	mark_ticket_as_granted_to(tk, local);
 	set_state(tk, ST_LEADER);
 
 	// Manual tickets never expire, we don't specify expiration time
@@ -81,8 +82,11 @@ int process_REVOKE_for_manual_ticket (
 	// has not been following the leader which had been revoked
 	// (and which had sent this message).
 
-	// We are going to send the ACK, to satisfy the requestor.
+	// We send the ACK, to satisfy the requestor.
 	rv = send_msg(OP_ACK, tk, sender, msg);		
+
+	// Mark this ticket as not granted to the sender anymore.
+	mark_ticket_as_revoked(tk, sender);
 	
 	if (tk->state == ST_LEADER) {
 		tk_log_warn("%s wants to revoke ticket, "

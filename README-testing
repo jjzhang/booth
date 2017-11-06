@@ -16,9 +16,9 @@ arguments to see usage and the list of tests and netem network
 emulation functions.
 
 There are some restrictions on how booth.conf is formatted.
-There could be several tickets defined, but only the first ticket
-is used for testing. This ticket must have expire and timeout
-parameters configured.
+There could be several tickets defined and all of them will be
+tested, one after another (they will be tested separately).
+The tickets must have expire and timeout parameters configured.
 
 Example booth.conf:
 

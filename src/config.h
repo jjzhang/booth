@@ -143,6 +143,15 @@ struct ticket_config {
 
 	/** Is the ticket granted? */
 	int is_granted;
+
+	/** Which site considered itself a leader.
+	 * For manual tickets it is possible, that
+	 * more than one site will act as a leader.
+	 * This array is used for tracking that situation
+	 * and notifying the user about the issue.
+	 */
+	int sites_where_granted[MAX_NODES];
+
 	/** Timestamp of leadership expiration */
 	timetype term_expires;
 	/** End of election period */
