@@ -514,7 +514,6 @@ static int pcmk_load_ticket(struct ticket_config *tk)
 			log_warn("%s: granted here, assume it belonged to us",
 				tk->name);
 			set_leader(tk, local);
-			mark_ticket_as_granted_to(tk, local);
 		}
 	}
 

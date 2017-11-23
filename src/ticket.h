@@ -39,28 +39,35 @@ extern int TIME_RES;
 #define foreach_node(i_,n_) for(i_=0; (n_=booth_conf->site+i_, i_<booth_conf->site_count); i_++)
 
 #define set_leader(tk, who) do { \
+	if (who == NULL) { \
+		mark_ticket_as_revoked_from_leader(tk); \
+	} \
+	\
 	tk->leader = who; \
 	tk_log_debug("ticket leader set to %s", ticket_leader_string(tk)); \
+	\
+	if (tk->leader) { \
+		mark_ticket_as_granted(tk, tk->leader); \
+	} \
 } while(0)
 
-#define mark_ticket_as_granted_to(tk, who) do { \
+#define mark_ticket_as_granted(tk, who) do { \
 	if (is_manual(tk) && (who->index > -1)) { \
 		tk->sites_where_granted[who->index] = 1; \
-		tk_log_debug("ticket marked as granted to %s", ticket_leader_string(tk)); \
+		tk_log_debug("manual ticket marked as granted to %s", ticket_leader_string(tk)); \
 	} \
 } while(0)
 
 #define mark_ticket_as_revoked(tk, who) do { \
-	if (is_manual(tk) && (who->index > -1)) { \
+	if (is_manual(tk) && who && (who->index > -1)) { \
 		tk->sites_where_granted[who->index] = 0; \
-		tk_log_debug("ticket marked as revoked from %s", site_string(who)); \
+		tk_log_debug("manual ticket marked as revoked from %s", site_string(who)); \
 	} \
 } while(0)
 
 #define mark_ticket_as_revoked_from_leader(tk) do { \
-	if (is_manual(tk) && tk->leader && (tk->leader->index > -1)) { \
-		tk->sites_where_granted[tk->leader->index] = 0; \
-		tk_log_debug("ticket marked as revoked from %s", ticket_leader_string(tk)); \
+	if (tk->leader) { \
+		mark_ticket_as_revoked(tk, tk->leader); \
 	} \
 } while(0)
 
@@ -90,6 +97,7 @@ int list_ticket(char **pdata, unsigned int *len);
 
 int ticket_recv(void *buf, struct booth_site *source);
 void reset_ticket(struct ticket_config *tk);
+void reset_ticket_and_set_no_leader(struct ticket_config *tk);
 void update_ticket_state(struct ticket_config *tk, struct booth_site *sender);
 int setup_ticket(void);
 int check_max_len_valid(const char *s, int max);

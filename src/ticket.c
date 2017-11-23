@@ -368,9 +368,7 @@ static void start_revoke_ticket(struct ticket_config *tk)
 	tk_log_info("revoking ticket");
 
 	save_committed_tkt(tk);
-	mark_ticket_as_revoked_from_leader(tk);
-	reset_ticket(tk);
-	set_leader(tk, no_leader);
+	reset_ticket_and_set_no_leader(tk);
 	ticket_write(tk);
 	ticket_broadcast(tk, OP_REVOKE, OP_ACK, RLT_SUCCESS, OR_ADMIN);
 }
@@ -407,7 +405,7 @@ int list_ticket(char **pdata, unsigned int *len)
 
 	foreach_ticket(i, tk) {
 		multiple_grant_warning_length = number_sites_marked_as_granted(tk);
-		
+
 		if (multiple_grant_warning_length > 1) {
 			// 164: 55 + 45 + 2*number_of_multiple_sites + some margin
 			alloc += 164 + BOOTH_NAME_LEN * (1+multiple_grant_warning_length);
@@ -469,13 +467,13 @@ int list_ticket(char **pdata, unsigned int *len)
 
 	foreach_ticket(i, tk) {
 		multiple_grant_warning_length = number_sites_marked_as_granted(tk);
-		
+
 		if (multiple_grant_warning_length > 1) {
 			cp += snprintf(cp,
 					alloc - (cp - data),
 					"\nWARNING: The ticket %s is granted to multiple sites: ",  // ~55 characters
 					tk->name);
-			
+
 			for(site_index=0; site_index<booth_conf->site_count; ++site_index) {
 				if (tk->sites_where_granted[site_index] > 0) {
 					cp += snprintf(cp,
@@ -506,7 +504,6 @@ int list_ticket(char **pdata, unsigned int *len)
 
 void disown_ticket(struct ticket_config *tk)
 {
-	mark_ticket_as_revoked_from_leader(tk);
 	set_leader(tk, NULL);
 	tk->is_granted = 0;
 	get_time(&tk->term_expires);
@@ -533,6 +530,14 @@ void reset_ticket(struct ticket_config *tk)
 	tk->voted_for = NULL;
 }
 
+void reset_ticket_and_set_no_leader(struct ticket_config *tk)
+{
+	mark_ticket_as_revoked_from_leader(tk);
+	reset_ticket(tk);
+
+	tk->leader = no_leader;
+	tk_log_debug("ticket leader set to no_leader");
+}
 
 static void log_reacquire_reason(struct ticket_config *tk)
 {

@@ -42,7 +42,6 @@ int manual_selection(struct ticket_config *tk,
 
 	// Manual selection is done without any delay, the leader is assigned
 	set_leader(tk, local);
-	mark_ticket_as_granted_to(tk, local);
 	set_state(tk, ST_LEADER);
 
 	// Manual tickets never expire, we don't specify expiration time

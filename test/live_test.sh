@@ -599,7 +599,7 @@ check_booth_consistency() {
 	# Check time consistency
 	ticket_times=$(echo "$tlist" | booth_list_fld 3)
 	if [[ $ticket_times == *"INF"* ]]; then
-  		rc=0
+		rc=0
 	else
 		maxdiff=`echo "$tlist" | max_booth_time_diff`
 		test "$maxdiff" -eq 0
@@ -657,7 +657,7 @@ can_run_test() {
 	fi
 }
 revoke_ticket() {
-	run_site 1 booth revoke -w $1 >/dev/null
+	run_site 1 booth revoke -w $tkt >/dev/null
 	wait_timeout
 }
 run_report() {
@@ -679,26 +679,24 @@ runtest() {
 	local rc booth_status dep_rsc_status
 	local start_time end_time
 	local usrmsg
-	local tested_ticket
 	rc=0
 	TEST=$1
-	tested_ticket=$2
 	start_time=`date`
 	start_ts=`date +%s`
-	echo -n "Testing: $1 (ticket: $tested_ticket)... "
+	echo -n "Testing: $1 (ticket: $tkt)... "
 	can_run_test $1 || return 0
 	echo "==================================================" | logmsg
 	echo "starting booth test $1 ..." | logmsg
 	if is_function setup_$1; then
 		echo "-------------------------------------------------- (setup)" | logmsg
-		setup_$1 $tested_ticket
+		setup_$1
 		rc=$?
 		[ "$rc" -ne 0 ] && rc=$ERR_SETUP_FAILED
 	fi
 	if [ "$rc" -eq 0 ]; then
 		setup_netem
 		echo "-------------------------------------------------- (test)" | logmsg
-		test_$1 $tested_ticket
+		test_$1
 		rc=$?
 	fi
 	case $rc in
@@ -706,7 +704,7 @@ runtest() {
 		# wait a bit more if we're losing packets
 		[ -n "$PKT_LOSS" ] && wait_timeout
 		echo "-------------------------------------------------- (check)" | logmsg
-		check_$1 $tested_ticket
+		check_$1
 		rc=$?
 		if [ $rc -eq 0 ]; then
 			usrmsg="SUCCESS"
@@ -723,9 +721,9 @@ runtest() {
 	esac
 	end_time=`date`
 	end_ts=`date +%s`
-	echo "finished booth test $1 ($tested_ticket): $usrmsg" | logmsg
+	echo "finished booth test $1 ($tkt): $usrmsg" | logmsg
 	echo "==================================================" | logmsg
-	is_function recover_$1 && recover_$1 $tested_ticket
+	is_function recover_$1 && recover_$1
 	reset_netem_env
 	#sleep 3
 	all_booth_status
@@ -745,7 +743,7 @@ runtest() {
 		reboot_test
 		master_rc=1
 	fi
-	revoke_ticket $tested_ticket
+	revoke_ticket
 }
 
 #
@@ -754,17 +752,17 @@ runtest() {
 
 # most tests start by granting ticket
 grant_ticket() {
-	run_site $1 booth grant -w $2 >/dev/null
+	run_site $1 booth grant -w $tkt >/dev/null
 }
 grant_ticket_cib() {
-	run_site $1 booth grant -C $2 >/dev/null
+	run_site $1 booth grant -C $tkt >/dev/null
 }
 
 ## TEST: grant ##
 
 # just a grant
 test_grant() {
-	grant_ticket 1 $1
+	grant_ticket 1
 }
 check_grant() {
 	check_consistency `get_internal_site 1`
@@ -774,7 +772,7 @@ check_grant() {
 
 # just a grant followed by three expire times
 setup_longgrant() {
-	grant_ticket 1 $1
+	grant_ticket 1
 }
 test_longgrant() {
 	wait_exp
@@ -789,7 +787,7 @@ check_longgrant() {
 
 # just a grant followed by 10 expire times
 setup_longgrant2() {
-	grant_ticket_cib 1 $1
+	grant_ticket_cib 1
 }
 test_longgrant2() {
 	local i
@@ -812,7 +810,7 @@ setup_grant_noarb() {
 	#sleep 1
 }
 test_grant_noarb() {
-	grant_ticket 1 $1
+	grant_ticket 1
 }
 check_grant_noarb() {
 	check_consistency `get_internal_site 1`
@@ -831,10 +829,10 @@ applicable_grant_noarb() {
 
 # just a revoke
 setup_revoke() {
-	grant_ticket 1 $1
+	grant_ticket 1
 }
 test_revoke() {
-	revoke_ticket $1
+	revoke_ticket
 }
 check_revoke() {
 	check_consistency
@@ -859,7 +857,7 @@ setup_grant_site_lost() {
 	return 0
 }
 test_grant_site_lost() {
-	grant_ticket 1 $1
+	grant_ticket 1
 	wait_exp
 }
 check_grant_site_lost() {
@@ -879,7 +877,7 @@ setup_grant_site_reappear() {
 	#sleep 1
 }
 test_grant_site_reappear() {
-	grant_ticket 1 $1 || return $ERR_SETUP_FAILED
+	grant_ticket 1 || return $ERR_SETUP_FAILED
 	check_cib `get_internal_site 1` || return $ERR_SETUP_FAILED
 	wait_timeout
 	start_site `get_site 2` || return $ERR_SETUP_FAILED
@@ -898,7 +896,7 @@ recover_grant_site_reappear() {
 
 # simultaneous start of even number of members
 setup_simultaneous_start_even() {
-	grant_ticket_cib 2 $1 || return 1
+	grant_ticket_cib 2 || return 1
 	stop_booth || return 1
 	#wait_timeout
 }
@@ -923,7 +921,7 @@ check_simultaneous_start_even() {
 
 # slow start
 setup_slow_start_granted() {
-	grant_ticket_cib 1 $1 || return 1
+	grant_ticket_cib 1 || return 1
 	stop_booth || return 1
 	#wait_timeout
 }
@@ -945,7 +943,7 @@ check_slow_start_granted() {
 
 # restart with ticket granted
 setup_restart_granted() {
-	grant_ticket_cib 1 $1
+	grant_ticket_cib 1
 }
 test_restart_granted() {
 	restart_site `get_site 1` || return 1
@@ -959,7 +957,7 @@ check_restart_granted() {
 
 # reload with ticket granted
 setup_reload_granted() {
-	grant_ticket_cib 1 $1
+	grant_ticket_cib 1
 }
 test_reload_granted() {
 	reload_site `get_site 1` || return 1
@@ -973,7 +971,7 @@ check_reload_granted() {
 
 # restart with ticket granted (but cib empty)
 setup_restart_granted_nocib() {
-	grant_ticket_cib 1 $1
+	grant_ticket_cib 1
 }
 test_restart_granted_nocib() {
 	stop_site_clean `get_site 1` || return 1
@@ -991,7 +989,7 @@ check_restart_granted_nocib() {
 
 # restart with ticket not granted
 setup_restart_notgranted() {
-	grant_ticket_cib 1 $1
+	grant_ticket_cib 1
 }
 test_restart_notgranted() {
 	stop_site `get_site 2` || return 1
@@ -1007,7 +1005,7 @@ check_restart_notgranted() {
 
 # ticket failover
 setup_failover() {
-	grant_ticket 1 $1
+	grant_ticket 1
 	[ -n "`get_attr`" ] && set_site_attr 2
 	return 0
 }
@@ -1030,7 +1028,7 @@ recover_failover() {
 
 # split brain (leader alone)
 setup_split_leader() {
-	grant_ticket_cib 1 $1
+	grant_ticket_cib 1
 	[ -n "`get_attr`" ] && set_site_attr 2
 	return 0
 }
@@ -1058,7 +1056,7 @@ recover_split_leader() {
 
 # split brain (follower alone)
 setup_split_follower() {
-	grant_ticket_cib 1 $1
+	grant_ticket_cib 1
 }
 test_split_follower() {
 	run_site 2 $iprules stop $port  >/dev/null
@@ -1075,7 +1073,7 @@ check_split_follower() {
 
 # split brain (leader alone)
 setup_split_edge() {
-	grant_ticket_cib 1 $1
+	grant_ticket_cib 1
 }
 test_split_edge() {
 	run_site 1 $iprules stop $port  >/dev/null
@@ -1092,7 +1090,7 @@ check_split_edge() {
 
 # external test prog failed
 setup_external_prog_failed() {
-	grant_ticket 1 $1 || return 1
+	grant_ticket 1 || return 1
 	[ -n "`get_attr`" ] && set_site_attr 2
 	break_external_prog 1
 	show_pref 1 || return 1
@@ -1116,7 +1114,7 @@ applicable_external_prog_failed() {
 
 # failover with attribute prerequisite
 setup_attr_prereq_ok() {
-	grant_ticket 1 $1 || return 1
+	grant_ticket 1 || return 1
 	set_site_attr 2
 	stop_site_clean `get_site 1`
 	booth_status `get_site 1` && return 1
@@ -1141,7 +1139,7 @@ applicable_attr_prereq_ok() {
 
 # failover with failed attribute prerequisite
 setup_attr_prereq_fail() {
-	grant_ticket 1 $1 || return 1
+	grant_ticket 1 || return 1
 	del_site_attr 2 >/dev/null 2>&1
 	stop_site_clean `get_site 1`
 	booth_status `get_site 1` && return 1
@@ -1274,14 +1272,14 @@ sed -n "1,$((${TICKET_LINES[0]}-1))p" $cnf > ${cnf}_main.config
 #create a separate file for every ticket data
 number_of_tickets=0
 for i in $(seq 0 1 $((${#TICKET_LINES[@]}-1))); do
-    ticket_line_start=${TICKET_LINES[i]}
-    ticket_line_end=$((${TICKET_LINES[i+1]}-1))
-    if [ ${ticket_line_end} -lt 0 ]; then
+	ticket_line_start=${TICKET_LINES[i]}
+	ticket_line_end=$((${TICKET_LINES[i+1]}-1))
+	if [ ${ticket_line_end} -lt 0 ]; then
 		# for the last ticket
-        ticket_line_end=${conf_file_size}
-    fi
-    sed -n "${ticket_line_start},${ticket_line_end}p" $cnf > ${cnf}_${number_of_tickets}.ticket
-    number_of_tickets=$((number_of_tickets+1))
+		ticket_line_end=${conf_file_size}
+	fi
+	sed -n "${ticket_line_start},${ticket_line_end}p" $cnf > ${cnf}_${number_of_tickets}.ticket
+	number_of_tickets=$((number_of_tickets+1))
 done
 
 
@@ -1292,11 +1290,11 @@ do
 	cat ${cnf}_main.config > booth_${i}.conf
 	cat ${cnf}_${i}.ticket >> booth_${i}.conf
 
-    tkt=`get_tkt < booth_${i}.conf`
+	tkt=`get_tkt < booth_${i}.conf`
 
 	if [ -z "$tkt" ]; then
 		echo "Skipping empty ticket.."
-    	continue
+		continue
 	fi
 
 	sync_conf booth_${i}.conf || exit
@@ -1314,40 +1312,40 @@ do
 	dump_conf | logmsg
 
 
-    eval `get_tkt_settings booth_${i}.conf`
+	eval `get_tkt_settings booth_${i}.conf`
 
-    MIN_TIMEOUT=`awk -v tm=$T_timeout 'BEGIN{
-    		if (tm >= 2) print tm;
-    		else print 2*tm;
-    		}'`
+	MIN_TIMEOUT=`awk -v tm=$T_timeout 'BEGIN{
+			if (tm >= 2) print tm;
+			else print 2*tm;
+			}'`
 
-    [ -z "$T_expire" ] && {
-    	echo set $tkt expire time in $cnf
-    	usage 1
-    }
+	[ -z "$T_expire" ] && {
+		echo set $tkt expire time in $cnf
+		usage 1
+	}
 
-    if [ -z "$T_renewal_freq" ]; then
-    	T_renewal_freq=$((T_expire/2))
-    fi
+	if [ -z "$T_renewal_freq" ]; then
+		T_renewal_freq=$((T_expire/2))
+	fi
 
-    revoke_ticket $tkt
+	revoke_ticket
 
-    T_mode=`get_mode`
-    T_mode_lowercase=$(echo "$T_mode" | tr '[:upper:]' '[:lower:]')
+	T_mode=`get_mode`
+	T_mode_lowercase=$(echo "$T_mode" | tr '[:upper:]' '[:lower:]')
 
-    if [[ $T_mode_lowercase == *"manual"* ]]; then
-        echo "Testing the manual ticket.."
+	if [[ $T_mode_lowercase == *"manual"* ]]; then
+		echo "Running tests for manual tickets.."
 
-        for t in $MANUAL_TESTS; do
-            runtest $t $tkt
-        done
+		for t in $MANUAL_TESTS; do
+			runtest $t
+		done
 	else
-        echo "Testing an automatic Raft ticket.."
+		echo "Running tests for automatic Raft tickets.."
 
-        for t in $TESTS; do
-            runtest $t $tkt
-        done
-    fi
+		for t in $TESTS; do
+			runtest $t
+		done
+	fi
 done
 
 exit $master_rc

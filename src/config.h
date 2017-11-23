@@ -149,6 +149,18 @@ struct ticket_config {
 	 * more than one site will act as a leader.
 	 * This array is used for tracking that situation
 	 * and notifying the user about the issue.
+	 *
+	 * Possible values for every site:
+	 *  0: the site does not claim to be the leader
+	 *  1: the site considers itself a leader and
+	 *     is sending or used to send heartbeat messages
+	 *
+	 * The site will be marked as '1' until this site
+	 * receives revoke confirmation.
+	 *
+	 * If more than one site has '1', the geo cluster is
+	 * considered to have multiple leadership and proper
+	 * warning are generated.
 	 */
 	int sites_where_granted[MAX_NODES];
 
