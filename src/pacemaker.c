@@ -513,7 +513,7 @@ static int pcmk_load_ticket(struct ticket_config *tk)
 		if (tk->is_granted) {
 			log_warn("%s: granted here, assume it belonged to us",
 				tk->name);
-			tk->leader = local;
+			set_leader(tk, local);
 		}
 	}
 

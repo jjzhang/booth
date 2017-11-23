@@ -30,7 +30,7 @@
 #include "ticket.h"
 #include "request.h"
 #include "log.h"
-
+#include "manual.h"
 
 
 inline static void clear_election(struct ticket_config *tk)
@@ -370,6 +370,8 @@ static int process_UPDATE (
 		tk_log_warn("different leader %s wants to update "
 				"our ticket, sending reject",
 			site_string(leader));
+
+		mark_ticket_as_granted(tk, sender);
 		return send_reject(sender, tk, RLT_TERM_OUTDATED, msg);
 	}
 
@@ -399,10 +401,18 @@ static int process_REVOKE (
 		/* assume that our ack got lost */
 		rv = send_msg(OP_ACK, tk, sender, msg);
 	} else if (tk->leader != sender) {
-		tk_log_error("%s wants to revoke ticket, "
-				"but it is not granted there (ignoring)",
-				site_string(sender));
-		return -1;
+		if (!is_manual(tk)) {
+			tk_log_error("%s wants to revoke ticket, "
+					"but it is not granted there (ignoring)",
+					site_string(sender));
+			return -1;
+		} else {
+			rv = process_REVOKE_for_manual_ticket(tk, sender, msg);
+	
+			// Ticket data stored in this site is not modified. This means
+			// that this site will still follow another leader (the one which
+			// has not been revoked) or be a leader itself.
+		}
 	} else if (tk->state != ST_FOLLOWER) {
 		tk_log_error("unexpected ticket revoke from %s "
 				"(in state %s) (ignoring)",
@@ -413,8 +423,7 @@ static int process_REVOKE (
 		tk_log_info("%s revokes ticket",
 				site_string(tk->leader));
 		save_committed_tkt(tk);
-		reset_ticket(tk);
-		set_leader(tk, no_leader);
+		reset_ticket_and_set_no_leader(tk);
 		ticket_write(tk);
 		rv = send_msg(OP_ACK, tk, sender, msg);
 	}
@@ -959,6 +968,8 @@ int raft_answer(
 			tk_log_warn("unexpected message %s, from %s",
 				state_to_string(cmd),
 				site_string(sender));
+				mark_ticket_as_granted(tk, sender);
+
 			if (ticket_seems_ok(tk))
 				send_reject(sender, tk, RLT_TERM_STILL_VALID, msg);
 			rv = -EINVAL;

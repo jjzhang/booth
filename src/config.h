@@ -57,6 +57,11 @@ typedef enum {
 	GRANT_MANUAL,
 } grant_type_e;
 
+typedef enum {
+	TICKET_MODE_AUTO = 1,
+	TICKET_MODE_MANUAL,
+} ticket_mode_e;
+
 struct toktab {
 	const char *str;
 	int val;
@@ -107,6 +112,15 @@ struct ticket_config {
 
 	/** Node weights. */
 	int weight[MAX_NODES];
+
+	/* Mode operation of the ticket.
+	 * Set to MANUAL to make sure that the ticket will be manipulated
+	 * only by manual commands of the administrator. In such a case
+	 * automatic elections will be disabled.
+	 * Manual tickets do not have to be renewed every some time.
+	 * The leader will continue to send heartbeat messages to other sites.
+	 */
+	ticket_mode_e mode;
 	/** @} */
 
 
@@ -129,6 +143,27 @@ struct ticket_config {
 
 	/** Is the ticket granted? */
 	int is_granted;
+
+	/** Which site considered itself a leader.
+	 * For manual tickets it is possible, that
+	 * more than one site will act as a leader.
+	 * This array is used for tracking that situation
+	 * and notifying the user about the issue.
+	 *
+	 * Possible values for every site:
+	 *  0: the site does not claim to be the leader
+	 *  1: the site considers itself a leader and
+	 *     is sending or used to send heartbeat messages
+	 *
+	 * The site will be marked as '1' until this site
+	 * receives revoke confirmation.
+	 *
+	 * If more than one site has '1', the geo cluster is
+	 * considered to have multiple leadership and proper
+	 * warning are generated.
+	 */
+	int sites_where_granted[MAX_NODES];
+
 	/** Timestamp of leadership expiration */
 	timetype term_expires;
 	/** End of election period */

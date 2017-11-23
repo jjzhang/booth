@@ -287,7 +287,7 @@ sync_conf() {
 	local h rc=0
 	local tmpf
 	for h in $sites $arbitrators; do
-		rsync -q -e "ssh $SSH_OPTS" $cnf root@$h:$run_cnf
+		rsync -q -e "ssh $SSH_OPTS" $1 root@$h:$run_cnf
 		rc=$((rc|$?))
 		if [ -n "$authfile" ]; then
 			tmpf=`mktemp`
@@ -398,6 +398,13 @@ n && (/^$/ || /^ticket.*/) {exit}
 /^ticket.*'$tkt'/ {n=1}
 ' $cnf
 }
+get_mode() {
+	awk '
+n && /^[[:space:]]*mode/ {print $NF; exit}
+n && (/^$/ || /^ticket.*/) {exit}
+/^ticket.*'$tkt'/ {n=1}
+' $cnf
+}
 
 set_site_attr() {
 	local site
@@ -440,7 +447,7 @@ n && /^[[:space:]]*(expire|timeout|renewal-freq)/ {
 }
 n && (/^$/ || /^ticket.*/) {exit}
 /^ticket.*'$tkt'/ {n=1}
-' $cnf
+' $1
 }
 wait_exp() {
 	sleep $T_expire
@@ -588,17 +595,25 @@ booth_leader_consistency_2() {
 check_booth_consistency() {
 	local tlist tlist_validate rc rc_lead maxdiff
 	tlist=`forall_withname booth list 2>/dev/null | grep $tkt`
-	tlist_validate=`echo "$tlist" |
-		sed 's/[^:]*: //;s/commit:.*//;s/NONE/none/'`
-	maxdiff=`echo "$tlist" | max_booth_time_diff`
-	test "$maxdiff" -eq 0
-	rc=$?
+
+	# Check time consistency
+	ticket_times=$(echo "$tlist" | booth_list_fld 3)
+	if [[ $ticket_times == *"INF"* ]]; then
+		rc=0
+	else
+		maxdiff=`echo "$tlist" | max_booth_time_diff`
+		test "$maxdiff" -eq 0
+		rc=$?
+	fi
+
+	# Check leader consistency
 	echo "$tlist" | booth_leader_consistency
 	rc_lead=$?
 	if [ $rc_lead -ne 0 ]; then
 		echo "$tlist" | booth_leader_consistency_2
 		rc_lead=$(($rc_lead + $?))  # rc_lead=2 if the prev test failed
 	fi
+
 	rc=$(($rc | $rc_lead<<1))
 	test $rc -eq 0 && return
 	cat<<EOF | logmsg
@@ -668,7 +683,7 @@ runtest() {
 	TEST=$1
 	start_time=`date`
 	start_ts=`date +%s`
-	echo -n "Testing: $1... "
+	echo -n "Testing: $1 (ticket: $tkt)... "
 	can_run_test $1 || return 0
 	echo "==================================================" | logmsg
 	echo "starting booth test $1 ..." | logmsg
@@ -706,7 +721,7 @@ runtest() {
 	esac
 	end_time=`date`
 	end_ts=`date +%s`
-	echo "finished booth test $1 ($usrmsg)" | logmsg
+	echo "finished booth test $1 ($tkt): $usrmsg" | logmsg
 	echo "==================================================" | logmsg
 	is_function recover_$1 && recover_$1
 	reset_netem_env
@@ -1202,13 +1217,6 @@ port=`get_value port < $cnf`
 : ${port:=9929}
 site_cnt=`echo $internal_sites | wc -w`
 arbitrator_cnt=`echo $internal_arbitrators | wc -w`
-tkt=`get_tkt < $cnf`
-eval `get_tkt_settings`
-
-MIN_TIMEOUT=`awk -v tm=$T_timeout 'BEGIN{
-		if (tm >= 2) print tm;
-		else print 2*tm;
-		}'`
 
 if [ "$1" = "__netem__" ]; then
 	shift 1
@@ -1221,15 +1229,6 @@ fi
 	echo no sites in $cnf
 	usage 1
 }
-
-[ -z "$T_expire" ] && {
-	echo set $tkt expire time in $cnf
-	usage 1
-}
-
-if [ -z "$T_renewal_freq" ]; then
-	T_renewal_freq=$((T_expire/2))
-fi
 
 exec 2>$logf
 BASH_XTRACEFD=2
@@ -1244,22 +1243,8 @@ PREFNAME=__pref_booth_live_test
 authfile=`get_value authfile < $cnf`
 run_site 1 'test -f '"$authfile"' || booth-keygen '"$authfile"
 
-sync_conf || exit
-reboot_test
-all_booth_status || {
-	start_booth
-	all_booth_status || {
-		echo "some booth servers couldn't be started"
-		exit 1
-	}
-}
-revoke_ticket
-
-ABSPATH=`get_prog_abspath`
-
-dump_conf | logmsg
-
 TESTS="$@"
+MANUAL_TESTS="$@"
 
 : ${TESTS:="grant longgrant grant_noarb grant_elsewhere
 grant_site_lost grant_site_reappear revoke
@@ -1268,9 +1253,99 @@ restart_granted reload_granted restart_granted_nocib restart_notgranted
 failover split_leader split_follower split_edge
 external_prog_failed attr_prereq_ok attr_prereq_fail"}
 
+: ${MANUAL_TESTS:="grant longgrant grant_noarb grant_elsewhere
+grant_site_lost
+restart_granted reload_granted
+split_leader split_follower split_edge
+ "}
+
+#get total number od lines in the file
+conf_file_size=$(grep -c $ $cnf)
+
+#get line numbers for all tickets
+ticket_line_numbers=$(grep -n ticket $cnf | cut -d: -f1)
+read -a TICKET_LINES<<< $ticket_line_numbers
+
+#save the part of config located before ticket definitions
+sed -n "1,$((${TICKET_LINES[0]}-1))p" $cnf > ${cnf}_main.config
+
+#create a separate file for every ticket data
+number_of_tickets=0
+for i in $(seq 0 1 $((${#TICKET_LINES[@]}-1))); do
+	ticket_line_start=${TICKET_LINES[i]}
+	ticket_line_end=$((${TICKET_LINES[i+1]}-1))
+	if [ ${ticket_line_end} -lt 0 ]; then
+		# for the last ticket
+		ticket_line_end=${conf_file_size}
+	fi
+	sed -n "${ticket_line_start},${ticket_line_end}p" $cnf > ${cnf}_${number_of_tickets}.ticket
+	number_of_tickets=$((number_of_tickets+1))
+done
+
+
 master_rc=0 # updated in runtest
-for t in $TESTS; do
-	runtest $t
+
+for i in `seq 0 $(($number_of_tickets-1))`
+do
+	cat ${cnf}_main.config > booth_${i}.conf
+	cat ${cnf}_${i}.ticket >> booth_${i}.conf
+
+	tkt=`get_tkt < booth_${i}.conf`
+
+	if [ -z "$tkt" ]; then
+		echo "Skipping empty ticket.."
+		continue
+	fi
+
+	sync_conf booth_${i}.conf || exit
+	reboot_test
+	all_booth_status || {
+		start_booth
+		all_booth_status || {
+			echo "some booth servers couldn't be started"
+			exit 1
+		}
+	}
+
+	ABSPATH=`get_prog_abspath`
+
+	dump_conf | logmsg
+
+
+	eval `get_tkt_settings booth_${i}.conf`
+
+	MIN_TIMEOUT=`awk -v tm=$T_timeout 'BEGIN{
+			if (tm >= 2) print tm;
+			else print 2*tm;
+			}'`
+
+	[ -z "$T_expire" ] && {
+		echo set $tkt expire time in $cnf
+		usage 1
+	}
+
+	if [ -z "$T_renewal_freq" ]; then
+		T_renewal_freq=$((T_expire/2))
+	fi
+
+	revoke_ticket
+
+	T_mode=`get_mode`
+	T_mode_lowercase=$(echo "$T_mode" | tr '[:upper:]' '[:lower:]')
+
+	if [[ $T_mode_lowercase == *"manual"* ]]; then
+		echo "Running tests for manual tickets.."
+
+		for t in $MANUAL_TESTS; do
+			runtest $t
+		done
+	else
+		echo "Running tests for automatic Raft tickets.."
+
+		for t in $TESTS; do
+			runtest $t
+		done
+	fi
 done
 
 exit $master_rc

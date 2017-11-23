@@ -40,6 +40,7 @@
 #include "raft.h"
 #include "handler.h"
 #include "request.h"
+#include "manual.h"
 
 #define TK_LINE			256
 
@@ -182,15 +183,27 @@ void save_committed_tkt(struct ticket_config *tk)
 static void ext_prog_failed(struct ticket_config *tk,
 		int start_election)
 {
-	/* Give it to somebody else.
-	 * Just send a VOTE_FOR message, so the
-	 * others can start elections. */
-	if (leader_and_valid(tk)) {
-		save_committed_tkt(tk);
-		reset_ticket(tk);
-		ticket_write(tk);
-		if (start_election) {
-			ticket_broadcast(tk, OP_VOTE_FOR, OP_REQ_VOTE, RLT_SUCCESS, OR_LOCAL_FAIL);
+	if (!is_manual(tk)) {
+		/* Give it to somebody else.
+	 	 * Just send a VOTE_FOR message, so the
+		 * others can start elections. */
+		if (leader_and_valid(tk)) {
+			save_committed_tkt(tk);
+			reset_ticket(tk);
+			ticket_write(tk);	
+			if (start_election) {
+				ticket_broadcast(tk, OP_VOTE_FOR, OP_REQ_VOTE, RLT_SUCCESS, OR_LOCAL_FAIL);
+			}
+		}
+	} else {
+		/* There is not much we can do now because
+		 * the manual ticket cannot be relocated.
+		 * Just warn the user. */
+		if (tk->leader == local) {
+			save_committed_tkt(tk);
+			reset_ticket(tk);
+			ticket_write(tk);	
+			log_error("external test failed on the specified machine, cannot acquire a manual ticket");
 		}
 	}
 }
@@ -299,7 +312,12 @@ int acquire_ticket(struct ticket_config *tk, cmd_reason_t reason)
 		return RLT_EXT_FAILED;
 	}
 
-	rv = new_election(tk, local, 1, reason);
+	if (is_manual(tk)) {
+		rv = manual_selection(tk, local, 1, reason);
+	} else {
+		rv = new_election(tk, local, 1, reason);
+	}
+
 	return rv ? RLT_SYNC_FAIL : 0;
 }
 
@@ -314,8 +332,18 @@ int do_grant_ticket(struct ticket_config *tk, int options)
 
 	if (tk->leader == local)
 		return RLT_SUCCESS;
-	if (is_owned(tk))
-		return RLT_OVERGRANT;
+	if (is_owned(tk)) {
+		if (is_manual(tk) && (options & OPT_IMMEDIATE)) {
+			/* -F flag has been used while granting a manual ticket.
+			 * The ticket will be granted and may end up being granted
+			 * on multiple sites */
+			tk_log_warn("manual ticket forced to be granted! be aware that "
+					"you may end up having two sites holding the same manual "
+					"ticket! revoke the ticket from the unnecessary site!");
+		} else {
+			return RLT_OVERGRANT;
+		}
+	}
 
 	set_future_time(&tk->delay_commit, tk->term_duration + tk->acquire_after);
 
@@ -340,8 +368,7 @@ static void start_revoke_ticket(struct ticket_config *tk)
 	tk_log_info("revoking ticket");
 
 	save_committed_tkt(tk);
-	reset_ticket(tk);
-	set_leader(tk, no_leader);
+	reset_ticket_and_set_no_leader(tk);
 	ticket_write(tk);
 	ticket_broadcast(tk, OP_REVOKE, OP_ACK, RLT_SUCCESS, OR_ADMIN);
 }
@@ -367,20 +394,32 @@ int list_ticket(char **pdata, unsigned int *len)
 	char timeout_str[64];
 	char pending_str[64];
 	char *data, *cp;
-	int i, alloc;
+	int i, alloc, site_index;
 	time_t ts;
+	int multiple_grant_warning_length = 0;
 
 	*pdata = NULL;
 	*len = 0;
 
-	alloc = booth_conf->ticket_count * (BOOTH_NAME_LEN * 2 + 128);
+	alloc = booth_conf->ticket_count * (BOOTH_NAME_LEN * 2 + 128 + 16);
+
+	foreach_ticket(i, tk) {
+		multiple_grant_warning_length = number_sites_marked_as_granted(tk);
+
+		if (multiple_grant_warning_length > 1) {
+			// 164: 55 + 45 + 2*number_of_multiple_sites + some margin
+			alloc += 164 + BOOTH_NAME_LEN * (1+multiple_grant_warning_length);
+		}
+	}
+
 	data = malloc(alloc);
 	if (!data)
 		return -ENOMEM;
 
 	cp = data;
 	foreach_ticket(i, tk) {
-		if (is_time_set(&tk->term_expires)) {
+		if ((!is_manual(tk)) && is_time_set(&tk->term_expires)) {
+			/* Manual tickets doesn't have term_expires defined */
 			ts = wall_ts(&tk->term_expires);
 			strftime(timeout_str, sizeof(timeout_str), "%F %T",
 					localtime(&ts));
@@ -407,16 +446,52 @@ int list_ticket(char **pdata, unsigned int *len)
 		if (is_owned(tk)) {
 			cp += snprintf(cp,
 					alloc - (cp - data),
-					", expires: %s%s\n",
+					", expires: %s%s",
 					timeout_str,
 					pending_str);
-		} else {
-			cp += snprintf(cp, alloc - (cp - data), "\n");
 		}
+
+		if (is_manual(tk)) {
+			cp += snprintf(cp,
+					alloc - (cp - data),
+					" [manual mode]");
+		}
+
+		cp += snprintf(cp, alloc - (cp - data), "\n");
 
 		if (alloc - (cp - data) <= 0) {
 			free(data);
 			return -ENOMEM;
+		}
+	}
+
+	foreach_ticket(i, tk) {
+		multiple_grant_warning_length = number_sites_marked_as_granted(tk);
+
+		if (multiple_grant_warning_length > 1) {
+			cp += snprintf(cp,
+					alloc - (cp - data),
+					"\nWARNING: The ticket %s is granted to multiple sites: ",  // ~55 characters
+					tk->name);
+
+			for(site_index=0; site_index<booth_conf->site_count; ++site_index) {
+				if (tk->sites_where_granted[site_index] > 0) {
+					cp += snprintf(cp,
+						alloc - (cp - data),
+						"%s",
+						site_string(&(booth_conf->site[site_index])));
+
+					if (--multiple_grant_warning_length > 0) {
+						cp += snprintf(cp,
+							alloc - (cp - data),
+							", ");
+					}
+				}
+			}
+
+			cp += snprintf(cp,
+				alloc - (cp - data),
+				". Revoke the ticket from the faulty sites.\n");  // ~45 characters
 		}
 	}
 
@@ -455,6 +530,14 @@ void reset_ticket(struct ticket_config *tk)
 	tk->voted_for = NULL;
 }
 
+void reset_ticket_and_set_no_leader(struct ticket_config *tk)
+{
+	mark_ticket_as_revoked_from_leader(tk);
+	reset_ticket(tk);
+
+	tk->leader = no_leader;
+	tk_log_debug("ticket leader set to no_leader");
+}
 
 static void log_reacquire_reason(struct ticket_config *tk)
 {
@@ -606,9 +689,12 @@ int process_client_request(struct client *req_client, void *buf)
 		goto reply_now;
 	}
 
-	if ((cmd == CMD_GRANT) && is_owned(tk)) {
+	/* Perform the initial check before granting
+	 * an already granted non-manual ticket */
+	if ((!is_manual(tk) && (cmd == CMD_GRANT) && is_owned(tk))) {
 		log_warn("client wants to grant an (already granted!) ticket %s",
 				msg->ticket.id);
+
 		rv = RLT_OVERGRANT;
 		goto reply_now;
 	}
@@ -726,12 +812,15 @@ int leader_update_ticket(struct ticket_config *tk)
 	if (tk->ticket_updated >= 2)
 		return 0;
 
-	if (tk->ticket_updated < 1) {
-		tk->ticket_updated = 1;
-		get_time(&now);
-		copy_time(&now, &tk->last_renewal);
-		set_future_time(&tk->term_expires, tk->term_duration);
-		rv = ticket_broadcast(tk, OP_UPDATE, OP_ACK, RLT_SUCCESS, 0);
+	/* for manual tickets, we don't set time expiration */
+	if (!is_manual(tk)) {
+		if (tk->ticket_updated < 1) {
+			tk->ticket_updated = 1;
+			get_time(&now);
+			copy_time(&now, &tk->last_renewal);
+			set_future_time(&tk->term_expires, tk->term_duration);
+			rv = ticket_broadcast(tk, OP_UPDATE, OP_ACK, RLT_SUCCESS, 0);
+		}
 	}
 
 	if (tk->ticket_updated < 2) {
@@ -907,6 +996,7 @@ static void ticket_lost(struct ticket_config *tk)
 
 	tk->lost_leader = tk->leader;
 	save_committed_tkt(tk);
+	mark_ticket_as_revoked_from_leader(tk);
 	reset_ticket(tk);
 	set_state(tk, ST_FOLLOWER);
 	if (local->type == SITE) {
@@ -938,21 +1028,39 @@ static void next_action(struct ticket_config *tk)
 		break;
 
 	case ST_FOLLOWER:
-		/* leader/ticket lost? and we didn't vote yet */
-		tk_log_debug("leader: %s, voted_for: %s",
-				site_string(tk->leader),
-				site_string(tk->voted_for));
-		if (!tk->leader) {
-			if (!tk->voted_for || !tk->in_election) {
-				disown_ticket(tk);
-				if (!new_election(tk, NULL, 1, OR_AGAIN)) {
+		if (!is_manual(tk)) {
+			/* leader/ticket lost? and we didn't vote yet */
+			tk_log_debug("leader: %s, voted_for: %s",
+					site_string(tk->leader),
+					site_string(tk->voted_for));
+			if (!tk->leader) {
+				if (!tk->voted_for || !tk->in_election) {
+					disown_ticket(tk);
+					if (!new_election(tk, NULL, 1, OR_AGAIN)) {
+						ticket_activate_timeout(tk);
+					}
+				} else {
+					/* we should restart elections in case nothing
+					* happens in the meantime */
+					tk->in_election = 0;
 					ticket_activate_timeout(tk);
 				}
+			}
+		} else {
+			/* for manual tickets, also try to acquire ticket on grant
+			 * in the Follower state (because we may end up having
+			 * two Leaders) */
+			if (has_extprog_exited(tk)) {
+				rv = acquire_ticket(tk, OR_ADMIN);
+				if (rv != 0) { /* external program failed */
+					tk->outcome = rv;
+					foreach_tkt_req(tk, notify_client);
+				}
 			} else {
-				/* we should restart elections in case nothing
-				 * happens in the meantime */
-				tk->in_election = 0;
-				ticket_activate_timeout(tk);
+				/* Otherwise, just send ACKs if needed */
+				if (tk->acks_expected) {
+					handle_resends(tk);
+				}
 			}
 		}
 		break;
@@ -1010,9 +1118,11 @@ static void ticket_cron(struct ticket_config *tk)
 	}
 
 	/* Has an owner, has an expiry date, and expiry date in the past?
-	 * Losing the ticket must happen in _every_ state.
+	 * For automatic tickets, losing the ticket must happen
+	 * in _every_ state.
 	 */
-	if (is_owned(tk) && is_time_set(&tk->term_expires)
+	if ((!is_manual(tk)) &&
+			is_owned(tk) && is_time_set(&tk->term_expires)
 			&& is_past(&tk->term_expires)) {
 		ticket_lost(tk);
 		goto out;
@@ -1159,56 +1269,72 @@ void set_ticket_wakeup(struct ticket_config *tk)
 {
 	timetype near_future, tv, next_vote;
 
-	/* At least every hour, perhaps sooner (default) */
-	ticket_next_cron_in(tk, 3600*TIME_RES);
 	set_future_time(&near_future, 10);
 
-	switch (tk->state) {
-	case ST_LEADER:
-		assert(tk->leader == local);
+	if (!is_manual(tk)) {
+		/* At least every hour, perhaps sooner (default) */
+		tk_log_debug("ticket will be woken up after up to one hour");
+		ticket_next_cron_in(tk, 3600*TIME_RES);
 
-		get_next_election_time(tk, &next_vote);
+		switch (tk->state) {
+		case ST_LEADER:
+			assert(tk->leader == local);
 
-		/* If timestamp is in the past, wakeup in
-		 * near future */
-		if (!is_time_set(&next_vote)) {
-			tk_log_debug("next ts unset, wakeup soon");
-			ticket_next_cron_at(tk, &near_future);
-		} else if (is_past(&next_vote)) {
-			int tdiff = time_left(&next_vote);
-			tk_log_debug("next ts in the past " intfmt(tdiff));
-			ticket_next_cron_at(tk, &near_future);
-		} else {
-			ticket_next_cron_at(tk, &next_vote);
+			get_next_election_time(tk, &next_vote);
+
+			/* If timestamp is in the past, wakeup in
+			* near future */
+			if (!is_time_set(&next_vote)) {
+				tk_log_debug("next ts unset, wakeup soon");
+				ticket_next_cron_at(tk, &near_future);
+			} else if (is_past(&next_vote)) {
+				int tdiff = time_left(&next_vote);
+				tk_log_debug("next ts in the past " intfmt(tdiff));
+				ticket_next_cron_at(tk, &near_future);
+			} else {
+				ticket_next_cron_at(tk, &next_vote);
+			}
+			break;
+
+		case ST_CANDIDATE:
+			assert(is_time_set(&tk->election_end));
+			ticket_next_cron_at(tk, &tk->election_end);
+			break;
+
+		case ST_INIT:
+		case ST_FOLLOWER:
+			/* If there is (or should be) some owner, check on it later on.
+			* If no one is interested - don't care. */
+			if (is_owned(tk)) {
+				interval_add(&tk->term_expires, tk->acquire_after, &tv);
+				ticket_next_cron_at(tk, &tv);
+			}
+			break;
+
+		default:
+			tk_log_error("unknown ticket state: %d", tk->state);
 		}
-		break;
 
-	case ST_CANDIDATE:
-		assert(is_time_set(&tk->election_end));
-		ticket_next_cron_at(tk, &tk->election_end);
-		break;
-
-	case ST_INIT:
-	case ST_FOLLOWER:
-		/* If there is (or should be) some owner, check on it later on.
-		 * If no one is interested - don't care. */
-		if (is_owned(tk)) {
-			interval_add(&tk->term_expires, tk->acquire_after, &tv);
-			ticket_next_cron_at(tk, &tv);
+		if (tk->next_state) {
+			/* we need to do something soon here */
+			if (!tk->acks_expected) {
+				ticket_next_cron_at(tk, &near_future);
+			} else {
+				ticket_activate_timeout(tk);
+			}
 		}
-		break;
+	} else {
+		/* At least six minutes, to make sure that multi-leader situations
+		 * will be solved promptly.
+		 */
+		tk_log_debug("manual ticket will be woken up after up to six minutes");
+		ticket_next_cron_in(tk, 60*TIME_RES);
 
-	default:
-		tk_log_error("unknown ticket state: %d", tk->state);
-	}
-
-	if (tk->next_state) {
-		/* we need to do something soon here */
-		if (!tk->acks_expected) {
-			ticket_next_cron_at(tk, &near_future);
-		} else {
-			ticket_activate_timeout(tk);
-		}
+		/* For manual tickets, no earlier timeout could be set in a similar
+		 * way as it is done in a switch above for automatic tickets.
+		 * The reason is that term's timeout is INF and no Raft-based elections
+		 * are performed.
+		 */
 	}
 
 	if (ANYDEBUG) {
@@ -1227,6 +1353,24 @@ void schedule_election(struct ticket_config *tk, cmd_reason_t reason)
 	/* introduce a short delay before starting election */
 	add_random_delay(tk);
 }
+
+
+int is_manual(struct ticket_config *tk)
+{
+	return (tk->mode == TICKET_MODE_MANUAL) ? 1 : 0;
+}
+
+int number_sites_marked_as_granted(struct ticket_config *tk)
+{
+	int i, result = 0;
+
+	for(i=0; i<booth_conf->site_count; ++i) {
+		result += tk->sites_where_granted[i];
+	}
+
+	return result;
+}
+
 
 
 /* Given a state (in host byte order), return a human-readable (char*).

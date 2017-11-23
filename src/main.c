@@ -93,6 +93,7 @@ static int client_size = 0;
 static const struct booth_site _no_leader = {
 	.addr_string = "none",
 	.site_id = NO_ONE,
+	.index = -1,
 };
 struct booth_site *const no_leader = (struct booth_site*) &_no_leader;
 
@@ -942,6 +943,8 @@ static void print_usage(void)
 	"  -s <site>     Connect/grant to a different site\n"
 	"  -F            Try to grant the ticket immediately\n"
 	"                even if not all sites are reachable\n"
+	"                For manual tickets:\n"
+	"                grant a manual ticket even if it has been already granted\n"
 	"  -w            Wait forever for the outcome of the request\n"
 	"  -C            Wait until the ticket is committed to the CIB (grant only)\n"
 	"  -h            Print this help\n"
