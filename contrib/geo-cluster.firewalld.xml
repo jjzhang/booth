@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<service>
+  <short>Booth</short>
+  <description>This allows you to open ports related to booth.</description>
+  <port protocol="tcp" port="9929"/>
+  <port protocol="udp" port="9929"/>
+</service>
