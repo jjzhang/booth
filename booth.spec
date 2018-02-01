@@ -20,11 +20,11 @@
 
 %if 0%{?suse_version}
 %define _libexecdir %{_libdir}
+%define _fwdefdir %{_libexecdir}/firewalld/services
 %endif
 %define with_extra_warnings   	0
 %define with_debugging  	0
 %define without_fatal_warnings 	1
-%define _fwdefdir /etc/sysconfig/SuSEfirewall2.d/services
 %if 0%{?fedora} || 0%{?centos} || 0%{?rhel}
 %define pkg_group System Environment/Daemons
 %else
@@ -51,6 +51,8 @@ BuildRequires:  automake
 BuildRequires:  pkgconfig
 %if 0%{?suse_version}
 BuildRequires:  glib2-devel
+# SuSEFirewall2 replaced by Firewalld (fate#323460)
+BuildRequires:  firewall-macros
 %else
 BuildRequires:  pkgconfig(glib-2.0)
 %endif
@@ -135,10 +137,13 @@ ln -s %{_sbindir}/boothd %{buildroot}/%{test_path}/src/
 rm -f %{buildroot}/%{test_path}/test/*.pyc
 
 %if 0%{?suse_version}
-#SUSE firewall rule
+#Firewalld rule
 mkdir -p $RPM_BUILD_ROOT/%{_fwdefdir}
-install -m 644 contrib/geo-cluster.fwd $RPM_BUILD_ROOT/%{_fwdefdir}/booth
+install -m 644 contrib/geo-cluster.firewalld.xml $RPM_BUILD_ROOT/%{_fwdefdir}/booth.xml
 #install -m 644 %{S:2} $RPM_BUILD_ROOT/%{_fwdefdir}/booth
+
+%post
+%firewalld_reload
 %endif
 
 %check
@@ -174,7 +179,9 @@ echo "%%run_build_tests set to %run_build_tests; skipping tests"
 /usr/lib/ocf/resource.d/booth/geostore
 %config %{_sysconfdir}/booth/booth.conf.example
 %if 0%{?suse_version}
-%config %{_fwdefdir}/booth
+%dir %{_libexecdir}/firewalld
+%dir %{_fwdefdir}
+%{_fwdefdir}/booth.xml
 %endif
 
 %if %{defined _unitdir}
