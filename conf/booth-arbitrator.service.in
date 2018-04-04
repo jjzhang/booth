@@ -14,3 +14,6 @@ WantedBy=multi-user.target
 Type=simple
 @NOTIFY_ACCESS_SWITCH@NotifyAccess=main
 ExecStart=/usr/sbin/boothd daemon -S -c /etc/booth/booth.conf
+
+# Restart options include: no, on-success, on-failure, on-abnormal, on-watchdog, on-abort, or always
+Restart=on-failure
