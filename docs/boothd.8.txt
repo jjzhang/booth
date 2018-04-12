@@ -1,5 +1,5 @@
 BOOTHD(8)
-===========
+=========
 :doctype: manpage
 
 
