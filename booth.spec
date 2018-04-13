@@ -45,7 +45,7 @@ Release:        0
 Source:         booth.tar.bz2
 Source1:        %name-rpmlintrc
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
-BuildRequires:  asciidoc
+BuildRequires:  asciidoctor
 BuildRequires:  autoconf
 BuildRequires:  automake
 BuildRequires:  pkgconfig

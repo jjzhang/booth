@@ -24,6 +24,8 @@ doc_DATA	= $(generated_docs)
 
 generated_docs	=
 generated_mans	=
+ASCIIDOC_ARGS =
+A2X_ARGS =
 
 if BUILD_ASCIIDOC_HTML_MAN
 generated_docs	+= $(ascii:%.txt=%.html) $(asciiman:%.txt=%.html)
@@ -34,9 +36,21 @@ $(generated_mans): $(asciiman)
 man8_MANS	= $(generated_mans)
 endif
 
+if IS_ASCIIDOC
+ASCIIDOC_ARGS += --unsafe --backend=xhtml11
+else
+ASCIIDOC_ARGS += -b xhtml5
+endif
+
+if IS_A2X
+A2X_ARGS += -f manpage
+else
+A2X_ARGS += -b manpage
+endif
+
 %.html: %.txt
-	$(ASCIIDOC) --unsafe --backend=xhtml11 $<
+	$(ASCIIDOC) $(ASCIIDOC_ARGS) $<
 %.8: %.8.txt
-	a2x -f manpage $<
+	$(A2X) $(A2X_ARGS) $<
 clean-local:
 	-rm -rf $(generated_docs) $(generated_mans)
