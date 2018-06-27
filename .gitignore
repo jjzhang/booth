@@ -45,4 +45,4 @@ docs/boothd.8*
 
 doxygen
 
-/conf/booth*.service.in
+/conf/booth*.service
