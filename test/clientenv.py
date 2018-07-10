@@ -4,8 +4,8 @@ from boothrunner  import BoothRunner
 class ClientTestEnvironment(BoothTestEnvironment):
     mode = 'client'
 
-    def run_booth(self, config_text=None, config_file=None, lock_file=True, args=[],
-                  expected_exitcode=0, debug=False):
+    def run_booth(self, config_text=None, config_file=None, lock_file=True,
+                  args=(), expected_exitcode=0, debug=False):
         '''
         Runs boothd.
 

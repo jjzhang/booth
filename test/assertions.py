@@ -10,7 +10,7 @@ class BoothAssertions:
         self.assertRegexpMatches(stderr, expected_error)
 
     def assertLockFileError(self, config_file=None, config_text=None,
-                            lock_file=True, args=[]):
+                            lock_file=True, args=()):
         (pid, ret, stdout, stderr, runner) = \
             self.run_booth(config_text=config_text, config_file=config_file,
                            lock_file=lock_file, args=args, expected_exitcode=1)

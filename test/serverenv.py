@@ -29,7 +29,7 @@ ticket="ticketB"
 
     def run_booth(self, expected_exitcode, expected_daemon,
                   config_text=None, config_file=None, lock_file=True,
-                  args=[], debug=False, foreground=False):
+                  args=(), debug=False, foreground=False):
         '''
         Runs boothd.  Defaults to using a temporary lock file and the
         standard config file path.  There are four possible types of
@@ -52,7 +52,7 @@ ticket="ticketB"
                 True: pass a temporary lockfile parameter to booth via -l
                 string: pass the given lockfile path to booth via -l
             args
-                array of extra args to pass to booth
+                iterable of extra args to pass to booth
             expected_exitcode
                 an integer, or False if booth is not expected to terminate
                 within the timeout

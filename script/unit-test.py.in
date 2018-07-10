@@ -199,7 +199,7 @@ class UT():
             self.booth.close( force=self.booth.isalive() )
 
 
-    def start_a_process(self, bin, env_add=[], **args):
+    def start_a_process(self, bin, env_add=(), **args):
         name = re.sub(r".*/", "", bin)
         # How to get stderr, too?
         expct = pexpect.spawn(bin,
@@ -220,16 +220,15 @@ class UT():
 
     def start_processes(self, test):
         self.booth = self.start_a_process(self.binary,
-                args = [ "daemon", "-D",
-                    "-c", self.test_base + "/booth.conf",
-                    "-s", "127.0.0.1",
-                    "-l", self.lockfile, 
-                    ],
-                env_add=[ ('UNIT_TEST', test),
+                args = ["daemon", "-D",
+                        "-c", self.test_base + "/booth.conf",
+                        "-s", "127.0.0.1",
+                        "-l", self.lockfile],
+                env_add=( ('UNIT_TEST', test),
                     ('UNIT_TEST_FILE', os.path.realpath(test)),
                     # provide some space, so that strcpy(getenv()) works
                     ('UNIT_TEST_AUX', "".zfill(1024)),
-                    ]);
+                    ));
 
         logging.info("started booth with PID %d, lockfile %s" % (self.booth.pid, self.lockfile))
         self.booth.expect("BOOTH site \S+ \(build \S+\) daemon is starting", timeout=2)
@@ -237,16 +236,15 @@ class UT():
 
         self.gdb = self.start_a_process("gdb",
                 args=["-quiet",
-                    "-p", str(self.booth.pid),
-                    # Don't use .gdbinit
-                    "-nx", "-nh",
-                    # Run until the defined point.
-                    # This is necessary so that ticket state setting doesn't
-                    # happen _before_ the call to pcmk_load_ticket()
-                    # (which would overwrite our data)
-                    "-ex", "break ticket_cron",
-                    "-ex", "continue",
-                    ])
+                      "-p", str(self.booth.pid),
+                      # Don't use .gdbinit
+                      "-nx", "-nh",
+                      # Run until the defined point.
+                      # This is necessary so that ticket state setting doesn't
+                      # happen _before_ the call to pcmk_load_ticket()
+                      # (which would overwrite our data)
+                      "-ex", "break ticket_cron",
+                      "-ex", "continue"])
         logging.info("started GDB with PID %d" % self.gdb.pid)
         self.gdb.expect("(gdb)")
         self.gdb.sendline("set pagination off\n")

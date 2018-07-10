@@ -8,14 +8,14 @@ class BoothRunner:
 
     def __init__(self, boothd_path, mode, args):
         self.boothd_path = boothd_path
-        self.args        = [ mode ]
-        self.final_args  = args # will be appended to self.args
+        self.args        = (mode, )
+        self.final_args  = tuple(args)  # will be appended to self.args
         self.mode        = mode
         self.config_file = None
         self.lock_file   = None
 
     def set_config_file_arg(self):
-        self.args += [ '-c', self.config_file ]
+        self.args += ('-c', self.config_file)
 
     def set_config_file(self, config_file):
         self.config_file = config_file
@@ -23,16 +23,16 @@ class BoothRunner:
 
     def set_lock_file(self, lock_file):
         self.lock_file = lock_file
-        self.args += [ '-l', self.lock_file ]
+        self.args += ('-l', self.lock_file)
 
     def set_debug(self):
-        self.args += [ '-D' ]
+        self.args += ('-D', )
 
     def set_foreground(self):
-        self.args += [ '-S' ]
+        self.args += ('-S', )
 
     def all_args(self):
-        return [ self.boothd_path ] + self.args + self.final_args
+        return (self.boothd_path, ) + self.args + self.final_args
 
     def show_output(self, stdout, stderr):
         if stdout:
