@@ -1,5 +1,3 @@
-#!/usr/bin/python
-
 import string
 
 from clientenv import ClientTestEnvironment

@@ -1,5 +1,3 @@
-#!/usr/bin/python
-
 from boothtestenv import BoothTestEnvironment
 from boothrunner  import BoothRunner
 

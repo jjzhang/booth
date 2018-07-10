@@ -1,5 +1,3 @@
-#!/usr/bin/python
-
 import copy
 from   pprint    import pprint, pformat
 import re
