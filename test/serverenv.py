@@ -73,12 +73,10 @@ ticket="ticketB"
         where return_code/stdout/stderr are None iff pid is still running.
         '''
         if expected_daemon and expected_exitcode is not None and expected_exitcode != 0:
-            raise RuntimeError, \
-                "Shouldn't ever expect daemon to start and then failure"
+            raise RuntimeError("Shouldn't ever expect daemon to start and then failure")
 
         if not expected_daemon and expected_exitcode == 0:
-            raise RuntimeError, \
-                "Shouldn't ever expect success without starting daemon"
+            raise RuntimeError("Shouldn't ever expect success without starting daemon")
 
         self.init_log()
 
@@ -122,9 +120,9 @@ ticket="ticketB"
         return config_file
 
     def kill_pid(self, pid):
-        print "killing %d ..." % pid
+        print("killing %d ..." % pid)
         os.kill(pid, 15)
-        print "killed"
+        print("killed")
 
     def check_daemon_handling(self, runner, expected_daemon):
         '''
@@ -154,7 +152,7 @@ ticket="ticketB"
         Returns the pid contained in lock_file, or None if it doesn't exist.
         '''
         if not os.path.exists(lock_file):
-            print "%s does not exist" % lock_file
+            print("%s does not exist" % lock_file)
             return None
 
         l = open(lock_file)
@@ -162,7 +160,7 @@ ticket="ticketB"
         l.close()
         self.assertEqual(len(lines), 1, "Lock file should contain one line")
         pid = re.search('\\bbooth_pid="?(\\d+)"?', lines[0]).group(1)
-        print "lockfile contains: <%s>" % pid
+        print("lockfile contains: <%s>" % pid)
         return pid
 
     def is_pid_running_daemon(self, pid):
@@ -185,11 +183,11 @@ ticket="ticketB"
 
         c = open("/proc/%s/cmdline" % pid)
         cmdline = "".join(c.readlines())
-        print cmdline
+        print(cmdline)
         c.close()
 
         if cmdline.find('boothd') == -1:
-            print 'no boothd in cmdline:', cmdline
+            print('no boothd in cmdline:', cmdline)
             return False
 
         # self.assertRegexpMatches(

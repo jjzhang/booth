@@ -53,5 +53,5 @@ if __name__ == '__main__':
         shutil.rmtree(test_run_path)
         sys.exit(0)
     else:
-        print "Left %s for debugging" % test_run_path
+        print("Left %s for debugging" % test_run_path)
         sys.exit(1)

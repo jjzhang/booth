@@ -1,4 +1,5 @@
 import os
+import sys
 import subprocess
 import time
 import unittest
@@ -37,14 +38,14 @@ class BoothRunner:
 
     def show_output(self, stdout, stderr):
         if stdout:
-            print "STDOUT:"
-            print "------"
-            print stdout,
+            print("STDOUT:")
+            print("------")
+            print(stdout.rstrip('\n'))
         if stderr:
-            print "STDERR: (N.B. crm_ticket failures indicate daemon started correctly)"
-            print "------"
-            print stderr,
-        print "-" * 70
+            print("STDERR: (N.B. crm_ticket failures indicate daemon started correctly)")
+            print("------")
+            print(stderr.rstrip('\n'))
+        print("-" * 70)
 
     def subproc_completed_within(self, p, timeout):
         start = time.time()
@@ -55,7 +56,7 @@ class BoothRunner:
             elapsed = time.time() - start
             if elapsed + wait > timeout:
                 wait = timeout - elapsed
-            print "Waiting on %d for %.1fs ..." % (p.pid, wait)
+            print("Waiting on %d for %.1fs ..." % (p.pid, wait))
             time.sleep(wait)
             elapsed = time.time() - start
             if elapsed >= timeout:
@@ -83,26 +84,29 @@ class BoothRunner:
         return text
 
     def show_args(self):
-        print "\n"
-        print "-" * 70
-        print "Running", ' '.join(self.all_args())
+        print("\n")
+        print("-" * 70)
+        print("Running", ' '.join(self.all_args()))
         msg = "with config from %s" % self.config_file_used()
         config_text = self.config_text_used()
         if config_text is not None:
             msg += ": [%s]" % config_text
-        print msg
+        print(msg)
 
     def run(self):
         p = subprocess.Popen(self.all_args(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if not p:
-            raise RuntimeError, "failed to start subprocess"
+            raise RuntimeError("failed to start subprocess")
 
-        print "Started subprocess pid %d" % p.pid
+        print("Started subprocess pid %d" % p.pid)
 
         completed = self.subproc_completed_within(p, 2)
 
         if completed:
             (stdout, stderr) = p.communicate()
+            if sys.version_info[0] >= 3:
+                # only expect ASCII/UTF-8 encodings for the obtained input bytes
+                stdout, stderr = str(stdout, 'UTF-8'), str(stderr, 'UTF-8')
             self.show_output(stdout, stderr)
             return (p.pid, p.returncode, stdout, stderr)
 

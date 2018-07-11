@@ -21,7 +21,7 @@ class BoothAssertions:
     # backported from 2.7 just in case we're running on an older Python
     def assertRegexpMatches(self, text, expected_regexp, msg=None):
         """Fail the test unless the text matches the regular expression."""
-        if isinstance(expected_regexp, basestring):
+        if isinstance(expected_regexp, str):
             expected_regexp = re.compile(expected_regexp)
         if not expected_regexp.search(text, MULTILINE):
             msg = msg or "Regexp didn't match"
@@ -30,7 +30,7 @@ class BoothAssertions:
 
     def assertNotRegexpMatches(self, text, unexpected_regexp, msg=None):
         """Fail the test if the text matches the regular expression."""
-        if isinstance(unexpected_regexp, basestring):
+        if isinstance(unexpected_regexp, str):
             unexpected_regexp = re.compile(unexpected_regexp)
         match = unexpected_regexp.search(text)
         if match:

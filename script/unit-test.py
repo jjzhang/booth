@@ -1,6 +1,8 @@
 #!/usr/bin/python
 # vim: fileencoding=utf-8
 # see http://stackoverflow.com/questions/728891/correct-way-to-define-python-source-code-encoding
+# NOTE: setting the encoding is needed as non-ASCII characters are contained
+# FIXME: apparently, pexpect.EOF is not being excepted properly
 
 import os, sys, time, signal, tempfile, socket, posix, time
 import re, shutil, pexpect, logging, pprint
@@ -16,6 +18,16 @@ default_log_format = '%(asctime)s: : %(message)s'
 default_log_datefmt = '%b %d %H:%M:%S'
 
 
+# Compatibility with dictionary methods not present in Python 3;
+# https://www.python.org/dev/peps/pep-0469/#migrating-to-the-common-subset-of-python-2-and-3
+try:
+    dict.iteritems
+except AttributeError:  # Python 3
+    iter_items = lambda d: iter(d.items())
+else:  # Python 2
+    iter_items = lambda d: d.iteritems()
+
+
 # {{{ pexpect-logging glue
 # needed for use as pexpect.logfile, to relay into existing logfiles
 class expect_logging():
@@ -28,9 +40,12 @@ class expect_logging():
 
     def flush(self, *arg):
         pass
+
     def write(self, stg):
         if self.test.dont_log_expect == 0:
             # TODO: split by input/output, give program
+            if sys.version_info[0] >= 3:
+                stg = str(stg, 'UTF-8')
             for line in re.split(r"[\r\n]+", stg):
                 if line == self.test.prompt:
                     continue
@@ -110,7 +125,7 @@ class UT():
             res = re.match(r"^\s*(\w+)\s*:(?:\s*(#.*?\S))?\s*$", line)
             if res:
                 state = res.group(1)
-                if not m.has_key(state):
+                if state not in m:
                     m[state] = dict_plus()
                 if res.group(2):
                     m[state].aux["comment"] = res.group(2)
@@ -188,17 +203,15 @@ class UT():
         name = re.sub(r".*/", "", bin)
         # How to get stderr, too?
         expct = pexpect.spawn(bin,
-                env = dict( os.environ.items() +
-                    [('PATH',
-                        self.test_base + "/bin/:" +
-                        os.getenv('PATH')),
-                    ('UNIT_TEST_PATH', self.test_base),
-                    ('LC_ALL', 'C'),
-                    ('LANG', 'C')] +
-                    env_add ),
-                timeout = 30,
-                maxread = 32768,
-                **args)
+                    env=dict(os.environ, **dict({
+                             'PATH': ':'.join((self.test_base + "/bin/",
+                                               os.getenv('PATH'))),
+                             'UNIT_TEST_PATH': self.test_base,
+                             'LC_ALL': 'C',
+                             'LANG': 'C'}, **dict(env_add))),
+                    timeout=30,
+                    maxread=32768,
+                    **args)
         expct.setecho(False)
         expct.logfile_read = expect_logging("<-  %s" % name, self)
         expct.logfile_send = expect_logging(" -> %s" % name, self)
@@ -361,7 +374,7 @@ class UT():
 
         self.current_nr = kv.aux.get("line")
         #os.system("strace -f -tt -s 2000 -e write -p" + str(self.gdb.pid) + " &")
-        for n, v in kv.iteritems():
+        for n, v in iter_items(kv):
             self.set_val( self.translate_shorthand(n, "ticket"), v)
         logging.info("set state")
 
@@ -372,7 +385,7 @@ class UT():
         if not sys.stdin.isatty():
             logging.error("Not a terminal, stopping.")
         else:
-            print "\n\nEntering interactive mode.\n\n"
+            print("\n\nEntering interactive mode.\n\n")
             self.gdb.sendline("set prompt GDB> \n")
             self.gdb.setecho(True)
             # can't use send_cmd, doesn't reply with expected prompt anymore.
@@ -415,7 +428,7 @@ class UT():
         self.send_cmd("next")
         
         # push message.
-        for (n, v) in msg.iteritems():
+        for (n, v) in iter_items(msg):
             self.set_val( self.translate_shorthand(n, "message"), v, "htonl")
 
         # set "received" length
@@ -426,7 +439,7 @@ class UT():
     def wait_outgoing(self, msg):
         self.wait_for_function("booth_udp_send")
         ok = True
-        for (n, v) in msg.iteritems():
+        for (n, v) in iter_items(msg):
             if re.search(r"\.", n):
                 ok = self.check_value( self.translate_shorthand(n, "inject"), v) and ok
             else:
@@ -438,14 +451,12 @@ class UT():
         #stopped_at = self.sync() 
 
     def merge_dicts(self, base, overlay):
-        return dict(base.items() + overlay.items())
+        return dict(base, **overlay)
        
 
     def loop(self, fn, data):
-        matches = map(lambda k: re.match(r"^(outgoing|message)(\d+)$", k), data.iterkeys())
-        valid_matches = filter(None, matches)
-        nums = map(lambda m: int(m.group(2)), valid_matches)
-        loop_max = max(nums)
+        matches = (re.match(r"^(outgoing|message)(\d+)$", k) for k in data)
+        loop_max = max(int(m.group(2)) for m in matches if m)
         for counter in range(0, loop_max+1):    # incl. last message
 
             kmsg = 'message%d' % counter
@@ -471,14 +482,14 @@ class UT():
                 logging.info("ticket change %s  (%s:%d)  %s" % (ktkt, fn, self.current_nr, comment))
                 self.set_state(tkt)
             if gdb:
-                for (k, v) in gdb.iteritems():
+                for (k, v) in iter_items(gdb):
                     self.send_cmd(k + " " + v.replace("§", "\n"))
             if msg:
                 self.current_nr = msg.aux.get("line")
                 comment = msg.aux.get("comment", "")
                 logging.info("sending %s  (%s:%d)  %s" % (kmsg, fn, self.current_nr, comment))
                 self.send_message(self.merge_dicts(data["message"], msg))
-            if data.has_key(kgdb) and len(gdb) == 0:
+            if kgdb in data and len(gdb) == 0:
                 self.user_debug("manual override")
             if out:
                 self.current_nr = out.aux.get("line")
@@ -520,7 +531,7 @@ class UT():
         self.let_booth_go_a_bit()
 
         ok = True
-        for (n, v) in data.iteritems():
+        for (n, v) in iter_items(data):
             ok = self.check_value( self.translate_shorthand(n, "ticket"), v) and ok
         if not ok:
             sys.exit(1)
@@ -529,8 +540,8 @@ class UT():
     def run(self, start_from="000", end_with="999"):
         os.chdir(self.test_base)
         # TODO: sorted, random order
-        tests = filter( (lambda f: re.match(r"^\d\d\d_.*\.txt$", f)), glob.glob("*"))
-        tests.sort()
+        tests = sorted(f for f in glob.glob("*")
+                       if re.match(r"^\d\d\d_.*\.txt$", f))
         failed = 0
         for f in tests:
             if f[0:3] < start_from:
@@ -561,7 +572,7 @@ class UT():
             except:
                 failed += 1
                 logging.error(self.colored_string("Broke in %s:%s %s" % (f, self.current_nr, sys.exc_info()), self.RED))
-                for frame in traceback.format_tb(sys.exc_traceback):
+                for frame in traceback.format_tb(sys.exc_info()[2]):
                     logging.info("  -  %s " % frame.rstrip())
             finally:
                 self.stop_processes()

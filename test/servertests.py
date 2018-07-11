@@ -35,13 +35,13 @@ class ServerTests(ServerTestEnvironment):
 
     def test_config_file_buffer_overflow(self):
         # https://bugzilla.novell.com/show_bug.cgi?id=750256
-        longfile = (string.lowercase * 5)[:127]
+        longfile = (string.ascii_lowercase * 5)[:127]
         expected_error = "'%s' exceeds maximum config name length" % longfile
         self._test_buffer_overflow(expected_error, config_file=longfile)
 
     def test_lock_file_buffer_overflow(self):
         # https://bugzilla.novell.com/show_bug.cgi?id=750256
-        longfile = (string.lowercase * 5)[:127]
+        longfile = (string.ascii_lowercase * 5)[:127]
         expected_error = "'%s' exceeds maximum lock file length" % longfile
         self._test_buffer_overflow(expected_error, lock_file=longfile)
 
@@ -54,12 +54,12 @@ class ServerTests(ServerTestEnvironment):
         # quotes no longer required
         return True
         orig_lines = self.working_config.split("\n")
-        for i in xrange(len(orig_lines)):
+        for (i, line) in enumerate(orig_lines):
             new_lines = copy.copy(orig_lines)
-            new_lines[i] = new_lines[i].replace('"', '')
+            new_lines[i] = line.replace('"', '')
             new_config = "\n".join(new_lines)
 
-            line_contains_IP = re.search('^\s*(site|arbitrator)=.*[0-9]\.', orig_lines[i])
+            line_contains_IP = re.search('^\s*(site|arbitrator)=.*[0-9]\.', line)
             if line_contains_IP:
                 # IP addresses need to be surrounded by quotes,
                 # so stripping them should cause it to fail
