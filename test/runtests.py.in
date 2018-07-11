@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!@PYTHON_SHEBANG@
 
 import os
 import re

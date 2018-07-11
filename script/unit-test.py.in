@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!@PYTHON_SHEBANG@
 # vim: fileencoding=utf-8
 # see http://stackoverflow.com/questions/728891/correct-way-to-define-python-source-code-encoding
 # NOTE: setting the encoding is needed as non-ASCII characters are contained

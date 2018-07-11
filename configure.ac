@@ -97,6 +97,14 @@ CPPFLAGS="$CPPFLAGS $XML2HEAD"
 
 PKG_CHECK_MODULES(GLIB, [glib-2.0])
 
+# Python casing, prefer 3.3+ to 2.{6...}
+AM_PATH_PYTHON([3.3], , [PYTHON=:])
+if test "x$PYTHON" = x:; then
+	AM_PATH_PYTHON([2.6])
+fi
+PYTHON_SHEBANG="$PYTHON ${PYTHON_OPTS--Es}"
+AC_ARG_VAR([PYTHON_SHEBANG], [Python invocation used in shebangs])
+
 # Checks for header files.
 AC_FUNC_ALLOCA
 AC_HEADER_DIRENT
@@ -157,7 +165,9 @@ AC_CONFIG_FILES([Makefile
 		 docs/Makefile
 		 conf/Makefile])
 AC_CONFIG_FILES([conf/booth-arbitrator.service conf/booth@.service])
-
+AC_CONFIG_FILES([script/unit-test.py test/runtests.py],
+		dnl Following required at least for "make check"
+		[chmod +x test/runtests.py])
 AC_CONFIG_FILES([script/service-runnable], [chmod +x script/service-runnable])
 
 # ===============================================
