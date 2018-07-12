@@ -51,8 +51,8 @@ class ServerTests(ServerTestEnvironment):
                            config_text=self.working_config)
 
     def test_missing_quotes(self):
-	# quotes no longer required
-	return True
+        # quotes no longer required
+        return True
         orig_lines = self.working_config.split("\n")
         for i in xrange(len(orig_lines)):
             new_lines = copy.copy(orig_lines)
@@ -97,8 +97,8 @@ class ServerTests(ServerTestEnvironment):
                            expected_exitcode=None, expected_daemon=True)
 
     def test_missing_transport(self):
-	# UDP is default -- TODO?
-	return True
+        # UDP is default -- TODO?
+        return True
         config = re.sub('transport=.+\n', '', self.typical_config)
         (pid, ret, stdout, stderr, runner) = \
             self.run_booth(config_text=config, expected_exitcode=1, expected_daemon=False)
@@ -141,10 +141,10 @@ class ServerTests(ServerTestEnvironment):
             self.assertRegexpMatches(stderr, 'ticket name "' + ticket + '" invalid')
 
     def test_unreachable_peer(self):
-	# what should this test do? daemon not expected, but no exitcode either?
-	# booth would now just run, and try to reach that peer...
-	# TCP reachability is not required during startup anymore.
-	return True
+        # what should this test do? daemon not expected, but no exitcode either?
+        # booth would now just run, and try to reach that peer...
+        # TCP reachability is not required during startup anymore.
+        return True
         config = re.sub('#(.+147.+)', lambda m: m.group(1), self.working_config)
         self.run_booth(config_text=config,
                        expected_exitcode=None, expected_daemon=False)
