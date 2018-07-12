@@ -5,7 +5,6 @@ import tempfile
 import unittest
 
 from assertions  import BoothAssertions
-from boothrunner import BoothRunner
 
 class BoothTestEnvironment(unittest.TestCase, BoothAssertions):
     test_src_path       = os.path.abspath(os.path.dirname(__file__))

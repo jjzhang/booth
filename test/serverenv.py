@@ -1,9 +1,7 @@
 import os
 import re
 import time
-import unittest
 
-from assertions   import BoothAssertions
 from boothrunner  import BoothRunner
 from boothtestenv import BoothTestEnvironment
 from utils        import get_IP

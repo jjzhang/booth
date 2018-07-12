@@ -1,8 +1,6 @@
-import os
 import sys
 import subprocess
 import time
-import unittest
 
 class BoothRunner:
     default_config_file = '/etc/booth/booth.conf'
