@@ -155,7 +155,6 @@ echo "%%run_build_tests set to %run_build_tests; skipping tests"
 %endif
 
 %files
-%defattr(-,root,root,-)
 %{_sbindir}/booth
 %{_sbindir}/boothd
 %{_sbindir}/booth-keygen
@@ -209,8 +208,6 @@ This package contains automated tests for Booth,
 the Cluster Ticket Manager for Pacemaker.
 
 %files test
-%defattr(-,root,root)
-
 %doc README-testing
 %{test_path}
 %dir /usr/lib/ocf
