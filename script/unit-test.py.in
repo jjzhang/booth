@@ -2,7 +2,6 @@
 # vim: fileencoding=utf-8
 # see http://stackoverflow.com/questions/728891/correct-way-to-define-python-source-code-encoding
 # NOTE: setting the encoding is needed as non-ASCII characters are contained
-# FIXME: apparently, pexpect.EOF is not being excepted properly
 
 import os, sys, time, signal, tempfile, socket, posix, time
 import re, shutil, pexpect, logging, pprint
@@ -220,7 +219,7 @@ class UT():
 
     def start_processes(self, test):
         self.booth = self.start_a_process(self.binary,
-                args = ["daemon", "-D",
+                args = ["daemon", "-DS",
                         "-c", self.test_base + "/booth.conf",
                         "-s", "127.0.0.1",
                         "-l", self.lockfile],
