@@ -87,6 +87,9 @@ Requires:       cluster-glue-libs >= 1.0.6
 Requires:       pacemaker-ticket-support >= 2.0
 %endif
 
+# for check scriptlet
+BuildRequires:  python
+
 %description
 Booth manages tickets which authorize cluster sites located in
 geographically dispersed locations to run resources. It
