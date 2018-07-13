@@ -2,8 +2,14 @@
 
 %if 0%{?fedora} > 18 || 0%{?centos} > 6 || 0%{?rhel} > 6
 %bcond_with glue
+%if 0%{?fedora} > 26 || 0%{?centos} > 7 || 0%{?rhel} > 7
+%bcond_without python3
+%else
+%bcond_with python3
+%endif
 %else
 %bcond_without glue
+%bcond_with python3
 %endif
 
 %if 0%{?suse_version}
@@ -88,7 +94,11 @@ Requires:       pacemaker-ticket-support >= 2.0
 %endif
 
 # for check scriptlet
+%if 0%{?with_python3}
+BuildRequires:  python3-devel
+%else
 BuildRequires:  python
+%endif
 
 %description
 Booth manages tickets which authorize cluster sites located in
@@ -205,8 +215,13 @@ Summary:        Test scripts for Booth
 Group:          %{pkg_group}
 Requires:       booth
 Requires:       gdb
+%if 0%{?with_python3}
+Requires:       python3
+Requires:       python3-pexpect
+%else
 Requires:       python
 Requires:       python-pexpect
+%endif
 
 %description test
 This package contains automated tests for Booth,
