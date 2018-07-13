@@ -204,7 +204,9 @@ echo "%%run_build_tests set to %run_build_tests; skipping tests"
 Summary:        Test scripts for Booth
 Group:          %{pkg_group}
 Requires:       booth
+Requires:       gdb
 Requires:       python
+Requires:       python-pexpect
 
 %description test
 This package contains automated tests for Booth,
