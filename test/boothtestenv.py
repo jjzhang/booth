@@ -1,5 +1,3 @@
-#!/usr/bin/python
-
 import os
 import subprocess
 import time
@@ -7,7 +5,6 @@ import tempfile
 import unittest
 
 from assertions  import BoothAssertions
-from boothrunner import BoothRunner
 
 class BoothTestEnvironment(unittest.TestCase, BoothAssertions):
     test_src_path       = os.path.abspath(os.path.dirname(__file__))
@@ -19,7 +16,7 @@ class BoothTestEnvironment(unittest.TestCase, BoothAssertions):
 
     def setUp(self):
         if not self._testMethodName.startswith('test_'):
-            raise RuntimeError, "unexpected test method name: " + self._testMethodName
+            raise RuntimeError("unexpected test method name: " + self._testMethodName)
         self.test_name = self._testMethodName[5:]
         self.test_path = os.path.join(self.test_run_path, self.test_name)
         os.makedirs(self.test_path)
@@ -56,11 +53,11 @@ class BoothTestEnvironment(unittest.TestCase, BoothAssertions):
 
     def check_return_code(self, pid, return_code, expected_exitcode):
         if return_code is None:
-            print "pid %d still running" % pid
+            print("pid %d still running" % pid)
             if expected_exitcode is not None:
                 self.fail("expected exit code %d, not long-running process" % expected_exitcode)
         else:
-            print "pid %d exited with code %d" % (pid, return_code)
+            print("pid %d exited with code %d" % (pid, return_code))
             if expected_exitcode is None:
                 msg = "should not exit"
             else:

@@ -1,7 +1,6 @@
-#!/usr/bin/python
+#!@PYTHON_SHEBANG@
 
 import os
-import re
 import shutil
 import sys
 import tempfile
@@ -10,7 +9,7 @@ import unittest
 
 from clienttests import ClientConfigTests
 from sitetests   import SiteConfigTests
-from arbtests    import ArbitratorConfigTests
+#from arbtests    import ArbitratorConfigTests
 
 if __name__ == '__main__':
     if os.geteuid() == 0:
@@ -53,5 +52,5 @@ if __name__ == '__main__':
         shutil.rmtree(test_run_path)
         sys.exit(0)
     else:
-        print "Left %s for debugging" % test_run_path
+        print("Left %s for debugging" % test_run_path)
         sys.exit(1)

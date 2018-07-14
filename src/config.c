@@ -75,7 +75,10 @@ static void hostname_to_ip(char * hostname)
 
 	/* Return the first found address */
 	if (addr_list[0] != NULL) {
-		strncpy(hostname, inet_ntoa(*addr_list[0]), BOOTH_NAME_LEN);
+		strncpy(hostname, inet_ntoa(*addr_list[0]), BOOTH_NAME_LEN - 1);
+		/* buffer overflow will not happen (IPv6 notation < 63 chars),
+		   but suppress the warnings */
+		hostname[BOOTH_NAME_LEN - 1] = '\0';
 	}
 	else {
 		log_error("no IP addresses found for the host \"%s\"", hostname);
@@ -106,7 +109,12 @@ static int add_site(char *addr_string, int type)
 	site->family = AF_INET;
 	site->type = type;
 
-	strncpy(site->addr_string, addr_string, sizeof(site->addr_string));
+	/* buffer overflow will not hapen (we've already checked that
+	   addr_string will fit incl. terminating '\0' above), but
+	   suppress the warnings with copying everything but the boundary
+	   byte, which is valid as-is, since this last byte will be safely
+	   pre-zeroed from the struct booth_config initialization */
+	strncpy(site->addr_string, addr_string, sizeof(site->addr_string) - 1);
 
 	if (!(inet_pton(AF_INET, site->addr_string, &site->sa4.sin_addr) > 0) &&
         !(inet_pton(AF_INET6, site->addr_string, &site->sa6.sin6_addr) > 0)) {
