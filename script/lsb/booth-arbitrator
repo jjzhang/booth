@@ -1,6 +1,7 @@
 #!/bin/bash
 #
-# BOOTH daemon init script for LSB-compliant Linux distributions.
+# BOOTH daemon init script for SUSE Linux based distributions
+# (almost LSB-compliant, except for s/startproc/start_daemon/ etc.)
 #
 # booth-arbitrator	BOOTH arbitrator daemon
 #
@@ -40,12 +41,13 @@ check_status() {
 
 	rc=$BOOTH_ERROR_GENERIC
 	eval `"$exec" status "${cnf:+-c$cnf}" ; echo rc=$?`
-	case $rc in 
+	case $rc in
 	0)
-		case  "$booth_state" in 
+		# shellcheck disable=SC2154
+		case "$booth_state" in
 		started)  return $BOOTH_DAEMON_STARTED;;
 		starting) return $BOOTH_DAEMON_STARTING;;
-		*) return $BOOTH_ERROR_GENERIC;;	
+		*) return $BOOTH_ERROR_GENERIC;;
 		esac
 	;;
 	$OCF_NOT_RUNNING) return $BOOTH_DAEMON_NOT_RUNNING;;
@@ -57,6 +59,7 @@ check_status() {
 status() {
 	echo -n "BOOTH daemon is "
 	if check_status; then
+		# shellcheck disable=SC2154
 		echo "running - PID $booth_lockpid for $booth_cfg_name, $booth_addr_string:$booth_port"
 		return 0
 	else
@@ -90,16 +93,15 @@ stop() {
 	wait_time=5
 	check_status; rc=$?
 	case $rc in
-	$BOOTH_DAEMON_STARTED);;
-	$BOOTH_DAEMON_STARTING);;
-	$BOOTH_DAEMON_EXIST);;
+	$BOOTH_DAEMON_STARTED|$BOOTH_DAEMON_STARTING|$BOOTH_DAEMON_EXIST)
+		;;
 	$BOOTH_DAEMON_NOT_RUNNING)
 		echo "BOOTH arbitrator daemon is not running."
 		return 0
-	;;
+		;;
 	*) return 1;;
 	esac
-	
+
 	echo -n $"Stopping BOOTH arbitrator daemon: "
 #	$exec stop "${cnf:+-c$cnf}"
 #	sleep 1
@@ -122,11 +124,10 @@ stop() {
 }
 
 foreach() {
-	local cnf cnf_base
+	local cnf
 	local rc=0
 
 	for cnf in ${BOOTH_CONF_FILE:-$CONF_DIR/*.conf} ; do
-		cnf_base=`basename $cnf`
 		"$@"
 		rc=$((rc|$?))
 	done
@@ -138,20 +139,31 @@ restart() {
 	start
 }
 
+condrestart() {
+	local rc
+
+	check_status; rc=$?
+
+	case "$rc" in
+	$BOOTH_DAEMON_STARTED|$BOOTH_DAEMON_STARTING|$BOOTH_DAEMON_EXIST)
+		# shellcheck disable=SC2154
+		[ ! -f "$booth_lockfile" ] || restart
+		;;
+	esac
+}
+
 case "$1" in
-	start|stop|restart)
-        foreach $1
-        ;;
-	reload|force-reload)
-        foreach restart
-        ;;
-	condrestart|try-restart)
-	[ ! -f "$booth_lockfile" ] || restart
-        ;;
-  status)
-        foreach status
-        ;;
-  *)
-        echo $"Usage: $0 {start|stop|restart|try-restart|condrestart|reload|force-reload|status}"
-        exit 2
+start|stop|restart|condrestart|status)
+	foreach $1
+	;;
+reload|force-reload)
+	foreach restart
+	;;
+try-restart)
+	foreach condrestart
+	;;
+*)
+	echo $"Usage: $0 {start|stop|restart|try-restart|condrestart|reload|force-reload|status}"
+	exit 2
+	;;
 esac

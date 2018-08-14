@@ -30,6 +30,7 @@ DEFAULT_BIN="boothd"
 DEFAULT_CONF="/etc/booth/booth.conf"
 
 : ${OCF_FUNCTIONS_DIR=${OCF_ROOT}/lib/heartbeat}
+# shellcheck source=/usr/lib/ocf/lib/heartbeat/ocf-shellfuncs
 . ${OCF_FUNCTIONS_DIR}/ocf-shellfuncs
 
 #######################################################################
@@ -140,6 +141,8 @@ booth_site_start() {
 	$OCF_NOT_RUNNING) ;;
 	esac
 
+	# shellcheck disable=SC2154
+	# (OCF_RESKEY_args: injected by CRM)
 	$OCF_RESKEY_daemon daemon -c $OCF_RESKEY_config $OCF_RESKEY_args ||
 		return $OCF_ERR_GENERIC
 	sleep 1
@@ -188,6 +191,8 @@ booth_site_validate_all() {
 		return $OCF_ERR_INSTALLED
 	fi
 
+	# shellcheck disable=SC2154
+	# (OCF_RESKEY_CRM_meta_globally_unique: injected by CRM)
 	if ocf_is_true $OCF_RESKEY_CRM_meta_globally_unique; then
 		ocf_log err "$OCF_RESOURCE_INSTANCE must be configured with the globally_unique=false meta attribute"
 		return $OCF_ERR_CONFIGURED
@@ -198,6 +203,8 @@ booth_site_validate_all() {
 
 : ${OCF_RESKEY_daemon:=$DEFAULT_BIN}
 : ${OCF_RESKEY_config:=$DEFAULT_CONF}
+# shellcheck disable=SC2034
+# (OCF_REQUIRED_BINARIES consumed by ocf_rarun)
 OCF_REQUIRED_BINARIES=${OCF_RESKEY_daemon}
 
 ocf_rarun $*

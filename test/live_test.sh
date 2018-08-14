@@ -41,7 +41,6 @@ EOF
 [ $# -eq 0 ] && usage 0
 
 cnf=$1
-BOOTH_DIR="/etc/booth"
 run_cnf="/etc/booth/booth.conf"
 
 shift 1
@@ -62,9 +61,9 @@ get_internal_site() {
 
 logmsg() {
 	if [ "$WE_SERVER" -o "$_JUST_NETEM" ]; then
-		logger -t "BOOTHTEST" -p $HA_LOGFACILITY.info -- $@
+		logger -t "BOOTHTEST" -p $HA_LOGFACILITY.info -- "$@"
 	else
-		ssh $SSH_OPTS `get_site 1` logger -t "BOOTHTEST" -p $HA_LOGFACILITY.info -- $@
+		ssh $SSH_OPTS `get_site 1` logger -t "BOOTHTEST" -p $HA_LOGFACILITY.info -- "$@"
 	fi
 }
 
@@ -141,20 +140,20 @@ local_netem_env() {
 }
 
 is_function() {
-    test z"`command -v $1`" = z"$1"
+	test z"`command -v $1`" = z"$1"
 }
 runcmd() {
 	local h=$1 rc
 	shift 1
-	echo "$h: running '$@'" | logmsg
+	echo "$h: running '$*'" | logmsg
 	if ip a l | fgrep -wq $h; then
-		eval $@
+		eval "$@"
 	else
-		ssh $SSH_OPTS $h $@
+		ssh $SSH_OPTS $h "$@"
 	fi
 	rc=$?
 	if [ $rc -ne 0 ]; then
-		echo "$h: '$@' failed (exit code $rc)" | logmsg
+		echo "$h: '$*' failed (exit code $rc)" | logmsg
 	fi
 	return $rc
 }
@@ -306,7 +305,7 @@ dump_conf() {
 forall() {
 	local h rc=0
 	for h in $sites $arbitrators; do
-		runcmd $h $@
+		runcmd $h "$@"
 		rc=$((rc|$?))
 	done
 	return $rc
@@ -314,7 +313,7 @@ forall() {
 forall_withname() {
 	local h rc=0 output
 	for h in $sites $arbitrators; do
-		output=`runcmd $h $@`
+		output=`runcmd $h "$@"`
 		rc=$((rc|$?))
 		echo $h: $output
 	done
@@ -323,7 +322,7 @@ forall_withname() {
 forall_sites() {
 	local h rc=0
 	for h in $sites; do
-		runcmd $h $@
+		runcmd $h "$@"
 		rc=$((rc|$?))
 	done
 	return $rc
@@ -343,7 +342,7 @@ forall_fun2() {
 	f=$1
 	shift 1
 	for h in $sites $arbitrators; do
-		$f $@ | ssh $SSH_OPTS $h
+		$f "$@" | ssh $SSH_OPTS $h
 		rc=$((rc|$?))
 		[ $rc -ne 0 ] && break
 	done
@@ -353,13 +352,13 @@ run_site() {
 	local n=$1 h
 	shift 1
 	h=`echo $sites | awk '{print $'$n'}'`
-	runcmd $h $@
+	runcmd $h "$@"
 }
 run_arbitrator() {
 	local n=$1 h
 	shift 1
 	h=`echo $arbitrators | awk '{print $'$n'}'`
-	runcmd $h $@
+	runcmd $h "$@"
 }
 
 # need to get logs from _all_ clusters' nodes
@@ -450,6 +449,8 @@ n && (/^$/ || /^ticket.*/) {exit}
 ' $1
 }
 wait_exp() {
+	# shellcheck disable=SC2154
+	# (T_expire: defined with get_tkt_settings)
 	sleep $T_expire
 }
 wait_renewal() {
@@ -593,7 +594,7 @@ booth_leader_consistency_2() {
 # b) some booths not uptodate (have no leader for the ticket)
 # c) ticket expiry times differ
 check_booth_consistency() {
-	local tlist tlist_validate rc rc_lead maxdiff
+	local tlist rc rc_lead maxdiff
 	tlist=`forall_withname booth list 2>/dev/null | grep $tkt`
 
 	# Check time consistency
@@ -620,7 +621,7 @@ check_booth_consistency() {
 `if [ $rc -ge 4 ]; then
 	echo "booth list consistency failed (more than one leader!):"
 elif [ $rc -ge 2 ]; then
-	echo "booth list consistency failed (some boots not uptodate):"
+	echo "booth list consistency failed (some booths not up-to-date):"
 else
 	echo "booth list consistency failed (max valid time diff: $maxdiff):"
 fi`
@@ -677,11 +678,10 @@ run_report() {
 runtest() {
 	local start_ts end_ts
 	local rc booth_status dep_rsc_status
-	local start_time end_time
 	local usrmsg
 	rc=0
 	TEST=$1
-	start_time=`date`
+	start_ts=`date`  # to have the expanded form in the logfile
 	start_ts=`date +%s`
 	echo -n "Testing: $1 (ticket: $tkt)... "
 	can_run_test $1 || return 0
@@ -719,7 +719,7 @@ runtest() {
 		usrmsg="test FAIL: $rc"
 		;;
 	esac
-	end_time=`date`
+	end_ts=`date`  # to have the expanded form in the logfile
 	end_ts=`date +%s`
 	echo "finished booth test $1 ($tkt): $usrmsg" | logmsg
 	echo "==================================================" | logmsg
@@ -791,6 +791,8 @@ setup_longgrant2() {
 }
 test_longgrant2() {
 	local i
+	# shellcheck disable=SC2034
+	# (variable exists merely out of necessity)
 	for i in `seq 10`; do
 		wait_exp
 	done
@@ -1033,14 +1035,14 @@ setup_split_leader() {
 	return 0
 }
 test_split_leader() {
-	run_site 1 $iprules stop $port   >/dev/null
+	run_site 1 $iprules stop $port >/dev/null
 	wait_exp
 	wait_timeout
 	wait_timeout
 	wait_timeout
 	wait_timeout
 	check_cib any || return 1
-	run_site 1 $iprules start $port  >/dev/null
+	run_site 1 $iprules start $port >/dev/null
 	wait_timeout
 	wait_timeout
 	wait_timeout
@@ -1049,7 +1051,7 @@ check_split_leader() {
 	check_consistency any
 }
 recover_split_leader() {
-	run_site 1 $iprules start $port  >/dev/null
+	run_site 1 $iprules start $port >/dev/null
 }
 
 ## TEST: split_follower ##
@@ -1059,10 +1061,10 @@ setup_split_follower() {
 	grant_ticket_cib 1
 }
 test_split_follower() {
-	run_site 2 $iprules stop $port  >/dev/null
+	run_site 2 $iprules stop $port >/dev/null
 	wait_exp
 	wait_timeout
-	run_site 2 $iprules start $port  >/dev/null
+	run_site 2 $iprules start $port >/dev/null
 	wait_timeout
 }
 check_split_follower() {
@@ -1076,9 +1078,9 @@ setup_split_edge() {
 	grant_ticket_cib 1
 }
 test_split_edge() {
-	run_site 1 $iprules stop $port  >/dev/null
+	run_site 1 $iprules stop $port >/dev/null
 	wait_exp
-	run_site 1 $iprules start $port  >/dev/null
+	run_site 1 $iprules start $port >/dev/null
 	wait_timeout
 	wait_timeout
 }
@@ -1215,13 +1217,11 @@ internal_arbitrators=`get_value arbitrator < $cnf`
 all_nodes=`get_all_nodes`
 port=`get_value port < $cnf`
 : ${port:=9929}
-site_cnt=`echo $internal_sites | wc -w`
-arbitrator_cnt=`echo $internal_arbitrators | wc -w`
 
 if [ "$1" = "__netem__" ]; then
 	shift 1
 	_JUST_NETEM=1
-	local_netem_env $@
+	local_netem_env "$@"
 	exit
 fi
 
@@ -1314,6 +1314,8 @@ do
 
 	eval `get_tkt_settings booth_${i}.conf`
 
+	# shellcheck disable=SC2154
+	# (T_timeout: defined with get_tkt_settings)
 	MIN_TIMEOUT=`awk -v tm=$T_timeout 'BEGIN{
 			if (tm >= 2) print tm;
 			else print 2*tm;

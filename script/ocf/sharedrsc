@@ -36,6 +36,7 @@
 # Initialization:
 
 : ${OCF_FUNCTIONS_DIR=${OCF_ROOT}/lib/heartbeat}
+# shellcheck source=/usr/lib/ocf/lib/heartbeat/ocf-shellfuncs
 . ${OCF_FUNCTIONS_DIR}/ocf-shellfuncs
 
 #######################################################################
@@ -148,6 +149,8 @@ sharedrsc_start() {
 	if ! owner=`runcmd getowner $DIR`; then
 		owner="... nobody, it's only half-claimed"
 	fi
+	# shellcheck disable=SC2154
+	# (OCF_RESKEY_dir: injected by CRM)
 	ocf_log err "eek, $OCF_RESKEY_dir already owned by $owner"
 	return $OCF_ERR_GENERIC
 }
@@ -180,6 +183,8 @@ sharedrsc_validate_all() {
 	return $OCF_SUCCESS
 }
 
+# shellcheck disable=SC2034
+# (OCF_REQUIRED_PARAMS consumed by ocf_rarun)
 OCF_REQUIRED_PARAMS="dir"
 ocf_rarun $*
 

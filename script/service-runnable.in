@@ -30,7 +30,7 @@ fi
 
 if echo "$status" |
 	sed -n '/^Revised cluster status:/,$p' |
-	egrep "^[[:space:]]+$service[[:space:]]+\(.*\):[[:space:]]+Started ([^[:space:]]+) *$" >/dev/null
+	egrep "^[[:space:]]+${service}[[:space:]]+\(.*\):[[:space:]]+Started ([^[:space:]]+) *$" >/dev/null
 then
 	# can be started - we're done.
 	exit 0
