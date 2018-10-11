@@ -74,7 +74,7 @@ The configuration name also determines the name of the PID file - for the defaul
 	'immediate grant': Don't wait for unreachable sites to
 	relinquish the ticket. See the 'Booth ticket management'
 	section below for more details.
-	For manual tickets this option allows to grant a ticket
+	For manual tickets this option allows one to grant a ticket
 	which is currently granted. See the 'Manual tickets' section
 	below for more details.
 +
@@ -137,7 +137,7 @@ client waits indefinitely.
 +
 In this mode the configuration file is searched for an IP address that is 
 locally reachable, ie. matches a configured subnet.
-This allows to run the client commands on another node in the same cluster, as
+This allows one to run the client commands on another node in the same cluster, as
 long as the config file and the service IP is locally reachable.
 +
 For instance, if the booth service IP is 192.168.55.200, and the
@@ -552,7 +552,7 @@ to make sure that some services will remain in a particular site and
 will not be moved to another site, possibly located in a different
 geographical location.
 
-Also, configuring only manual tickets in a GEO cluster, allows to have
+Also, configuring only manual tickets in a GEO cluster, allows one to have
 just two sites in a cluster, without a need of having an arbitrator.
 This is possible because there is no automatic elections and no voting
 performed for manual tickets.
