@@ -18,7 +18,6 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 MAINTAINERCLEANFILES    = Makefile.in
-DISTCLEANFILES          = booth-arbitrator.service.in booth@.service.in
 
 # XXX do not install for now, later support should be per daemon(7)
 nodist_noinst_DATA      = booth-arbitrator.service booth@.service
