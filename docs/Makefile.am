@@ -37,9 +37,9 @@ man8_MANS	= $(generated_mans)
 endif
 
 if IS_ASCIIDOC
-HTML_GENERATOR += $(ASCIIDOC)--unsafe --backend=xhtml11
+HTML_GENERATOR += $(ASCIIDOC) --unsafe --backend=xhtml11
 else
-HTML_GENERATOR += $(ASCIIDOCTOR)-b xhtml5
+HTML_GENERATOR += $(ASCIIDOCTOR) -b xhtml5
 endif
 
 if IS_A2X
