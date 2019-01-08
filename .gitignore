@@ -41,7 +41,8 @@ tools/booth_resource_monitord
 
 *.pyc
 
-docs/boothd.8*
+/docs/boothd.8*
+!/docs/boothd.8.txt
 
 doxygen
 
