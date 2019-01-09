@@ -221,6 +221,7 @@ process_ext_dir(struct ticket_config *tk)
 			_exit(1);
 		case 0: /* child */
 			run_ext_prog(tk, prog);
+			break;  /* run_ext_prog effectively noreturn */
 		default: /* parent */
 			while (waitpid(curr_pid, &status, 0) != curr_pid)
 				;
