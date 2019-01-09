@@ -153,7 +153,7 @@ int do_attr_command(cmd_request_t cmd)
 {
 	struct booth_site *site = NULL;
 	struct boothc_header *header;
-	struct booth_transport const *tpt;
+	struct booth_transport const *tpt = NULL;
 	int len, rv = -1;
 	char *msg = NULL;
 
@@ -218,7 +218,7 @@ int do_attr_command(cmd_request_t cmd)
 	rv = test_attr_reply(ntohl(header->result), cmd);
 
 out_close:
-	if (site)
+	if (tpt && site)
 		tpt->close(site);
 	if (msg)
 		free(msg);
