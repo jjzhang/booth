@@ -42,7 +42,7 @@
 #include <arpa/inet.h>
 #include <sys/types.h>
 
-#include <pacemaker/crm/services.h>
+#include <crm/services.h>
 
 #include "b_config.h"
 
