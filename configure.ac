@@ -90,9 +90,8 @@ PKG_CHECK_MODULES([PCMK], [pacemaker-service],,
 		  [PKG_CHECK_MODULES([PCMK], [pcmk-service])])
 
 # Python casing, prefer 3.3+ to 2.{6...}
-AM_PATH_PYTHON([3.3], , [PYTHON=:])
-if test "x$PYTHON" = x:; then
-	AM_PATH_PYTHON([2.6])
+if test "x$PYTHON" = "x"; then
+	AM_PATH_PYTHON([3.3],, [AM_PATH_PYTHON([2.6])])
 fi
 PYTHON_SHEBANG="$PYTHON ${PYTHON_OPTS--Es}"
 AC_ARG_VAR([PYTHON_SHEBANG], [Python invocation used in shebangs])
