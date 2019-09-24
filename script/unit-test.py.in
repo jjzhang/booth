@@ -591,7 +591,23 @@ class UT():
 
 # {{{ main 
 if __name__ == '__main__':
-    if os.geteuid() == 0:
+    # Likely assumption for the root exclusion is the amount of risk
+    # associated with what naturally accompanies root privileges:
+    # - accidental overwrite (eventually also deletion) of unrelated,
+    #   legitimate and perhaps vital files
+    # - accidental termination of unrelated, legitimate and perhaps
+    #   vital processes
+    # - and so forth, possibly amplified with awkward parallel test
+    #   suite run scenarios (containers partly sharing state, etc.)
+    #
+    # Nonetheless, there are cases like self-contained CI runs where
+    # all these concerns are absent, so allow opt-in relaxing of this.
+    # Alternatively, the config generator could inject particular
+    # credentials for a booth proces to use, but that might come too
+    # late to address the above concerns reliably.
+    if (os.geteuid() == 0
+            and "--allow-root-user" not in sys.argv
+            and not(os.environ.get("BOOTH_UNITTEST_ROOT_USER"))):
         sys.stderr.write("Must be run non-root; aborting.\n")
         sys.exit(1)
 
