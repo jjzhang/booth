@@ -560,10 +560,12 @@ performed for manual tickets.
 Manual tickets are defined in a configuration files by adding a 'mode'
 ticket parameter and setting it to 'manual' or 'MANUAL':
 
+-----------------------
 ticket="manual-ticket"
     [...]
     mode = manual
     [...]
+-----------------------
 
 Manual tickets can be granted and revoked by using normal 'grant' and
 'revoke' commands, with the usual flags and parameters. The only
