@@ -63,7 +63,6 @@ AC_PATH_PROGS(PKGCONFIG, pkg-config)
 AC_PATH_PROGS(ASCIIDOC, asciidoc)
 AC_PATH_PROGS(ASCIIDOCTOR, asciidoctor)
 AC_PATH_PROGS(A2X, a2x)
-AC_PATH_PROGS(XML2CONFIG, xml2-config)
 
 AM_CONDITIONAL(IS_ASCIIDOC, test x"${ASCIIDOC}" != x"")
 AM_CONDITIONAL(IS_A2X, test x"${A2X}" != x"")
@@ -84,17 +83,8 @@ if test "x$libgcrypt_installed" = "xno"; then
 	AM_CONDITIONAL(BUILD_AUTH_C, test "x${mhash_installed}" = "xyes")
 fi
 
-AC_MSG_CHECKING(for special libxml2 includes)
-if test "x$XML2CONFIG" = "x"; then
-   AC_MSG_ERROR(libxml2 config not found)
-else
-   XML2HEAD="`$XML2CONFIG --cflags`"
-   AC_MSG_RESULT($XML2HEAD)
-   AC_CHECK_LIB(xml2, xmlReadMemory)
-fi
-
-CPPFLAGS="$CPPFLAGS $XML2HEAD"
-
+AC_CHECK_LIB([xml2], xmlReadDoc)
+PKG_CHECK_MODULES(XML, [libxml-2.0])
 PKG_CHECK_MODULES(GLIB, [glib-2.0])
 
 # Python casing, prefer 3.3+ to 2.{6...}
@@ -542,8 +532,9 @@ fi
 # final build of *FLAGS
 CFLAGS="$ENV_CFLAGS $OPT_CFLAGS $GDB_FLAGS $OS_CFLAGS \
 	$COVERAGE_CFLAGS $EXTRA_WARNINGS $WERROR_CFLAGS $NSS_CFLAGS"
-CPPFLAGS="$ENV_CPPFLAGS $ANSI_CPPFLAGS $OS_CPPFLAGS $GLIB_CFLAGS $RESMON_CFLAGS"
+CPPFLAGS="$ENV_CPPFLAGS $ANSI_CPPFLAGS $OS_CPPFLAGS $GLIB_CFLAGS $RESMON_CFLAGS $XML_CFLAGS"
 LDFLAGS="$ENV_LDFLAGS $COVERAGE_LDFLAGS $OS_LDFLAGS"
+LIBS="$LIBS $XML_LIBS"
 
 # substitute what we need:
 AC_SUBST([INITDDIR])
