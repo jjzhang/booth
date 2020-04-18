@@ -32,7 +32,7 @@ struct ticket_handler {
 	int (*del_attr) (struct ticket_config *tk, const char *a);
 };
 
-struct ticket_handler pcmk_handler;
+extern struct ticket_handler pcmk_handler;
 const char * interpret_rv(int rv);
 
 
