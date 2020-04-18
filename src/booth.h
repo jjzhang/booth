@@ -171,7 +171,7 @@ struct geo_attr {
 	/** Who set it (currently unused)
 	struct booth_site *origin;
 	*/
-} __attribute__((packed));
+};
 
 struct hmac {
 	/** hash id, currently set to constant BOOTH_HASH */
@@ -321,7 +321,7 @@ struct booth_site {
 	/** last timestamp seen from this site */
 	uint32_t last_secs;
 	uint32_t last_usecs;
-} __attribute__((packed));
+};
 
 
 
