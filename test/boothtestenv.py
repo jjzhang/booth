@@ -20,6 +20,11 @@ class BoothTestEnvironment(unittest.TestCase, BoothAssertions):
         self.test_name = self._testMethodName[5:]
         self.test_path = os.path.join(self.test_run_path, self.test_name)
         os.makedirs(self.test_path)
+        # Give all users permisions for temp directory so boothd running as "hacluster"
+        # can delete the lock file
+        if os.geteuid() == 0:
+            os.chmod(self.test_path, 0o777)
+
         self.ensure_boothd_not_running()
 
     def ensure_boothd_not_running(self):
