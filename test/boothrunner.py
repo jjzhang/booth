@@ -91,14 +91,21 @@ class BoothRunner:
             msg += ": [%s]" % config_text
         print(msg)
 
-    def run(self):
+    def run(self, expected_exitcode = None):
         p = subprocess.Popen(self.all_args(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if not p:
             raise RuntimeError("failed to start subprocess")
 
         print("Started subprocess pid %d" % p.pid)
 
-        completed = self.subproc_completed_within(p, 2)
+        # Wait for end of process for short time when daemonize expected
+        # and for longer time when exit is expected - to avoid false
+        # negatives for overloaded machines
+        timeout = 2
+        if expected_exitcode is not None:
+            timeout = 30
+
+        completed = self.subproc_completed_within(p, timeout)
 
         if completed:
             (stdout, stderr) = p.communicate()

@@ -16,7 +16,7 @@ class ClientTestEnvironment(BoothTestEnvironment):
 
         runner = BoothRunner(self.boothd_path, self.mode, args)
         runner.show_args()
-        (pid, return_code, stdout, stderr) = runner.run()
+        (pid, return_code, stdout, stderr) = runner.run(expected_exitcode)
         self.check_return_code(pid, return_code, expected_exitcode)
 
         return (pid, return_code, stdout, stderr, runner)

@@ -97,7 +97,7 @@ ticket="ticketB"
             runner.set_foreground()
 
         runner.show_args()
-        (pid, return_code, stdout, stderr) = runner.run()
+        (pid, return_code, stdout, stderr) = runner.run(expected_exitcode)
         self.check_return_code(pid, return_code, expected_exitcode)
 
         if expected_daemon:
