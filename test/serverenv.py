@@ -97,7 +97,7 @@ ticket="ticketB"
             runner.set_foreground()
 
         runner.show_args()
-        (pid, return_code, stdout, stderr) = runner.run()
+        (pid, return_code, stdout, stderr) = runner.run(expected_exitcode)
         self.check_return_code(pid, return_code, expected_exitcode)
 
         if expected_daemon:
@@ -122,12 +122,36 @@ ticket="ticketB"
         os.kill(pid, 15)
         print("killed")
 
+    # Wait for lock file to appear if must_exist is True, or disappear if
+    # must_exist is False for maximum of timeout seconds
+    def wait_for_lock_file(self, lock_file, must_exist = True, timeout = 30):
+        start = time.time()
+        wait = 0.1
+        while True:
+            if must_exist and os.path.exists(lock_file) and os.path.getsize(lock_file) > 0:
+                return True
+            if not must_exist and not os.path.exists(lock_file):
+                return True
+            elapsed = time.time() - start
+            if elapsed + wait > timeout:
+                wait = timeout - elapsed
+
+            appear_str = "appear" if must_exist else "disappear"
+            print("Waiting for lock file %s to %s for %.1fs ..." % (lock_file, appear_str, wait))
+
+            time.sleep(wait)
+            elapsed = time.time() - start
+            if elapsed >= timeout:
+                return False
+            wait *= 2
+
     def check_daemon_handling(self, runner, expected_daemon):
         '''
         Check that the lock file contains a pid referring to a running
         daemon.  Then kill the daemon, and ensure that the lock file
         vanishes (bnc#749763).
         '''
+        self.wait_for_lock_file(runner.lock_file, True, 30)
         daemon_pid = self.get_daemon_pid_from_lock_file(runner.lock_file)
         err = "lock file should contain pid"
         if not expected_daemon:
@@ -140,6 +164,7 @@ ticket="ticketB"
 
         if daemon_running:
             self.kill_pid(int(daemon_pid))
+            self.wait_for_lock_file(runner.lock_file, False, 30)
             time.sleep(1)
             daemon_pid = self.get_daemon_pid_from_lock_file(runner.lock_file)
             self.assertTrue(daemon_pid is None,
