@@ -12,7 +12,23 @@ from sitetests   import SiteConfigTests
 #from arbtests    import ArbitratorConfigTests
 
 if __name__ == '__main__':
-    if os.geteuid() == 0:
+    # Likely assumption for the root exclusion is the amount of risk
+    # associated with what naturally accompanies root privileges:
+    # - accidental overwrite (eventually also deletion) of unrelated,
+    #   legitimate and perhaps vital files
+    # - accidental termination of unrelated, legitimate and perhaps
+    #   vital processes
+    # - and so forth, possibly amplified with awkward parallel test
+    #   suite run scenarios (containers partly sharing state, etc.)
+    #
+    # Nonetheless, there are cases like self-contained CI runs where
+    # all these concerns are absent, so allow opt-in relaxing of this.
+    # Alternatively, the config generator could inject particular
+    # credentials for a booth proces to use, but that might come too
+    # late to address the above concerns reliably.
+    if (os.geteuid() == 0
+            and "--allow-root-user" not in sys.argv
+            and not(os.environ.get("BOOTH_RUNTESTS_ROOT_USER"))):
         sys.stderr.write("Must be run non-root; aborting.\n")
         sys.exit(1)
 
@@ -20,6 +36,10 @@ if __name__ == '__main__':
     if not os.path.exists(tmp_path):
         os.makedirs(tmp_path)
     test_run_path       = tempfile.mkdtemp(prefix='%d.' % time.time(), dir=tmp_path)
+    if os.geteuid() == 0:
+        # Give all users at least rx permisions for temp directory so hacluster running booth
+        # can delete lock file
+        os.chmod(test_run_path, 0o755)
 
     suite = unittest.TestSuite()
     testclasses = [
@@ -41,9 +61,10 @@ if __name__ == '__main__':
         runner_args['failfast'] = True
         pass
 
-    # not root anymore, so safe
-    # needed because old instances might still use the UDP port.
-    os.system("killall boothd")
+    if os.geteuid() != 0:
+        # not root, so safe
+        # needed because old instances might still use the UDP port.
+        os.system("killall boothd")
 
     runner = unittest.TextTestRunner(**runner_args)
     result = runner.run(suite)
