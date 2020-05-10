@@ -3,8 +3,8 @@
 #   https://github.com/travis-ci/apt-package-whitelist/issues/2936
 # - libsystemd-daemon-dev (libsystemd-dev)
 #   https://github.com/travis-ci/apt-package-whitelist/issues/2449
-# - no equivalent of "libcrmcluster4-dev" (trusty) for precise,
-#   but can be worked around with something like (or local dir + CPPFLAGS):
+# - likewise, lack of pacemaker packages (sources contain setuid et al.,
+#   can be worked around with something like (or local dir + CPPFLAGS):
 #   GHREPO=ClusterLabs/pacemaker INCLFILE=crm/services.h curl --create-dirs \
 #     -o "/usr/include/pacemaker/${INCLFILE}" \
 #     "https://raw.githubusercontent.com/${GHREPO}/master/include/${INCLFILE}"
@@ -29,7 +29,13 @@ before_install:
         # spurious test suite failure) so do that manually as a workaround
         - sudo ip addr add 127.0.1.1/8 scope host dev lo
         - sudo apt-get update -qq
-        - sudo apt-get install -qq -y libglib2.0-dev libcrmcluster4-dev
+        - sudo apt-get install -qq -y libglib2.0-dev libcrmservice1-dev
+        # sadly, the newest supported at the moment Ubuntu is "Trusty"
+        # that carries backdated 1.1.10+git20130802-1ubuntu2.5 pacemaker,
+        # moreover with broken split of files on packaging level (or was it
+        # due to inherently inseparable cross-dependencies between headers?),
+        # hence the following is needed as well (will go away, eventually)
+        - sudo apt-get install -qq -y libcrmcluster4-dev
         - test "${GLUE}" = 0
           || sudo apt-get install -qq -y cluster-glue-dev
         - test "${GLUE}" != 0
