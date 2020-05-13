@@ -26,6 +26,7 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <glib.h>
+#include <limits.h>
 #include "timer.h"
 
 
@@ -39,7 +40,7 @@
 	BOOTH_DEFAULT_CONF_DIR BOOTH_DEFAULT_CONF_NAME BOOTH_DEFAULT_CONF_EXT
 
 #define DAEMON_NAME		"boothd"
-#define BOOTH_PATH_LEN		127
+#define BOOTH_PATH_LEN		PATH_MAX
 #define BOOTH_MAX_KEY_LEN	64
 #define BOOTH_MIN_KEY_LEN	8
 /* hash size is 160 bits (sha1), but add a bit more space in case
