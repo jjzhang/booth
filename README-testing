@@ -121,9 +121,18 @@ and `test_booth.log`.
 
 Run (as non-root)
 
+    # make check
+
+or
+
+    # make test/runtests.py
     # python test/runtests.py
 
 to run the tests written in python.
+
+It is also possible to run the tests as a root when
+"--allow-root-user" parameter is used or if
+the BOOTH_RUNTESTS_ROOT_USER environment variable is defined.
 
 
 
