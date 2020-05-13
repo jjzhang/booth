@@ -19,6 +19,8 @@
 #
 MAINTAINERCLEANFILES    = Makefile.in
 
+EXTRA_DIST	= boothd.8.txt booth-keygen.8.txt fsm-full.dot fsm-netfail.dot fsm-normal.dot geostore.8.txt
+
 asciiman	= boothd.8.txt booth-keygen.8.txt geostore.8.txt
 doc_DATA	= $(generated_docs)
 
@@ -43,7 +45,7 @@ HTML_GENERATOR += $(ASCIIDOCTOR) -b xhtml5
 endif
 
 if IS_A2X
-MANPAGE_GENERATOR += $(A2X) -f manpage
+MANPAGE_GENERATOR += $(A2X) -f manpage --destination-dir=$(abs_builddir)/
 else
 MANPAGE_GENERATOR += $(ASCIIDOCTOR) -b manpage
 endif

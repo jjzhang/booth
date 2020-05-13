@@ -1,25 +1,37 @@
 Makefile.in
 Makefile
+compile
+autom4te.cache
 aclocal.m4
 config.guess
-config.log
 config.status
 config.sub
 configure
 depcomp
 install-sh
 missing
-booth.tar.bz2
+test-driver
+*.trs
+*.log
 *.rpm
-Doxyfile
-src/.deps
-src/Makefile.in
+*.o
+.deps
+.dirstamp
+
+booth-*.tar*
+
+conf/booth*.service
+docs/*.8
+script/service-runnable
+script/unit-test.py
 src/b_config.h.in
 src/b_config.h
 src/booth_config.h
 src/boothd
 src/stamp-h1
 src/stamp-h2
+test/boothtestenv.py
+test/runtests.py
 
 # cscope files
 cscope.*
@@ -28,22 +40,11 @@ ncscope.*
 # ctags files
 tags
 
-autom4te.cache
-*.o
-
-test-driver
-tools/.deps/
-tools/booth_resource_monitord
-
 # vim temp files
 .*.sw?
 *~
 
+# test suite random files
 *.pyc
+__pycache__
 
-/docs/boothd.8*
-!/docs/boothd.8.txt
-
-doxygen
-
-/conf/booth*.service
