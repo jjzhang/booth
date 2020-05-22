@@ -34,13 +34,13 @@ class ServerTests(ServerTestEnvironment):
 
     def test_config_file_buffer_overflow(self):
         # https://bugzilla.novell.com/show_bug.cgi?id=750256
-        longfile = (string.ascii_lowercase * 5)[:127]
+        longfile = string.ascii_lowercase * (8192 // len(string.ascii_lowercase))
         expected_error = "'%s' exceeds maximum config name length" % longfile
         self._test_buffer_overflow(expected_error, config_file=longfile)
 
     def test_lock_file_buffer_overflow(self):
         # https://bugzilla.novell.com/show_bug.cgi?id=750256
-        longfile = (string.ascii_lowercase * 5)[:127]
+        longfile = string.ascii_lowercase * (8192 // len(string.ascii_lowercase))
         expected_error = "'%s' exceeds maximum lock file length" % longfile
         self._test_buffer_overflow(expected_error, lock_file=longfile)
 
