@@ -34,14 +34,19 @@ SPEC			= $(PACKAGE_NAME).spec
 TARFILE			= $(PACKAGE_NAME)-$(VERSION).tar.gz
 
 EXTRA_DIST		= autogen.sh conf/booth.conf.example \
-               $(bootharbitrator_SCRIPTS) $(boothsite_SCRIPTS) \
-               $(boothnoarch_SCRIPTS)
+			  script/booth-keygen script/lsb script/ocf script/service-runnable.in \
+			  script/unit-test.py.in script/wireshark-dissector.lua \
+			  test/arbtests.py test/assertions.py test/booth_path test/boothrunner.py \
+			  test/boothtestenv.py.in test/clientenv.py test/clienttests.py test/live_test.sh \
+			  test/runtests.py.in test/serverenv.py test/servertests.py test/sitetests.py \
+			  test/utils.py
 
 AUTOMAKE_OPTIONS	= foreign
 
 MAINTAINERCLEANFILES	= Makefile.in aclocal.m4 configure depcomp \
 			  config.guess config.sub missing install-sh \
-			  autoheader automake autoconf test_lense.sh
+			  autoheader automake autoconf test_lense.sh \
+			  compile
 
 dist_doc_DATA		= AUTHORS README COPYING README.upgrade-from-v0.1
 
@@ -49,13 +54,13 @@ boothconfdir		= ${BOOTHSYSCONFDIR}
 
 boothconf_DATA		= conf/booth.conf.example
 
-boothsitedir		= /usr/lib/ocf/resource.d/pacemaker
+boothsitedir		= $(ocfdir)/resource.d/pacemaker
 boothsite_SCRIPTS	= script/ocf/booth-site
 
-boothocfdir		= /usr/lib/ocf/resource.d/booth
+boothocfdir		= $(ocfdir)/resource.d/booth
 boothocf_SCRIPTS	= script/ocf/sharedrsc script/ocf/geostore
 
-boothocflibdir		= /usr/lib/ocf/lib/booth
+boothocflibdir		= $(ocfdir)/lib/booth
 boothocflib_DATA	= script/ocf/geo_attr.sh
 
 bootharbitratordir	= ${INITDDIR}
@@ -82,7 +87,6 @@ install-exec-local:
 	$(INSTALL) -d $(DESTDIR)/${bootharbitratordir}
 	$(INSTALL) -d $(DESTDIR)/${boothsitedir}
 	$(INSTALL) -d $(DESTDIR)/${boothocfdir}
-	$(INSTALL) -d $(DESTDIR)/${SOCKETDIR}
 	$(INSTALL) -d $(DESTDIR)/${BOOTH_LIB_DIR} -m 750
 	-chown $(CRM_DAEMON_USER):$(CRM_DAEMON_GROUP) $(DESTDIR)/${BOOTH_LIB_DIR} 
 	$(INSTALL) -d $(DESTDIR)/${BOOTH_CORE_DIR} -m 750
@@ -96,7 +100,6 @@ uninstall-local:
 	rmdir $(DESTDIR)/${boothconfdir} || :;
 	rmdir $(DESTDIR)/${bootharbitratordir} || :;
 	rmdir $(DESTDIR)/${boothsitedir} || :;
-	rmdir $(DESTDIR)/${SOCKETDIR} || :;
 	rmdir $(DESTDIR)/${BOOTH_CORE_DIR} || :;
 	rmdir $(DESTDIR)/${BOOTH_LIB_DIR} || :;
 
@@ -105,12 +108,37 @@ test: check
 lint:
 	for dir in src; do make -C $$dir lint; done
 
+clean-local:
+	rm -rf test/*.pyc test/__pycache__ test/runtests.py test/boothtestenv.py
+
 dist-clean-local:
 	rm -f autoconf automake autoheader
 
 dist-hook:
 	echo $(VERSION) > $(distdir)/.tarball-version
 
+
+test/runtests.py: test/runtests.py.in test/boothtestenv.py
+	rm -f $@-t $@
+	mkdir -p ${abs_top_builddir}/test
+	sed \
+	    -e 's#PYTHON_SHEBANG#${PYTHON_SHEBANG}#g' \
+	    -e 's#TEST_SRC_DIR#${abs_top_srcdir}/test#g' \
+	    -e 's#TEST_BUILD_DIR#${abs_top_builddir}/test#g' \
+		$< > $@-t;
+	chmod a-w $@-t
+	chmod u+x $@-t
+	mv $@-t $@
+
+test/boothtestenv.py: test/boothtestenv.py.in
+	rm -f $@-t $@
+	mkdir -p ${abs_top_builddir}/test
+	sed \
+	    -e 's#TEST_SRC_DIR#${abs_top_srcdir}/test#g' \
+	    -e 's#TEST_BUILD_DIR#${abs_top_builddir}/test#g' \
+		$< > $@-t;
+	chmod a-w $@-t
+	mv $@-t $@
 
 ## make rpm/srpm section.
 

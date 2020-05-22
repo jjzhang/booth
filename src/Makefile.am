@@ -7,18 +7,19 @@ AM_CPPFLAGS		= -I$(top_builddir)/include
 
 sbin_PROGRAMS		= boothd
 
-boothd_SOURCES	 	= config.c main.c raft.c ticket.c  transport.c \
+boothd_SOURCES	 	= config.c main.c raft.c ticket.c transport.c \
 			  pacemaker.c handler.c request.c attr.c manual.c
 
-noinst_HEADERS		= booth.h pacemaker.h \
-			  config.h log.h raft.h ticket.h transport.h handler.h request.h attr.h manual.h
+noinst_HEADERS		= \
+			  attr.h booth.h handler.h log.h pacemaker.h request.h timer.h \
+			  auth.h config.h inline-fn.h manual.h raft.h ticket.h transport.h
 
 if BUILD_TIMER_C
-boothd_SOURCES += timer.c
+boothd_SOURCES		+= timer.c
 endif
 
 if BUILD_AUTH_C
-boothd_SOURCES += auth.c
+boothd_SOURCES		+= auth.c
 endif
 
 boothd_LDFLAGS		= $(OS_DYFLAGS) -L./

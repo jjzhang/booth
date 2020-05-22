@@ -1,4 +1,4 @@
-#!@PYTHON_SHEBANG@
+#!PYTHON_SHEBANG
 
 import os
 import shutil
@@ -6,6 +6,9 @@ import sys
 import tempfile
 import time
 import unittest
+
+sys.path.append('TEST_SRC_DIR')
+sys.path.append('TEST_BUILD_DIR')
 
 from clienttests import ClientConfigTests
 from sitetests   import SiteConfigTests
