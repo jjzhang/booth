@@ -1440,13 +1440,22 @@ static int do_server(int type)
 		}
 	}
 
+	/*
+	 * Register signal and exit handler
+	 */
+	signal(SIGUSR1, (__sighandler_t)tickets_log_info);
+	signal(SIGTERM, (__sighandler_t)sig_exit_handler);
+	signal(SIGINT, (__sighandler_t)sig_exit_handler);
+	/* we'll handle errors there and then */
+	signal(SIGPIPE, SIG_IGN);
+
+	atexit(server_exit);
+
 	/* The lockfile must be written to _after_ the call to daemon(), so
 	 * that the lockfile contains the pid of the daemon, not the parent. */
 	lock_fd = create_lockfile();
 	if (lock_fd < 0)
 		return lock_fd;
-
-	atexit(server_exit);
 
 	strcat(log_ent, type_to_string(local->type));
 	cl_log_set_entity(log_ent);
@@ -1457,11 +1466,6 @@ static int do_server(int type)
 	log_info("BOOTH %s %s daemon is starting",
 			type_to_string(local->type), RELEASE_STR);
 
-	signal(SIGUSR1, (__sighandler_t)tickets_log_info);
-	signal(SIGTERM, (__sighandler_t)sig_exit_handler);
-	signal(SIGINT, (__sighandler_t)sig_exit_handler);
-	/* we'll handle errors there and then */
-	signal(SIGPIPE, SIG_IGN);
 
 	set_scheduler();
 	/* we don't want to be killed by the OOM-killer */
