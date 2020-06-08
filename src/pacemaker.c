@@ -59,6 +59,7 @@ enum atomic_ticket_supported atomicity = UNKNOWN;
  *   - the old version asks for "Y/N" via STDIN, and returns 0
  *     when reading "no";
  *   - the new version just reports an error without asking.
+ *     Since 2.0.0-rc2 error code is changed from 1 (EPERM) to 4 (CRM_EX_INSUFFICIENT_PRIV)
  */
 static void test_atomicity(void)
 {
@@ -86,7 +87,8 @@ static void test_atomicity(void)
 		log_info("Old \"crm_ticket\" found, using non-atomic ticket updates.");
 		break;
 
-	case 1:
+	case 1: /* Pacemaker < 2.0.0-rc2 - EPERM */
+	case 4: /* Pacemaker >= 2.0.0-rc2 - CRM_EX_INSUFFICIENT_PRIV */
 		atomicity = YES;
 		log_info("New \"crm_ticket\" found, using atomic ticket updates.");
 		break;
@@ -94,7 +96,7 @@ static void test_atomicity(void)
 	default:
 		log_error("Unexpected return value from \"crm_ticket\" (%d), "
 				"falling back to non-atomic ticket updates.",
-				rv);
+				WEXITSTATUS(rv));
 		atomicity = NO;
 	}
 
