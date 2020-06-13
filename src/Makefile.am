@@ -23,7 +23,7 @@ boothd_SOURCES		+= auth.c
 endif
 
 boothd_LDFLAGS		= $(OS_DYFLAGS) -L./
-boothd_LDADD		= -lm $(GLIB_LIBS) $(ZLIB_LIBS) $(PCMK_LIBS)
+boothd_LDADD		= -lm $(GLIB_LIBS) $(ZLIB_LIBS)
 boothd_CFLAGS		= $(GLIB_CFLAGS) $(PCMK_CFLAGS)
 
 if !LOGGING_LIBQB
