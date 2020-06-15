@@ -5,6 +5,7 @@ import tempfile
 import unittest
 
 from assertions  import BoothAssertions
+from utils       import use_single_instance
 
 class BoothTestEnvironment(unittest.TestCase, BoothAssertions):
     abs_test_src_path    = os.path.abspath('TEST_SRC_DIR')
@@ -23,7 +24,10 @@ class BoothTestEnvironment(unittest.TestCase, BoothAssertions):
         if os.geteuid() == 0:
             os.chmod(self.test_path, 0o777)
 
-        self.ensure_boothd_not_running()
+        # It's not good idea to kill other instancies so call following function
+        # only if single_instance mode is used
+        if use_single_instance():
+            self.ensure_boothd_not_running()
 
     def ensure_boothd_not_running(self):
         # Need to redirect STDERR in case we're not root, in which

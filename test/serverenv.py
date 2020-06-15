@@ -4,7 +4,7 @@ import time
 
 from boothrunner  import BoothRunner
 from boothtestenv import BoothTestEnvironment
-from utils        import get_IP
+from utils        import get_IP, use_single_instance
 
 class ServerTestEnvironment(BoothTestEnvironment):
     '''
@@ -26,6 +26,11 @@ ticket="ticketB"
 """
     site_re = re.compile('^site=".+"', re.MULTILINE)
     working_config = re.sub(site_re, 'site="%s"' % get_IP(), typical_config, 1)
+
+    if not use_single_instance():
+        # use port based on pid
+        port_re = re.compile('^port=".+"', re.MULTILINE)
+        working_config = re.sub(port_re, 'port="%s"' % (9929 + (os.getpid() % 1009)), working_config, 1)
 
     def run_booth(self, expected_exitcode, expected_daemon,
                   config_text=None, config_file=None, lock_file=True,
