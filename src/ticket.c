@@ -17,6 +17,8 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
+#include "b_config.h"
+
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
@@ -25,7 +27,6 @@
 #include <stdio.h>
 #include <assert.h>
 #include <time.h>
-#include "b_config.h"
 #ifndef RANGE2RANDOM_GLIB
 #include <clplumbing/cl_random.h>
 #else

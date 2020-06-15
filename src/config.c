@@ -17,6 +17,8 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
+#include "b_config.h"
+
 #include <stdio.h>
 #include <ctype.h>
 #include <stdlib.h>
@@ -28,7 +30,6 @@
 #include <errno.h>
 #include <string.h>
 #include <netdb.h>
-#include "b_config.h"
 #include "booth.h"
 #include "config.h"
 #include "raft.h"

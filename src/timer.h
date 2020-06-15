@@ -19,6 +19,8 @@
 #ifndef _TIMER_H
 #define _TIMER_H
 
+#include "b_config.h"
+
 #include <time.h>
 #include <unistd.h>
 #include <string.h>

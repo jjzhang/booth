@@ -17,6 +17,8 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
+#include "b_config.h"
+
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -32,7 +34,6 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <sys/socket.h>  /* getnameinfo */
-#include "b_config.h"
 #include "attr.h"
 #include "auth.h"
 #include "booth.h"
