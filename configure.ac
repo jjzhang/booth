@@ -74,8 +74,6 @@ AC_PATH_PROGS(A2X, a2x)
 AM_CONDITIONAL(IS_ASCIIDOC, test x"${ASCIIDOC}" != x"")
 AM_CONDITIONAL(IS_A2X, test x"${A2X}" != x"")
 AM_CONDITIONAL(BUILD_ASCIIDOC, test x"${A2X}" != x"" || test x"${ASCIIDOCTOR}" != x"")
-AM_CONDITIONAL(BUILD_ASCIIDOC_HTML_MAN,
-	       (test "x${ASCIIDOC}" != "x" || test x"${ASCIIDOCTOR}" != x"") && test "x$with_html_man" = "xyes")
 
 # libgcrypt or mhash for hmac
 libgcrypt_installed="yes"
@@ -255,9 +253,11 @@ AC_ARG_WITH([build-version],
 	[ BOOTH_BUILD_VERSION="${GIT_VER:-$PACKAGE_VERSION}" ])
 
 AC_ARG_WITH([html_man],
-	[  --without-html_man              : Avoid generating man pages in HTML.],
-	[],
-	[with_html_man=yes])
+	[  --with-html_man                 : Enable generating man pages in HTML.],
+	[with_html_man=yes],
+	[])
+AM_CONDITIONAL(BUILD_ASCIIDOC_HTML_MAN,
+	       (test "x${ASCIIDOC}" != "x" || test x"${ASCIIDOCTOR}" != x"") && test "x$with_html_man" = "xyes")
 
 AC_ARG_WITH([glue],
 	[  --without-glue                  : Avoid libraries from (cluster-)glue project.],
