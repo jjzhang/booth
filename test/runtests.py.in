@@ -14,6 +14,8 @@ from clienttests import ClientConfigTests
 from sitetests   import SiteConfigTests
 #from arbtests    import ArbitratorConfigTests
 
+from utils       import use_single_instance
+
 if __name__ == '__main__':
     # Likely assumption for the root exclusion is the amount of risk
     # associated with what naturally accompanies root privileges:
@@ -64,7 +66,7 @@ if __name__ == '__main__':
         runner_args['failfast'] = True
         pass
 
-    if os.geteuid() != 0:
+    if os.geteuid() != 0 and use_single_instance():
         # not root, so safe
         # needed because old instances might still use the UDP port.
         os.system("killall boothd")

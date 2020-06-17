@@ -134,6 +134,11 @@ It is also possible to run the tests as a root when
 "--allow-root-user" parameter is used or if
 the BOOTH_RUNTESTS_ROOT_USER environment variable is defined.
 
+By default tests uses TCP port based on current PID in range
+from 9929 to 10937 to allow running multiple instances in parallel.
+It is possible to use "--single-instance" parameter or define
+BOOTH_RUNTESTS_SINGLE_INSTANCE environment variable to make tests use
+only single port (9929), but parallel instances will fail.
 
 
 

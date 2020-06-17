@@ -1,4 +1,6 @@
 import socket
+import os
+import sys
 
 def get_IP():
     # IPv4 only for now
@@ -12,3 +14,6 @@ def get_IP():
         s.close()
 
     return ret
+
+def use_single_instance():
+    return ("--single-instance" in sys.argv) or (os.environ.get("BOOTH_RUNTESTS_SINGLE_INSTANCE") != None)
