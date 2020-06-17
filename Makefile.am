@@ -42,7 +42,7 @@ EXTRA_DIST		= autogen.sh conf/booth.conf.example \
 			  test/utils.py \
 			  unit-tests \
 			  contrib \
-			  $(SPEC) booth-rpmlintrc \
+			  $(SPEC).in booth-rpmlintrc \
 			  .version build-aux/git-version-gen
 
 AUTOMAKE_OPTIONS	= foreign
@@ -113,7 +113,7 @@ lint:
 	for dir in src; do make -C $$dir lint; done
 
 clean-local:
-	rm -rf test/*.pyc test/__pycache__ test/runtests.py test/boothtestenv.py cov*
+	rm -rf test/*.pyc test/__pycache__ test/runtests.py test/boothtestenv.py cov* $(SPEC)
 
 dist-clean-local:
 	rm -f autoconf automake autoheader
@@ -150,46 +150,48 @@ test/boothtestenv.py: test/boothtestenv.py.in
 	mv $@-t $@
 
 ## make rpm/srpm section.
+$(abs_builddir)/booth-rpmlintrc:
+	cat $(abs_srcdir)/booth-rpmlintrc > booth-rpmlintrc
 
-$(SPEC):
+$(SPEC): $(SPEC).in .version config.status $(abs_builddir)/booth-rpmlintrc
 	rm -f $@-t $@
 	date="$(shell LC_ALL=C date "+%a %b %d %Y")" && \
-	if [ -f .tarball-version ]; then \
-		gitver="$(shell cat .tarball-version)" && \
-		rpmver=$$gitver && \
+	gvgver="`cd $(abs_srcdir); build-aux/git-version-gen --fallback $(VERSION) .tarball-version .gitarchivever`" && \
+	if [ "$$gvgver" == "`echo $$gvgver | sed 's/-/./'`" ];then \
+		rpmver="$$gvgver" && \
 		alphatag="" && \
 		dirty="" && \
 		numcomm="0"; \
 	else \
-		gitver="$(shell git describe --tags --abbrev=4 --match='v*' HEAD 2>/dev/null)" && \
-		rpmver=`echo $$gitver | sed -e "s/^v//" -e "s/-.*//g"` && \
-		alphatag=`echo $$gitver | sed -e "s/.*-//" -e "s/^g//"` && \
-		vtag=`echo $$gitver | sed -e "s/-.*//g"` && \
-		numcomm=`git rev-list $$vtag..HEAD | wc -l` && \
-		git update-index --refresh > /dev/null 2>&1 || true && \
-		dirty=`git diff-index --name-only HEAD 2>/dev/null`; \
+		gitver="`echo $$gvgver | sed 's/\(.*\)\./\1-/'`" && \
+		rpmver=`echo $$gitver | sed 's/-.*//g'` && \
+		alphatag=`echo $$gvgver | sed 's/[^-]*-\([^-]*\).*/\1/'` && \
+		numcomm=`echo $$gitver | sed 's/[^-]*-\([^-]*\).*/\1/'` && \
+		dirty="" && \
+		if [ "`echo $$gitver | sed 's/^.*-dirty$$//g'`" == "" ];then \
+			dirty="dirty"; \
+		fi \
 	fi && \
-	if [ -n "$$dirty" ]; then dirty="dirty"; else dirty=""; fi && \
-	if [ "$$numcomm" = "0" ]; then \
-		sed \
-			-e "s#@version@#$$rpmver#g" \
-			-e "s#%glo.*alpha.*##g" \
-			-e "s#%glo.*numcomm.*##g" \
-			-e "s#@dirty@#$$dirty#g" \
-			-e "s#@date@#$$date#g" \
-		$< > $@-t; \
-	else \
-		sed \
-			-e "s#@version@#$$rpmver#g" \
-			-e "s#@alphatag@#$$alphatag#g" \
-			-e "s#@numcomm@#$$numcomm#g" \
-			-e "s#@dirty@#$$dirty#g" \
-			-e "s#@date@#$$date#g" \
-		$< > $@-t; \
-	fi; \
-	if [ -z "$$dirty" ]; then sed -i -e "s#%glo.*dirty.*##g" $@-t; fi
+	if [ "$$numcomm" = "0" ]; then numcomm=""; fi && \
+	if [ -n "$$numcomm" ]; then numcomm="%global numcomm $$numcomm"; fi && \
+	if [ "$$alphatag" = "$$gitver" ]; then alphatag=""; fi && \
+	if [ -n "$$alphatag" ]; then alphatag="%global alphatag $$alphatag"; fi && \
+	if [ -n "$$dirty" ]; then dirty="%global dirty dirty"; fi && \
+	sed \
+		-e "s#@version@#$$rpmver#g" \
+		-e "s#@ALPHATAG@#$$alphatag#g" \
+		-e "s#@NUMCOMM@#$$numcomm#g" \
+		-e "s#@DIRTY@#$$dirty#g" \
+		-e "s#@date@#$$date#g" \
+	$(abs_srcdir)/$@.in > $@-t;
+if BUILD_ASCIIDOC_HTML_MAN
+	sed -i -e "s#@bcond_html_man@#bcond_without#g" $@-t
+else
+	sed -i -e "s#@bcond_html_man@#bcond_with#g" $@-t
+endif
 	chmod a-w $@-t
 	mv $@-t $@
+	rm -f $@-t*
 
 $(TARFILE):
 	$(MAKE) dist
@@ -201,11 +203,9 @@ RPMBUILDOPTS	= --define "_sourcedir $(abs_builddir)" \
 		  --define "_rpmdir $(abs_builddir)"
 
 srpm: clean
-	autoreconf -if
 	$(MAKE) $(SPEC) $(TARFILE)
-	rpmbuild $(WITH_LIST) $(RPMBUILDOPTS) --nodeps -bs $(SPEC)
+	rpmbuild $(RPMBUILDOPTS) --nodeps -bs $(SPEC)
 
 rpm: clean
-	autoreconf -if
 	$(MAKE) $(SPEC) $(TARFILE)
-	rpmbuild $(WITH_LIST) $(RPMBUILDOPTS) -ba $(SPEC)
+	rpmbuild $(RPMBUILDOPTS) -ba $(SPEC)
