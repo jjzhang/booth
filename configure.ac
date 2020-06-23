@@ -99,6 +99,9 @@ PKG_CHECK_MODULES([PCMK], [pacemaker-service],,
 # Python casing, prefer 3.3+ to 2.{6...}
 if test "x$PYTHON" = "x"; then
 	AM_PATH_PYTHON([3.3],, [AM_PATH_PYTHON([2.6])])
+else
+	# Just set Automake variables (mainly PYTHON_VERSION)
+	AM_PATH_PYTHON
 fi
 PYTHON_SHEBANG="$PYTHON ${PYTHON_OPTS--Es}"
 AC_SUBST([PYTHON_SHEBANG])
