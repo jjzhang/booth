@@ -9,6 +9,7 @@
 %@bcond_html_man@ html_man
 %@bcond_glue@ glue
 %@bcond_python3@ python3
+%@bcond_run_build_tests@ run_build_tests
 
 ## User and group to use for nonprivileged services (should be in sync with pacemaker)
 %global uname @uname@
@@ -185,11 +186,11 @@ install -m 644 contrib/geo-cluster.firewalld.xml $RPM_BUILD_ROOT/%{_fwdefdir}/bo
 %endif
 
 %check
-%if 0%{?run_build_tests}
-echo "%%run_build_tests set to %run_build_tests; including tests"
+%if 0%{?with_run_build_tests}
+echo "%%with_run_build_tests set to %with_run_build_tests; including tests"
 make check
 %else
-echo "%%run_build_tests set to %run_build_tests; skipping tests"
+echo "%%with_run_build_tests set to %with_run_build_tests; skipping tests"
 %endif
 
 %files

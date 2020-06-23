@@ -264,6 +264,12 @@ AC_ARG_WITH([glue],
 	[],
 	[with_glue=yes])
 
+AC_ARG_WITH([run_build_tests],
+	[  --with-run-build-tests          : Enable running build tests when generating RPM],
+	[run_build_tests=yes],
+	[])
+AM_CONDITIONAL([RUN_BUILD_TESTS], [test "x$run_build_tests" = "xyes"])
+
 # figure out logging provider
 logging_provider=""
 if test "x$logging_provider" = "x" && test "x$with_glue" = "xyes"; then

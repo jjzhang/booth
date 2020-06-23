@@ -206,6 +206,11 @@ if PYTHON_IS_VERSION3
 else
 	sed -i -e "s#@bcond_python3@#bcond_with#g" $@-t
 endif
+if RUN_BUILD_TESTS
+	sed -i -e "s#@bcond_run_build_tests@#bcond_without#g" $@-t
+else
+	sed -i -e "s#@bcond_run_build_tests@#bcond_with#g" $@-t
+endif
 	chmod a-w $@-t
 	mv $@-t $@
 	rm -f $@-t*
