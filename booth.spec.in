@@ -58,7 +58,7 @@ Version:        @version@
 Release:        1%{?numcomm:.%{numcomm}}%{?alphatag:.%{alphatag}}%{?dirty:.%{dirty}}%{?dist}
 Source:         https://github.com/ClusterLabs/booth/archive/v%{version}%{?gittarver}/%{name}-%{version}%{?gitver}.tar.gz
 Source1:        %name-rpmlintrc
-BuildRequires:  asciidoctor
+BuildRequires:  @asciidoc@
 BuildRequires:  autoconf
 BuildRequires:  automake
 BuildRequires:  pkgconfig

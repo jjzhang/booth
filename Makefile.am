@@ -189,6 +189,11 @@ if BUILD_ASCIIDOC_HTML_MAN
 else
 	sed -i -e "s#@bcond_html_man@#bcond_with#g" $@-t
 endif
+if IS_ASCIIDOC
+	sed -i -e "s#@asciidoc@#asciidoc#g" $@-t
+else
+	sed -i -e "s#@asciidoc@#asciidoctor#g" $@-t
+endif
 	chmod a-w $@-t
 	mv $@-t $@
 	rm -f $@-t*
