@@ -8,15 +8,16 @@
 
 %@bcond_html_man@ html_man
 %@bcond_glue@ glue
+%@bcond_python3@ python3
 
-%if 0%{?fedora} > 18 || 0%{?centos} > 6 || 0%{?rhel} > 6
-%if 0%{?fedora} > 26 || 0%{?centos} > 7 || 0%{?rhel} > 7
-%bcond_without python3
+# Defined on RHEL 8 and Fedora
+%{!?__python2: %global __python2 /usr/bin/python2}
+%{!?__python3: %global __python3 /usr/bin/python3}
+
+%if 0%{?with_python3}
+%global __python_full_path %{__python3}
 %else
-%bcond_with python3
-%endif
-%else
-%bcond_with python3
+%global __python_full_path %{__python2}
 %endif
 
 %if 0%{?suse_version}
@@ -121,7 +122,8 @@ Pacemaker.
 	--with-initddir=%{_initrddir} \
 	--docdir=%{booth_docdir} \
 	%{?with_html_man:--with-html_man} \
-	%{!?with_glue:--without-glue}
+	%{!?with_glue:--without-glue} \
+	PYTHON=%{__python_full_path}
 
 make
 
@@ -154,6 +156,19 @@ chmod +x %{buildroot}/%{test_path}/test/live_test.sh
 mkdir -p %{buildroot}/%{test_path}/src/
 ln -s %{_sbindir}/boothd %{buildroot}/%{test_path}/src/
 rm -f %{buildroot}/%{test_path}/test/*.pyc
+
+# Generate runtests.py and boothtestenv.py
+sed -e 's#PYTHON_SHEBANG#%{__python_full_path} -Es#g' \
+    -e 's#TEST_SRC_DIR#%{test_path}/test#g' \
+    -e 's#TEST_BUILD_DIR#%{test_path}/test#g' \
+    %{buildroot}/%{test_path}/test/runtests.py.in > %{buildroot}/%{test_path}/test/runtests.py
+
+chmod +x %{buildroot}/%{test_path}/test/runtests.py
+
+sed -e 's#PYTHON_SHEBANG#%{__python_full_path} -Es#g' \
+    -e 's#TEST_SRC_DIR#%{test_path}/test#g' \
+    -e 's#TEST_BUILD_DIR#%{test_path}/test#g' \
+    %{buildroot}/%{test_path}/test/boothtestenv.py.in > %{buildroot}/%{test_path}/test/boothtestenv.py
 
 %if 0%{?suse_version}
 #Firewalld rule
@@ -221,11 +236,10 @@ Summary:        Test scripts for Booth
 Group:          %{pkg_group}
 Requires:       booth
 Requires:       gdb
+Requires:       %{__python_full_path}
 %if 0%{?with_python3}
-Requires:       python3
 Requires:       python3-pexpect
 %else
-Requires:       python
 Requires:       python-pexpect
 %endif
 

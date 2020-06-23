@@ -199,7 +199,11 @@ if LOGGING_LIBQB
 else
 	sed -i -e "s#@bcond_glue@#bcond_without#g" $@-t
 endif
-
+if PYTHON_IS_VERSION3
+	sed -i -e "s#@bcond_python3@#bcond_without#g" $@-t
+else
+	sed -i -e "s#@bcond_python3@#bcond_with#g" $@-t
+endif
 	chmod a-w $@-t
 	mv $@-t $@
 	rm -f $@-t*
