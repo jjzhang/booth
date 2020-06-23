@@ -112,6 +112,11 @@ BuildRequires:  python3-devel
 BuildRequires:  python
 %endif
 
+# For Fedora compatibility
+Provides: booth-core
+Provides: booth-site
+Provides: booth-arbitrator
+
 %description
 Booth manages tickets which authorize cluster sites located in
 geographically dispersed locations to run resources. It
