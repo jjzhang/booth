@@ -10,6 +10,10 @@
 %@bcond_glue@ glue
 %@bcond_python3@ python3
 
+## User and group to use for nonprivileged services (should be in sync with pacemaker)
+%global uname @uname@
+%global gname @gname@
+
 # Defined on RHEL 8 and Fedora
 %{!?__python2: %global __python2 /usr/bin/python2}
 %{!?__python3: %global __python3 /usr/bin/python3}

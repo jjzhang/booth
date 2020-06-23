@@ -184,6 +184,8 @@ $(SPEC): $(SPEC).in .version config.status $(abs_builddir)/booth-rpmlintrc
 		-e "s#@DIRTY@#$$dirty#g" \
 		-e "s#@date@#$$date#g" \
 	$(abs_srcdir)/$@.in > $@-t;
+	sed -i -e "s#@uname@#$(CRM_DAEMON_USER)#g" $@-t
+	sed -i -e "s#@gname@#$(CRM_DAEMON_GROUP)#g" $@-t
 if BUILD_ASCIIDOC_HTML_MAN
 	sed -i -e "s#@bcond_html_man@#bcond_without#g" $@-t
 else
