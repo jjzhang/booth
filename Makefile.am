@@ -194,6 +194,12 @@ if IS_ASCIIDOC
 else
 	sed -i -e "s#@asciidoc@#asciidoctor#g" $@-t
 endif
+if LOGGING_LIBQB
+	sed -i -e "s#@bcond_glue@#bcond_with#g" $@-t
+else
+	sed -i -e "s#@bcond_glue@#bcond_without#g" $@-t
+endif
+
 	chmod a-w $@-t
 	mv $@-t $@
 	rm -f $@-t*
