@@ -39,7 +39,10 @@ EXTRA_DIST		= autogen.sh conf/booth.conf.example \
 			  test/arbtests.py test/assertions.py test/booth_path test/boothrunner.py \
 			  test/boothtestenv.py.in test/clientenv.py test/clienttests.py test/live_test.sh \
 			  test/runtests.py.in test/serverenv.py test/servertests.py test/sitetests.py \
-			  test/utils.py
+			  test/utils.py \
+			  unit-tests \
+			  contrib \
+			  $(SPEC) booth-rpmlintrc
 
 AUTOMAKE_OPTIONS	= foreign
 
@@ -48,7 +51,7 @@ MAINTAINERCLEANFILES	= Makefile.in aclocal.m4 configure depcomp \
 			  autoheader automake autoconf test_lense.sh \
 			  compile
 
-dist_doc_DATA		= AUTHORS README COPYING README.upgrade-from-v0.1
+dist_doc_DATA		= AUTHORS README COPYING README.upgrade-from-v0.1 README-testing
 
 boothconfdir		= ${BOOTHSYSCONFDIR}
 
@@ -65,7 +68,7 @@ boothocflib_DATA	= script/ocf/geo_attr.sh
 
 bootharbitratordir	= ${INITDDIR}
 
-bootharbitrator_SCRIPTS	= script/lsb/booth-arbitrator 
+bootharbitrator_SCRIPTS	= script/lsb/booth-arbitrator
 
 boothnoarchdir		= $(datadir)/$(PACKAGE_NAME)
 
@@ -142,7 +145,7 @@ test/boothtestenv.py: test/boothtestenv.py.in
 
 ## make rpm/srpm section.
 
-$(SPEC): $(SPEC).in
+$(SPEC):
 	rm -f $@-t $@
 	date="$(shell LC_ALL=C date "+%a %b %d %Y")" && \
 	if [ -f .tarball-version ]; then \
