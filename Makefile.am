@@ -112,7 +112,7 @@ lint:
 	for dir in src; do make -C $$dir lint; done
 
 clean-local:
-	rm -rf test/*.pyc test/__pycache__ test/runtests.py test/boothtestenv.py
+	rm -rf test/*.pyc test/__pycache__ test/runtests.py test/boothtestenv.py cov*
 
 dist-clean-local:
 	rm -f autoconf automake autoheader

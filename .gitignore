@@ -48,3 +48,4 @@ tags
 *.pyc
 __pycache__
 
+cov*
