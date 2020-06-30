@@ -42,7 +42,8 @@ EXTRA_DIST		= autogen.sh conf/booth.conf.example \
 			  test/utils.py \
 			  unit-tests \
 			  contrib \
-			  $(SPEC) booth-rpmlintrc
+			  $(SPEC) booth-rpmlintrc \
+			  .version build-aux/git-version-gen
 
 AUTOMAKE_OPTIONS	= foreign
 
@@ -116,6 +117,11 @@ clean-local:
 
 dist-clean-local:
 	rm -f autoconf automake autoheader
+
+# release/versioning
+BUILT_SOURCES = .version
+.version:
+	echo $(VERSION) > $@-t && mv $@-t $@
 
 dist-hook:
 	echo $(VERSION) > $(distdir)/.tarball-version

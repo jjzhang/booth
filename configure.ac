@@ -4,7 +4,9 @@
 # bootstrap / init
 AC_PREREQ([2.61])
 
-AC_INIT([booth], [1.0], [users@clusterlabs.org])
+AC_INIT([booth],
+    m4_esyscmd([build-aux/git-version-gen --fallback 1.0 .tarball-version .gitarchivever]),
+    [users@clusterlabs.org])
 
 AC_USE_SYSTEM_EXTENSIONS
 
@@ -249,14 +251,6 @@ AC_ARG_WITH([initddir],
 	[ INITDDIR="$withval" ],
 	[ INITDDIR="$sysconfdir/init.d" ])
 
-test -s .git_info &&
-	GIT_VER="`cat .git_info`"
-
-AC_ARG_WITH([build-version],
-	[  --with-build-version=STR        : build version ],
-	[ BOOTH_BUILD_VERSION="$withval" ],
-	[ BOOTH_BUILD_VERSION="${GIT_VER:-$PACKAGE_VERSION}" ])
-
 AC_ARG_WITH([html_man],
 	[  --with-html_man                 : Enable generating man pages in HTML.],
 	[with_html_man=yes],
@@ -486,7 +480,6 @@ AC_SUBST([HAVE_XML_LOG_PATCHSET])
 AC_SUBST([BOOTH_LIB_DIR])
 AC_SUBST([BOOTH_CORE_DIR])
 AC_SUBST([BOOTHSYSCONFDIR])
-AC_SUBST([BOOTH_BUILD_VERSION])
 
 AC_DEFINE_UNQUOTED([BOOTH_LIB_DIR], "$(eval echo ${BOOTH_LIB_DIR})", [booth lib directory])
 AC_DEFINE_UNQUOTED([BOOTH_CORE_DIR], "$(eval echo ${BOOTH_CORE_DIR})", [booth working directory])
@@ -494,13 +487,11 @@ AC_DEFINE_UNQUOTED([BOOTHSYSCONFDIR], "$(eval echo ${BOOTHSYSCONFDIR})", [booth 
 
 AC_DEFINE_UNQUOTED([PACKAGE_FEATURES], "${PACKAGE_FEATURES}", [booth built-in features])
 
-AC_DEFINE_UNQUOTED([BOOTH_BUILD_VERSION], "${BOOTH_BUILD_VERSION}", [booth build version])
-
 AC_OUTPUT
 
 AC_MSG_RESULT([])
 AC_MSG_RESULT([$PACKAGE configuration:])
-AC_MSG_RESULT([  Version                  = ${VERSION} (Build: ${BOOTH_BUILD_VERSION})])
+AC_MSG_RESULT([  Version                  = ${VERSION}])
 AC_MSG_RESULT([  Prefix                   = ${prefix}])
 AC_MSG_RESULT([  Executables              = ${sbindir}])
 AC_MSG_RESULT([  Man pages                = ${mandir}])

@@ -16,6 +16,7 @@ test-driver
 *.rpm
 *.o
 .deps
+.version
 .dirstamp
 
 booth-*.tar*
