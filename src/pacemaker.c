@@ -365,7 +365,7 @@ static int pcmk_get_attr(struct ticket_config *tk, const char *attr, const char 
 		rv = errno;
 		log_error("popen error %d (%s) for \"%s\"",
 				rv, strerror(rv), cmd);
-		return rv || EINVAL;
+		return (rv != 0 ? rv : EINVAL);
 	}
 	if (fgets(line, BOOTH_ATTRVAL_LEN, p) == NULL) {
 		rv = ENODATA;
@@ -499,7 +499,7 @@ static int pcmk_load_ticket(struct ticket_config *tk)
 		pipe_rv = errno;
 		log_error("popen error %d (%s) for \"%s\"",
 				pipe_rv, strerror(pipe_rv), cmd);
-		return pipe_rv || -EINVAL;
+		return (pipe_rv != 0 ? pipe_rv : EINVAL);
 	}
 
 	rv = parse_ticket_state(tk, p);
