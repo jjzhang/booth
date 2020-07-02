@@ -843,7 +843,7 @@ static int _lockfile(int mode, int *fdp, pid_t *locked_by)
 	 * Try to create it, but ignore errors. */
 	if (strncmp(cl.lockfile, BOOTH_RUN_DIR,
 				strlen(BOOTH_RUN_DIR)) == 0)
-		mkdir(BOOTH_RUN_DIR, 0775);
+		(void)mkdir(BOOTH_RUN_DIR, 0775);
 
 
 	if (locked_by)
