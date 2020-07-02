@@ -351,7 +351,7 @@ static int pcmk_get_attr(struct ticket_config *tk, const char *attr, const char 
 {
 	char cmd[COMMAND_MAX];
 	char line[BOOTH_ATTRVAL_LEN+1];
-	int rv = 0;
+	int rv = 0, pipe_rv;
 	FILE *p;
 
 
@@ -362,10 +362,10 @@ static int pcmk_get_attr(struct ticket_config *tk, const char *attr, const char 
 
 	p = popen(cmd, "r");
 	if (p == NULL) {
-		rv = errno;
+		pipe_rv = errno;
 		log_error("popen error %d (%s) for \"%s\"",
-				rv, strerror(rv), cmd);
-		return (rv != 0 ? rv : EINVAL);
+				pipe_rv, strerror(pipe_rv), cmd);
+		return (pipe_rv != 0 ? pipe_rv : EINVAL);
 	}
 	if (fgets(line, BOOTH_ATTRVAL_LEN, p) == NULL) {
 		rv = ENODATA;
@@ -375,15 +375,15 @@ static int pcmk_get_attr(struct ticket_config *tk, const char *attr, const char 
 	*vp = g_strdup(line);
 
 out:
-	rv = pclose(p);
-	if (!rv) {
+	pipe_rv = pclose(p);
+	if (!pipe_rv) {
 		log_debug("command \"%s\"", cmd);
-	} else if (WEXITSTATUS(rv) == 6) {
+	} else if (WEXITSTATUS(pipe_rv) == 6) {
 		log_info("command \"%s\", ticket not found", cmd);
 	} else {
-		log_error("command \"%s\" %s", cmd, interpret_rv(rv));
+		log_error("command \"%s\" %s", cmd, interpret_rv(pipe_rv));
 	}
-	return rv;
+	return rv | pipe_rv;
 }
 
 static int save_attributes(struct ticket_config *tk, xmlDocPtr doc)
