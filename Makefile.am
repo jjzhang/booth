@@ -157,7 +157,7 @@ $(SPEC): $(SPEC).in .version config.status $(abs_builddir)/booth-rpmlintrc
 	rm -f $@-t $@
 	date="$(shell LC_ALL=C date "+%a %b %d %Y")" && \
 	gvgver="`cd $(abs_srcdir); build-aux/git-version-gen --fallback $(VERSION) .tarball-version .gitarchivever`" && \
-	if [ "$$gvgver" == "`echo $$gvgver | sed 's/-/./'`" ];then \
+	if [ "$$gvgver" = "`echo $$gvgver | sed 's/-/./'`" ];then \
 		rpmver="$$gvgver" && \
 		alphatag="" && \
 		dirty="" && \
@@ -168,7 +168,7 @@ $(SPEC): $(SPEC).in .version config.status $(abs_builddir)/booth-rpmlintrc
 		alphatag=`echo $$gvgver | sed 's/[^-]*-\([^-]*\).*/\1/'` && \
 		numcomm=`echo $$gitver | sed 's/[^-]*-\([^-]*\).*/\1/'` && \
 		dirty="" && \
-		if [ "`echo $$gitver | sed 's/^.*-dirty$$//g'`" == "" ];then \
+		if [ "`echo $$gitver | sed 's/^.*-dirty$$//g'`" = "" ];then \
 			dirty="dirty"; \
 		fi \
 	fi && \

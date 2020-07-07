@@ -107,7 +107,7 @@ else
 fi
 PYTHON_SHEBANG="$PYTHON ${PYTHON_OPTS--Es}"
 AC_SUBST([PYTHON_SHEBANG])
-AM_CONDITIONAL(PYTHON_IS_VERSION3, test "x${PYTHON_VERSION%%.*}" == "x3")
+AM_CONDITIONAL(PYTHON_IS_VERSION3, test "x${PYTHON_VERSION%%.*}" = "x3")
 
 # Checks for header files.
 AC_FUNC_ALLOCA
@@ -200,7 +200,7 @@ try_extract_header_define() {
 	  if test -x ${Cfile}; then
 	      value=`${Cfile} 2>/dev/null`
 	  fi
-	  if  test x"${value}" == x""; then
+	  if  test x"${value}" = x""; then
 	      value=$3
 	      AC_MSG_RESULT(default: $value)
 	  else
