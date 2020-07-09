@@ -39,7 +39,11 @@ EXTRA_DIST		= autogen.sh conf/booth.conf.example \
 			  test/arbtests.py test/assertions.py test/booth_path test/boothrunner.py \
 			  test/boothtestenv.py.in test/clientenv.py test/clienttests.py test/live_test.sh \
 			  test/runtests.py.in test/serverenv.py test/servertests.py test/sitetests.py \
-			  test/utils.py
+			  test/utils.py \
+			  unit-tests \
+			  contrib \
+			  $(SPEC).in booth-rpmlintrc \
+			  .version build-aux/git-version-gen
 
 AUTOMAKE_OPTIONS	= foreign
 
@@ -48,7 +52,7 @@ MAINTAINERCLEANFILES	= Makefile.in aclocal.m4 configure depcomp \
 			  autoheader automake autoconf test_lense.sh \
 			  compile
 
-dist_doc_DATA		= AUTHORS README COPYING README.upgrade-from-v0.1
+dist_doc_DATA		= AUTHORS README COPYING README.upgrade-from-v0.1 README-testing
 
 boothconfdir		= ${BOOTHSYSCONFDIR}
 
@@ -65,7 +69,7 @@ boothocflib_DATA	= script/ocf/geo_attr.sh
 
 bootharbitratordir	= ${INITDDIR}
 
-bootharbitrator_SCRIPTS	= script/lsb/booth-arbitrator 
+bootharbitrator_SCRIPTS	= script/lsb/booth-arbitrator
 
 boothnoarchdir		= $(datadir)/$(PACKAGE_NAME)
 
@@ -109,10 +113,15 @@ lint:
 	for dir in src; do make -C $$dir lint; done
 
 clean-local:
-	rm -rf test/*.pyc test/__pycache__ test/runtests.py test/boothtestenv.py
+	rm -rf test/*.pyc test/__pycache__ test/runtests.py test/boothtestenv.py cov* $(SPEC)
 
 dist-clean-local:
 	rm -f autoconf automake autoheader
+
+# release/versioning
+BUILT_SOURCES = .version
+.version:
+	echo $(VERSION) > $@-t && mv $@-t $@
 
 dist-hook:
 	echo $(VERSION) > $(distdir)/.tarball-version
@@ -141,46 +150,70 @@ test/boothtestenv.py: test/boothtestenv.py.in
 	mv $@-t $@
 
 ## make rpm/srpm section.
+$(abs_builddir)/booth-rpmlintrc:
+	cat $(abs_srcdir)/booth-rpmlintrc > booth-rpmlintrc
 
-$(SPEC): $(SPEC).in
+$(SPEC): $(SPEC).in .version config.status $(abs_builddir)/booth-rpmlintrc
 	rm -f $@-t $@
 	date="$(shell LC_ALL=C date "+%a %b %d %Y")" && \
-	if [ -f .tarball-version ]; then \
-		gitver="$(shell cat .tarball-version)" && \
-		rpmver=$$gitver && \
+	gvgver="`cd $(abs_srcdir); build-aux/git-version-gen --fallback $(VERSION) .tarball-version .gitarchivever`" && \
+	if [ "$$gvgver" = "`echo $$gvgver | sed 's/-/./'`" ];then \
+		rpmver="$$gvgver" && \
 		alphatag="" && \
 		dirty="" && \
 		numcomm="0"; \
 	else \
-		gitver="$(shell git describe --tags --abbrev=4 --match='v*' HEAD 2>/dev/null)" && \
-		rpmver=`echo $$gitver | sed -e "s/^v//" -e "s/-.*//g"` && \
-		alphatag=`echo $$gitver | sed -e "s/.*-//" -e "s/^g//"` && \
-		vtag=`echo $$gitver | sed -e "s/-.*//g"` && \
-		numcomm=`git rev-list $$vtag..HEAD | wc -l` && \
-		git update-index --refresh > /dev/null 2>&1 || true && \
-		dirty=`git diff-index --name-only HEAD 2>/dev/null`; \
+		gitver="`echo $$gvgver | sed 's/\(.*\)\./\1-/'`" && \
+		rpmver=`echo $$gitver | sed 's/-.*//g'` && \
+		alphatag=`echo $$gvgver | sed 's/[^-]*-\([^-]*\).*/\1/'` && \
+		numcomm=`echo $$gitver | sed 's/[^-]*-\([^-]*\).*/\1/'` && \
+		dirty="" && \
+		if [ "`echo $$gitver | sed 's/^.*-dirty$$//g'`" = "" ];then \
+			dirty="dirty"; \
+		fi \
 	fi && \
-	if [ -n "$$dirty" ]; then dirty="dirty"; else dirty=""; fi && \
-	if [ "$$numcomm" = "0" ]; then \
-		sed \
-			-e "s#@version@#$$rpmver#g" \
-			-e "s#%glo.*alpha.*##g" \
-			-e "s#%glo.*numcomm.*##g" \
-			-e "s#@dirty@#$$dirty#g" \
-			-e "s#@date@#$$date#g" \
-		$< > $@-t; \
-	else \
-		sed \
-			-e "s#@version@#$$rpmver#g" \
-			-e "s#@alphatag@#$$alphatag#g" \
-			-e "s#@numcomm@#$$numcomm#g" \
-			-e "s#@dirty@#$$dirty#g" \
-			-e "s#@date@#$$date#g" \
-		$< > $@-t; \
-	fi; \
-	if [ -z "$$dirty" ]; then sed -i -e "s#%glo.*dirty.*##g" $@-t; fi
+	if [ "$$numcomm" = "0" ]; then numcomm=""; fi && \
+	if [ -n "$$numcomm" ]; then numcomm="%global numcomm $$numcomm"; fi && \
+	if [ "$$alphatag" = "$$gitver" ]; then alphatag=""; fi && \
+	if [ -n "$$alphatag" ]; then alphatag="%global alphatag $$alphatag"; fi && \
+	if [ -n "$$dirty" ]; then dirty="%global dirty dirty"; fi && \
+	sed \
+		-e "s#@version@#$$rpmver#g" \
+		-e "s#@ALPHATAG@#$$alphatag#g" \
+		-e "s#@NUMCOMM@#$$numcomm#g" \
+		-e "s#@DIRTY@#$$dirty#g" \
+		-e "s#@date@#$$date#g" \
+	$(abs_srcdir)/$@.in > $@-t;
+	sed -i -e "s#@uname@#$(CRM_DAEMON_USER)#g" $@-t
+	sed -i -e "s#@gname@#$(CRM_DAEMON_GROUP)#g" $@-t
+if BUILD_ASCIIDOC_HTML_MAN
+	sed -i -e "s#@bcond_html_man@#bcond_without#g" $@-t
+else
+	sed -i -e "s#@bcond_html_man@#bcond_with#g" $@-t
+endif
+if IS_ASCIIDOC
+	sed -i -e "s#@asciidoc@#asciidoc#g" $@-t
+else
+	sed -i -e "s#@asciidoc@#asciidoctor#g" $@-t
+endif
+if LOGGING_LIBQB
+	sed -i -e "s#@bcond_glue@#bcond_with#g" $@-t
+else
+	sed -i -e "s#@bcond_glue@#bcond_without#g" $@-t
+endif
+if PYTHON_IS_VERSION3
+	sed -i -e "s#@bcond_python3@#bcond_without#g" $@-t
+else
+	sed -i -e "s#@bcond_python3@#bcond_with#g" $@-t
+endif
+if RUN_BUILD_TESTS
+	sed -i -e "s#@bcond_run_build_tests@#bcond_without#g" $@-t
+else
+	sed -i -e "s#@bcond_run_build_tests@#bcond_with#g" $@-t
+endif
 	chmod a-w $@-t
 	mv $@-t $@
+	rm -f $@-t*
 
 $(TARFILE):
 	$(MAKE) dist
@@ -192,11 +225,9 @@ RPMBUILDOPTS	= --define "_sourcedir $(abs_builddir)" \
 		  --define "_rpmdir $(abs_builddir)"
 
 srpm: clean
-	autoreconf -if
 	$(MAKE) $(SPEC) $(TARFILE)
-	rpmbuild $(WITH_LIST) $(RPMBUILDOPTS) --nodeps -bs $(SPEC)
+	rpmbuild $(RPMBUILDOPTS) --nodeps -bs $(SPEC)
 
 rpm: clean
-	autoreconf -if
 	$(MAKE) $(SPEC) $(TARFILE)
-	rpmbuild $(WITH_LIST) $(RPMBUILDOPTS) -ba $(SPEC)
+	rpmbuild $(RPMBUILDOPTS) -ba $(SPEC)

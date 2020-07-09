@@ -4,7 +4,11 @@
 # bootstrap / init
 AC_PREREQ([2.61])
 
-AC_INIT([booth], [1.0], [users@clusterlabs.org])
+AC_INIT([booth],
+    m4_esyscmd([build-aux/git-version-gen --fallback 1.0 .tarball-version .gitarchivever]),
+    [users@clusterlabs.org])
+
+AC_USE_SYSTEM_EXTENSIONS
 
 AM_INIT_AUTOMAKE([-Wno-portability subdir-objects])
 
@@ -74,8 +78,6 @@ AC_PATH_PROGS(A2X, a2x)
 AM_CONDITIONAL(IS_ASCIIDOC, test x"${ASCIIDOC}" != x"")
 AM_CONDITIONAL(IS_A2X, test x"${A2X}" != x"")
 AM_CONDITIONAL(BUILD_ASCIIDOC, test x"${A2X}" != x"" || test x"${ASCIIDOCTOR}" != x"")
-AM_CONDITIONAL(BUILD_ASCIIDOC_HTML_MAN,
-	       (test "x${ASCIIDOC}" != "x" || test x"${ASCIIDOCTOR}" != x"") && test "x$with_html_man" = "xyes")
 
 # libgcrypt or mhash for hmac
 libgcrypt_installed="yes"
@@ -99,9 +101,13 @@ PKG_CHECK_MODULES([PCMK], [pacemaker-service],,
 # Python casing, prefer 3.3+ to 2.{6...}
 if test "x$PYTHON" = "x"; then
 	AM_PATH_PYTHON([3.3],, [AM_PATH_PYTHON([2.6])])
+else
+	# Just set Automake variables (mainly PYTHON_VERSION)
+	AM_PATH_PYTHON
 fi
 PYTHON_SHEBANG="$PYTHON ${PYTHON_OPTS--Es}"
 AC_SUBST([PYTHON_SHEBANG])
+AM_CONDITIONAL(PYTHON_IS_VERSION3, test "x${PYTHON_VERSION%%.*}" = "x3")
 
 # Checks for header files.
 AC_FUNC_ALLOCA
@@ -194,7 +200,7 @@ try_extract_header_define() {
 	  if test -x ${Cfile}; then
 	      value=`${Cfile} 2>/dev/null`
 	  fi
-	  if  test x"${value}" == x""; then
+	  if  test x"${value}" = x""; then
 	      value=$3
 	      AC_MSG_RESULT(default: $value)
 	  else
@@ -246,23 +252,23 @@ AC_ARG_WITH([initddir],
 	[ INITDDIR="$withval" ],
 	[ INITDDIR="$sysconfdir/init.d" ])
 
-test -s .git_info &&
-	GIT_VER="`cat .git_info`"
-
-AC_ARG_WITH([build-version],
-	[  --with-build-version=STR        : build version ],
-	[ BOOTH_BUILD_VERSION="$withval" ],
-	[ BOOTH_BUILD_VERSION="${GIT_VER:-$PACKAGE_VERSION}" ])
-
 AC_ARG_WITH([html_man],
-	[  --without-html_man              : Avoid generating man pages in HTML.],
-	[],
-	[with_html_man=yes])
+	[  --with-html_man                 : Enable generating man pages in HTML.],
+	[with_html_man=yes],
+	[])
+AM_CONDITIONAL(BUILD_ASCIIDOC_HTML_MAN,
+	       (test "x${ASCIIDOC}" != "x" || test x"${ASCIIDOCTOR}" != x"") && test "x$with_html_man" = "xyes")
 
 AC_ARG_WITH([glue],
 	[  --without-glue                  : Avoid libraries from (cluster-)glue project.],
 	[],
 	[with_glue=yes])
+
+AC_ARG_WITH([run_build_tests],
+	[  --with-run-build-tests          : Enable running build tests when generating RPM],
+	[run_build_tests=yes],
+	[])
+AM_CONDITIONAL([RUN_BUILD_TESTS], [test "x$run_build_tests" = "xyes"])
 
 # figure out logging provider
 logging_provider=""
@@ -360,81 +366,6 @@ CRM_DAEMON_GROUP=`try_extract_header_define glue_config.h HA_APIGROUP haclient`
 AC_DEFINE_UNQUOTED(CRM_DAEMON_GROUP,"$CRM_DAEMON_GROUP", Group to run Booth daemon as)
 AC_SUBST(CRM_DAEMON_GROUP)
 
-# OS detection
-# THIS SECTION MUST DIE!
-CP=cp
-OS_LDL="-ldl"
-have_linux="no"
-case "$host_os" in
-	*linux*)
-		AC_DEFINE_UNQUOTED([BOOTH_LINUX], [1],
-				   [Compiling for Linux platform])
-		OS_CFLAGS=""
-		OS_CPPFLAGS="-D_GNU_SOURCE"
-		OS_LDFLAGS=""
-		OS_DYFLAGS="-rdynamic"
-		DARWIN_OPTS=""
-		have_linux="yes"
-	;;
-	darwin*)
-		AC_DEFINE_UNQUOTED([BOOTH_DARWIN], [1],
-				   [Compiling for Darwin platform])
-		CP=rsync
-		OS_CFLAGS=""
-		OS_CPPFLAGS=""
-		OS_LDFLAGS=""
-		OS_DYFLAGS=""
-		DARWIN_OPTS="-dynamiclib -bind_at_load \
-			     -current_version ${SONAME} \
-			     -compatibility_version ${SONAME} -install_name \$(libdir)/\$(@)"
-		AC_DEFINE_UNQUOTED([MAP_ANONYMOUS], [MAP_ANON],
-				   [Shared memory define for Darwin platform])
-		AC_DEFINE_UNQUOTED([PATH_MAX], [4096],
-				   [Number of chars in a path name including nul])
-		AC_DEFINE_UNQUOTED([NAME_MAX], [255],
-				   [Number of chars in a file name])
-	;;
-	*bsd*)
-		AC_DEFINE_UNQUOTED([BOOTH_BSD], [1],
-				   [Compiling for BSD platform])
-		AC_DEFINE_UNQUOTED([MAP_ANONYMOUS], [MAP_ANON],
-				   [Shared memory define for Darwin platform])
-		OS_CFLAGS=""
-		OS_CPPFLAGS="-I/usr/local/include"
-		OS_LDFLAGS="-L/usr/local/lib"
-		OS_DYFLAGS="-export-dynamic"
-		DARWIN_OPTS=""
-		OS_LDL=""
-		case "$host_os" in
-			*freebsd[[234567]]*)
-			;;
-			*freebsd*)
-				AC_DEFINE_UNQUOTED([BOOTH_FREEBSD_GE_8], [1],
-					   [Compiling for FreeBSD >= 8 platform])
-			;;
-		esac
-	;;
-	*solaris*)
-		AC_DEFINE_UNQUOTED([BOOTH_SOLARIS], [1],
-				   [Compiling for Solaris platform])
-		AC_DEFINE_UNQUOTED([TS_CLASS], [1],
-				   [Prevent being scheduled RR])
-		AC_DEFINE_UNQUOTED([_SEM_SEMUN_UNDEFINED], [1],
-				   [The semun structure is undefined])
-		CP=rsync
-		OS_CFLAGS=""
-		OS_CPPFLAGS="-D_REENTRANT"
-		OS_LDFLAGS=""
-		OS_DYFLAGS="-Wl,-z,lazyload"
-		DARWIN_OPTS=""
-		SOLARIS_OPTS=" "
-	;;
-	*)
-		AC_MSG_ERROR([Unsupported OS? hmmmm])
-	;;
-esac
-
-AC_SUBST(CP)
 # *FLAGS handling goes here
 
 ENV_CFLAGS="$CFLAGS"
@@ -545,17 +476,6 @@ LIBS="$LIBS $XML_LIBS"
 # substitute what we need:
 AC_SUBST([INITDDIR])
 
-AC_SUBST([OS_DYFLAGS])
-
-AC_SUBST([OS_LDL])
-
-AM_CONDITIONAL(BUILD_DARWIN, test -n "${DARWIN_OPTS}")
-AM_CONDITIONAL(BUILD_SOLARIS, test -n "${SOLARIS_OPTS}")
-AC_SUBST([DARWIN_OPTS])
-AC_SUBST([SOLARIS_OPTS])
-
-AM_CONDITIONAL(BUILD_HTML_DOCS, test -n "${GROFF}")
-
 AC_SUBST([LINT_FLAGS])
 
 BOOTH_LIB_DIR=${localstatedir}/lib/booth
@@ -567,7 +487,6 @@ AC_SUBST([HAVE_XML_LOG_PATCHSET])
 AC_SUBST([BOOTH_LIB_DIR])
 AC_SUBST([BOOTH_CORE_DIR])
 AC_SUBST([BOOTHSYSCONFDIR])
-AC_SUBST([BOOTH_BUILD_VERSION])
 
 AC_DEFINE_UNQUOTED([BOOTH_LIB_DIR], "$(eval echo ${BOOTH_LIB_DIR})", [booth lib directory])
 AC_DEFINE_UNQUOTED([BOOTH_CORE_DIR], "$(eval echo ${BOOTH_CORE_DIR})", [booth working directory])
@@ -575,13 +494,11 @@ AC_DEFINE_UNQUOTED([BOOTHSYSCONFDIR], "$(eval echo ${BOOTHSYSCONFDIR})", [booth 
 
 AC_DEFINE_UNQUOTED([PACKAGE_FEATURES], "${PACKAGE_FEATURES}", [booth built-in features])
 
-AC_DEFINE_UNQUOTED([BOOTH_BUILD_VERSION], "${BOOTH_BUILD_VERSION}", [booth build version])
-
 AC_OUTPUT
 
 AC_MSG_RESULT([])
 AC_MSG_RESULT([$PACKAGE configuration:])
-AC_MSG_RESULT([  Version                  = ${VERSION} (Build: ${BOOTH_BUILD_VERSION})])
+AC_MSG_RESULT([  Version                  = ${VERSION}])
 AC_MSG_RESULT([  Prefix                   = ${prefix}])
 AC_MSG_RESULT([  Executables              = ${sbindir}])
 AC_MSG_RESULT([  Man pages                = ${mandir}])
@@ -603,19 +520,12 @@ AC_MSG_RESULT([  HA group name            = ${CRM_DAEMON_GROUP}])
 AC_MSG_RESULT([  HA user name             = ${CRM_DAEMON_USER}])
 AC_MSG_RESULT([])
 AC_MSG_RESULT([$PACKAGE build info:])
-AC_MSG_RESULT([  Library SONAME           = ${SONAME}])
-LIB_MSG_RESULT(m4_shift(local_soname_list))dnl
 AC_MSG_RESULT([  Default optimization     = ${OPT_CFLAGS}])
 AC_MSG_RESULT([  Default debug options    = ${GDB_CFLAGS}])
 AC_MSG_RESULT([  Extra compiler warnings  = ${EXTRA_WARNING}])
 AC_MSG_RESULT([  Env. defined CFLAG       = ${ENV_CFLAGS}])
 AC_MSG_RESULT([  Env. defined CPPFLAGS    = ${ENV_CPPFLAGS}])
 AC_MSG_RESULT([  Env. defined LDFLAGS     = ${ENV_LDFLAGS}])
-AC_MSG_RESULT([  OS   defined CFLAGS      = ${OS_CFLAGS}])
-AC_MSG_RESULT([  OS   defined CPPFLAGS    = ${OS_CPPFLAGS}])
-AC_MSG_RESULT([  OS   defined LDFLAGS     = ${OS_LDFLAGS}])
-AC_MSG_RESULT([  OS   defined LDL         = ${OS_LDL}])
-AC_MSG_RESULT([  OS   defined DYFLAGS     = ${OS_DYFLAGS}])
 AC_MSG_RESULT([  ANSI defined CPPFLAGS    = ${ANSI_CPPFLAGS}])
 AC_MSG_RESULT([  Coverage     CFLAGS      = ${COVERAGE_CFLAGS}])
 AC_MSG_RESULT([  Coverage     LDFLAGS     = ${COVERAGE_LDFLAGS}])

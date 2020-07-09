@@ -17,6 +17,8 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
+#include "b_config.h"
+
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -44,8 +46,6 @@
 
 #include <crm/services.h>
 
-#include "b_config.h"
-
 #if HAVE_LIBGCRYPT
 #include <gcrypt.h>
 #endif
@@ -69,8 +69,7 @@
 #include "attr.h"
 #include "handler.h"
 
-#define RELEASE_VERSION		"1.0"
-#define RELEASE_STR 	RELEASE_VERSION " (build " BOOTH_BUILD_VERSION ")"
+#define RELEASE_STR 	VERSION
 
 #define CLIENT_NALLOC		32
 

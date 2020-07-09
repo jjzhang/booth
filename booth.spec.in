@@ -1,15 +1,28 @@
-%bcond_with html_man
+# keep around ready for later user
+@ALPHATAG@
+@NUMCOMM@
+@DIRTY@
 
-%if 0%{?fedora} > 18 || 0%{?centos} > 6 || 0%{?rhel} > 6
-%bcond_with glue
-%if 0%{?fedora} > 26 || 0%{?centos} > 7 || 0%{?rhel} > 7
-%bcond_without python3
+%global gitver %{?numcomm:.%{numcomm}}%{?alphatag:-%{alphatag}}%{?dirty:-%{dirty}}
+%global gittarver %{?numcomm:-%{numcomm}}%{?alphatag:-g%{alphatag}}%{?dirty:-%{dirty}}
+
+%@bcond_html_man@ html_man
+%@bcond_glue@ glue
+%@bcond_python3@ python3
+%@bcond_run_build_tests@ run_build_tests
+
+## User and group to use for nonprivileged services (should be in sync with pacemaker)
+%global uname @uname@
+%global gname @gname@
+
+# Defined on RHEL 8 and Fedora
+%{!?__python2: %global __python2 /usr/bin/python2}
+%{!?__python3: %global __python3 /usr/bin/python3}
+
+%if 0%{?with_python3}
+%global __python_full_path %{__python3}
 %else
-%bcond_with python3
-%endif
-%else
-%bcond_without glue
-%bcond_with python3
+%global __python_full_path %{__python2}
 %endif
 
 %if 0%{?suse_version}
@@ -46,12 +59,11 @@ License:        GPL-2.0+
 License:        GPLv2+
 %endif
 Group:          %{pkg_group}
-Version:        1.0
-Release:        0
-Source:         booth.tar.bz2
+Version:        @version@
+Release:        1%{?numcomm:.%{numcomm}}%{?alphatag:.%{alphatag}}%{?dirty:.%{dirty}}%{?dist}
+Source:         https://github.com/ClusterLabs/booth/archive/v%{version}%{?gittarver}/%{name}-%{version}%{?gitver}.tar.gz
 Source1:        %name-rpmlintrc
-BuildRoot:      %{_tmppath}/%{name}-%{version}-build
-BuildRequires:  asciidoctor
+BuildRequires:  @asciidoc@
 BuildRequires:  autoconf
 BuildRequires:  automake
 BuildRequires:  pkgconfig
@@ -100,6 +112,11 @@ BuildRequires:  python3-devel
 BuildRequires:  python
 %endif
 
+# For Fedora compatibility
+Provides: booth-core
+Provides: booth-site
+Provides: booth-arbitrator
+
 %description
 Booth manages tickets which authorize cluster sites located in
 geographically dispersed locations to run resources. It
@@ -107,15 +124,16 @@ facilitates support of geographically distributed clustering in
 Pacemaker.
 
 %prep
-%setup -q -n %{name}
+%setup -q -n %{name}-%{version}%{?gitver}
 
 %build
 ./autogen.sh
 %configure \
 	--with-initddir=%{_initrddir} \
 	--docdir=%{booth_docdir} \
-	%{!?with_html_man:--without-html_man} \
-	%{!?with_glue:--without-glue}
+	%{?with_html_man:--with-html_man} \
+	%{!?with_glue:--without-glue} \
+	PYTHON=%{__python_full_path}
 
 make
 
@@ -124,7 +142,7 @@ make DESTDIR=$RPM_BUILD_ROOT install docdir=%{booth_docdir}
 
 mkdir -p %{buildroot}/%{_mandir}/man8/
 gzip < docs/boothd.8 > %{buildroot}/%{_mandir}/man8/booth.8.gz
-ln %{buildroot}/%{_mandir}/man8/booth.8.gz %{buildroot}/%{_mandir}/man8/boothd.8.gz 
+ln %{buildroot}/%{_mandir}/man8/booth.8.gz %{buildroot}/%{_mandir}/man8/boothd.8.gz
 
 %if %{defined _unitdir}
 # systemd
@@ -149,6 +167,19 @@ mkdir -p %{buildroot}/%{test_path}/src/
 ln -s %{_sbindir}/boothd %{buildroot}/%{test_path}/src/
 rm -f %{buildroot}/%{test_path}/test/*.pyc
 
+# Generate runtests.py and boothtestenv.py
+sed -e 's#PYTHON_SHEBANG#%{__python_full_path} -Es#g' \
+    -e 's#TEST_SRC_DIR#%{test_path}/test#g' \
+    -e 's#TEST_BUILD_DIR#%{test_path}/test#g' \
+    %{buildroot}/%{test_path}/test/runtests.py.in > %{buildroot}/%{test_path}/test/runtests.py
+
+chmod +x %{buildroot}/%{test_path}/test/runtests.py
+
+sed -e 's#PYTHON_SHEBANG#%{__python_full_path} -Es#g' \
+    -e 's#TEST_SRC_DIR#%{test_path}/test#g' \
+    -e 's#TEST_BUILD_DIR#%{test_path}/test#g' \
+    %{buildroot}/%{test_path}/test/boothtestenv.py.in > %{buildroot}/%{test_path}/test/boothtestenv.py
+
 %if 0%{?suse_version}
 #Firewalld rule
 mkdir -p $RPM_BUILD_ROOT/%{_fwdefdir}
@@ -160,11 +191,11 @@ install -m 644 contrib/geo-cluster.firewalld.xml $RPM_BUILD_ROOT/%{_fwdefdir}/bo
 %endif
 
 %check
-%if 0%{?run_build_tests}
-echo "%%run_build_tests set to %run_build_tests; including tests"
+%if 0%{?with_run_build_tests}
+echo "%%with_run_build_tests set to %with_run_build_tests; including tests"
 make check
 %else
-echo "%%run_build_tests set to %run_build_tests; skipping tests"
+echo "%%with_run_build_tests set to %with_run_build_tests; skipping tests"
 %endif
 
 %files
@@ -215,11 +246,10 @@ Summary:        Test scripts for Booth
 Group:          %{pkg_group}
 Requires:       booth
 Requires:       gdb
+Requires:       %{__python_full_path}
 %if 0%{?with_python3}
-Requires:       python3
 Requires:       python3-pexpect
 %else
-Requires:       python
 Requires:       python-pexpect
 %endif
 
@@ -228,7 +258,7 @@ This package contains automated tests for Booth,
 the Cluster Ticket Manager for Pacemaker.
 
 %files test
-%doc README-testing
+%doc %{booth_docdir}/README-testing
 %{test_path}
 %dir /usr/lib/ocf
 %dir /usr/lib/ocf/resource.d

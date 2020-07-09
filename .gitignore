@@ -16,6 +16,7 @@ test-driver
 *.rpm
 *.o
 .deps
+.version
 .dirstamp
 
 booth-*.tar*
@@ -33,6 +34,8 @@ src/stamp-h2
 test/boothtestenv.py
 test/runtests.py
 
+booth.spec
+
 # cscope files
 cscope.*
 ncscope.*
@@ -48,3 +51,4 @@ tags
 *.pyc
 __pycache__
 
+cov*
