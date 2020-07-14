@@ -170,7 +170,7 @@ int _find_myself(int family, struct booth_site **mep, int fuzzy_allowed)
 		return 0;
 	}
 
-	setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &rcvbuf, sizeof(rcvbuf));
+	(void)setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &rcvbuf, sizeof(rcvbuf));
 
 	memset(&nladdr, 0, sizeof(nladdr));
 	nladdr.nl_family = AF_NETLINK;
@@ -515,10 +515,15 @@ static void process_tcp_listener(int ci)
 			  fd, errno);
 		return;
 	}
-	setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&one, sizeof(one));
+	(void)setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&one, sizeof(one));
 
 	flags = fcntl(fd, F_GETFL, 0);
-	fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+	if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1) {
+		log_error("process_tcp_listener: fcntl O_NONBLOCK error %d %d",
+			  fd, errno);
+		(void)close(fd);
+		return;
+	}
 
 	i = client_add(fd, clients[ci].transport,
 			process_connection, NULL);
@@ -593,7 +598,10 @@ static int connect_nonb(int sockfd, const struct sockaddr *saptr,
 	struct timeval	tval;
 
 	flags = fcntl(sockfd, F_GETFL, 0);
-	fcntl(sockfd, F_SETFL, flags | O_NONBLOCK);
+	if (fcntl(sockfd, F_SETFL, flags | O_NONBLOCK) == -1) {
+		log_error("fcntl: Can't set sockfd to nonblocking mode");
+		return -1;
+	}
 
 	error = 0;
 	if ( (n = connect(sockfd, saptr, salen)) < 0)
@@ -628,7 +636,11 @@ static int connect_nonb(int sockfd, const struct sockaddr *saptr,
 	}
 
 done:
-	fcntl(sockfd, F_SETFL, flags);	/* restore file status flags */
+	/* restore file status flags */
+	if (fcntl(sockfd, F_SETFL, flags) == -1) {
+		log_error("fcntl: Can't restore sockfd flags");
+		return -1;
+	}
 
 	if (error) {
 		/* leave outside function to close */
