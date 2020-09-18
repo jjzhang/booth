@@ -1264,7 +1264,7 @@ conf_file_size=$(grep -c $ $cnf)
 
 #get line numbers for all tickets
 ticket_line_numbers=$(grep -n ticket $cnf | cut -d: -f1)
-read -a TICKET_LINES<<< $ticket_line_numbers
+read -d'\n' -a TICKET_LINES<<< $ticket_line_numbers
 
 #save the part of config located before ticket definitions
 sed -n "1,$((${TICKET_LINES[0]}-1))p" $cnf > ${cnf}_main.config
