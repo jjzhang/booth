@@ -253,9 +253,8 @@ AC_ARG_WITH([initddir],
 	[ INITDDIR="$sysconfdir/init.d" ])
 
 AC_ARG_WITH([html_man],
-	[  --with-html_man                 : Enable generating man pages in HTML.],
-	[with_html_man=yes],
-	[])
+	[  --with-html_man                 : Enable generating man pages in HTML.])
+
 AM_CONDITIONAL(BUILD_ASCIIDOC_HTML_MAN,
 	       (test "x${ASCIIDOC}" != "x" || test x"${ASCIIDOCTOR}" != x"") && test "x$with_html_man" = "xyes")
 
