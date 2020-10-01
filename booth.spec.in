@@ -241,6 +241,12 @@ echo "%%with_run_build_tests set to %with_run_build_tests; skipping tests"
 %doc AUTHORS README COPYING
 %doc README.upgrade-from-v0.1
 
+%if 0%{?with_html_man}
+%{booth_docdir}/booth-keygen.8.html
+%{booth_docdir}/boothd.8.html
+%{booth_docdir}/geostore.8.html
+%endif
+
 %package test
 Summary:        Test scripts for Booth
 Group:          %{pkg_group}
