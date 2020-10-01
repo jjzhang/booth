@@ -50,6 +50,8 @@
 %define pkg_group Productivity/Clustering/HA
 %endif
 
+%global release 1
+
 Name:           booth
 Url:            https://github.com/ClusterLabs/booth
 Summary:        Ticket Manager for Multi-site Clusters
@@ -60,7 +62,7 @@ License:        GPLv2+
 %endif
 Group:          %{pkg_group}
 Version:        @version@
-Release:        1%{?numcomm:.%{numcomm}}%{?alphatag:.%{alphatag}}%{?dirty:.%{dirty}}%{?dist}
+Release:        %{?numcomm:%{numcomm}.}%{release}%{?alphatag:.%{alphatag}}%{?dirty:.%{dirty}}%{?alphatag:.git}%{?dist}
 Source:         https://github.com/ClusterLabs/booth/archive/v%{version}%{?gittarver}/%{name}-%{version}%{?gitver}.tar.gz
 Source1:        %name-rpmlintrc
 BuildRequires:  @asciidoc@
