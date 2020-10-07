@@ -31,11 +31,13 @@ class BoothTestEnvironment(unittest.TestCase, BoothAssertions):
 
     def ensure_boothd_not_running(self):
         # Need to redirect STDERR in case we're not root, in which
-        # case netstat's -p option causes a warning.  However we only
+        # case netstat's -p option causes a warning (ss doesn't).  However we only
         # want to kill boothd processes which we own; -p will list the
         # pid for those and only those, which is exactly what we want
         # here.
-        subprocess.call("netstat -tpln 2>&1 | perl -lne 'm,LISTEN\s+(\d+)/boothd, and kill 15, $1'", shell=True)
+        subprocess.call("(netstat -tlnp || ss -tlnp) 2>&1 | " +
+            "perl -lne '(m,LISTEN\s+(\d+)/boothd, || /\"boothd\".*pid=(\d+)/) and kill 15, $1'",
+            shell=True)
 
     def get_tempfile(self, identity):
         tf = tempfile.NamedTemporaryFile(
