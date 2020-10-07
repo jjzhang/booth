@@ -39,7 +39,7 @@ man8_MANS	= $(generated_mans)
 endif
 
 if IS_ASCIIDOC
-HTML_GENERATOR += $(ASCIIDOC) --unsafe --backend=xhtml11 --destination-dir=$(abs_builddir)/
+HTML_GENERATOR += $(ASCIIDOC) --unsafe --backend=xhtml11
 else
 HTML_GENERATOR += $(ASCIIDOCTOR) -b xhtml5 --destination-dir=$(abs_builddir)/
 endif
@@ -51,7 +51,11 @@ MANPAGE_GENERATOR += $(ASCIIDOCTOR) -b manpage --destination-dir=$(abs_builddir)
 endif
 
 %.html: %.txt
+if IS_ASCIIDOC
+	$(HTML_GENERATOR) -o $(abs_builddir)/$@ $<
+else
 	$(HTML_GENERATOR) $<
+endif
 %.8: %.8.txt
 	$(MANPAGE_GENERATOR) $<
 clean-local:
