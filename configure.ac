@@ -165,6 +165,7 @@ AC_CHECK_FUNCS([alarm alphasort atexit bzero dup2 endgrent endpwent fcntl \
 		sched_get_priority_max sched_setscheduler])
 
 AC_CONFIG_FILES([Makefile
+		 booth.pc
 		 src/Makefile
 		 docs/Makefile
 		 conf/Makefile])
