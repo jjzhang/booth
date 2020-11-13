@@ -77,6 +77,9 @@ nodist_boothnoarch_SCRIPTS = script/service-runnable
 
 sbin_SCRIPTS		= script/booth-keygen
 
+pkgconfigdir		= $(datadir)/pkgconfig
+pkgconfig_DATA		= booth.pc
+
 TESTS			= test/runtests.py
 
 SUBDIRS			= src docs conf
