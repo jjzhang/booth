@@ -378,13 +378,11 @@ fi
 AM_CONDITIONAL([COREDUMP_NURSING], [test "x$coredump_nursing" != "xno"])
 
 # define CRM daemon user & group
-CRM_DAEMON_USER=`try_extract_header_define glue_config.h HA_CCMUSER hacluster`
+BOOTH_PKG_CHECK_VAR([CRM_DAEMON_USER], [pacemaker], [daemon_user], [hacluster])
 AC_DEFINE_UNQUOTED(CRM_DAEMON_USER,"$CRM_DAEMON_USER", User to run Booth daemon as)
-AC_SUBST(CRM_DAEMON_USER)
 
-CRM_DAEMON_GROUP=`try_extract_header_define glue_config.h HA_APIGROUP haclient`
+BOOTH_PKG_CHECK_VAR([CRM_DAEMON_GROUP], [pacemaker], [daemon_group], [haclient])
 AC_DEFINE_UNQUOTED(CRM_DAEMON_GROUP,"$CRM_DAEMON_GROUP", Group to run Booth daemon as)
-AC_SUBST(CRM_DAEMON_GROUP)
 
 # *FLAGS handling goes here
 
