@@ -12,6 +12,7 @@ AC_USE_SYSTEM_EXTENSIONS
 
 AM_INIT_AUTOMAKE([-Wno-portability subdir-objects])
 
+AC_CONFIG_MACRO_DIR([build-aux])
 AC_CONFIG_SRCDIR([src/main.c])
 AC_CONFIG_HEADER([src/b_config.h src/booth_config.h])
 
@@ -176,6 +177,21 @@ AC_CONFIG_FILES([script/service-runnable], [chmod +x script/service-runnable])
 # ===============================================
 # Helpers
 # ===============================================
+
+## PKG_CHECK_VAR wrapper that allows defining a default value
+## when value from pkg-config is not detected
+
+AC_DEFUN([BOOTH_PKG_CHECK_VAR], [
+	  varname=$1
+	  default=$4
+	  AC_MSG_CHECKING([for pkg-conf $2 var $3])
+	  PKG_CHECK_VAR([$1], [$2], [$3])
+	  AS_VAR_IF([$1], [""],
+		    [AS_VAR_IF([default], [""],
+			       AC_MSG_ERROR([not found]),
+			       [AS_VAR_COPY([$varname], [default]) && AC_MSG_RESULT([not found, using default ${!varname}])])],
+		    [AC_MSG_RESULT([yes (detected: ${!varname})])])
+])
 
 ## helper for CC stuff
 cc_supports_flag() {
