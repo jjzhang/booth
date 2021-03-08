@@ -44,13 +44,6 @@ if test "$prefix" = "NONE"; then
 	fi
 fi
 
-if test "x${prefix}" != "x/usr"; then
-	ocfdir="${prefix}/usr/lib/ocf"
-else
-	ocfdir="${prefix}/lib/ocf"
-fi
-AC_SUBST([ocfdir])
-
 if test "$srcdir" = "."; then
 	AC_MSG_NOTICE([building in place srcdir:$srcdir])
 	AC_DEFINE([BUILDING_IN_PLACE], 1, [building in place])
@@ -285,6 +278,17 @@ AC_ARG_WITH([run_build_tests],
 	[run_build_tests=yes],
 	[])
 AM_CONDITIONAL([RUN_BUILD_TESTS], [test "x$run_build_tests" = "xyes"])
+
+# figure out ocfdir automatically and allow manual override (mostly for CI)
+
+BOOTH_PKG_CHECK_VAR([OCFROOT], [resource-agents], [ocfrootdir], [/usr/lib/ocf])
+
+AC_ARG_WITH([ocfdir],
+	[  --with-ocfdir=DIR               : path to ocfdir (default: autodetected). ],
+	[ ocfdir="$withval" ],
+	[ ocfdir="$OCFROOT" ])
+
+AC_SUBST([ocfdir])
 
 # figure out logging provider
 logging_provider=""
@@ -526,6 +530,7 @@ AC_MSG_RESULT([  State information        = ${localstatedir}])
 AC_MSG_RESULT([  System configuration     = ${sysconfdir}])
 AC_MSG_RESULT([  System init.d directory  = ${INITDDIR}])
 AC_MSG_RESULT([  booth config dir         = ${BOOTHSYSCONFDIR}])
+AC_MSG_RESULT([  ocf dir                  = ${ocfdir}])
 AC_MSG_RESULT([  Features                 = ${PACKAGE_FEATURES}])
 AC_MSG_RESULT([  Logging provider         = ${logging_provider}])
 AC_MSG_RESULT([  Range2random provider    = ${range2random_provider}])
