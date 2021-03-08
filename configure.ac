@@ -44,6 +44,13 @@ if test "$prefix" = "NONE"; then
 	fi
 fi
 
+AC_MSG_NOTICE(Sanitizing exec_prefix: ${exec_prefix})
+case $exec_prefix in
+  dnl For consistency with Corosync, map NONE->$prefix
+  NONE)   exec_prefix=$prefix;;
+  prefix) exec_prefix=$prefix;;
+esac
+
 if test "$srcdir" = "."; then
 	AC_MSG_NOTICE([building in place srcdir:$srcdir])
 	AC_DEFINE([BUILDING_IN_PLACE], 1, [building in place])
@@ -194,14 +201,6 @@ cc_supports_flag() {
            [RC=0; AC_MSG_RESULT(yes)],[RC=1; AC_MSG_RESULT(no)])
          return $RC
 }
-
-## cleanup
-AC_MSG_NOTICE(Sanitizing exec_prefix: ${exec_prefix})
-case $exec_prefix in
-  dnl For consistency with Corosync, map NONE->$prefix
-  NONE)   exec_prefix=$prefix;;
-  prefix) exec_prefix=$prefix;;
-esac
 
 ## local defines
 PACKAGE_FEATURES=""
