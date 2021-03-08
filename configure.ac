@@ -276,19 +276,19 @@ if test "x$logging_provider" = "x" && test "x$with_glue" = "xyes"; then
 	AC_CHECK_LIB([plumb], [cl_log], [logging_provider="libplumb"])
 fi
 if test "x$logging_provider" = "x" && test "x$with_glue" = "xno"; then
-	AC_CHECK_LIB([qb], [qb_log_real_], [logging_provider="libqb"])
-fi
-case "$logging_provider" in
-libplumb)
-	LOGGER="ha_logger"
-	;;
-libqb)
 	PKG_CHECK_MODULES([LIBQB], [libqb])
 	AC_DEFINE([LOGGING_LIBQB], [], [use libqb as a logging provider])
 	PKG_CHECK_MODULES([LIBQB1], [libqb >= 1.0],
 			  [AC_DEFINE([LOGGING_LIBQB_MAJOR], [1],
 				     [libqb major version lower bound])],
 			  [AC_MSG_WARN([[syslog identifier will not get changed]])])
+	logging_provider=libqb
+fi
+case "$logging_provider" in
+libplumb)
+	LOGGER="ha_logger"
+	;;
+libqb)
 	LOGGER="logger -t booth-script"
 	;;
 *)
