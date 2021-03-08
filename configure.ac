@@ -195,31 +195,6 @@ cc_supports_flag() {
          return $RC
 }
 
-## extract header or define
-try_extract_header_define() {
-	  AC_MSG_CHECKING(if $2 in $1 exists)
-	  Cfile=$srcdir/extract_define.$2.${$}
-	  printf "#include <stdio.h>\n" > ${Cfile}.c
-	  printf "#include <%s>\n" $1 >> ${Cfile}.c
-	  printf "int main(int argc, char **argv) {\n" >> ${Cfile}.c
-	  printf "#ifdef %s\n" $2 >> ${Cfile}.c
-	  printf "printf(\"%%s\", %s);\n" $2 >> ${Cfile}.c
-	  printf "#endif \n return 0; }\n" >> ${Cfile}.c
-	  $CC $CFLAGS ${Cfile}.c -o ${Cfile} 2>/dev/null
-	  value=
-	  if test -x ${Cfile}; then
-	      value=`${Cfile} 2>/dev/null`
-	  fi
-	  if  test x"${value}" = x""; then
-	      value=$3
-	      AC_MSG_RESULT(default: $value)
-	  else
-	      AC_MSG_RESULT($value)
-	  fi
-	  printf $value
-	  rm -rf ${Cfile}.c ${Cfile} ${Cfile}.dSYM ${Cfile}.gcno
-	}
-
 ## cleanup
 AC_MSG_NOTICE(Sanitizing prefix: ${prefix})
 case $prefix in
