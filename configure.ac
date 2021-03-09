@@ -12,6 +12,7 @@ AC_USE_SYSTEM_EXTENSIONS
 
 AM_INIT_AUTOMAKE([-Wno-portability subdir-objects])
 
+AC_CONFIG_MACRO_DIR([build-aux])
 AC_CONFIG_SRCDIR([src/main.c])
 AC_CONFIG_HEADER([src/b_config.h src/booth_config.h])
 
@@ -43,19 +44,12 @@ if test "$prefix" = "NONE"; then
 	fi
 fi
 
-if test "x${prefix}" != "x/usr"; then
-	ocfdir="${prefix}/usr/lib/ocf"
-else
-	ocfdir="${prefix}/lib/ocf"
-fi
-AC_SUBST([ocfdir])
-
-if test "$srcdir" = "."; then
-	AC_MSG_NOTICE([building in place srcdir:$srcdir])
-	AC_DEFINE([BUILDING_IN_PLACE], 1, [building in place])
-else
-	AC_MSG_NOTICE([building out of tree srcdir:$srcdir])
-fi
+AC_MSG_NOTICE(Sanitizing exec_prefix: ${exec_prefix})
+case $exec_prefix in
+  dnl For consistency with Corosync, map NONE->$prefix
+  NONE)   exec_prefix=$prefix;;
+  prefix) exec_prefix=$prefix;;
+esac
 
 # Checks for programs.
 
@@ -69,8 +63,8 @@ AC_PROG_INSTALL
 AC_PROG_LN_S
 AC_PROG_MAKE_SET
 AC_PROG_RANLIB
+PKG_PROG_PKG_CONFIG
 
-AC_PATH_PROGS(PKGCONFIG, pkg-config)
 AC_PATH_PROGS(ASCIIDOC, asciidoc)
 AC_PATH_PROGS(ASCIIDOCTOR, asciidoctor)
 AC_PATH_PROGS(A2X, a2x)
@@ -177,6 +171,21 @@ AC_CONFIG_FILES([script/service-runnable], [chmod +x script/service-runnable])
 # Helpers
 # ===============================================
 
+## PKG_CHECK_VAR wrapper that allows defining a default value
+## when value from pkg-config is not detected
+
+AC_DEFUN([BOOTH_PKG_CHECK_VAR], [
+	  varname=$1
+	  default=$4
+	  AC_MSG_CHECKING([for pkg-conf $2 var $3])
+	  PKG_CHECK_VAR([$1], [$2], [$3])
+	  AS_VAR_IF([$1], [""],
+		    [AS_VAR_IF([default], [""],
+			       AC_MSG_ERROR([not found]),
+			       [AS_VAR_COPY([$varname], [default]) && AC_MSG_RESULT([not found, using default ${!varname}])])],
+		    [AC_MSG_RESULT([yes (detected: ${!varname})])])
+])
+
 ## helper for CC stuff
 cc_supports_flag() {
          local CFLAGS="-Werror $@"
@@ -185,44 +194,6 @@ cc_supports_flag() {
            [RC=0; AC_MSG_RESULT(yes)],[RC=1; AC_MSG_RESULT(no)])
          return $RC
 }
-
-## extract header or define
-try_extract_header_define() {
-	  AC_MSG_CHECKING(if $2 in $1 exists)
-	  Cfile=$srcdir/extract_define.$2.${$}
-	  printf "#include <stdio.h>\n" > ${Cfile}.c
-	  printf "#include <%s>\n" $1 >> ${Cfile}.c
-	  printf "int main(int argc, char **argv) {\n" >> ${Cfile}.c
-	  printf "#ifdef %s\n" $2 >> ${Cfile}.c
-	  printf "printf(\"%%s\", %s);\n" $2 >> ${Cfile}.c
-	  printf "#endif \n return 0; }\n" >> ${Cfile}.c
-	  $CC $CFLAGS ${Cfile}.c -o ${Cfile} 2>/dev/null
-	  value=
-	  if test -x ${Cfile}; then
-	      value=`${Cfile} 2>/dev/null`
-	  fi
-	  if  test x"${value}" = x""; then
-	      value=$3
-	      AC_MSG_RESULT(default: $value)
-	  else
-	      AC_MSG_RESULT($value)
-	  fi
-	  printf $value
-	  rm -rf ${Cfile}.c ${Cfile} ${Cfile}.dSYM ${Cfile}.gcno
-	}
-
-## cleanup
-AC_MSG_NOTICE(Sanitizing prefix: ${prefix})
-case $prefix in
-  NONE) prefix=/usr/local;;
-esac
-
-AC_MSG_NOTICE(Sanitizing exec_prefix: ${exec_prefix})
-case $exec_prefix in
-  dnl For consistency with Corosync, map NONE->$prefix
-  NONE)   exec_prefix=$prefix;;
-  prefix) exec_prefix=$prefix;;
-esac
 
 ## local defines
 PACKAGE_FEATURES=""
@@ -270,25 +241,36 @@ AC_ARG_WITH([run_build_tests],
 	[])
 AM_CONDITIONAL([RUN_BUILD_TESTS], [test "x$run_build_tests" = "xyes"])
 
+# figure out ocfdir automatically and allow manual override (mostly for CI)
+
+BOOTH_PKG_CHECK_VAR([OCFROOT], [resource-agents], [ocfrootdir], [/usr/lib/ocf])
+
+AC_ARG_WITH([ocfdir],
+	[  --with-ocfdir=DIR               : path to ocfdir (default: autodetected). ],
+	[ ocfdir="$withval" ],
+	[ ocfdir="$OCFROOT" ])
+
+AC_SUBST([ocfdir])
+
 # figure out logging provider
 logging_provider=""
 if test "x$logging_provider" = "x" && test "x$with_glue" = "xyes"; then
 	AC_CHECK_LIB([plumb], [cl_log], [logging_provider="libplumb"])
 fi
 if test "x$logging_provider" = "x" && test "x$with_glue" = "xno"; then
-	AC_CHECK_LIB([qb], [qb_log_real_], [logging_provider="libqb"])
-fi
-case "$logging_provider" in
-libplumb)
-	LOGGER="ha_logger"
-	;;
-libqb)
 	PKG_CHECK_MODULES([LIBQB], [libqb])
 	AC_DEFINE([LOGGING_LIBQB], [], [use libqb as a logging provider])
 	PKG_CHECK_MODULES([LIBQB1], [libqb >= 1.0],
 			  [AC_DEFINE([LOGGING_LIBQB_MAJOR], [1],
 				     [libqb major version lower bound])],
 			  [AC_MSG_WARN([[syslog identifier will not get changed]])])
+	logging_provider=libqb
+fi
+case "$logging_provider" in
+libplumb)
+	LOGGER="ha_logger"
+	;;
+libqb)
 	LOGGER="logger -t booth-script"
 	;;
 *)
@@ -358,13 +340,11 @@ fi
 AM_CONDITIONAL([COREDUMP_NURSING], [test "x$coredump_nursing" != "xno"])
 
 # define CRM daemon user & group
-CRM_DAEMON_USER=`try_extract_header_define glue_config.h HA_CCMUSER hacluster`
+BOOTH_PKG_CHECK_VAR([CRM_DAEMON_USER], [pacemaker], [daemon_user], [hacluster])
 AC_DEFINE_UNQUOTED(CRM_DAEMON_USER,"$CRM_DAEMON_USER", User to run Booth daemon as)
-AC_SUBST(CRM_DAEMON_USER)
 
-CRM_DAEMON_GROUP=`try_extract_header_define glue_config.h HA_APIGROUP haclient`
+BOOTH_PKG_CHECK_VAR([CRM_DAEMON_GROUP], [pacemaker], [daemon_group], [haclient])
 AC_DEFINE_UNQUOTED(CRM_DAEMON_GROUP,"$CRM_DAEMON_GROUP", Group to run Booth daemon as)
-AC_SUBST(CRM_DAEMON_GROUP)
 
 # *FLAGS handling goes here
 
@@ -510,6 +490,7 @@ AC_MSG_RESULT([  State information        = ${localstatedir}])
 AC_MSG_RESULT([  System configuration     = ${sysconfdir}])
 AC_MSG_RESULT([  System init.d directory  = ${INITDDIR}])
 AC_MSG_RESULT([  booth config dir         = ${BOOTHSYSCONFDIR}])
+AC_MSG_RESULT([  ocf dir                  = ${ocfdir}])
 AC_MSG_RESULT([  Features                 = ${PACKAGE_FEATURES}])
 AC_MSG_RESULT([  Logging provider         = ${logging_provider}])
 AC_MSG_RESULT([  Range2random provider    = ${range2random_provider}])

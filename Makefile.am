@@ -43,7 +43,7 @@ EXTRA_DIST		= autogen.sh conf/booth.conf.example \
 			  unit-tests \
 			  contrib \
 			  $(SPEC).in booth-rpmlintrc \
-			  .version build-aux/git-version-gen
+			  .version build-aux/git-version-gen build-aux/PKG_CHECK_VAR.m4
 
 AUTOMAKE_OPTIONS	= foreign
 
