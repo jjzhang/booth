@@ -64,26 +64,55 @@ static int ticket_realloc(void)
 
 static void hostname_to_ip(char * hostname)
 {
-	struct hostent *he;
-	struct in_addr **addr_list;
+	struct addrinfo hints;
+	struct addrinfo *result, *rp;
+	int res;
+	int addr_found = 0;
+	const char *ntop_res;
 
-	if ((he = gethostbyname(hostname)) == NULL) {
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+
+	res = getaddrinfo(hostname, NULL, &hints, &result);
+
+	if (res != 0) {
 		log_error("can't find IP for the host \"%s\"", hostname);
 		return;
 	}
 
-	addr_list = (struct in_addr **) he->h_addr_list;
+	/* Return the first found AF_INET or AF_INET6 address */
+	for (rp = result; rp && !addr_found; rp = rp->ai_next) {
+		if (rp->ai_family != AF_INET && rp->ai_family != AF_INET6) {
+			continue ;
+		}
 
-	/* Return the first found address */
-	if (addr_list[0] != NULL) {
-		strncpy(hostname, inet_ntoa(*addr_list[0]), BOOTH_NAME_LEN - 1);
-		/* buffer overflow will not happen (IPv6 notation < 63 chars),
-		   but suppress the warnings */
-		hostname[BOOTH_NAME_LEN - 1] = '\0';
+		switch (rp->ai_family) {
+		case AF_INET:
+			ntop_res = inet_ntop(rp->ai_family,
+			    &((struct sockaddr_in *)(rp->ai_addr))->sin_addr,
+			    hostname, BOOTH_NAME_LEN - 1);
+			break;
+		case AF_INET6:
+			ntop_res = inet_ntop(rp->ai_family,
+			    &((struct sockaddr_in6 *)(rp->ai_addr))->sin6_addr,
+			    hostname, BOOTH_NAME_LEN - 1);
+			break;
+		}
+
+		if (ntop_res) {
+			/* buffer overflow will not happen (IPv6 notation < 63 chars),
+			   but suppress the warnings */
+			hostname[BOOTH_NAME_LEN - 1] = '\0';
+			addr_found = 1;
+		}
 	}
-	else {
+
+	if (!addr_found) {
 		log_error("no IP addresses found for the host \"%s\"", hostname);
 	}
+
+	freeaddrinfo(result);
 }
 
 static int add_site(char *addr_string, int type)
