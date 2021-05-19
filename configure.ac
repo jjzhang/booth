@@ -153,7 +153,7 @@ AC_FUNC_SELECT_ARGTYPES
 AC_TYPE_SIGNAL
 AC_FUNC_VPRINTF
 AC_CHECK_FUNCS([alarm alphasort atexit bzero dup2 endgrent endpwent fcntl \
-		getcwd getpeerucred getpeereid gettimeofday inet_ntoa memmove \
+		getcwd getpeerucred getpeereid gettimeofday memmove \
 		memset mkdir scandir select socket strcasecmp strchr strdup \
 		strerror strrchr strspn strstr \
 		sched_get_priority_max sched_setscheduler])
