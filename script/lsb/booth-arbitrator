@@ -57,7 +57,7 @@ check_status() {
 }
 
 status() {
-	echo -n "BOOTH daemon is "
+	printf "BOOTH daemon is "
 	if check_status; then
 		# shellcheck disable=SC2154
 		echo "running - PID $booth_lockpid for $booth_cfg_name, $booth_addr_string:$booth_port"
@@ -79,7 +79,7 @@ start() {
 		return 0
 		;;
 	$BOOTH_ERROR_GENERIC|$BOOTH_DAEMON_NOT_RUNNING)
-		echo -n $"Starting BOOTH arbitrator daemon: "
+		printf "Starting BOOTH arbitrator daemon: "
 		startproc $exec start "${cnf:+-c$cnf}"
 		rc_status -v
 		;;
@@ -102,7 +102,7 @@ stop() {
 	*) return 1;;
 	esac
 
-	echo -n $"Stopping BOOTH arbitrator daemon: "
+	printf "Stopping BOOTH arbitrator daemon: "
 #	$exec stop "${cnf:+-c$cnf}"
 #	sleep 1
 	pkill -TERM -s $booth_lockpid boothd
@@ -163,7 +163,7 @@ try-restart)
 	foreach condrestart
 	;;
 *)
-	echo $"Usage: $0 {start|stop|restart|try-restart|condrestart|reload|force-reload|status}"
+	echo "Usage: $0 {start|stop|restart|try-restart|condrestart|reload|force-reload|status}"
 	exit 2
 	;;
 esac
