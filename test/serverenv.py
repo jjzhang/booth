@@ -133,8 +133,14 @@ ticket="ticketB"
         start = time.time()
         wait = 0.1
         while True:
-            if must_exist and os.path.exists(lock_file) and os.path.getsize(lock_file) > 0:
-                return True
+            if must_exist and os.path.exists(lock_file):
+                # Lock file must contain single line
+                l = open(lock_file)
+                lines = l.readlines()
+                l.close()
+
+                if len(lines) == 1:
+                    return True
             if not must_exist and not os.path.exists(lock_file):
                 return True
             elapsed = time.time() - start
