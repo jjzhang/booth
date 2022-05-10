@@ -376,6 +376,10 @@ By default all tickets are automatic (that is, they are fully
 controlled by Raft algorithm). Assign the strings "manual" or
 "MANUAL" to define the ticket as manually controlled.
 
+*'debug'*::
+	Specifies the debug output level. Alternative to
+	command line argument. Effective only for 'daemon'
+	mode of operation.
 
 One example of a booth configuration file:
 
