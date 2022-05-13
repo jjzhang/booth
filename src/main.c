@@ -109,6 +109,14 @@ int poll_timeout;
 struct booth_config *booth_conf;
 struct command_line cl;
 
+/*
+ * Global signal handlers variables
+ */
+static int sig_exit_handler_called = 0;
+static int sig_exit_handler_sig = 0;
+static int sig_usr1_handler_called = 0;
+static int sig_chld_handler_called = 0;
+
 static void client_alloc(void)
 {
 	int i;
@@ -480,6 +488,24 @@ static int write_daemon_state(int fd, int state)
 	return 0;
 }
 
+static int process_signals(void)
+{
+	if (sig_exit_handler_called) {
+		log_info("caught signal %d", sig_exit_handler_sig);
+		return 1;
+	}
+	if (sig_usr1_handler_called) {
+		sig_usr1_handler_called = 0;
+		tickets_log_info();
+	}
+	if (sig_chld_handler_called) {
+		sig_chld_handler_called = 0;
+		wait_child(SIGCHLD);
+	}
+
+	return 0;
+}
+
 static int loop(int fd)
 {
 	void (*workfn) (int ci);
@@ -532,6 +558,10 @@ static int loop(int fd)
 		}
 
 		process_tickets();
+
+		if (process_signals() != 0) {
+			return 0;
+		}
 	}
 
 	return 0;
@@ -1418,8 +1448,18 @@ static void server_exit(void)
 
 static void sig_exit_handler(int sig)
 {
-	log_info("caught signal %d", sig);
-	exit(0);
+	sig_exit_handler_sig = sig;
+	sig_exit_handler_called = 1;
+}
+
+static void sig_usr1_handler(int sig)
+{
+	sig_usr1_handler_called = 1;
+}
+
+static void sig_chld_handler(int sig)
+{
+	sig_chld_handler_called = 1;
 }
 
 static int do_server(int type)
@@ -1446,7 +1486,7 @@ static int do_server(int type)
 	/*
 	 * Register signal and exit handler
 	 */
-	signal(SIGUSR1, (__sighandler_t)tickets_log_info);
+	signal(SIGUSR1, (__sighandler_t)sig_usr1_handler);
 	signal(SIGTERM, (__sighandler_t)sig_exit_handler);
 	signal(SIGINT, (__sighandler_t)sig_exit_handler);
 	/* we'll handle errors there and then */
@@ -1497,7 +1537,7 @@ static int do_server(int type)
 	}
 #endif
 
-	signal(SIGCHLD, (__sighandler_t)wait_child);
+	signal(SIGCHLD, (__sighandler_t)sig_chld_handler);
 	rv = loop(lock_fd);
 
 	return rv;

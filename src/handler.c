@@ -155,7 +155,6 @@ void wait_child(int sig)
 static void ignore_rest(int sig)
 {
 	signal(SIGTERM, SIG_IGN);
-	log_info("external programs handler caught TERM, ignoring status of external test programs");
 	ignore_status = 1;
 	if (curr_pid > 0) {
 		(void)kill(curr_pid, SIGTERM);
@@ -230,6 +229,14 @@ process_ext_dir(struct ticket_config *tk)
 				rv = test_exit_status(tk, prog, status, 1);
 				if (rv)
 					_exit(rv);
+			} else {
+				/*
+				 * To make ignore_rest function signal safe log_info
+				 * must be removed from signal function. Information
+				 * about signal delivery is important so put it here.
+				 */
+				log_info("external programs handler caught TERM, ignoring "
+				    "status of external test programs");
 			}
 		}
 	}
