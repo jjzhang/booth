@@ -80,7 +80,7 @@ BuildRequires:  libgcrypt-devel
 %if 0%{?fedora} || 0%{?centos} || 0%{?rhel}
 BuildRequires:  pacemaker-libs-devel
 %else
-BuildRequires:  libpacemaker-devel
+BuildRequires:  libpacemaker3-devel
 %endif
 %if 0%{?with_glue}
 %if 0%{?fedora} || 0%{?centos} || 0%{?rhel}
